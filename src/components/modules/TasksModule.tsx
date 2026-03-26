@@ -26,6 +26,7 @@ import {
   TaskPriority,
   TimeFilter,
   IncidenciaStatus,
+  Department,
 } from '@/types';
 import {
   cn,
@@ -48,6 +49,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
@@ -72,8 +80,14 @@ export default function TasksModule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
-  // Filtrar tareas por tab y tiempo (para contadores)
+  // Todos los departamentos del enum
+  const allDepartments = useMemo(() => {
+    return Object.values(Department).sort();
+  }, []);
+
+  // Filtrar tareas por tab, tiempo y departamento (para contadores)
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
 
@@ -82,6 +96,9 @@ export default function TasksModule() {
       result = result.filter((t) => t.assignedTo.includes(user.id));
     } else if (mainTab === 'my-department' && user) {
       result = result.filter((t) => t.department === user.department);
+    } else if (mainTab === 'all' && selectedDepartment !== 'all') {
+      // Filtrar por departamento seleccionado en pestaña "Todas"
+      result = result.filter((t) => t.department === selectedDepartment);
     }
 
     // Filtrar por tiempo
@@ -108,7 +125,7 @@ export default function TasksModule() {
     }
 
     return result;
-  }, [tasks, mainTab, user, timeFilter]);
+  }, [tasks, mainTab, user, timeFilter, selectedDepartment]);
 
   // Calcular contadores basados en tareas filtradas por tab y tiempo
   const filteredTaskCounts = useMemo(() => {
@@ -351,6 +368,28 @@ export default function TasksModule() {
             Incidencias
           </button>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════════════════
+            DEPARTMENT FILTER (solo en pestaña "Todas")
+            ═══════════════════════════════════════════════════════════════════ */}
+        {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-[#86868B]">Departamento:</span>
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]">
+                <SelectValue placeholder="Seleccionar departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los departamentos</SelectItem>
+                {allDepartments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════════════
             TIME FILTERS
