@@ -62,7 +62,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { tasks, incidencias, getTaskCounts, getIncidenciaCounts } = useTasks();
+  const { tasks, incidencias, getIncidenciaCounts } = useTasks();
 
   // Estados
   const [mainTab, setMainTab] = useState<MainTab>('my-tasks');
@@ -73,12 +73,8 @@ export default function TasksModule() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
 
-  // Contadores
-  const taskCounts = getTaskCounts();
-  const incidenciaCounts = getIncidenciaCounts();
-
-  // Filtrar tareas según tab y filtros
-  const filteredTasks = useMemo(() => {
+  // Filtrar tareas por tab y tiempo (para contadores)
+  const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
 
     // Filtrar por tab principal
@@ -111,6 +107,54 @@ export default function TasksModule() {
         break;
     }
 
+    return result;
+  }, [tasks, mainTab, user, timeFilter]);
+
+  // Calcular contadores basados en tareas filtradas por tab y tiempo
+  const filteredTaskCounts = useMemo(() => {
+    const counts = {
+      total: tasksByTabAndTime.length,
+      pending: 0,
+      inProgress: 0,
+      completed: 0,
+      verified: 0,
+      blocked: 0,
+      overdue: 0,
+    };
+
+    tasksByTabAndTime.forEach((task) => {
+      switch (task.status) {
+        case TaskStatus.PENDING:
+          counts.pending++;
+          break;
+        case TaskStatus.IN_PROGRESS:
+          counts.inProgress++;
+          break;
+        case TaskStatus.COMPLETED:
+          counts.completed++;
+          break;
+        case TaskStatus.VERIFIED:
+          counts.verified++;
+          break;
+        case TaskStatus.BLOCKED:
+          counts.blocked++;
+          break;
+        case TaskStatus.OVERDUE:
+          counts.overdue++;
+          break;
+      }
+    });
+
+    return counts;
+  }, [tasksByTabAndTime]);
+
+  // Contadores de incidencias (sin cambios)
+  const incidenciaCounts = getIncidenciaCounts();
+
+  // Filtrar tareas por estado y búsqueda (para mostrar)
+  const filteredTasks = useMemo(() => {
+    let result = [...tasksByTabAndTime];
+
     // Filtrar por estado
     if (statusFilter !== 'all') {
       result = result.filter((t) => t.status === statusFilter);
@@ -142,7 +186,7 @@ export default function TasksModule() {
     });
 
     return result;
-  }, [tasks, mainTab, user, timeFilter, statusFilter, searchQuery]);
+  }, [tasksByTabAndTime, statusFilter, searchQuery]);
 
   // Filtrar incidencias
   const filteredIncidencias = useMemo(() => {
@@ -375,7 +419,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.total}</span>
+                <span className="font-semibold">{filteredTaskCounts.total}</span>
                 <span>Todas</span>
               </button>
               <button
@@ -387,7 +431,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.pending}</span>
+                <span className="font-semibold">{filteredTaskCounts.pending}</span>
                 <span>Pendientes</span>
               </button>
               <button
@@ -399,7 +443,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.inProgress}</span>
+                <span className="font-semibold">{filteredTaskCounts.inProgress}</span>
                 <span>En Progreso</span>
               </button>
               <button
@@ -411,7 +455,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.completed}</span>
+                <span className="font-semibold">{filteredTaskCounts.completed}</span>
                 <span>Completadas</span>
               </button>
               <button
@@ -423,7 +467,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.verified}</span>
+                <span className="font-semibold">{filteredTaskCounts.verified}</span>
                 <span>Verificadas</span>
               </button>
               <button
@@ -435,7 +479,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.blocked}</span>
+                <span className="font-semibold">{filteredTaskCounts.blocked}</span>
                 <span>Bloqueadas</span>
               </button>
               <button
@@ -447,7 +491,7 @@ export default function TasksModule() {
                     : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
                 )}
               >
-                <span className="font-semibold">{taskCounts.overdue}</span>
+                <span className="font-semibold">{filteredTaskCounts.overdue}</span>
                 <span>Atrasadas</span>
               </button>
             </>
