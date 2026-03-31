@@ -14,12 +14,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
 import {
   Task, TaskStatus, TaskPriority, TaskType, TimeFilter,
-  IncidenciaStatus, Department, Role, Incidencia,
+  IncidenciaStatus, Department, Role, Incidencia, TaskRecurrence,
 } from '@/types';
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
   getIncidenciaStatusColor, getIncidenciaStatusLabel,
-  formatDateShort, formatRelativeTime, getInitials, generateId,
+  formatDateShort, formatRelativeTime, formatHistoryDateTime, getInitials, generateId,
 } from '@/lib/utils';
 import { users } from '@/data/users';
 import { shifts } from '@/data/shifts';
@@ -70,6 +70,7 @@ export default function TasksModule() {
     requiresPhoto: false, subtasks: [] as { id: string; title: string; completed: boolean }[],
     selectedShifts: [] as string[], supportDepartment: '' as Department | '',
     supportUsers: [] as string[],
+    recurrence: TaskRecurrence.NONE,
   });
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
@@ -100,6 +101,7 @@ export default function TasksModule() {
       priority: TaskPriority.MEDIUM, startDate: new Date().toISOString().split('T')[0],
       startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [],
       requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
+      recurrence: TaskRecurrence.NONE,
     });
     setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
@@ -197,7 +199,8 @@ export default function TasksModule() {
                 <Plus className="w-4 h-4" />Tarea Extra
               </Button>
             )}
-            {hasPermission('canCreateSpecificTask') && (
+            {/* Solo DIRECTOR_GENERAL puede crear tareas específicas */}
+            {user?.role === Role.DIRECTOR_GENERAL && (
               <Button onClick={() => handleOpenModal('specific')} variant="outline" className="rounded-lg gap-2 border-corporate text-corporate hover:bg-corporate/5">
                 <Target className="w-4 h-4" />Tarea Específica
               </Button>
@@ -301,13 +304,16 @@ export default function TasksModule() {
         </div>
 
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className={createType === 'incidencia' ? 'text-red-500' : ''}>
-                {createType === 'extra' ? 'Nueva Tarea Extra' : createType === 'specific' ? 'Nueva Tarea Específica' : 'Nueva Incidencia'}
-              </DialogTitle>
-            </DialogHeader>
+          <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 overflow-hidden">
+            <div className="p-6 border-b">
+              <DialogHeader>
+                <DialogTitle className={createType === 'incidencia' ? 'text-red-500' : ''}>
+                  {createType === 'extra' ? 'Nueva Tarea Extra' : createType === 'specific' ? 'Nueva Tarea Específica' : 'Nueva Incidencia'}
+                </DialogTitle>
+              </DialogHeader>
+            </div>
 
+            <div className="overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
             {createType === 'incidencia' ? (
               <div className="space-y-4 py-4">
                 <div className="space-y-2"><Label>Título *</Label><Input placeholder="Resumen de la incidencia" value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} /></div>
@@ -322,8 +328,9 @@ export default function TasksModule() {
                 </div>
               </div>
             ) : (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }); } setIsCreateModalOpen(false); }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }); } setIsCreateModalOpen(false); }} />
             )}
+            </div>
           </DialogContent>
         </Dialog>
       </div>
@@ -333,7 +340,7 @@ export default function TasksModule() {
 
 interface TaskFormModalProps {
   createType: 'extra' | 'specific';
-  taskForm: { title: string; description: string; department: Department; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: Department | ''; supportUsers: string[]; };
+  taskForm: { title: string; description: string; department: Department; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: Department | ''; supportUsers: string[]; recurrence: TaskRecurrence; };
   setTaskForm: React.Dispatch<React.SetStateAction<TaskFormModalProps['taskForm']>>;
   newSubtaskTitle: string;
   setNewSubtaskTitle: React.Dispatch<React.SetStateAction<string>>;
@@ -356,21 +363,230 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
 
   const usersByDepartment = useMemo(() => users.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId), [taskForm.department, currentUserId]);
 
+  // Opciones de recurrencia para tareas específicas
+  const recurrenceOptions = [
+    { value: TaskRecurrence.DAILY, label: 'Diaria' },
+    { value: TaskRecurrence.WEEKLY, label: 'Semanal' },
+    { value: TaskRecurrence.MONTHLY, label: 'Mensual' },
+    { value: TaskRecurrence.YEARLY, label: 'Anual' },
+  ];
+
   return (
-    <div className="space-y-4 py-4 max-h-[70vh] overflow-y-auto pr-2">
-      <div className="space-y-2"><Label>Título *</Label><Input placeholder="Nombre de la tarea" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} /></div>
-      <div className="space-y-2"><Label>Descripción</Label><Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} /></div>
-      <div className="space-y-2"><Label>Departamento</Label><select value={taskForm.department} onChange={(e) => setTaskForm({ ...taskForm, department: e.target.value as Department })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white">{allDepartments.map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}</select></div>
-      <div className="space-y-2"><Label>Prioridad</Label><div className="grid grid-cols-4 gap-2">{[{ value: TaskPriority.LOW, label: 'Baja', color: 'bg-green-500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: 'bg-blue-500' }, { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-orange-500' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: 'bg-red-500' }].map((p) => (<button key={p.value} type="button" onClick={() => setTaskForm({ ...taskForm, priority: p.value })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all', taskForm.priority === p.value ? `${p.color} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>{p.label}</button>))}</div></div>
-      <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Fecha de inicio</Label><Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} /></div><div className="space-y-2"><Label>Hora de inicio (24h)</Label><Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} /></div></div>
-      <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Tiempo estimado (minutos)</Label><Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} /><div className="text-xs text-slate-500">{Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</div></div><div className="space-y-2"><Label>Fecha límite (calculada)</Label><div className="flex items-center gap-2 bg-slate-100 rounded-md px-3 py-2 border border-slate-200"><span className="text-slate-700">{calculatedDueDate}</span><span className="text-slate-400">•</span><span className="text-slate-700">{calculatedDueTime}</span></div></div></div>
-      <div className="space-y-2"><Label>Supervisor</Label><div className="space-y-2"><button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all', taskForm.supervisor === '' ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>Sin supervisor</button>{availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (<button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between', taskForm.supervisor === supervisor.id ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}><span>{supervisor.name}</span><span className="text-xs opacity-75">{supervisor.position}</span></button>)) : <p className="text-sm text-slate-500 p-2">No hay supervisores disponibles para este departamento</p>}</div><p className="text-xs text-slate-400">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p></div>
-      <div className="space-y-2"><Label>Asignar a (Usuarios del departamento)</Label><div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">{usersByDepartment.length > 0 ? usersByDepartment.map((user) => (<label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={taskForm.assignedTo.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } else { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300" /><div className="flex-1"><div className="font-medium text-sm">{user.name}</div><div className="text-xs text-slate-500">{user.position} - {user.role.replace(/_/g, ' ')}</div></div></label>)) : <p className="text-sm text-slate-500 p-2">No hay usuarios disponibles en este departamento</p>}</div></div>
-      <div className="space-y-2"><Label>Asignar a (Turnos, responsabilidades y usuarios)</Label><div className="space-y-3 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-2">{shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').map((shift) => (<div key={shift.id} className="border-b border-slate-100 last:border-0 pb-2 last:pb-0"><div className="font-medium text-sm text-slate-700 mb-1">{shift.name} ({shift.startTime} - {shift.endTime})</div>{shift.requirements && shift.requirements.length > 0 && (<div className="space-y-2 pl-2">{shift.requirements.map((req, idx) => { const assignedUsers = shiftAssignments.filter((a) => a.shiftId === shift.id && a.role === req.role); return (<div key={idx} className="space-y-1"><div className="text-xs font-medium text-slate-500">{req.count} {req.role.replace(/_/g, ' ').toLowerCase()}:</div>{assignedUsers.length > 0 ? (<div className="space-y-1 pl-2">{assignedUsers.map((assignment) => { const user = users.find((u) => u.id === assignment.userId); const roleKey = `${shift.id}-${req.role}-${assignment.userId}`; const isSelected = taskForm.selectedShifts.includes(roleKey); return user ? (<label key={assignment.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={isSelected} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, selectedShifts: [...taskForm.selectedShifts, roleKey] }); } else { setTaskForm({ ...taskForm, selectedShifts: taskForm.selectedShifts.filter((id) => id !== roleKey) }); } }} className="w-4 h-4 rounded border-slate-300" /><span className="text-sm">{user.name} - {user.position}</span></label>) : null; })}</div>) : (<p className="text-xs text-slate-400 pl-2">Sin usuarios asignados</p>)}</div>); })}</div>)}{(!shift.requirements || shift.requirements.length === 0) && (<p className="text-xs text-slate-400 pl-2">Sin requisitos definidos</p>)}</div>))}{shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').length === 0 && (<p className="text-sm text-slate-500 p-2">No hay turnos disponibles para este departamento</p>)}</div></div>
-      <div className="space-y-2"><Label>Solicitar apoyo (Otros departamentos)</Label><select value={taskForm.supportDepartment} onChange={(e) => setTaskForm({ ...taskForm, supportDepartment: e.target.value as Department | '', supportUsers: [] })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white"><option value="">Seleccionar departamento...</option>{allDepartments.filter((d) => d !== taskForm.department).map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}</select>{taskForm.supportDepartment && (<div className="space-y-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 mt-2"><div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>{users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => (<label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer"><input type="checkbox" checked={taskForm.supportUsers.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } else { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300" /><div className="flex-1"><div className="font-medium text-sm">{user.name}</div><div className="text-xs text-slate-500">{user.position} - {user.role.replace(/_/g, ' ')}</div></div></label>))}{users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}</div>)}</div>
-      <div className="flex items-center gap-2"><input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-slate-300" /><Label htmlFor="requiresPhoto" className="cursor-pointer text-sm">Requiere foto para completar</Label></div>
-      <div className="space-y-2"><Label>Subtareas</Label><div className="flex gap-2"><Input placeholder="Nueva subtarea..." value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }} /><Button type="button" variant="outline" onClick={() => { if (newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }}><Plus className="w-4 h-4" /></Button></div>{taskForm.subtasks.length > 0 && (<div className="space-y-2 mt-2">{taskForm.subtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded"><input type="checkbox" checked={subtask.completed} onChange={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.map((s) => s.id === subtask.id ? { ...s, completed: !s.completed } : s) }); }} className="w-4 h-4" /><span className={cn('text-sm flex-1', subtask.completed && 'line-through text-slate-400')}>{subtask.title}</span><button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-red-500 hover:text-red-700 px-2">×</button></div>))}</div>)}</div>
-      <div className="flex justify-end gap-3 pt-4"><Button variant="outline" onClick={onCancel}>Cancelar</Button><Button className={createType === 'extra' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} onClick={onSubmit} disabled={!taskForm.title}>Crear Tarea</Button></div>
+    <div className="space-y-4 py-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+      {/* Título */}
+      <div className="space-y-2">
+        <Label>Título *</Label>
+        <Input placeholder="Nombre de la tarea" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
+      </div>
+
+      {/* Descripción */}
+      <div className="space-y-2">
+        <Label>Descripción</Label>
+        <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
+      </div>
+
+      {/* Departamento */}
+      <div className="space-y-2">
+        <Label>Departamento</Label>
+        <select value={taskForm.department} onChange={(e) => setTaskForm({ ...taskForm, department: e.target.value as Department })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white">
+          {allDepartments.map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}
+        </select>
+      </div>
+
+      {/* Prioridad */}
+      <div className="space-y-2">
+        <Label>Prioridad</Label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[{ value: TaskPriority.LOW, label: 'Baja', color: 'bg-green-500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: 'bg-blue-500' }, { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-orange-500' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: 'bg-red-500' }].map((p) => (
+            <button key={p.value} type="button" onClick={() => setTaskForm({ ...taskForm, priority: p.value })} className={cn('px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.priority === p.value ? `${p.color} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Recurrencia - SOLO para tareas específicas */}
+      {createType === 'specific' && (
+        <div className="space-y-2">
+          <Label>Periodicidad de repetición</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {recurrenceOptions.map((rec) => (
+              <button key={rec.value} type="button" onClick={() => setTaskForm({ ...taskForm, recurrence: rec.value })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all', taskForm.recurrence === rec.value ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                {rec.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Fecha y hora de inicio */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2 min-w-0 overflow-hidden">
+          <Label className="text-xs sm:text-sm">Fecha de inicio</Label>
+          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm" />
+        </div>
+        <div className="space-y-2 min-w-0 overflow-hidden">
+          <Label className="text-xs sm:text-sm">Hora de inicio (24h)</Label>
+          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm" />
+        </div>
+      </div>
+
+      {/* Tiempo estimado y fecha límite */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2 min-w-0">
+          <Label>Tiempo estimado (minutos)</Label>
+          <Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} className="w-full" />
+          <div className="text-xs text-slate-500">{Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</div>
+        </div>
+        <div className="space-y-2 min-w-0">
+          <Label>Fecha límite (calculada)</Label>
+          <div className="flex items-center gap-2 bg-slate-100 rounded-md px-3 py-2 border border-slate-200 overflow-hidden">
+            <span className="text-slate-700 text-sm truncate">{calculatedDueDate}</span>
+            <span className="text-slate-400 flex-shrink-0">•</span>
+            <span className="text-slate-700 text-sm flex-shrink-0">{calculatedDueTime}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Supervisor */}
+      <div className="space-y-2">
+        <Label>Supervisor</Label>
+        <div className="space-y-2">
+          <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all', taskForm.supervisor === '' ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            Sin supervisor
+          </button>
+          {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
+            <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', taskForm.supervisor === supervisor.id ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              <span className="truncate">{supervisor.name}</span>
+              <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{supervisor.position}</span>
+            </button>
+          )) : <p className="text-sm text-slate-500 p-2">No hay supervisores disponibles para este departamento</p>}
+        </div>
+        <p className="text-xs text-slate-400">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p>
+      </div>
+
+      {/* Asignación a usuarios - SOLO para tareas EXTRA */}
+      {createType === 'extra' && (
+        <div className="space-y-2">
+          <Label>Asignar a (Usuarios del departamento)</Label>
+          <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
+            {usersByDepartment.length > 0 ? usersByDepartment.map((user) => (
+              <label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
+                <input type="checkbox" checked={taskForm.assignedTo.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } else { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">{user.name}</div>
+                  <div className="text-xs text-slate-500 truncate">{user.position} - {user.role.replace(/_/g, ' ')}</div>
+                </div>
+              </label>
+            )) : <p className="text-sm text-slate-500 p-2">No hay usuarios disponibles en este departamento</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Asignación a turnos - Para AMBOS tipos de tarea */}
+      <div className="space-y-2">
+        <Label>Asignar a (Turnos del departamento)</Label>
+        <div className="space-y-3 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-2">
+          {shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').map((shift) => (
+            <div key={shift.id} className="border-b border-slate-100 last:border-0 pb-2 last:pb-0 overflow-hidden">
+              <div className="font-medium text-sm text-slate-700 mb-1 truncate">{shift.name} ({shift.startTime} - {shift.endTime})</div>
+              {shift.requirements && shift.requirements.length > 0 && (
+                <div className="space-y-2 pl-2">
+                  {shift.requirements.map((req, idx) => {
+                    const assignedUsers = shiftAssignments.filter((a) => a.shiftId === shift.id && a.role === req.role);
+                    return (
+                      <div key={idx} className="space-y-1">
+                        <div className="text-xs font-medium text-slate-500 truncate">{req.count} {req.role.replace(/_/g, ' ').toLowerCase()}:</div>
+                        {assignedUsers.length > 0 ? (
+                          <div className="space-y-1 pl-2">
+                            {assignedUsers.map((assignment) => {
+                              const user = users.find((u) => u.id === assignment.userId);
+                              const roleKey = `${shift.id}-${req.role}-${assignment.userId}`;
+                              const isSelected = taskForm.selectedShifts.includes(roleKey);
+                              return user ? (
+                                <label key={assignment.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
+                                  <input type="checkbox" checked={isSelected} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, selectedShifts: [...taskForm.selectedShifts, roleKey] }); } else { setTaskForm({ ...taskForm, selectedShifts: taskForm.selectedShifts.filter((id) => id !== roleKey) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
+                                  <span className="text-sm truncate">{user.name} - {user.position}</span>
+                                </label>
+                              ) : null;
+                            })}
+                          </div>
+                        ) : (<p className="text-xs text-slate-400 pl-2">Sin usuarios asignados</p>)}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {(!shift.requirements || shift.requirements.length === 0) && (<p className="text-xs text-slate-400 pl-2">Sin requisitos definidos</p>)}
+            </div>
+          ))}
+          {shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').length === 0 && (
+            <p className="text-sm text-slate-500 p-2">No hay turnos disponibles para este departamento</p>
+          )}
+        </div>
+      </div>
+
+      {/* Apoyo de otros departamentos - SOLO para tareas EXTRA */}
+      {createType === 'extra' && (
+        <div className="space-y-2">
+          <Label>Solicitar apoyo (Otros departamentos)</Label>
+          <select value={taskForm.supportDepartment} onChange={(e) => setTaskForm({ ...taskForm, supportDepartment: e.target.value as Department | '', supportUsers: [] })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white">
+            <option value="">Seleccionar departamento...</option>
+            {allDepartments.filter((d) => d !== taskForm.department).map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}
+          </select>
+          {taskForm.supportDepartment && (
+            <div className="space-y-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 mt-2">
+              <div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>
+              {users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => (
+                <label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
+                  <input type="checkbox" checked={taskForm.supportUsers.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } else { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-sm truncate">{user.name}</div>
+                    <div className="text-xs text-slate-500 truncate">{user.position} - {user.role.replace(/_/g, ' ')}</div>
+                  </div>
+                </label>
+              ))}
+              {users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Requiere foto */}
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-slate-300" />
+        <Label htmlFor="requiresPhoto" className="cursor-pointer text-sm">Requiere foto para completar</Label>
+      </div>
+
+      {/* Subtareas */}
+      <div className="space-y-2">
+        <Label>Subtareas</Label>
+        <div className="flex gap-2">
+          <Input placeholder="Nueva subtarea..." value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }} />
+          <Button type="button" variant="outline" onClick={() => { if (newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }}>
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+        {taskForm.subtasks.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {taskForm.subtasks.map((subtask) => (
+              <div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
+                <input type="checkbox" checked={subtask.completed} onChange={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.map((s) => s.id === subtask.id ? { ...s, completed: !s.completed } : s) }); }} className="w-4 h-4" />
+                <span className={cn('text-sm flex-1', subtask.completed && 'line-through text-slate-400')}>{subtask.title}</span>
+                <button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-red-500 hover:text-red-700 px-2">×</button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Botones de acción */}
+      <div className="flex justify-end gap-3 pt-4">
+        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+        <Button className={createType === 'extra' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} onClick={onSubmit} disabled={!taskForm.title}>
+          Crear Tarea
+        </Button>
+      </div>
     </div>
   );
 }
@@ -393,11 +609,13 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showUnblockModal, setShowUnblockModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [unblockReason, setUnblockReason] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [localSubtasks, setLocalSubtasks] = useState(task.subtasks);
+  const [localPhotos, setLocalPhotos] = useState(task.photos);
   const statusColor = getStatusColor(task.status);
   const priorityColor = getPriorityColor(task.priority);
   
@@ -410,6 +628,10 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const canComplete = currentUserId && task.assignedTo.includes(currentUserId);
   const canVerify = currentUserId && (task.supervisorId === currentUserId || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
   const toggleSubtask = (subtaskId: string) => { setLocalSubtasks((prev) => prev.map((s) => (s.id === subtaskId ? { ...s, completed: !s.completed } : s))); };
+  
+  const handleAddPhoto = (photoUrl: string) => {
+    setLocalPhotos([...localPhotos, photoUrl]);
+  };
 
   return (
     <div className={cn('bg-white rounded-xl border border-[#E5E5E7] overflow-hidden transition-all', expanded && 'shadow-lg')}>
@@ -432,7 +654,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               })}
               {task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
             </div>
-            <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span>{formatDateShort(task.dueDate)}</span>{task.dueTime && <span>• {task.dueTime}</span>}{task.status === TaskStatus.OVERDUE && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1">ATRASADA</Badge>)}</div>
+            <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span>{formatDateShort(task.dueDate)}</span><span>•</span><span>{task.dueTime || '23:59'}</span>{task.status === TaskStatus.OVERDUE && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1">ATRASADA</Badge>)}</div>
             {task.subtasks.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
             {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos.length}</span></div>)}
           </div>
@@ -454,18 +676,40 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
             <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{task.description || 'Sin descripción'}</p></div>
             {localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
-            <div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Fotos</h5>{task.photos.length > 0 ? (<div className="flex flex-wrap gap-2">{task.photos.map((photo, idx) => (<div key={idx} className="w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">{photo.startsWith('http') ? <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" /> : <Camera className="w-6 h-6 text-[#86868B]" />}</div>))}</div>) : <p className="text-sm text-[#86868B]">No hay fotos</p>}</div>
-            {task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}</div><span className="text-xs whitespace-nowrap">{formatRelativeTime(h.performedAt)}</span></div>))}</div></div>)}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos</h5>
+                {task.requiresPhoto && canComplete && (
+                  <Button size="sm" variant="outline" onClick={() => setShowPhotoModal(true)} className="gap-1">
+                    <Camera className="w-3.5 h-3.5" />Agregar foto
+                  </Button>
+                )}
+              </div>
+              {localPhotos.length > 0 ? (
+                <div className="flex flex-wrap gap-2">{localPhotos.map((photo, idx) => (<div key={idx} className="w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">{photo.startsWith('http') ? <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" /> : <Camera className="w-6 h-6 text-[#86868B]" />}</div>))}</div>
+              ) : <p className="text-sm text-[#86868B]">No hay fotos</p>}
+            </div>
+            {task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = users.find((u) => u.id === h.performedBy); return (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performer?.name || h.performedBy} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
             <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
-              <div className="flex items-center justify-between"><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5><button onClick={() => setShowNoteInput(!showNoteInput)} className="text-xs text-blue-600 hover:text-blue-700">{showNoteInput ? 'Cancelar' : 'Agregar nota'}</button></div>
-              {showNoteInput && (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1 text-sm" /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button></div>)}
-              <div className="space-y-2 max-h-40 overflow-y-auto">{task.notes.length > 0 ? (task.notes.map((note) => { const noteAuthor = users.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3 text-sm"><p className="text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><p className="text-xs text-[#86868B] mt-1">{noteAuthor?.name || note.createdBy} • {formatRelativeTime(note.createdAt)}</p></div>); })) : (<p className="text-sm text-[#86868B] italic">No hay notas</p>)}</div>
+              <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
+              {task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = users.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
+              {currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}
             </div>
           </div>
 
           <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
             {task.status === TaskStatus.PENDING && canComplete && (<Button size="sm" className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.IN_PROGRESS)}>En Progreso</Button>)}
-            {task.status === TaskStatus.IN_PROGRESS && canComplete && (<Button size="sm" className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => setShowCompleteConfirm(true)}>Completar</Button>)}
+            {task.status === TaskStatus.IN_PROGRESS && canComplete && (
+              <>
+                {task.requiresPhoto && localPhotos.length === 0 ? (
+                  <Button size="sm" variant="outline" className="border-amber-500 text-amber-600" onClick={() => setShowPhotoModal(true)}>
+                    <Camera className="w-3.5 h-3.5 mr-1" />Agregar foto para completar
+                  </Button>
+                ) : (
+                  <Button size="sm" className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => setShowCompleteConfirm(true)}>Completar</Button>
+                )}
+              </>
+            )}
             {task.status === TaskStatus.COMPLETED && canVerify && (<><Button size="sm" className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.VERIFIED)}>Verificar</Button>{canReopen && (<Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button>)}</>)}
             {task.status === TaskStatus.BLOCKED && canUnblock && (<Button size="sm" className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => setShowUnblockModal(true)}>Desbloquear</Button>)}
             {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => onStatusChange?.(task.id, TaskStatus.BLOCKED, 'Tarea bloqueada por el usuario')}>Bloquear</Button>)}
@@ -474,6 +718,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
           {showCompleteConfirm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">¿Completar tarea?</h3><p className="text-sm text-slate-600 mb-4">¿Confirmas que la tarea "{task.title}" fue completada correctamente?</p><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCompleteConfirm(false)}>Cancelar</Button><Button className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => { onComplete?.(task.id); setShowCompleteConfirm(false); }}>Sí, completar</Button></div></div></div>)}
           {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Marcar como Pendiente</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual la tarea debe volver a pendiente:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { if (reopenReason.trim()) { onReopen?.(task.id); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Marcar como Pendiente</Button></div></div></div>)}
           {showUnblockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Desbloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se desbloquea la tarea:</p><textarea value={unblockReason} onChange={(e) => setUnblockReason(e.target.value)} placeholder="Escribe el motivo del desbloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowUnblockModal(false)}>Cancelar</Button><Button className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => { if (unblockReason.trim()) { onStatusChange?.(task.id, TaskStatus.PENDING, unblockReason); setShowUnblockModal(false); setUnblockReason(''); } }} disabled={!unblockReason.trim()}>Desbloquear</Button></div></div></div>)}
+          
+          {showPhotoModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Agregar Foto</h3><p className="text-sm text-slate-600 mb-4">Ingresa la URL de la foto o selecciona un archivo:</p><Input placeholder="https://ejemplo.com/foto.jpg" className="mb-4" onKeyDown={(e) => { if (e.key === 'Enter') { const value = (e.target as HTMLInputElement).value; if (value.trim()) { handleAddPhoto(value.trim()); setShowPhotoModal(false); } } }} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowPhotoModal(false)}>Cancelar</Button><Button className="bg-corporate hover:bg-corporate/90 text-white" onClick={() => { const input = document.querySelector('input[placeholder="https://ejemplo.com/foto.jpg"]') as HTMLInputElement; if (input?.value.trim()) { handleAddPhoto(input.value.trim()); setShowPhotoModal(false); input.value = ''; } }}>Agregar</Button></div></div></div>)}
         </div>
       )}
     </div>
@@ -503,19 +749,31 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   const [resolution, setResolution] = useState('');
   const [closeReason, setCloseReason] = useState('');
   const [reopenReason, setReopenReason] = useState('');
+  const [viewers, setViewers] = useState<string[]>([]);
   
   const statusColor = getIncidenciaStatusColor(incidencia.status);
   const priorityColor = getPriorityColor(incidencia.priority);
   const reporter = users.find((u) => u.id === incidencia.reportedBy);
   
+  // Verificar si el usuario actual ya vio la incidencia
+  const hasViewed = currentUserId && viewers.includes(currentUserId);
+  
+  // Registrar visualización cuando se expande
+  const handleExpand = () => {
+    if (!expanded && currentUserId && !hasViewed) {
+      setViewers([...viewers, currentUserId]);
+    }
+    setExpanded(!expanded);
+  };
+  
   const canConfirm = currentUser && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
   const canResolve = currentUser && incidencia.status === IncidenciaStatus.VERIFIED && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
-  const canClose = currentUser && incidencia.status === IncidenciaStatus.RESOLVED && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
+  const canClose = currentUser && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
 
   return (
     <>
       <div className={cn('bg-white rounded-xl border border-[#E5E5E7] overflow-hidden transition-all', expanded && 'shadow-lg')}>
-        <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
+        <button onClick={handleExpand} className="w-full p-4 flex items-start gap-3 text-left">
           <Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs flex-shrink-0">{getPriorityLabel(incidencia.priority)}</Badge>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
@@ -543,13 +801,33 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{users.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
                 {incidencia.reopenReason && (<div className="w-full bg-[#007AFF]/10 rounded-lg p-2 text-xs"><span className="text-[#007AFF] font-medium">Motivo de reapertura:</span><span className="text-[#1D1D1F] ml-1">{incidencia.reopenReason}</span></div>)}
               </div>
-              {incidencia.history.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}</div><span className="text-xs whitespace-nowrap">{formatRelativeTime(h.performedAt)}</span></div>))}</div></div>)}
+              {viewers.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <UserCircle className="w-4 h-4 text-[#86868B]" />
+                    <h5 className="text-sm font-medium text-[#1D1D1F]">Visualizado por</h5>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {viewers.map((viewerId) => {
+                      const viewer = users.find((u) => u.id === viewerId);
+                      return viewer ? (
+                        <span key={viewerId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                          {viewer.name}
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+              {incidencia.history.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = users.find((u) => u.id === h.performedBy); return (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performer?.name || h.performedBy} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
               <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes.length > 0 ? (<div className="space-y-2">{incidencia.notes.map((note) => { const noteAuthor = users.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
             <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
               {(incidencia.status === IncidenciaStatus.NEW || incidencia.status === IncidenciaStatus.OPEN || incidencia.status === IncidenciaStatus.REOPENED) && canConfirm && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}
               {incidencia.status === IncidenciaStatus.VERIFIED && canResolve && (<Button size="sm" onClick={() => setShowResolveModal(true)} className="bg-[#34C759] hover:bg-[#34C759]/90 text-white gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Resolver</Button>)}
-              {incidencia.status === IncidenciaStatus.RESOLVED && canClose && (<Button size="sm" onClick={() => setShowCloseModal(true)} className="bg-[#8E8E93] hover:bg-[#8E8E93]/90 text-white gap-1"><Lock className="w-3.5 h-3.5" />Cerrar</Button>)}
+              {/* Botón Cerrar disponible desde el inicio para supervisores+ */}
+              {canClose && incidencia.status !== IncidenciaStatus.CLOSED && (<Button size="sm" onClick={() => setShowCloseModal(true)} className="bg-[#8E8E93] hover:bg-[#8E8E93]/90 text-white gap-1"><Lock className="w-3.5 h-3.5" />Cerrar</Button>)}
               {incidencia.status !== IncidenciaStatus.NEW && incidencia.status !== IncidenciaStatus.REOPENED && (<Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)} className="gap-1 border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/5"><Unlock className="w-3.5 h-3.5" />Reabrir</Button>)}
             </div>
           </div>

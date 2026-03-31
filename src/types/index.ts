@@ -67,6 +67,14 @@ export enum TaskType {
   EXTRA = 'EXTRA',
 }
 
+export enum TaskRecurrence {
+  NONE = 'NONE',
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // INTERFACES
 // ═══════════════════════════════════════════════════════════════════
@@ -141,6 +149,7 @@ export interface Task {
   blockedBy?: string; // userId
   shiftIds?: string[]; // IDs de turnos asignados
   supportUserIds?: string[]; // IDs de usuarios de apoyo
+  recurrence?: TaskRecurrence; // Periodicidad para tareas específicas
 }
 
 export interface Incidencia {

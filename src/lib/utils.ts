@@ -92,6 +92,15 @@ export function formatDateTimeShort(date: string | Date | number): string {
 }
 
 /**
+ * Formatea fecha y hora para historial
+ * Ej: "25/03/2025 14:30 por Juan Pérez"
+ */
+export function formatHistoryDateTime(date: string | Date | number): string {
+  const d = typeof date === 'string' ? parseISO(date) : new Date(date);
+  return format(d, 'dd/MM/yyyy HH:mm', { locale: es });
+}
+
+/**
  * Formatea hora relativa
  * Ej: "Hace 2 horas"
  */
