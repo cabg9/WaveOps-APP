@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { Shift, ShiftAssignment, Department } from '@/types';
+import { Shift, ShiftAssignment, Department, AssignmentStatus, Role } from '@/types';
 import { shifts as initialShifts } from '@/data/shifts';
 import { users } from '@/data/users';
 import { generateId, addDaysToDate, format } from '@/lib/utils';
@@ -27,6 +27,9 @@ interface ShiftsContextType {
   getUsersByDepartment: (department: Department) => typeof users;
   isUserOnShift: (userId: string, date: string) => boolean;
   getUsersOnShift: (department: Department, date: string) => typeof users;
+  publishAssignments: (department: Department, weekStart: Date, publishedBy: string) => void;
+  getBorradorCount: (department: Department, weekStart: Date) => number;
+  validateDayRequirements: (department: Department, date: string) => { isValid: boolean; errors: string[] };
 }
 
 const ShiftsContext = createContext<ShiftsContextType | undefined>(undefined);
@@ -39,7 +42,7 @@ interface ShiftsProviderProps {
   children: React.ReactNode;
 }
 
-// Generar asignaciones iniciales de ejemplo
+// Generar asignaciones iniciales de ejemplo (PUBLICADAS)
 const generateInitialAssignments = (): ShiftAssignment[] => {
   const assignments: ShiftAssignment[] = [];
   const today = new Date();
@@ -56,6 +59,9 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
       userId: '16', // Carlos
       role: 'STAFF',
       date: dateStr,
+      status: AssignmentStatus.PUBLICADO,
+      publishedAt: new Date().toISOString(),
+      publishedBy: '1',
     });
     
     assignments.push({
@@ -64,6 +70,9 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
       userId: '17', // Maria
       role: 'STAFF',
       date: dateStr,
+      status: AssignmentStatus.PUBLICADO,
+      publishedAt: new Date().toISOString(),
+      publishedBy: '1',
     });
     
     // Warehouse
@@ -73,6 +82,9 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
       userId: '32', // Victor
       role: 'STAFF',
       date: dateStr,
+      status: AssignmentStatus.PUBLICADO,
+      publishedAt: new Date().toISOString(),
+      publishedBy: '1',
     });
     
     // Guianza
@@ -82,6 +94,9 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
       userId: '20', // Fernando
       role: 'STAFF',
       date: dateStr,
+      status: AssignmentStatus.PUBLICADO,
+      publishedAt: new Date().toISOString(),
+      publishedBy: '1',
     });
     
     assignments.push({
@@ -90,6 +105,9 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
       userId: '21', // Isabel
       role: 'STAFF',
       date: dateStr,
+      status: AssignmentStatus.PUBLICADO,
+      publishedAt: new Date().toISOString(),
+      publishedBy: '1',
     });
   }
   
@@ -169,7 +187,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   );
 
   // ═══════════════════════════════════════════════════════════════════
-  // ASSIGN SHIFT
+  // ASSIGN SHIFT (crea como BORRADOR)
   // ═══════════════════════════════════════════════════════════════════
 
   const assignShift = useCallback(
@@ -189,6 +207,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
         userId,
         role,
         date,
+        status: AssignmentStatus.BORRADOR, // Nuevas asignaciones son borrador
       };
       
       setAssignments(prev => [...prev, newAssignment]);
@@ -198,10 +217,26 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
   // ═══════════════════════════════════════════════════════════════════
   // REMOVE SHIFT
+  // - Si está PUBLICADO → marca como ELIMINADO (para publicar el cambio)
+  // - Si está BORRADOR → elimina permanentemente
   // ═══════════════════════════════════════════════════════════════════
 
   const removeShift = useCallback((assignmentId: string): void => {
-    setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+    setAssignments(prev => {
+      const assignment = prev.find(a => a.id === assignmentId);
+      
+      if (assignment?.status === AssignmentStatus.PUBLICADO) {
+        // Marcar como eliminado (se borrará al publicar)
+        return prev.map(a => 
+          a.id === assignmentId 
+            ? { ...a, status: AssignmentStatus.ELIMINADO }
+            : a
+        );
+      } else {
+        // Borrador o ya eliminado → eliminar permanentemente
+        return prev.filter(a => a.id !== assignmentId);
+      }
+    });
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -267,6 +302,159 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   );
 
   // ═══════════════════════════════════════════════════════════════════
+  // PUBLISH ASSIGNMENTS
+  // - Cambia BORRADOR a PUBLICADO
+  // - Elimina permanentemente las marcadas como ELIMINADO
+  // ═══════════════════════════════════════════════════════════════════
+
+  const publishAssignments = useCallback(
+    (department: Department, weekStart: Date, publishedBy: string): void => {
+      const weekDates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = addDaysToDate(weekStart, i);
+        weekDates.push(format(date, 'yyyy-MM-dd'));
+      }
+      
+      setAssignments(prev => {
+        // Primero: eliminar las marcadas como ELIMINADO
+        const filtered = prev.filter(a => {
+          if (!weekDates.includes(a.date)) return true;
+          const user = users.find(u => u.id === a.userId);
+          if (user?.department !== department) return true;
+          return a.status !== AssignmentStatus.ELIMINADO;
+        });
+        
+        // Luego: publicar las BORRADOR
+        return filtered.map(a => {
+          if (weekDates.includes(a.date) && a.status === AssignmentStatus.BORRADOR) {
+            const user = users.find(u => u.id === a.userId);
+            if (user?.department === department) {
+              return {
+                ...a,
+                status: AssignmentStatus.PUBLICADO,
+                publishedAt: new Date().toISOString(),
+                publishedBy,
+              };
+            }
+          }
+          return a;
+        });
+      });
+    },
+    []
+  );
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GET PENDING CHANGES COUNT (contar BORRADOR + ELIMINADO)
+  // ═══════════════════════════════════════════════════════════════════
+
+  const getBorradorCount = useCallback(
+    (department: Department, weekStart: Date): number => {
+      const weekDates: string[] = [];
+      for (let i = 0; i < 7; i++) {
+        const date = addDaysToDate(weekStart, i);
+        weekDates.push(format(date, 'yyyy-MM-dd'));
+      }
+      
+      const deptUserIds = users
+        .filter(u => u.department === department && u.isActive)
+        .map(u => u.id);
+      
+      return assignments.filter(
+        a => weekDates.includes(a.date) && 
+             deptUserIds.includes(a.userId) && 
+             (a.status === AssignmentStatus.BORRADOR || a.status === AssignmentStatus.ELIMINADO)
+      ).length;
+    },
+    [assignments]
+  );
+
+  // ═══════════════════════════════════════════════════════════════════
+  // VALIDATE DEPARTMENT REQUIREMENTS
+  // ═══════════════════════════════════════════════════════════════════
+
+  const validateDayRequirements = useCallback(
+    (department: Department, date: string): { isValid: boolean; errors: string[] } => {
+      const errors: string[] = [];
+      
+      // Obtener asignaciones del día (solo PUBLICADAS para validación oficial)
+      const dayAssignments = assignments.filter(
+        a => a.date === date && a.status === AssignmentStatus.PUBLICADO
+      );
+      
+      // Obtener usuarios del departamento
+      const deptUsers = users.filter(u => u.department === department && u.isActive);
+      const deptUserIds = deptUsers.map(u => u.id);
+      
+      // Filtrar asignaciones del departamento
+      const deptAssignments = dayAssignments.filter(a => deptUserIds.includes(a.userId));
+      
+      // Verificar si hay gerente o supervisor
+      const hasManagerOrSupervisor = deptAssignments.some(a => {
+        const user = users.find(u => u.id === a.userId);
+        return user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.SUPERVISOR;
+      });
+      
+      if (!hasManagerOrSupervisor) {
+        errors.push('Se requiere al menos un Gerente de Departamento o Supervisor');
+      }
+      
+      // Validaciones específicas por departamento
+      switch (department) {
+        case Department.DIVE_SHOP:
+          // Validar requisitos específicos de Dive Shop
+          const despachoAssignments = deptAssignments.filter(a => {
+            const shift = shifts.find(s => s.id === a.shiftId);
+            return shift?.name === 'Despacho';
+          });
+          
+          if (despachoAssignments.length > 0) {
+            const hasVoluntarioA = despachoAssignments.some(a => {
+              const user = users.find(u => u.id === a.userId);
+              return user?.position?.toLowerCase().includes('voluntario') && user?.position?.toLowerCase().includes('a');
+            });
+            if (!hasVoluntarioA) {
+              errors.push('Turno Despacho: Se requiere Voluntario A');
+            }
+          }
+          break;
+          
+        case Department.WAREHOUSE:
+          // Validar requisitos de Warehouse
+          const pm1Assignments = deptAssignments.filter(a => {
+            const shift = shifts.find(s => s.id === a.shiftId);
+            return shift?.name === 'PM 1';
+          });
+          
+          if (pm1Assignments.length > 0) {
+            const hasVoluntarioA = pm1Assignments.some(a => {
+              const user = users.find(u => u.id === a.userId);
+              return user?.position?.toLowerCase().includes('voluntario') && user?.position?.toLowerCase().includes('a');
+            });
+            if (!hasVoluntarioA) {
+              errors.push('Turno PM 1: Se requiere Voluntario A');
+            }
+          }
+          break;
+          
+        case Department.VESSELS:
+          // Validar que haya al menos 1 marinero
+          const hasMarinero = deptAssignments.some(a => {
+            const user = users.find(u => u.id === a.userId);
+            return user?.position?.toLowerCase().includes('marinero');
+          });
+          if (!hasMarinero) {
+            errors.push('Se requiere al menos 1 Marinero');
+          }
+          break;
+      }
+      
+      return { isValid: errors.length === 0, errors };
+    },
+    [assignments, shifts]
+  );
+
+  // ═══════════════════════════════════════════════════════════════════
   // VALUE
   // ═══════════════════════════════════════════════════════════════════
 
@@ -285,6 +473,9 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     getUsersByDepartment,
     isUserOnShift,
     getUsersOnShift,
+    publishAssignments,
+    getBorradorCount,
+    validateDayRequirements,
   };
 
   return (

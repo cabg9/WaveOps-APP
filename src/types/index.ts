@@ -190,12 +190,35 @@ export interface ShiftRequirement {
   count: number; // Cantidad de personas necesarias con ese rol
 }
 
+export enum AssignmentStatus {
+  BORRADOR = 'BORRADOR',
+  PUBLICADO = 'PUBLICADO',
+  ELIMINADO = 'ELIMINADO', // Marcado para eliminar (aún no publicado)
+}
+
 export interface ShiftAssignment {
   id: string;
   shiftId: string;
   userId: string;
   role: string; // Rol del usuario en este turno (ej: SUPERVISOR, STAFF)
   date: string; // YYYY-MM-DD
+  status: AssignmentStatus; // BORRADOR o PUBLICADO
+  publishedAt?: string; // ISO date - cuando se publicó
+  publishedBy?: string; // userId - quién publicó
+}
+
+// Validaciones de límites por departamento
+export interface DepartmentValidation {
+  department: Department;
+  minManagerOrSupervisor: boolean; // Siempre debe haber gerente o supervisor
+  shiftRequirements: Record<string, ShiftValidationRequirement[]>; // Requisitos por turno
+  crossDepartmentManagers?: Department[]; // Gerentes de otros deptos que pueden cubrir
+}
+
+export interface ShiftValidationRequirement {
+  role: Role;
+  count: number;
+  message: string; // Mensaje de error si no se cumple
 }
 
 // ═══════════════════════════════════════════════════════════════════

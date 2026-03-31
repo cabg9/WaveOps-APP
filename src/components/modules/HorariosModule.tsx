@@ -15,16 +15,19 @@ import {
   Save,
   Send,
   GripVertical,
+  CheckCircle2,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
-import { Department, Shift, ShiftAssignment } from '@/types';
+import { Department, Shift, ShiftAssignment, AssignmentStatus } from '@/types';
 import {
   cn,
   formatWeekRange,
   addDays,
+  addDaysToDate,
+  format,
   getInitials,
 } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -509,10 +512,21 @@ function EquipoTab() {
 
 function AsignarTab() {
   const { user } = useAuth();
-  const { shifts, getShiftsByDepartment, getUsersByDepartment, assignShift, getWeekAssignments } = useShifts();
+  const { 
+    shifts, 
+    getShiftsByDepartment, 
+    getUsersByDepartment, 
+    assignShift, 
+    getWeekAssignments,
+    publishAssignments,
+    getBorradorCount,
+    removeShift,
+  } = useShifts();
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(user?.department || Department.DIVE_SHOP);
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -536,8 +550,30 @@ function AsignarTab() {
 
   const getUserAssignmentsForDay = (userId: string, date: Date): ShiftAssignment[] => {
     const dateStr = date.toISOString().split('T')[0];
-    return assignments.filter(a => a.userId === userId && a.date === dateStr);
+    // No mostrar las asignaciones marcadas como ELIMINADO
+    return assignments.filter(a => a.userId === userId && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO);
   };
+  
+  // Contar eliminaciones pendientes
+  const getPendingDeletionsCount = (department: Department, weekStart: Date): number => {
+    const weekDates: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = addDaysToDate(weekStart, i);
+      weekDates.push(format(date, 'yyyy-MM-dd'));
+    }
+    
+    const deptUserIds = users
+      .filter(u => u.department === department && u.isActive)
+      .map(u => u.id);
+    
+    return assignments.filter(
+      a => weekDates.includes(a.date) && 
+           deptUserIds.includes(a.userId) && 
+           a.status === AssignmentStatus.ELIMINADO
+    ).length;
+  };
+  
+  const pendingDeletions = getPendingDeletionsCount(selectedDepartment, weekStart);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -625,11 +661,32 @@ function AsignarTab() {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="gap-2">
+                {(getBorradorCount(selectedDepartment, weekStart) > 0 || pendingDeletions > 0) && (
+                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                    {getBorradorCount(selectedDepartment, weekStart)} cambios sin publicar
+                    {pendingDeletions > 0 && ` (${pendingDeletions} eliminaciones)`}
+                  </span>
+                )}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="gap-2"
+                  disabled={getBorradorCount(selectedDepartment, weekStart) === 0 && pendingDeletions === 0}
+                  onClick={() => {
+                    // Simular guardado (en una app real, aquí se guardaría en backend)
+                    setShowSaveSuccess(true);
+                    setTimeout(() => setShowSaveSuccess(false), 2000);
+                  }}
+                >
                   <Save className="w-4 h-4" />
-                  Guardar
+                  Guardar borrador
                 </Button>
-                <Button size="sm" className="gap-2 bg-corporate hover:bg-corporate/90">
+                <Button 
+                  size="sm" 
+                  className="gap-2 bg-corporate hover:bg-corporate/90"
+                  onClick={() => setShowPublishConfirm(true)}
+                  disabled={getBorradorCount(selectedDepartment, weekStart) === 0 && pendingDeletions === 0}
+                >
                   <Send className="w-4 h-4" />
                   Publicar
                 </Button>
@@ -682,15 +739,29 @@ function AsignarTab() {
                                 return shift ? (
                                   <div
                                     key={idx}
+                                    onDoubleClick={() => removeShift(assignment.id)}
                                     className={cn(
-                                      'px-2 py-1 rounded-lg text-xs font-medium text-center',
-                                      shift.name === 'Despacho' && 'bg-[#FFCC00]/20 text-[#FF9500]',
-                                      shift.name === 'AM' && 'bg-[#007AFF]/20 text-[#007AFF]',
-                                      shift.name === 'PM' && 'bg-[#5856D6]/20 text-[#5856D6]',
-                                      shift.name === 'Libre' && 'bg-[#8E8E93]/20 text-[#8E8E93]'
+                                      'px-2 py-1 rounded-lg text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105'
                                     )}
+                                    style={{
+                                      backgroundColor: assignment.status === AssignmentStatus.BORRADOR 
+                                        ? `${shift.color}20` // 20 = 12% opacidad en hex
+                                        : `${shift.color}30`, // 30 = 18% opacidad
+                                      color: shift.color,
+                                      border: assignment.status === AssignmentStatus.BORRADOR 
+                                        ? `2px dashed ${shift.color}` 
+                                        : 'none',
+                                      opacity: assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
+                                    }}
+                                    title={`${shift.name} (${shift.startTime}-${shift.endTime}) - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
                                   >
-                                    {shift.name}
+                                    <div>{shift.name}</div>
+                                    <div className="text-[9px] opacity-70">{shift.startTime}-{shift.endTime}</div>
+                                    {assignment.status === AssignmentStatus.BORRADOR && (
+                                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                                        <span className="text-[7px] text-white font-bold">B</span>
+                                      </span>
+                                    )}
                                   </div>
                                 ) : null;
                               })}
@@ -715,6 +786,69 @@ function AsignarTab() {
           </div>
         ) : null}
       </DragOverlay>
+
+      {/* Modal de confirmación de guardado */}
+      {showSaveSuccess && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSaveSuccess(false)}>
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 text-center" onClick={e => e.stopPropagation()}>
+            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold mb-2">¡Guardado!</h3>
+            <p className="text-sm text-slate-600">
+              Los cambios han sido guardados correctamente.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación para publicar */}
+      {showPublishConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">Publicar cambios</h3>
+            <p className="text-sm text-slate-600 mb-4">
+              Estás a punto de publicar los siguientes cambios:
+            </p>
+            
+            <div className="space-y-2 mb-4">
+              {getBorradorCount(selectedDepartment, weekStart) > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
+                  <span>{getBorradorCount(selectedDepartment, weekStart)} asignación(es) nueva(s)</span>
+                </div>
+              )}
+              {pendingDeletions > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="w-2 h-2 bg-red-400 rounded-full"></span>
+                  <span>{pendingDeletions} asignación(es) serán eliminada(s)</span>
+                </div>
+              )}
+            </div>
+            
+            <p className="text-sm text-slate-500 mb-4">
+              Una vez publicados, estos cambios serán oficiales y visibles para todo el equipo.
+            </p>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowPublishConfirm(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                className="bg-corporate hover:bg-corporate/90"
+                onClick={() => {
+                  if (user) {
+                    publishAssignments(selectedDepartment, weekStart, user.id);
+                    setShowPublishConfirm(false);
+                  }
+                }}
+              >
+                Confirmar publicación
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </DndContext>
   );
 }
@@ -734,13 +868,14 @@ function DraggableShift({ shift }: { shift: Shift }) {
       {...listeners}
       {...attributes}
       className={cn(
-        'flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all',
-        shift.name === 'Despacho' && 'bg-[#FFCC00]/20 text-[#FF9500] border border-[#FFCC00]/30',
-        shift.name === 'AM' && 'bg-[#007AFF]/20 text-[#007AFF] border border-[#007AFF]/30',
-        shift.name === 'PM' && 'bg-[#5856D6]/20 text-[#5856D6] border border-[#5856D6]/30',
-        shift.name === 'Libre' && 'bg-[#8E8E93]/20 text-[#8E8E93] border border-[#8E8E93]/30',
+        'flex items-center gap-2 px-3 py-2 rounded-lg cursor-grab active:cursor-grabbing transition-all border',
         isDragging && 'opacity-50'
       )}
+      style={{
+        backgroundColor: `${shift.color}20`, // 20 = 12% opacidad
+        color: shift.color,
+        borderColor: `${shift.color}40`, // 40 = 25% opacidad
+      }}
     >
       <GripVertical className="w-3 h-3 opacity-50" />
       <span className="text-sm font-medium">{shift.name}</span>

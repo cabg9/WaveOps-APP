@@ -2,7 +2,7 @@
 // ASIGNACIONES DE USUARIOS A TURNOS - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { ShiftAssignment } from '@/types';
+import { ShiftAssignment, AssignmentStatus } from '@/types';
 
 // Asignaciones de usuarios a turnos por departamento
 export const shiftAssignments: ShiftAssignment[] = [
@@ -11,31 +11,27 @@ export const shiftAssignments: ShiftAssignment[] = [
   // ═══════════════════════════════════════════════════════════════════
   {
     id: 'assign-ds-am-1',
-    shiftId: 'shift-ds-2', // AM
+    shiftId: 'shift-ds-am', // AM
     userId: '5', // Pedro Mendoza - Gerente de Dive Shop
     role: 'SUPERVISOR',
     date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
   {
     id: 'assign-ds-am-2',
-    shiftId: 'shift-ds-2', // AM
+    shiftId: 'shift-ds-am', // AM
     userId: '15', // Carlos Ruiz - Staff
     role: 'STAFF',
     date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
   {
     id: 'assign-ds-am-3',
-    shiftId: 'shift-ds-2', // AM
+    shiftId: 'shift-ds-am', // AM
     userId: '16', // Ana Lopez - Staff
     role: 'STAFF',
     date: '2025-01-15',
-  },
-  {
-    id: 'assign-ds-am-4',
-    shiftId: 'shift-ds-2', // AM
-    userId: '17', // Diego Flores - Staff
-    role: 'STAFF',
-    date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -43,45 +39,27 @@ export const shiftAssignments: ShiftAssignment[] = [
   // ═══════════════════════════════════════════════════════════════════
   {
     id: 'assign-ds-pm-1',
-    shiftId: 'shift-ds-3', // PM
+    shiftId: 'shift-ds-pm', // PM
     userId: '18', // Sofia Castro - Supervisor
     role: 'SUPERVISOR',
     date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
   {
     id: 'assign-ds-pm-2',
-    shiftId: 'shift-ds-3', // PM
+    shiftId: 'shift-ds-pm', // PM
     userId: '19', // Miguel Angel - Staff
     role: 'STAFF',
     date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
   {
     id: 'assign-ds-pm-3',
-    shiftId: 'shift-ds-3', // PM
+    shiftId: 'shift-ds-pm', // PM
     userId: '20', // Laura Jimenez - Staff
     role: 'STAFF',
     date: '2025-01-15',
-  },
-  {
-    id: 'assign-ds-pm-4',
-    shiftId: 'shift-ds-3', // PM
-    userId: '21', // Javier Ortiz - Staff
-    role: 'STAFF',
-    date: '2025-01-15',
-  },
-  {
-    id: 'assign-ds-pm-5',
-    shiftId: 'shift-ds-3', // PM
-    userId: '22', // Patricia Vega - Staff
-    role: 'STAFF',
-    date: '2025-01-15',
-  },
-  {
-    id: 'assign-ds-pm-6',
-    shiftId: 'shift-ds-3', // PM
-    userId: '23', // Ricardo Soto - Staff
-    role: 'STAFF',
-    date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
 
   // ═══════════════════════════════════════════════════════════════════
@@ -89,23 +67,53 @@ export const shiftAssignments: ShiftAssignment[] = [
   // ═══════════════════════════════════════════════════════════════════
   {
     id: 'assign-ds-despacho-1',
-    shiftId: 'shift-ds-1', // Despacho
+    shiftId: 'shift-ds-despacho', // Despacho
     userId: '24', // Maria Elena - Staff
     role: 'STAFF',
     date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // WAREHOUSE - PM 1
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: 'assign-wh-pm1-1',
+    shiftId: 'shift-wh-pm1', // PM 1
+    userId: '32', // Victor - Staff
+    role: 'STAFF',
+    date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GUIANZA - Guianza Norte 1
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: 'assign-gz-norte1-1',
+    shiftId: 'shift-gz-norte-1', // Guianza Norte 1
+    userId: '20', // Fernando - Staff
+    role: 'STAFF',
+    date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // GUIANZA - Guianza Norte 2
+  // ═══════════════════════════════════════════════════════════════════
+  {
+    id: 'assign-gz-norte2-1',
+    shiftId: 'shift-gz-norte-2', // Guianza Norte 2
+    userId: '21', // Isabel - Staff
+    role: 'STAFF',
+    date: '2025-01-15',
+    status: AssignmentStatus.PUBLICADO,
   },
 ];
 
 // Función para obtener usuarios asignados a un turno específico
 export function getUsersByShift(shiftId: string): { userId: string; role: string }[] {
   return shiftAssignments
-    .filter((a) => a.shiftId === shiftId)
-    .map((a) => ({ userId: a.userId, role: a.role }));
-}
-
-// Función para obtener usuarios por turno y rol
-export function getUsersByShiftAndRole(shiftId: string, role: string): string[] {
-  return shiftAssignments
-    .filter((a) => a.shiftId === shiftId && a.role === role)
-    .map((a) => a.userId);
+    .filter(a => a.shiftId === shiftId)
+    .map(a => ({ userId: a.userId, role: a.role }));
 }
