@@ -2,7 +2,7 @@
 // DATOS DE TURNOS - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { Shift, Department } from '@/types';
+import { Shift, Department, Role } from '@/types';
 
 export const shifts: Shift[] = [
   // ═══════════════════════════════════════════════════════════════════
@@ -23,6 +23,10 @@ export const shifts: Shift[] = [
     startTime: '09:00',
     endTime: '13:00',
     color: '#045aa0',
+    requirements: [
+      { role: Role.SUPERVISOR, count: 1 },
+      { role: Role.STAFF, count: 3 }, // 2 voluntarios + 1 vendedor
+    ],
   },
   {
     id: 'shift-ds-3',
@@ -31,6 +35,10 @@ export const shifts: Shift[] = [
     startTime: '12:30',
     endTime: '20:30',
     color: '#045aa0',
+    requirements: [
+      { role: Role.SUPERVISOR, count: 1 },
+      { role: Role.STAFF, count: 5 }, // 3 voluntarios + 2 vendedores
+    ],
   },
   {
     id: 'shift-ds-4',

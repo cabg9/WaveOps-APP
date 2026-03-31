@@ -75,9 +75,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false;
       }
       
-      // Validar contraseña (en producción esto sería bcrypt)
-      // Por ahora, cualquier contraseña de 6+ caracteres funciona para demo
-      if (password.length < 6) {
+      // Validar contraseña
+      // Para usuarios de prueba, usar la contraseña definida
+      // Para otros usuarios, cualquier contraseña de 6+ caracteres funciona
+      if (foundUser.password && foundUser.password !== password) {
+        return false;
+      }
+      if (!foundUser.password && password.length < 6) {
         return false;
       }
       

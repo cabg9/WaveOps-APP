@@ -52,49 +52,44 @@ const generateInitialAssignments = (): ShiftAssignment[] => {
     // Dive Shop - algunos buzos
     assignments.push({
       id: generateId(),
-      userId: '16', // Carlos
       shiftId: dayOffset % 2 === 0 ? 'shift-ds-2' : 'shift-ds-3', // AM / PM alternados
+      userId: '16', // Carlos
+      role: 'STAFF',
       date: dateStr,
-      createdBy: '5',
-      createdAt: new Date().toISOString(),
     });
     
     assignments.push({
       id: generateId(),
-      userId: '17', // Maria
       shiftId: dayOffset % 2 === 0 ? 'shift-ds-3' : 'shift-ds-2', // PM / AM alternados
+      userId: '17', // Maria
+      role: 'STAFF',
       date: dateStr,
-      createdBy: '5',
-      createdAt: new Date().toISOString(),
     });
     
     // Warehouse
     assignments.push({
       id: generateId(),
-      userId: '32', // Victor
       shiftId: 'shift-wh-2', // PM1
+      userId: '32', // Victor
+      role: 'STAFF',
       date: dateStr,
-      createdBy: '9',
-      createdAt: new Date().toISOString(),
     });
     
     // Guianza
     assignments.push({
       id: generateId(),
-      userId: '20', // Fernando
       shiftId: 'shift-gz-1', // Mañana
+      userId: '20', // Fernando
+      role: 'STAFF',
       date: dateStr,
-      createdBy: '6',
-      createdAt: new Date().toISOString(),
     });
     
     assignments.push({
       id: generateId(),
-      userId: '21', // Isabel
       shiftId: 'shift-gz-2', // Tarde
+      userId: '21', // Isabel
+      role: 'STAFF',
       date: dateStr,
-      createdBy: '6',
-      createdAt: new Date().toISOString(),
     });
   }
   
@@ -178,7 +173,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const assignShift = useCallback(
-    (userId: string, shiftId: string, date: string, assignedBy: string): void => {
+    (userId: string, shiftId: string, date: string, role: string): void => {
       // Verificar si ya existe una asignación para este usuario en esta fecha
       const existingAssignment = assignments.find(
         a => a.userId === userId && a.date === date && a.shiftId === shiftId
@@ -190,11 +185,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       
       const newAssignment: ShiftAssignment = {
         id: generateId(),
-        userId,
         shiftId,
+        userId,
+        role,
         date,
-        createdBy: assignedBy,
-        createdAt: new Date().toISOString(),
       };
       
       setAssignments(prev => [...prev, newAssignment]);

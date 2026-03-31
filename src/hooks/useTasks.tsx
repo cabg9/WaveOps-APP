@@ -58,9 +58,9 @@ interface TasksContextType {
   createIncidencia: (incidencia: Partial<Incidencia>) => Incidencia;
   updateIncidencia: (id: string, updates: Partial<Incidencia>) => void;
   confirmIncidencia: (id: string, userId: string) => void;
-  resolveIncidencia: (id: string, userId: string) => void;
-  closeIncidencia: (id: string, userId: string) => void;
-  reopenIncidencia: (id: string, userId: string) => void;
+  resolveIncidencia: (id: string, userId: string, resolution?: string) => void;
+  closeIncidencia: (id: string, userId: string, reason?: string) => void;
+  reopenIncidencia: (id: string, userId: string, reason?: string) => void;
   addIncidenciaNote: (id: string, content: string, userId: string) => void;
   // Contadores
   getTaskCounts: () => TaskCounts;
@@ -637,6 +637,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const createIncidencia = useCallback((incidencia: Partial<Incidencia>): Incidencia => {
+    const now = new Date().toISOString();
     const newIncidencia: Incidencia = {
       id: generateId(),
       title: incidencia.title || 'Nueva Incidencia',
@@ -647,7 +648,15 @@ export function TasksProvider({ children }: TasksProviderProps) {
       reportedFor: incidencia.reportedFor,
       targetDepartment: incidencia.targetDepartment || Department.ADMINISTRATIVO,
       notes: [],
-      createdAt: new Date().toISOString(),
+      history: [
+        {
+          id: generateId(),
+          action: 'Incidencia reportada',
+          performedBy: incidencia.reportedBy || 'system',
+          performedAt: now,
+        },
+      ],
+      createdAt: now,
     };
 
     setIncidencias(prev => [...prev, newIncidencia]);
@@ -669,6 +678,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const confirmIncidencia = useCallback((id: string, userId: string): void => {
+    const now = new Date().toISOString();
     setIncidencias(prev =>
       prev.map(inc =>
         inc.id === id
@@ -676,7 +686,16 @@ export function TasksProvider({ children }: TasksProviderProps) {
               ...inc,
               status: IncidenciaStatus.VERIFIED,
               confirmedBy: userId,
-              confirmedAt: new Date().toISOString(),
+              confirmedAt: now,
+              history: [
+                ...inc.history,
+                {
+                  id: generateId(),
+                  action: 'Incidencia verificada',
+                  performedBy: userId,
+                  performedAt: now,
+                },
+              ],
             }
           : inc
       )
@@ -687,7 +706,8 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // RESOLVE INCIDENCIA
   // ═══════════════════════════════════════════════════════════════════
 
-  const resolveIncidencia = useCallback((id: string, userId: string): void => {
+  const resolveIncidencia = useCallback((id: string, userId: string, resolution?: string): void => {
+    const now = new Date().toISOString();
     setIncidencias(prev =>
       prev.map(inc =>
         inc.id === id
@@ -695,7 +715,17 @@ export function TasksProvider({ children }: TasksProviderProps) {
               ...inc,
               status: IncidenciaStatus.RESOLVED,
               resolvedBy: userId,
-              resolvedAt: new Date().toISOString(),
+              resolvedAt: now,
+              history: [
+                ...inc.history,
+                {
+                  id: generateId(),
+                  action: 'Incidencia resuelta',
+                  performedBy: userId,
+                  performedAt: now,
+                  note: resolution,
+                },
+              ],
             }
           : inc
       )
@@ -706,7 +736,8 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // CLOSE INCIDENCIA
   // ═══════════════════════════════════════════════════════════════════
 
-  const closeIncidencia = useCallback((id: string, userId: string): void => {
+  const closeIncidencia = useCallback((id: string, userId: string, reason?: string): void => {
+    const now = new Date().toISOString();
     setIncidencias(prev =>
       prev.map(inc =>
         inc.id === id
@@ -714,7 +745,17 @@ export function TasksProvider({ children }: TasksProviderProps) {
               ...inc,
               status: IncidenciaStatus.CLOSED,
               closedBy: userId,
-              closedAt: new Date().toISOString(),
+              closedAt: now,
+              history: [
+                ...inc.history,
+                {
+                  id: generateId(),
+                  action: 'Incidencia cerrada',
+                  performedBy: userId,
+                  performedAt: now,
+                  note: reason,
+                },
+              ],
             }
           : inc
       )
@@ -725,13 +766,27 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // REOPEN INCIDENCIA
   // ═══════════════════════════════════════════════════════════════════
 
-  const reopenIncidencia = useCallback((id: string, _userId: string): void => {
+  const reopenIncidencia = useCallback((id: string, userId: string, reason?: string): void => {
+    const now = new Date().toISOString();
     setIncidencias(prev =>
       prev.map(inc =>
         inc.id === id
           ? {
               ...inc,
               status: IncidenciaStatus.REOPENED,
+              reopenedBy: userId,
+              reopenedAt: now,
+              reopenReason: reason,
+              history: [
+                ...inc.history,
+                {
+                  id: generateId(),
+                  action: 'Incidencia reabierta',
+                  performedBy: userId,
+                  performedAt: now,
+                  note: reason,
+                },
+              ],
             }
           : inc
       )
@@ -743,17 +798,30 @@ export function TasksProvider({ children }: TasksProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const addIncidenciaNote = useCallback((id: string, content: string, userId: string): void => {
+    const now = new Date().toISOString();
     const newNote: Note = {
       id: generateId(),
       content,
       createdBy: userId,
-      createdAt: new Date().toISOString(),
+      createdAt: now,
     };
 
     setIncidencias(prev =>
       prev.map(inc =>
         inc.id === id
-          ? { ...inc, notes: [...inc.notes, newNote] }
+          ? {
+              ...inc,
+              notes: [...inc.notes, newNote],
+              history: [
+                ...inc.history,
+                {
+                  id: generateId(),
+                  action: 'Nota agregada',
+                  performedBy: userId,
+                  performedAt: now,
+                },
+              ],
+            }
           : inc
       )
     );

@@ -17,6 +17,9 @@ export const incidencias: Incidencia[] = [
     reportedBy: '16', // Carlos Mendez
     targetDepartment: Department.ADMINISTRATIVO,
     notes: [],
+    history: [
+      { id: 'h-inc-1-1', action: 'Incidencia reportada', performedBy: '16', performedAt: new Date(Date.now() - 3600000).toISOString() },
+    ],
     createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hora atrás
   },
 
@@ -33,6 +36,10 @@ export const incidencias: Incidencia[] = [
     targetDepartment: Department.WAREHOUSE,
     notes: [
       { id: 'n-inc-2-1', content: 'Ya se contactó al técnico', createdBy: '14', createdAt: new Date(Date.now() - 7200000).toISOString() },
+    ],
+    history: [
+      { id: 'h-inc-2-1', action: 'Incidencia reportada', performedBy: '17', performedAt: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'h-inc-2-2', action: 'Incidencia abierta', performedBy: '14', performedAt: new Date(Date.now() - 7200000).toISOString() },
     ],
     createdAt: new Date(Date.now() - 86400000).toISOString(), // 1 día atrás
   },
@@ -52,6 +59,10 @@ export const incidencias: Incidencia[] = [
     confirmedAt: new Date(Date.now() - 43200000).toISOString(), // 12 horas atrás
     notes: [
       { id: 'n-inc-3-1', content: 'Confirmado, necesitamos reponer', createdBy: '14', createdAt: new Date(Date.now() - 43200000).toISOString() },
+    ],
+    history: [
+      { id: 'h-inc-3-1', action: 'Incidencia reportada', performedBy: '20', performedAt: new Date(Date.now() - 86400000).toISOString() },
+      { id: 'h-inc-3-2', action: 'Incidencia verificada', performedBy: '14', performedAt: new Date(Date.now() - 43200000).toISOString() },
     ],
     createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
@@ -73,6 +84,11 @@ export const incidencias: Incidencia[] = [
     resolvedAt: new Date(Date.now() - 86400000).toISOString(),
     notes: [
       { id: 'n-inc-4-1', content: 'Ya reabastecimos el agua', createdBy: '38', createdAt: new Date(Date.now() - 86400000).toISOString() },
+    ],
+    history: [
+      { id: 'h-inc-4-1', action: 'Incidencia reportada', performedBy: '36', performedAt: new Date(Date.now() - 259200000).toISOString() },
+      { id: 'h-inc-4-2', action: 'Incidencia verificada', performedBy: '15', performedAt: new Date(Date.now() - 172800000).toISOString() },
+      { id: 'h-inc-4-3', action: 'Incidencia resuelta', performedBy: '38', performedAt: new Date(Date.now() - 86400000).toISOString() },
     ],
     createdAt: new Date(Date.now() - 259200000).toISOString(),
   },
@@ -98,6 +114,12 @@ export const incidencias: Incidencia[] = [
       { id: 'n-inc-5-1', content: 'Luz reemplazada', createdBy: '34', createdAt: new Date(Date.now() - 259200000).toISOString() },
       { id: 'n-inc-5-2', content: 'Verificado y cerrado', createdBy: '14', createdAt: new Date(Date.now() - 172800000).toISOString() },
     ],
+    history: [
+      { id: 'h-inc-5-1', action: 'Incidencia reportada', performedBy: '18', performedAt: new Date(Date.now() - 432000000).toISOString() },
+      { id: 'h-inc-5-2', action: 'Incidencia verificada', performedBy: '14', performedAt: new Date(Date.now() - 345600000).toISOString() },
+      { id: 'h-inc-5-3', action: 'Incidencia resuelta', performedBy: '34', performedAt: new Date(Date.now() - 259200000).toISOString() },
+      { id: 'h-inc-5-4', action: 'Incidencia cerrada', performedBy: '14', performedAt: new Date(Date.now() - 172800000).toISOString() },
+    ],
     createdAt: new Date(Date.now() - 432000000).toISOString(),
   },
 
@@ -118,9 +140,19 @@ export const incidencias: Incidencia[] = [
     resolvedAt: new Date(Date.now() - 432000000).toISOString(),
     closedBy: '10',
     closedAt: new Date(Date.now() - 345600000).toISOString(),
+    reopenedBy: '32',
+    reopenedAt: new Date(Date.now() - 86400000).toISOString(),
+    reopenReason: 'Volvió a fallar, necesita reparación más profunda',
     notes: [
       { id: 'n-inc-6-1', content: 'Se reparó el generador', createdBy: '34', createdAt: new Date(Date.now() - 432000000).toISOString() },
       { id: 'n-inc-6-2', content: 'Volvió a fallar, necesita reparación más profunda', createdBy: '32', createdAt: new Date(Date.now() - 86400000).toISOString() },
+    ],
+    history: [
+      { id: 'h-inc-6-1', action: 'Incidencia reportada', performedBy: '32', performedAt: new Date(Date.now() - 691200000).toISOString() },
+      { id: 'h-inc-6-2', action: 'Incidencia verificada', performedBy: '10', performedAt: new Date(Date.now() - 604800000).toISOString() },
+      { id: 'h-inc-6-3', action: 'Incidencia resuelta', performedBy: '34', performedAt: new Date(Date.now() - 432000000).toISOString() },
+      { id: 'h-inc-6-4', action: 'Incidencia cerrada', performedBy: '10', performedAt: new Date(Date.now() - 345600000).toISOString() },
+      { id: 'h-inc-6-5', action: 'Incidencia reabierta', performedBy: '32', performedAt: new Date(Date.now() - 86400000).toISOString(), note: 'Volvió a fallar, necesita reparación más profunda' },
     ],
     createdAt: new Date(Date.now() - 691200000).toISOString(),
   },
@@ -135,6 +167,9 @@ export const incidencias: Incidencia[] = [
     reportedBy: '16', // Carlos Mendez
     targetDepartment: Department.DIVE_SHOP,
     notes: [],
+    history: [
+      { id: 'h-inc-7-1', action: 'Incidencia reportada', performedBy: '16', performedAt: new Date(Date.now() - 1800000).toISOString() },
+    ],
     createdAt: new Date(Date.now() - 1800000).toISOString(),
   },
   {
@@ -146,6 +181,10 @@ export const incidencias: Incidencia[] = [
     reportedBy: '21', // Isabel Reyes
     targetDepartment: Department.ADMINISTRATIVO,
     notes: [],
+    history: [
+      { id: 'h-inc-8-1', action: 'Incidencia reportada', performedBy: '21', performedAt: new Date(Date.now() - 129600000).toISOString() },
+      { id: 'h-inc-8-2', action: 'Incidencia abierta', performedBy: '10', performedAt: new Date(Date.now() - 86400000).toISOString() },
+    ],
     createdAt: new Date(Date.now() - 129600000).toISOString(),
   },
 ];

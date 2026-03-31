@@ -11,7 +11,8 @@ export const users: User[] = [
   {
     id: '1',
     name: 'Andres Bonilla',
-    email: 'andres.bonilla@galapagosdiveandsurf.com',
+    email: 'director@waveops.com',
+    password: '123456',
     role: Role.DIRECTOR_GENERAL,
     department: Department.ADMINISTRATIVO,
     position: 'Director General',
@@ -457,6 +458,73 @@ export const users: User[] = [
 export const getUserById = (id: string): User | undefined => {
   return users.find(user => user.id === id);
 };
+
+// ═══════════════════════════════════════════════════════════════════
+// USUARIOS DE PRUEBA - CONTRASEÑAS SIMPLES
+// ═══════════════════════════════════════════════════════════════════
+// Agregar usuarios adicionales de prueba con contraseñas simples
+users.push(
+  // SUPERVISOR de DIVE_SHOP
+  {
+    id: 'supervisor1',
+    name: 'Carlos Supervisor',
+    email: 'supervisor@waveops.com',
+    password: '123456',
+    role: Role.SUPERVISOR,
+    department: Department.DIVE_SHOP,
+    position: 'Supervisor Dive Shop',
+    level: 6,
+    isActive: true,
+  },
+  // GERENTE de DIVE_SHOP
+  {
+    id: 'gerente1',
+    name: 'Maria Gerente',
+    email: 'gerente@waveops.com',
+    password: '123456',
+    role: Role.GERENTE_DEPARTAMENTO,
+    department: Department.DIVE_SHOP,
+    position: 'Gerente Dive Shop',
+    level: 5,
+    isActive: true,
+  },
+  // GERENTE DE OPERACIONES
+  {
+    id: 'ops1',
+    name: 'Juan Operaciones',
+    email: 'ops@waveops.com',
+    password: '123456',
+    role: Role.GERENTE_OPERACIONES,
+    department: Department.ADMINISTRATIVO,
+    position: 'Gerente de Operaciones',
+    level: 4,
+    isActive: true,
+  },
+  // STAFF de DIVE_SHOP
+  {
+    id: 'staff1',
+    name: 'Pedro Buzo',
+    email: 'buzo@waveops.com',
+    password: '123456',
+    role: Role.STAFF,
+    department: Department.DIVE_SHOP,
+    position: 'Buzo',
+    level: 7,
+    isActive: true,
+  },
+  // STAFF de COCINA
+  {
+    id: 'staff2',
+    name: 'Ana Cocinera',
+    email: 'cocina@waveops.com',
+    password: '123456',
+    role: Role.STAFF,
+    department: Department.COCINA,
+    position: 'Cocinera',
+    level: 7,
+    isActive: true,
+  }
+);
 
 export const getUserByEmail = (email: string): User | undefined => {
   return users.find(user => user.email.toLowerCase() === email.toLowerCase());

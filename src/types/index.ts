@@ -75,6 +75,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  password?: string; // Para usuarios de prueba
   role: Role;
   department: Department;
   position: string;
@@ -118,9 +119,10 @@ export interface Task {
   type: TaskType;
   createdBy: string; // userId
   assignedTo: string[]; // userIds
-  supervisorId: string; // userId
+  supervisorId?: string; // userId
   department: Department;
-  dueDate: string; // ISO date
+  dueDate: string; // ISO date YYYY-MM-DD
+  dueTime?: string; // HH:MM - hora límite calculada
   startTime?: string; // HH:MM
   estimatedMinutes?: number;
   requiresPhoto: boolean;
@@ -137,6 +139,8 @@ export interface Task {
   blockedReason?: string;
   blockedAt?: string; // ISO date
   blockedBy?: string; // userId
+  shiftIds?: string[]; // IDs de turnos asignados
+  supportUserIds?: string[]; // IDs de usuarios de apoyo
 }
 
 export interface Incidencia {
@@ -154,7 +158,11 @@ export interface Incidencia {
   resolvedAt?: string; // ISO date
   closedBy?: string; // userId
   closedAt?: string; // ISO date
+  reopenedBy?: string; // userId
+  reopenedAt?: string; // ISO date
+  reopenReason?: string;
   notes: Note[];
+  history: TaskHistory[];
   createdAt: string; // ISO date
 }
 
@@ -165,15 +173,20 @@ export interface Shift {
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   color?: string; // hex color
+  requirements?: ShiftRequirement[]; // Roles necesarios para el turno
+}
+
+export interface ShiftRequirement {
+  role: Role;
+  count: number; // Cantidad de personas necesarias con ese rol
 }
 
 export interface ShiftAssignment {
   id: string;
-  userId: string;
   shiftId: string;
+  userId: string;
+  role: string; // Rol del usuario en este turno (ej: SUPERVISOR, STAFF)
   date: string; // YYYY-MM-DD
-  createdBy: string; // userId
-  createdAt: string; // ISO date
 }
 
 // ═══════════════════════════════════════════════════════════════════
