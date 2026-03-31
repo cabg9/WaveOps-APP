@@ -27,8 +27,8 @@ interface ShiftsContextType {
   getUsersByDepartment: (department: Department) => typeof users;
   isUserOnShift: (userId: string, date: string) => boolean;
   getUsersOnShift: (department: Department, date: string) => typeof users;
-  publishAssignments: (department: Department, weekStart: Date, publishedBy: string) => void;
-  getBorradorCount: (department: Department, weekStart: Date) => number;
+  publishAssignments: (department: Department | 'ALL', weekStart: Date, publishedBy: string) => void;
+  getBorradorCount: (department: Department | 'ALL', weekStart: Date) => number;
   validateDayRequirements: (department: Department, date: string) => { isValid: boolean; errors: string[] };
 }
 
@@ -308,7 +308,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const publishAssignments = useCallback(
-    (department: Department, weekStart: Date, publishedBy: string): void => {
+    (department: Department | 'ALL', weekStart: Date, publishedBy: string): void => {
       const weekDates: string[] = [];
       for (let i = 0; i < 7; i++) {
         const date = addDaysToDate(weekStart, i);
@@ -316,19 +316,17 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       }
       
       setAssignments(prev => {
-        // Primero: eliminar las marcadas como ELIMINADO
-        const filtered = prev.filter(a => {
-          if (!weekDates.includes(a.date)) return true;
-          const user = users.find(u => u.id === a.userId);
-          if (user?.department !== department) return true;
-          return a.status !== AssignmentStatus.ELIMINADO;
-        });
-        
-        // Luego: publicar las BORRADOR
-        return filtered.map(a => {
-          if (weekDates.includes(a.date) && a.status === AssignmentStatus.BORRADOR) {
-            const user = users.find(u => u.id === a.userId);
-            if (user?.department === department) {
+        if (department === 'ALL') {
+          // Modo ALL: publicar todos los borradores de todos los departamentos
+          // Primero: eliminar las marcadas como ELIMINADO
+          const filtered = prev.filter(a => {
+            if (!weekDates.includes(a.date)) return true;
+            return a.status !== AssignmentStatus.ELIMINADO;
+          });
+          
+          // Luego: publicar todas las BORRADOR de la semana
+          return filtered.map(a => {
+            if (weekDates.includes(a.date) && a.status === AssignmentStatus.BORRADOR) {
               return {
                 ...a,
                 status: AssignmentStatus.PUBLICADO,
@@ -336,9 +334,34 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
                 publishedBy,
               };
             }
-          }
-          return a;
-        });
+            return a;
+          });
+        } else {
+          // Modo departamento específico
+          // Primero: eliminar las marcadas como ELIMINADO
+          const filtered = prev.filter(a => {
+            if (!weekDates.includes(a.date)) return true;
+            const user = users.find(u => u.id === a.userId);
+            if (user?.department !== department) return true;
+            return a.status !== AssignmentStatus.ELIMINADO;
+          });
+          
+          // Luego: publicar las BORRADOR
+          return filtered.map(a => {
+            if (weekDates.includes(a.date) && a.status === AssignmentStatus.BORRADOR) {
+              const user = users.find(u => u.id === a.userId);
+              if (user?.department === department) {
+                return {
+                  ...a,
+                  status: AssignmentStatus.PUBLICADO,
+                  publishedAt: new Date().toISOString(),
+                  publishedBy,
+                };
+              }
+            }
+            return a;
+          });
+        }
       });
     },
     []
@@ -349,11 +372,19 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   // ═══════════════════════════════════════════════════════════════════
 
   const getBorradorCount = useCallback(
-    (department: Department, weekStart: Date): number => {
+    (department: Department | 'ALL', weekStart: Date): number => {
       const weekDates: string[] = [];
       for (let i = 0; i < 7; i++) {
         const date = addDaysToDate(weekStart, i);
         weekDates.push(format(date, 'yyyy-MM-dd'));
+      }
+      
+      if (department === 'ALL') {
+        // En modo ALL, contar todos los cambios pendientes
+        return assignments.filter(
+          a => weekDates.includes(a.date) && 
+               (a.status === AssignmentStatus.BORRADOR || a.status === AssignmentStatus.ELIMINADO)
+        ).length;
       }
       
       const deptUserIds = users
