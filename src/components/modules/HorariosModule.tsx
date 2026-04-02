@@ -2,7 +2,7 @@
 // HORARIOS MODULE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   User,
   Users,
@@ -37,7 +37,17 @@ import {
   Activity,
   AlertTriangle,
   Stethoscope,
-  FileText,
+  UserX,
+  History,
+  Inbox,
+  Check,
+  X,
+  Camera,
+  Plus,
+  Upload,
+  FileImage,
+  XCircle,
+  Download,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
@@ -82,29 +92,132 @@ import {
 } from '@dnd-kit/core';
 
 // ═══════════════════════════════════════════════════════════════════
+// FUNCIONES AUXILIARES
+// ═══════════════════════════════════════════════════════════════════
+
+// Función para formatear fecha desde string YYYY-MM-DD sin problema de timezone
+const formatDateFromString = (dateStr: string): string => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+};
+
+// Función para generar días del mes para el calendario de incapacidad
+// Retorna strings YYYY-MM-DD para evitar problemas de timezone
+const generateIncapacityMonthDays = (year: number, month: number): string[] => {
+  const days: string[] = [];
+  const lastDay = new Date(year, month + 1, 0);
+  for (let d = 1; d <= lastDay.getDate(); d++) {
+    // Crear string YYYY-MM-DD directamente sin usar Date para evitar timezone issues
+    const dayStr = d.toString().padStart(2, '0');
+    const monthStr = (month + 1).toString().padStart(2, '0');
+    days.push(`${year}-${monthStr}-${dayStr}`);
+  }
+  return days;
+};
+
+// Función para obtener el día del mes desde string YYYY-MM-DD
+const getDayFromString = (dateStr: string): number => {
+  return parseInt(dateStr.split('-')[2], 10);
+};
+
+// ═══════════════════════════════════════════════════════════════════
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type TabType = 'mi-horario' | 'equipo' | 'asignar' | 'solicitudes';
+type TabType = 'mi-horario' | 'equipo' | 'asignar' | 'solicitudes' | 'incapacidades';
+
+interface IncapacidadHistoryItem {
+  date: string;
+  action: string;
+  user: string;
+}
+
+interface IncapacidadNote {
+  date: string;
+  text: string;
+  user: string;
+}
+
+interface IncapacidadDocument {
+  id: string;
+  name: string;
+  requested: boolean;
+  uploaded: boolean;
+  fileUrls?: string[];
+}
+
+interface Incapacidad {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  userDepartment: Department;
+  type: string;
+  startDate: string;
+  endDate: string;
+  description: string;
+  status: 'pendiente' | 'verificada' | 'registrada' | 'rechazada';
+  history: IncapacidadHistoryItem[];
+  notes: IncapacidadNote[];
+  documents: IncapacidadDocument[];
+  createdAt: string;
+  replacementUserId?: string;
+  replacementUserName?: string;
+  replacementUserDept?: Department;
+  isExternalSupport?: boolean;
+  rejectionReason?: string;
+  verifiedBy?: string[]; // IDs de usuarios que han verificado (supervisor, gerente)
+}
+
+interface IncapacidadesTabProps {
+  incapacityDates: { date: string; type: string; userId: string }[];
+  setIncapacityDates: React.Dispatch<React.SetStateAction<{ date: string; type: string; userId: string }[]>>;
+  getUsersByDepartment: (dept: Department) => { id: string; name: string; department: Department; isActive: boolean; position?: string; avatar?: string; initials?: string }[];
+  activeSubTab: 'mias' | 'equipo';
+  myFilter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial';
+  setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════
 
 export default function HorariosModule() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   
-  // Estado global de incapacidades compartido entre tabs
-  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string}[]>([]);
+  // Estado para sub-pestañas de incapacidades
+  const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
   
-  const addIncapacity = (dates: string[], type: string) => {
-    setIncapacityDates(prev => [...prev, ...dates.map(d => ({ date: d, type }))]);
+  // Estado global de incapacidades compartido entre tabs - ahora con userId
+  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>(() => {
+    const saved = localStorage.getItem('waveops_incapacity_dates');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error al cargar fechas de incapacidad:', e);
+      }
+    }
+    return [];
+  });
+
+  // Guardar fechas de incapacidad en localStorage cuando cambien
+  useEffect(() => {
+    localStorage.setItem('waveops_incapacity_dates', JSON.stringify(incapacityDates));
+  }, [incapacityDates]);
+  
+  const addIncapacity = (dates: string[], type: string, userId: string) => {
+    setIncapacityDates(prev => [...prev, ...dates.map(d => ({ date: d, type, userId }))]);
   };
   
-  const getIncapacityForDate = (date: string) => {
-    return incapacityDates.find(i => i.date === date);
+  const getIncapacityForDate = (date: string, userId: string) => {
+    return incapacityDates.find(i => i.date === date && i.userId === userId);
   };
+  
+  // Estado para filtros de Mis Incapacidades
+  const [myIncapacidadesFilter, setMyIncapacidadesFilter] = useState<'enviadas' | 'registradas' | 'rechazadas' | 'historial'>('enviadas');
 
   return (
     <Layout title="Horarios" showDate={true}>
@@ -115,65 +228,113 @@ export default function HorariosModule() {
           <p className="text-sm text-[#86868B]">Gestiona turnos y horarios del equipo</p>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-          <button
-            onClick={() => setActiveTab('mi-horario')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              activeTab === 'mi-horario'
-                ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <User className="w-4 h-4" />
-            Mi Horario
-          </button>
-          <button
-            onClick={() => setActiveTab('equipo')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              activeTab === 'equipo'
-                ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <Users className="w-4 h-4" />
-            Equipo
-          </button>
-          {hasPermission('canAssignShifts') && (
+        {/* Tabs principales + sub-pestañas de incapacidades */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
             <button
-              onClick={() => setActiveTab('asignar')}
+              onClick={() => setActiveTab('mi-horario')}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                activeTab === 'asignar'
+                activeTab === 'mi-horario'
                   ? 'bg-[#F5F5F7] text-[#1D1D1F]'
                   : 'text-[#86868B] hover:text-[#1D1D1F]'
               )}
             >
-              <CalendarDays className="w-4 h-4" />
-              Asignar
+              <User className="w-4 h-4" />
+              Mi Horario
             </button>
-          )}
-          <button
-            onClick={() => setActiveTab('solicitudes')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              activeTab === 'solicitudes'
-                ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            <button
+              onClick={() => setActiveTab('equipo')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                activeTab === 'equipo'
+                  ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <Users className="w-4 h-4" />
+              Equipo
+            </button>
+            {hasPermission('canAssignShifts') && (
+              <button
+                onClick={() => setActiveTab('asignar')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  activeTab === 'asignar'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <CalendarDays className="w-4 h-4" />
+                Asignar
+              </button>
             )}
-          >
-            <ClipboardList className="w-4 h-4" />
-            Solicitudes
-          </button>
+            <button
+              onClick={() => setActiveTab('solicitudes')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                activeTab === 'solicitudes'
+                  ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Solicitudes
+            </button>
+            {/* Pestaña Incapacidades - solo para supervisores y roles superiores */}
+            {(user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || user?.role === Role.DIRECTOR_GENERAL) && (
+              <button
+                onClick={() => setActiveTab('incapacidades')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  activeTab === 'incapacidades'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <HeartPulse className="w-4 h-4" />
+                Incapacidades
+              </button>
+            )}
+          </div>
+          
+          {/* Sub-pestañas de incapacidades - alineadas a la derecha cuando está activa */}
+          {activeTab === 'incapacidades' && (
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit ml-auto">
+              <button
+                onClick={() => setIncapacidadesSubTab('mias')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  incapacidadesSubTab === 'mias'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <User className="w-4 h-4" />
+                Mis Incapacidades
+              </button>
+              <button
+                onClick={() => setIncapacidadesSubTab('equipo')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  incapacidadesSubTab === 'equipo'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <Users className="w-4 h-4" />
+                Equipo
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Content */}
         {activeTab === 'mi-horario' && <MiHorarioTab incapacityDates={incapacityDates} addIncapacity={addIncapacity} getIncapacityForDate={getIncapacityForDate} />}
-        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} />}
+        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} />}
         {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} />}
         {activeTab === 'solicitudes' && <SolicitudesTab />}
+        {activeTab === 'incapacidades' && <IncapacidadesTab incapacityDates={incapacityDates} setIncapacityDates={setIncapacityDates} getUsersByDepartment={useShifts().getUsersByDepartment} activeSubTab={incapacidadesSubTab} myFilter={myIncapacidadesFilter} setMyFilter={setMyIncapacidadesFilter} />}
       </div>
     </Layout>
   );
@@ -184,9 +345,9 @@ export default function HorariosModule() {
 // ═══════════════════════════════════════════════════════════════════
 
 interface MiHorarioTabProps {
-  incapacityDates: {date: string, type: string}[];
-  addIncapacity: (dates: string[], type: string) => void;
-  getIncapacityForDate: (date: string) => {date: string, type: string} | undefined;
+  incapacityDates: {date: string, type: string, userId: string}[];
+  addIncapacity: (dates: string[], type: string, userId: string) => void;
+  getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
 }
 
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
@@ -210,6 +371,17 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const [selectedTargetShift, setSelectedTargetShift] = useState<string | null>(null);
   const [selectedSwapUser, setSelectedSwapUser] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState('');
+  
+  // Estado para solicitudes enviadas desde Mi Horario
+  const [misSolicitudesEnviadas, setMisSolicitudesEnviadas] = useState<Solicitud[]>(() => {
+    const saved = localStorage.getItem('waveops_mis_solicitudes_enviadas');
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  // Guardar solicitudes en localStorage
+  useEffect(() => {
+    localStorage.setItem('waveops_mis_solicitudes_enviadas', JSON.stringify(misSolicitudesEnviadas));
+  }, [misSolicitudesEnviadas]);
 
   const today = new Date().toISOString().split('T')[0];
   const todayShifts = user ? getUserShifts(user.id, today) : [];
@@ -277,16 +449,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 
   const goToToday = () => {
     setCurrentMonth(new Date());
-  };
-
-  // Función para generar días del mes
-  const generateMonthDays = (year: number, month: number): Date[] => {
-    const days: Date[] = [];
-    const lastDay = new Date(year, month + 1, 0);
-    for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push(new Date(year, month, d));
-    }
-    return days;
   };
 
   return (
@@ -468,16 +630,16 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
             const dayShifts = user ? getUserShifts(user.id, dateStr) : [];
             const hasShifts = dayShifts.length > 0;
             const isExpanded = expandedDate === dateStr;
-            const incapacityInfo = incapacityDates.find(i => i.date === dateStr);
+            const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
             const hasIncapacity = !!incapacityInfo;
             const dayTasks = user ? getTasksByUser(user.id).filter(t => t.dueDate === dateStr) : [];
             
             // Configuración de iconos y colores por tipo de incapacidad
-            const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string }> = {
-              enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100' },
-              accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100' },
-              cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100' },
-              otro: { icon: FileText, color: 'text-gray-500', bgColor: 'bg-gray-100' },
+            const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
+              enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Enfermedad' },
+              accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100', label: 'Accidente' },
+              cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Cita médica' },
+              inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-100', label: 'Inasistencia' },
             };
             const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
             const IncapacityIcon = incapacityStyle?.icon;
@@ -525,12 +687,9 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         )}
                       </div>
                     )}
-                    {hasIncapacity && incapacityInfo && (
-                      <div className={cn("mt-1 text-[10px] font-semibold", incapacityStyle?.color)}>
-                        {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
-                        {incapacityInfo.type === 'accidente' && 'Accidente'}
-                        {incapacityInfo.type === 'cita_medica' && 'Cita médica'}
-                        {incapacityInfo.type === 'otro' && 'Otro'}
+                    {hasIncapacity && incapacityInfo && incapacityStyle && (
+                      <div className={cn("mt-1 text-[10px] font-semibold", incapacityStyle.color)}>
+                        {incapacityStyle.label}
                       </div>
                     )}
                   </button>
@@ -657,8 +816,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
                   </div>
                   <div className="grid grid-cols-7 gap-1 justify-items-center">
-                    {generateMonthDays(incapacityCalendarMonth.getFullYear(), incapacityCalendarMonth.getMonth()).map((d, i) => {
-                      const dStr = d.toISOString().split('T')[0];
+                    {generateIncapacityMonthDays(incapacityCalendarMonth.getFullYear(), incapacityCalendarMonth.getMonth()).map((dStr, i) => {
                       const isSelected = incapacityStartDate && incapacityEndDate && dStr >= incapacityStartDate && dStr <= incapacityEndDate;
                       const isStart = dStr === incapacityStartDate;
                       const isEnd = dStr === incapacityEndDate;
@@ -667,13 +825,23 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         <button
                           key={i}
                           onClick={() => {
-                            if (!incapacityStartDate || (incapacityStartDate && incapacityEndDate)) {
+                            if (!incapacityStartDate) {
+                              // Primer clic: establecer inicio
                               setIncapacityStartDate(dStr);
                               setIncapacityEndDate('');
-                            } else if (dStr < incapacityStartDate) {
-                              setIncapacityStartDate(dStr);
+                            } else if (!incapacityEndDate) {
+                              // Segundo clic: establecer fin
+                              if (dStr < incapacityStartDate) {
+                                // Si clickeó antes del inicio, invertir
+                                setIncapacityEndDate(incapacityStartDate);
+                                setIncapacityStartDate(dStr);
+                              } else {
+                                setIncapacityEndDate(dStr);
+                              }
                             } else {
-                              setIncapacityEndDate(dStr);
+                              // Tercer clic: reiniciar con nueva fecha de inicio
+                              setIncapacityStartDate(dStr);
+                              setIncapacityEndDate('');
                             }
                           }}
                           className={cn(
@@ -683,7 +851,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                             'hover:bg-white text-[#1D1D1F]'
                           )}
                         >
-                          {d.getDate()}
+                          {getDayFromString(dStr)}
                         </button>
                       );
                     })}
@@ -694,11 +862,11 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   <div className="text-center text-sm bg-white rounded-lg py-2">
                     <span className="text-[#86868B]">Desde:</span>{' '}
                     <span className="font-medium text-corporate">
-                      {incapacityStartDate ? new Date(incapacityStartDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '...'}
+                      {incapacityStartDate ? formatDateFromString(incapacityStartDate) : '...'}
                     </span>
                     {' '}<span className="text-[#86868B]">hasta:</span>{' '}
                     <span className="font-medium text-corporate">
-                      {incapacityEndDate ? new Date(incapacityEndDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : '...'}
+                      {incapacityEndDate ? formatDateFromString(incapacityEndDate) : '...'}
                     </span>
                   </div>
                 )}
@@ -729,10 +897,10 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     color: 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' 
                   },
                   { 
-                    id: 'otro', 
-                    label: 'Otro', 
-                    Icon: FileText,
-                    color: 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100' 
+                    id: 'inasistencia', 
+                    label: 'Inasistencia', 
+                    Icon: UserX,
+                    color: 'bg-purple-50 text-purple-600 border-purple-200 hover:bg-purple-100' 
                   },
                 ].map((type) => (
                   <button
@@ -771,13 +939,21 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                 className="flex-1 bg-corporate hover:bg-corporate/90"
                 disabled={!incapacityStartDate || !incapacityEndDate || !incapacityType}
                 onClick={() => {
-                  const start = new Date(incapacityStartDate);
-                  const end = new Date(incapacityEndDate);
+                  // Generar array de fechas usando strings YYYY-MM-DD directamente (sin timezone issues)
                   const newDates: string[] = [];
+                  const [startYear, startMonth, startDay] = incapacityStartDate.split('-').map(Number);
+                  const [endYear, endMonth, endDay] = incapacityEndDate.split('-').map(Number);
+                  
+                  const start = new Date(startYear, startMonth - 1, startDay);
+                  const end = new Date(endYear, endMonth - 1, endDay);
+                  
                   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                    newDates.push(d.toISOString().split('T')[0]);
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    newDates.push(`${year}-${month}-${day}`);
                   }
-                  addIncapacity(newDates, incapacityType);
+                  addIncapacity(newDates, incapacityType, user?.id || '');
                   setIncapacityStartDate('');
                   setIncapacityEndDate('');
                   setIncapacityType('');
@@ -1181,6 +1357,61 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       ? (!selectedShiftForChange || !selectedTargetShift || !selectedSwapUser)
                       : (!selectedSwapUser || dayShifts.length === 0)}
                     onClick={() => {
+                      const now = new Date().toISOString();
+                      const swapUser = selectedSwapUser ? Object.values(Department)
+                        .flatMap(dept => getUsersByDepartment(dept))
+                        .find(u => u.id === selectedSwapUser) : null;
+                      
+                      const selectedShift = dayShifts.find(s => s.id === selectedShiftForChange);
+                      const targetShift = selectedTargetShift ? Object.values(Department)
+                        .flatMap(dept => getUsersByDepartment(dept))
+                        .flatMap(u => getUserShifts(u.id, expandedDate))
+                        .find(s => s.id === selectedTargetShift) : null;
+                      
+                      const swapUserShifts = swapUser ? getUserShifts(swapUser.id, expandedDate) : [];
+                      
+                      const nuevaSolicitud: Solicitud = {
+                        id: Date.now(),
+                        tipo: requestType === 'change' ? 'cambio' : 'intercambio',
+                        de: user?.name || 'Tú',
+                        a: swapUser?.name || 'Usuario',
+                        deCargo: user?.position || 'Voluntario',
+                        aCargo: swapUser?.position || 'Voluntario',
+                        deDept: user?.department || Department.DIVE_SHOP,
+                        aDept: swapUser?.department || Department.DIVE_SHOP,
+                        // Turnos del usuario que solicita (de)
+                        deTurnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
+                        deTurnoNuevo: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
+                        deHorarioActual: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        deHorarioNuevo: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        // Turnos del usuario destinatario (a)
+                        aTurnoActual: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
+                        aTurnoNuevo: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
+                        aHorarioActual: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        aHorarioNuevo: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        // Legacy fields
+                        turnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
+                        turnoSolicitado: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
+                        horarioActual: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        horarioSolicitado: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
+                        fecha: expandedDate || now.split('T')[0],
+                        fechaSolicitud: now,
+                        estado: 'pendiente',
+                        avatar: getInitials(user?.name || 'U'),
+                        historial: [
+                          { fecha: now, accion: 'Solicitud creada', usuario: user?.name || 'Tú' }
+                        ]
+                      };
+                      
+                      // Guardar en estado local
+                      setMisSolicitudesEnviadas(prev => [...prev, nuevaSolicitud]);
+                      
+                      // También guardar en localStorage para que esté disponible en SolicitudesTab
+                      const todasSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
+                      todasSolicitudes.push(nuevaSolicitud);
+                      localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
+                      
+                      // Limpiar estados
                       setShowChangeShiftModal(false);
                       setSelectedShiftForChange(null);
                       setSelectedTargetShift(null);
@@ -1207,11 +1438,12 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 // ═══════════════════════════════════════════════════════════════════
 
 interface EquipoTabProps {
-  incapacityDates: {date: string, type: string}[];
-  getIncapacityForDate: (date: string) => {date: string, type: string} | undefined;
+  incapacityDates: {date: string, type: string, userId: string}[];
+  getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
+  addIncapacity: (dates: string[], type: string, userId: string) => void;
 }
 
-function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate }: EquipoTabProps) {
+function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity }: EquipoTabProps) {
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { getTasksByUser } = useTasks();
@@ -1227,6 +1459,16 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
   const [showHeaderDayModal, setShowHeaderDayModal] = useState(false);
   const [selectedHeaderDay, setSelectedHeaderDay] = useState<Date | null>(null);
   const [userCalendarMonth, setUserCalendarMonth] = useState(new Date());
+  
+  // Modal para registrar incapacidad desde Equipo
+  const [showRegisterIncapacityModal, setShowRegisterIncapacityModal] = useState(false);
+  const [selectedUserForIncapacity, setSelectedUserForIncapacity] = useState<typeof users[0] | null>(null);
+  const [selectedDateForIncapacity, setSelectedDateForIncapacity] = useState<Date | null>(null);
+  const [incapacityType, setIncapacityType] = useState<'enfermedad' | 'accidente' | 'cita_medica' | 'inasistencia'>('enfermedad');
+  const [incapacityDescription, setIncapacityDescription] = useState('');
+  const [incapacityStartDate, setIncapacityStartDate] = useState('');
+  const [incapacityEndDate, setIncapacityEndDate] = useState('');
+  const [incapacityCalendarMonth, setIncapacityCalendarMonth] = useState(new Date());
 
   const weekStart = useMemo(() => {
     const today = new Date();
@@ -1288,6 +1530,52 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
     setSelectedDayInfo({ user: u, date });
     setShowDayModal(true);
     setExpandedDayInCalendar(null);
+  };
+
+  // Handler para abrir modal de registrar incapacidad
+  const handleOpenRegisterIncapacity = (u: typeof users[0], date: Date) => {
+    setSelectedUserForIncapacity(u);
+    setSelectedDateForIncapacity(date);
+    setIncapacityType('enfermedad');
+    setIncapacityDescription('');
+    // Inicializar fechas de incapacidad
+    const dateStr = date.toISOString().split('T')[0];
+    setIncapacityStartDate(dateStr);
+    setIncapacityEndDate(dateStr);
+    setIncapacityCalendarMonth(new Date(date));
+    setShowRegisterIncapacityModal(true);
+    setShowDayModal(false);
+  };
+
+  // Handler para confirmar registro de incapacidad
+  const handleConfirmRegisterIncapacity = () => {
+    if (!selectedUserForIncapacity || !incapacityStartDate || !incapacityEndDate || !incapacityType) return;
+    
+    // Generar array de fechas entre inicio y fin (usando strings YYYY-MM-DD directamente)
+    const dates: string[] = [];
+    const [startYear, startMonth, startDay] = incapacityStartDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = incapacityEndDate.split('-').map(Number);
+    
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dates.push(`${year}-${month}-${day}`);
+    }
+    
+    // Registrar la incapacidad en el estado global
+    addIncapacity(dates, incapacityType, selectedUserForIncapacity.id);
+    
+    setShowRegisterIncapacityModal(false);
+    setSelectedUserForIncapacity(null);
+    setSelectedDateForIncapacity(null);
+    setIncapacityStartDate('');
+    setIncapacityEndDate('');
+    setIncapacityType('enfermedad');
+    setIncapacityDescription('');
   };
 
   // Generar días del mes para el calendario del usuario
@@ -1416,13 +1704,38 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                   </td>
                   {weekDays.map((day, i) => {
                     const dayShifts = getUserShiftsForDay(u.id, day);
+                    const dateStr = day.toISOString().split('T')[0];
+                    const incapacityInfo = getIncapacityForDate(dateStr, u.id);
+                    const hasIncapacity = !!incapacityInfo;
+                    
+                    // Configuración de colores por tipo de incapacidad
+                    const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string }> = {
+                      enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
+                      accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
+                      cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
+                      inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
+                    };
+                    const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                    
                     return (
                       <td key={i} className="p-2 text-center">
                         <button
                           onClick={() => handleDayClick(u, day)}
                           className="w-full"
                         >
-                          {dayShifts.length > 0 ? (
+                          {hasIncapacity && incapacityStyle ? (
+                            <div className={cn(
+                              'px-2 py-1 rounded-lg text-xs font-medium border',
+                              incapacityStyle.bgColor,
+                              incapacityStyle.color,
+                              incapacityStyle.borderColor
+                            )}>
+                              {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
+                              {incapacityInfo.type === 'accidente' && 'Accidente'}
+                              {incapacityInfo.type === 'cita_medica' && 'Cita méd.'}
+                              {incapacityInfo.type === 'inasistencia' && 'Inasist.'}
+                            </div>
+                          ) : dayShifts.length > 0 ? (
                             <div className="space-y-1">
                               {dayShifts.map((shift, idx) => {
                                 const isCrossDept = shift.department !== u.department;
@@ -1533,6 +1846,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                 let workingDays = 0;
                 let freeDays = 0;
                 let totalShifts = 0;
+                let incapacityDays = 0;
                 const todayStr = new Date().toISOString().split('T')[0];
                 const todayShifts = getUserShifts(selectedUser.id, todayStr);
                 
@@ -1540,7 +1854,11 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                   const date = new Date(year, month, d);
                   const dateStr = date.toISOString().split('T')[0];
                   const dayShifts = getUserShifts(selectedUser.id, dateStr);
-                  if (dayShifts.length > 0) {
+                  const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
+                  
+                  if (incapacityInfo) {
+                    incapacityDays++;
+                  } else if (dayShifts.length > 0) {
                     workingDays++;
                     totalShifts += dayShifts.length;
                   } else {
@@ -1554,7 +1872,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                       <CalendarDays className="w-4 h-4" />
                       Estadísticas de {userCalendarMonth.toLocaleDateString('es-ES', { month: 'long' })}
                     </h4>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                       <div className="bg-green-50 rounded-xl p-3 text-center">
                         <p className="text-2xl font-bold text-green-600">{workingDays}</p>
                         <p className="text-xs text-green-700">Días trabajados</p>
@@ -1566,6 +1884,10 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                       <div className="bg-purple-50 rounded-xl p-3 text-center">
                         <p className="text-2xl font-bold text-purple-600">{totalShifts}</p>
                         <p className="text-xs text-purple-700">Total turnos</p>
+                      </div>
+                      <div className="bg-red-50 rounded-xl p-3 text-center">
+                        <p className="text-2xl font-bold text-red-600">{incapacityDays}</p>
+                        <p className="text-xs text-red-700">Incapacidades</p>
                       </div>
                     </div>
                     
@@ -1640,6 +1962,17 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                       const hasTasks = dayTasks.length > 0;
                       const isExpanded = expandedDayInCalendar?.toISOString().split('T')[0] === dateStr;
                       const isToday = dateStr === new Date().toISOString().split('T')[0];
+                      const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
+                      const hasIncapacity = !!incapacityInfo;
+                      
+                      // Configuración de iconos y colores por tipo de incapacidad
+                      const incapacityConfig: Record<string, { color: string, bgColor: string }> = {
+                        enfermedad: { color: 'text-red-500', bgColor: 'bg-red-100' },
+                        accidente: { color: 'text-orange-500', bgColor: 'bg-orange-100' },
+                        cita_medica: { color: 'text-blue-500', bgColor: 'bg-blue-100' },
+                        inasistencia: { color: 'text-purple-500', bgColor: 'bg-purple-100' },
+                      };
+                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
                       
                       return (
                         <div key={index} className="relative">
@@ -1648,14 +1981,16 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                             className={cn(
                               'w-full aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-all',
                               isToday ? 'ring-2 ring-corporate bg-corporate/10' : 'hover:bg-white',
-                              hasShifts && 'font-medium'
+                              hasShifts && 'font-medium',
+                              hasIncapacity && incapacityStyle?.bgColor
                             )}
-                            style={hasShifts ? { color: dayShifts[0]?.color } : {}}
+                            style={hasShifts && !hasIncapacity ? { color: dayShifts[0]?.color } : {}}
                           >
-                            <span className={isToday ? 'text-corporate font-bold' : ''}>{date.getDate()}</span>
-                            {(hasShifts || hasTasks) && (
+                            <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color)}>{date.getDate()}</span>
+                            {(hasShifts || hasTasks || hasIncapacity) && (
                               <div className="flex gap-0.5 mt-0.5">
-                                {hasShifts && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
+                                {hasIncapacity && <span className={cn("w-1.5 h-1.5 rounded-full", incapacityStyle?.bgColor.replace('100', '500'))} />}
+                                {hasShifts && !hasIncapacity && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
                                 {hasTasks && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                               </div>
                             )}
@@ -1685,8 +2020,36 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                       const dayShifts = getUserShifts(selectedUser.id, dateStr);
                       const dayTasks = getTasksByUser(selectedUser.id).filter(t => t.dueDate === dateStr);
                       
+                      const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
+                      const hasIncapacity = !!incapacityInfo;
+                      
+                      // Configuración de iconos y colores por tipo de incapacidad
+                      const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
+                        enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Enfermedad' },
+                        accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100', label: 'Accidente' },
+                        cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Cita médica' },
+                        inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-100', label: 'Inasistencia' },
+                      };
+                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      const IncapacityIcon = incapacityStyle?.icon;
+                      
                       return (
                         <div className="space-y-3">
+                          {/* Incapacidad */}
+                          {hasIncapacity && incapacityStyle && IncapacityIcon && (
+                            <div>
+                              <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1">
+                                <HeartPulse className="w-3 h-3" /> Incapacidad:
+                              </p>
+                              <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg", incapacityStyle.bgColor)}>
+                                <IncapacityIcon className={cn("w-4 h-4", incapacityStyle.color)} />
+                                <span className={cn("text-sm font-medium", incapacityStyle.color)}>
+                                  {incapacityStyle.label}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                          
                           {/* Turnos */}
                           <div>
                             <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1">
@@ -1786,6 +2149,47 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
           </DialogHeader>
           {selectedDayInfo && (
             <div className="space-y-4">
+              {/* Información del usuario */}
+              <div className="bg-[#F5F5F7] rounded-xl p-3">
+                <div className="flex items-center gap-2 text-sm text-[#86868B]">
+                  <Briefcase className="w-4 h-4" />
+                  <span>{selectedDayInfo.user.position}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#86868B] mt-1">
+                  <DeptIcon department={selectedDayInfo.user.department} className="w-4 h-4" />
+                  <span>{selectedDayInfo.user.department.replace(/_/g, ' ')}</span>
+                </div>
+              </div>
+
+              {/* Incapacidad - si existe */}
+              {(() => {
+                const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                const incapacityInfo = getIncapacityForDate(dateStr, selectedDayInfo.user.id);
+                if (!incapacityInfo) return null;
+                
+                const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
+                  enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-50', label: 'Enfermedad' },
+                  accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-50', label: 'Accidente' },
+                  cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-50', label: 'Cita médica' },
+                  inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-50', label: 'Inasistencia' },
+                };
+                const config = incapacityConfig[incapacityInfo.type];
+                const Icon = config?.icon;
+                
+                return (
+                  <div>
+                    <h4 className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
+                      <HeartPulse className="w-4 h-4 text-red-500" />
+                      Incapacidad registrada
+                    </h4>
+                    <div className={cn("flex items-center gap-3 p-3 rounded-lg", config?.bgColor)}>
+                      {Icon && <Icon className={cn("w-5 h-5", config?.color)} />}
+                      <span className={cn("font-medium", config?.color)}>{config?.label}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Turnos del día */}
               <div>
                 <h4 className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
@@ -1869,6 +2273,214 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                     </p>
                   );
                 })()}
+              </div>
+
+              {/* Botón para registrar incapacidad - solo si no hay incapacidad */}
+              {(() => {
+                const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                const hasIncapacity = !!getIncapacityForDate(dateStr, selectedDayInfo.user.id);
+                if (hasIncapacity) return null;
+                
+                return (
+                  <div className="pt-2 border-t border-[#E5E5E7]">
+                    <button
+                      onClick={() => handleOpenRegisterIncapacity(selectedDayInfo.user, selectedDayInfo.date)}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 text-red-600 rounded-xl text-sm font-medium hover:bg-red-100 transition-colors"
+                    >
+                      <HeartPulse className="w-4 h-4" />
+                      Registrar incapacidad
+                    </button>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para registrar incapacidad desde Equipo */}
+      <Dialog open={showRegisterIncapacityModal} onOpenChange={setShowRegisterIncapacityModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <HeartPulse className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-lg">Registrar Incapacidad</p>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedUserForIncapacity && selectedDateForIncapacity && (
+            <div className="space-y-4">
+              {/* Info del usuario seleccionado */}
+              <div className="bg-[#F5F5F7] rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className="bg-corporate text-white">
+                      {getInitials(selectedUserForIncapacity.name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium text-[#1D1D1F]">{selectedUserForIncapacity.name}</p>
+                    <p className="text-sm text-[#86868B]">{selectedUserForIncapacity.position}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-[#86868B]">
+                  <DeptIcon department={selectedUserForIncapacity.department} className="w-4 h-4" />
+                  <span>{selectedUserForIncapacity.department.replace(/_/g, ' ')}</span>
+                </div>
+              </div>
+
+              {/* Calendario de selección de fechas */}
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Selecciona el rango de fechas</label>
+                <div className="bg-[#F5F5F7] rounded-xl p-4">
+                  {/* Navegación del mes */}
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={() => setIncapacityCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1))}
+                      className="w-7 h-7 rounded-lg bg-white hover:bg-corporate/10 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronLeft className="w-4 h-4 text-[#1D1D1F]" />
+                    </button>
+                    <span className="text-sm font-medium text-[#1D1D1F]">
+                      {incapacityCalendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <button
+                      onClick={() => setIncapacityCalendarMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1))}
+                      className="w-7 h-7 rounded-lg bg-white hover:bg-corporate/10 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight className="w-4 h-4 text-[#1D1D1F]" />
+                    </button>
+                  </div>
+                  
+                  {/* Días de la semana */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
+                      <div key={i} className="text-center text-[10px] font-medium text-[#86868B] py-1">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Grid de días */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {generateIncapacityMonthDays(incapacityCalendarMonth.getFullYear(), incapacityCalendarMonth.getMonth()).map((dStr, i) => {
+                      const isSelected = incapacityStartDate && incapacityEndDate && dStr >= incapacityStartDate && dStr <= incapacityEndDate;
+                      const isStart = dStr === incapacityStartDate;
+                      const isEnd = dStr === incapacityEndDate;
+                      
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            if (!incapacityStartDate) {
+                              // Primer clic: establecer inicio
+                              setIncapacityStartDate(dStr);
+                              setIncapacityEndDate('');
+                            } else if (!incapacityEndDate) {
+                              // Segundo clic: establecer fin
+                              if (dStr < incapacityStartDate) {
+                                // Si clickeó antes del inicio, invertir
+                                setIncapacityEndDate(incapacityStartDate);
+                                setIncapacityStartDate(dStr);
+                              } else {
+                                setIncapacityEndDate(dStr);
+                              }
+                            } else {
+                              // Tercer clic: reiniciar con nueva fecha de inicio
+                              setIncapacityStartDate(dStr);
+                              setIncapacityEndDate('');
+                            }
+                          }}
+                          className={cn(
+                            'w-8 h-8 text-xs rounded-lg transition-colors',
+                            isStart || isEnd ? 'bg-corporate text-white' : 
+                            isSelected ? 'bg-corporate/20 text-corporate' : 
+                            'hover:bg-white text-[#1D1D1F]'
+                          )}
+                        >
+                          {getDayFromString(dStr)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* Mostrar rango seleccionado */}
+                {(incapacityStartDate || incapacityEndDate) && (
+                  <div className="text-center text-sm bg-white rounded-lg py-2 mt-2 border border-[#E5E5E7]">
+                    <span className="text-[#86868B]">Desde:</span>{' '}
+                    <span className="font-medium text-corporate">
+                      {incapacityStartDate ? formatDateFromString(incapacityStartDate) : '...'}
+                    </span>
+                    {' '}<span className="text-[#86868B]">hasta:</span>{' '}
+                    <span className="font-medium text-corporate">
+                      {incapacityEndDate ? formatDateFromString(incapacityEndDate) : '...'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Tipo de incapacidad */}
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Tipo de incapacidad</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'enfermedad', label: 'Enfermedad', icon: Activity, color: 'text-red-500', bgColor: 'bg-red-50' },
+                    { id: 'accidente', label: 'Accidente', icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-50' },
+                    { id: 'cita_medica', label: 'Cita médica', icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-50' },
+                    { id: 'inasistencia', label: 'Inasistencia', icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-50' },
+                  ].map((type) => {
+                    const TypeIcon = type.icon;
+                    return (
+                      <button
+                        key={type.id}
+                        onClick={() => setIncapacityType(type.id as typeof incapacityType)}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all border',
+                          incapacityType === type.id
+                            ? cn(type.bgColor, type.color, 'border-current')
+                            : 'bg-white text-[#86868B] border-[#E5E5E7] hover:border-[#C7C7CC]'
+                        )}
+                      >
+                        <TypeIcon className="w-4 h-4" />
+                        {type.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Descripción (opcional)</label>
+                <textarea
+                  value={incapacityDescription}
+                  onChange={(e) => setIncapacityDescription(e.target.value)}
+                  placeholder="Añade detalles sobre la incapacidad..."
+                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm min-h-[80px] resize-none"
+                />
+              </div>
+
+              {/* Botones */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setShowRegisterIncapacityModal(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  onClick={handleConfirmRegisterIncapacity}
+                  disabled={!incapacityStartDate || !incapacityEndDate || !incapacityType}
+                >
+                  <HeartPulse className="w-4 h-4 mr-1.5" />
+                  Registrar
+                </Button>
               </div>
             </div>
           )}
@@ -2110,18 +2722,49 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
                       </div>
                     )}
 
-                    {/* Usuarios enfermos/faltantes - Placeholder */}
-                    <div className="opacity-50">
-                      <h4 className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-red-100 flex items-center justify-center">
-                          <span className="text-[10px] text-red-500">!</span>
-                        </span>
-                        Enfermos / Faltantes (0)
-                      </h4>
-                      <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg p-3">
-                        No hay registros de ausencias para este día
-                      </p>
-                    </div>
+                    {/* Usuarios con incapacidad */}
+                    {(() => {
+                      // Contar usuarios con incapacidad según el departamento seleccionado
+                      const usersWithIncapacity = relevantUsers.filter((u) => {
+                        const incapacityInfo = getIncapacityForDate(dateStr, u.id);
+                        return !!incapacityInfo;
+                      });
+                      
+                      return usersWithIncapacity.length > 0 ? (
+                        <div>
+                          <h4 className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2">
+                            <HeartPulse className="w-4 h-4 text-red-500" />
+                            Incapacidades ({usersWithIncapacity.length})
+                          </h4>
+                          <div className="flex flex-wrap gap-2">
+                            {usersWithIncapacity.map((u) => {
+                              const incapacityInfo = getIncapacityForDate(dateStr, u.id);
+                              const incapacityConfig: Record<string, { color: string, bgColor: string, label: string }> = {
+                                enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', label: 'Enfermedad' },
+                                accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', label: 'Accidente' },
+                                cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', label: 'Cita médica' },
+                                inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', label: 'Inasistencia' },
+                              };
+                              const style = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                              
+                              return (
+                                <div key={u.id} className={cn("flex items-center gap-2 rounded-lg px-3 py-2", style?.bgColor)}>
+                                  <Avatar className="w-6 h-6">
+                                    <AvatarFallback className="bg-red-500 text-white text-[10px]">
+                                      {getInitials(u.name)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <span className={cn("text-xs font-medium", style?.color)}>{u.name}</span>
+                                    <span className={cn("text-[10px] ml-1", style?.color)}>({style?.label})</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
                   </>
                 );
               })()}
@@ -2138,8 +2781,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _g
 // ═══════════════════════════════════════════════════════════════════
 
 interface AsignarTabProps {
-  incapacityDates: {date: string, type: string}[];
-  getIncapacityForDate: (date: string) => {date: string, type: string} | undefined;
+  incapacityDates: {date: string, type: string, userId: string}[];
+  getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
 }
 
 function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate }: AsignarTabProps) {
@@ -2504,10 +3147,34 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     {weekDays.map((day, i) => {
                       const dayAssignments = getUserAssignmentsForDay(u.id, day);
                       const dropId = `${u.id}|${day.toISOString().split('T')[0]}`;
+                      const dateStr = day.toISOString().split('T')[0];
+                      const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
+                      const hasIncapacity = !!incapacityInfo;
+                      
+                      // Configuración de colores por tipo de incapacidad
+                      const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
+                        enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
+                        accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
+                        cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita méd.' },
+                        inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
+                      };
+                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      
                       return (
                         <td key={i} className="p-2">
                           <DroppableCell id={dropId}>
                             <div className="space-y-1">
+                              {/* Mostrar incapacidad si existe */}
+                              {hasIncapacity && incapacityStyle && (
+                                <div className={cn(
+                                  'px-2 py-1 rounded-lg text-xs font-medium border text-center',
+                                  incapacityStyle.bgColor,
+                                  incapacityStyle.color,
+                                  incapacityStyle.borderColor
+                                )}>
+                                  {incapacityStyle.label}
+                                </div>
+                              )}
                               {dayAssignments.map((assignment, idx) => {
                                 const shift = shifts.find(s => s.id === assignment.shiftId);
                                 // Verificar si el turno es de otro departamento
@@ -2720,19 +3387,2690 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
     </div>
   );
 }
+function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDates: _setIncapacityDates, getUsersByDepartment, activeSubTab, myFilter, setMyFilter }: IncapacidadesTabProps) {
+  const { user } = useAuth();
+  
+  // Filtros para pestaña "Equipo"
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
+  const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
+  
+  const [expandedIncapacityId, setExpandedIncapacityId] = useState<string | null>(null);
+  const [selectedIncapacity, setSelectedIncapacity] = useState<Incapacidad | null>(null);
+  
+  // Modales
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showChangeReplaceModal, setShowChangeReplaceModal] = useState(false);
+  const [showUploadDocModal, setShowUploadDocModal] = useState(false);
+  const [selectedDocForUpload, setSelectedDocForUpload] = useState<string | null>(null);
+  
+  // Estados de formularios
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedReplacement, setSelectedReplacement] = useState<string>('');
+  const [isExternalSupport, setIsExternalSupport] = useState(false);
+  const [newNote, setNewNote] = useState('');
+  const [newDocName, setNewDocName] = useState('');
+  
+  // Ref para input file
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Estado para previews de imágenes seleccionadas (múltiples)
+  const [selectedFilePreviews, setSelectedFilePreviews] = useState<string[]>([]);
+  
+  // Estado para imagen expandida
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  
+  // Sincronizar incapacidades del estado global con el estado local
+  // Cada registro (batch de fechas) crea una incapacidad única
+  useEffect(() => {
+    if (_incapacityDates.length === 0) return;
+    
+    // Agrupar por timestamp de creación (simulado por el orden en el array)
+    // Cada vez que se registra, se agregan las fechas en grupo
+    const processedBatches = new Set<string>();
+    const newIncapacidades: Incapacidad[] = [];
+    
+    // Procesar en grupos - cada batch es un registro único
+    let currentBatch: typeof _incapacityDates = [];
+    
+    _incapacityDates.forEach((inc) => {
+      // Si es la primera fecha o es consecutiva a la anterior, agrupar
+      if (currentBatch.length === 0) {
+        currentBatch.push(inc);
+      } else {
+        const lastDate = currentBatch[currentBatch.length - 1].date;
+        const lastDateObj = new Date(lastDate);
+        const currentDateObj = new Date(inc.date);
+        const diffDays = Math.round((currentDateObj.getTime() - lastDateObj.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1 && currentBatch[0].userId === inc.userId && currentBatch[0].type === inc.type) {
+          // Es consecutiva, agregar al batch actual
+          currentBatch.push(inc);
+        } else {
+          // No es consecutiva o es diferente usuario/tipo, crear incapacidad del batch anterior
+          createIncapacityFromBatch(currentBatch);
+          currentBatch = [inc];
+        }
+      }
+    });
+    
+    // Procesar el último batch
+    if (currentBatch.length > 0) {
+      createIncapacityFromBatch(currentBatch);
+    }
+    
+    function createIncapacityFromBatch(batch: typeof _incapacityDates) {
+      if (batch.length === 0) return;
+      
+      const firstInc = batch[0];
+      const lastInc = batch[batch.length - 1];
+      const batchKey = `${firstInc.userId}-${firstInc.type}-${firstInc.date}-${lastInc.date}`;
+      
+      if (processedBatches.has(batchKey)) return;
+      processedBatches.add(batchKey);
+      
+      // Buscar si ya existe esta incapacidad
+      const existing = incapacidades.find(i => 
+        i.userId === firstInc.userId && 
+        i.startDate === firstInc.date && 
+        i.endDate === lastInc.date && 
+        i.type === firstInc.type
+      );
+      
+      if (existing) {
+        newIncapacidades.push(existing);
+      } else {
+        // Crear nueva incapacidad con el batch
+        const userDept = user?.department || Department.DIVE_SHOP;
+        const allUsers = getUsersByDepartment(userDept);
+        const userInfo = allUsers.find(u => u.id === firstInc.userId);
+        
+        newIncapacidades.push({
+          id: `new-${Date.now()}-${batchKey}`,
+          userId: firstInc.userId,
+          userName: userInfo?.name || 'Usuario',
+          userAvatar: userInfo?.initials || 'U',
+          userDepartment: userInfo?.department || userDept,
+          type: firstInc.type,
+          startDate: firstInc.date,
+          endDate: lastInc.date,
+          description: '',
+          status: 'pendiente',
+          history: [{ date: new Date().toISOString(), action: 'Solicitud creada', user: userInfo?.name || 'Usuario' }],
+          notes: [],
+          documents: [],
+          createdAt: new Date().toISOString()
+        });
+      }
+    }
+    
+    // Agregar solo las nuevas que no existan
+    // IMPORTANTE: No sobrescribir incapacidades que ya tienen estado modificado (verificada, registrada, rechazada)
+    setIncapacidades(prev => {
+      const existingIds = new Set(prev.map(i => i.id));
+      const trulyNew = newIncapacidades.filter(i => !existingIds.has(i.id));
+      
+      // Mantener las incapacidades existentes que ya fueron modificadas (no sobrescribir)
+      const modifiedExisting = prev.filter(i => i.status !== 'pendiente');
+      
+      // Para las pendientes, actualizar solo si vienen del nuevo batch
+      const pendingExisting = prev.filter(i => i.status === 'pendiente');
+      const pendingIds = new Set(newIncapacidades.map(i => i.id));
+      const pendingToKeep = pendingExisting.filter(i => pendingIds.has(i.id));
+      
+      return [...modifiedExisting, ...pendingToKeep, ...trulyNew];
+    });
+  }, [_incapacityDates, user?.department]);
+  
+  // Cargar incapacidades desde localStorage o usar datos de ejemplo
+  const [incapacidades, setIncapacidades] = useState<Incapacidad[]>(() => {
+    const saved = localStorage.getItem('waveops_incapacidades');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error('Error al cargar incapacidades:', e);
+      }
+    }
+    return [
+    {
+      id: '1',
+      userId: 'user1',
+      userName: 'Juan Pérez',
+      userAvatar: 'JP',
+      userDepartment: Department.DIVE_SHOP,
+      type: 'enfermedad',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: addDaysToDate(new Date(), 3).toISOString().split('T')[0],
+      description: 'Gripe fuerte con fiebre',
+      status: 'pendiente',
+      history: [
+        { date: new Date().toISOString(), action: 'Solicitud creada', user: 'Juan Pérez' }
+      ],
+      notes: [],
+      documents: [
+        { id: 'doc1', name: 'Certificado médico', requested: true, uploaded: false }
+      ],
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: '2',
+      userId: 'user2',
+      userName: 'María García',
+      userAvatar: 'MG',
+      userDepartment: Department.VENTAS,
+      type: 'cita_medica',
+      startDate: addDaysToDate(new Date(), 1).toISOString().split('T')[0],
+      endDate: addDaysToDate(new Date(), 1).toISOString().split('T')[0],
+      description: 'Cita con especialista',
+      status: 'registrada',
+      replacementUserId: 'user3',
+      replacementUserName: 'Carlos López',
+      replacementUserDept: Department.VENTAS,
+      isExternalSupport: false,
+      history: [
+        { date: new Date().toISOString(), action: 'Solicitud creada', user: 'María García' },
+        { date: addDaysToDate(new Date(), 0.5).toISOString(), action: 'Incapacidad registrada', user: 'Supervisor' },
+        { date: addDaysToDate(new Date(), 0.5).toISOString(), action: 'Reemplazo asignado: Carlos López', user: 'Supervisor' }
+      ],
+      notes: [
+        { date: addDaysToDate(new Date(), 0.5).toISOString(), text: 'Se asignó reemplazo del mismo departamento', user: 'Supervisor' }
+      ],
+      documents: [],
+      createdAt: addDaysToDate(new Date(), -1).toISOString()
+    },
+    {
+      id: '3',
+      userId: 'user4',
+      userAvatar: 'AT',
+      userName: 'Ana Torres',
+      userDepartment: Department.DIVE_SHOP,
+      type: 'inasistencia',
+      startDate: addDaysToDate(new Date(), -2).toISOString().split('T')[0],
+      endDate: addDaysToDate(new Date(), -2).toISOString().split('T')[0],
+      description: 'No se presentó al turno',
+      status: 'rechazada',
+      rejectionReason: 'No se proporcionó justificación válida',
+      history: [
+        { date: addDaysToDate(new Date(), -2).toISOString(), action: 'Solicitud creada', user: 'Ana Torres' },
+        { date: addDaysToDate(new Date(), -1).toISOString(), action: 'Incapacidad rechazada', user: 'Supervisor' }
+      ],
+      notes: [
+        { date: addDaysToDate(new Date(), -1).toISOString(), text: 'Se requiere documentación adicional', user: 'Supervisor' }
+      ],
+      documents: [
+        { id: 'doc1', name: 'Justificación escrita', requested: true, uploaded: false }
+      ],
+      createdAt: addDaysToDate(new Date(), -3).toISOString()
+    }
+  ];
+  });
+
+  // Guardar incapacidades en localStorage cuando cambien
+  useEffect(() => {
+    localStorage.setItem('waveops_incapacidades', JSON.stringify(incapacidades));
+  }, [incapacidades]);
+
+  // Configuración de tipos de incapacidad
+  const incapacityTypeConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, borderColor: string, label: string }> = {
+    enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
+    accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
+    cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita médica' },
+    inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasistencia' },
+  };
+
+  // Configuración de estados - MÁS VISIBLES
+  const statusConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string, icon: React.ElementType }> = {
+    pendiente: { color: 'text-amber-700', bgColor: 'bg-amber-100', borderColor: 'border-amber-300', label: 'Pendiente', icon: Clock },
+    verificada: { color: 'text-blue-700', bgColor: 'bg-blue-100', borderColor: 'border-blue-300', label: 'Verificada', icon: Check },
+    registrada: { color: 'text-green-700', bgColor: 'bg-green-100', borderColor: 'border-green-300', label: 'Registrada', icon: CheckCircle2 },
+    rechazada: { color: 'text-red-700', bgColor: 'bg-red-100', borderColor: 'border-red-300', label: 'Rechazada', icon: XCircle },
+  };
+
+  // Filtrar incapacidades
+  const filteredIncapacidades = useMemo(() => {
+    return incapacidades.filter(inc => {
+      if (selectedDepartment !== 'ALL' && inc.userDepartment !== selectedDepartment) return false;
+      if (statusFilter !== 'todas' && inc.status !== statusFilter) return false;
+      return true;
+    });
+  }, [incapacidades, selectedDepartment, statusFilter]);
+
+  // Contadores por estado - filtrados por departamento seleccionado
+  const counts = useMemo(() => {
+    // Filtrar incapacidades por departamento seleccionado
+    const filteredByDept = selectedDepartment === 'ALL' 
+      ? incapacidades 
+      : incapacidades.filter(i => i.userDepartment === selectedDepartment);
+    
+    return {
+      todas: filteredByDept.length,
+      pendiente: filteredByDept.filter(i => i.status === 'pendiente').length,
+      verificada: filteredByDept.filter(i => i.status === 'verificada').length,
+      registrada: filteredByDept.filter(i => i.status === 'registrada').length,
+      rechazada: filteredByDept.filter(i => i.status === 'rechazada').length,
+    };
+  }, [incapacidades, selectedDepartment]);
+
+  // Obtener usuarios disponibles para reemplazo (mismo departamento u otros)
+  const getReplacementUsers = (incapacity: Incapacidad, external: boolean = false) => {
+    if (external) {
+      // Obtener usuarios de OTROS departamentos
+      return Object.values(Department)
+        .flatMap(dept => dept !== incapacity.userDepartment ? getUsersByDepartment(dept) : [])
+        .filter(u => u.id !== incapacity.userId && u.isActive);
+    }
+    // Usuarios del mismo departamento
+    const deptUsers = selectedDepartment === 'ALL' 
+      ? getUsersByDepartment(incapacity.userDepartment)
+      : getUsersByDepartment(selectedDepartment as Department);
+    return deptUsers.filter(u => u.id !== incapacity.userId && u.isActive);
+  };
+
+  // Toggle expansión de tarjeta
+  const toggleExpand = (id: string) => {
+    setExpandedIncapacityId(prev => prev === id ? null : id);
+  };
+
+  // Abrir modal de registro con selección de reemplazo
+  const handleRegister = (incapacity: Incapacidad) => {
+    setSelectedIncapacity(incapacity);
+    setSelectedReplacement('');
+    setIsExternalSupport(false);
+    setShowRegisterModal(true);
+  };
+
+  // Abrir modal de rechazo
+  const handleReject = (incapacity: Incapacidad) => {
+    setSelectedIncapacity(incapacity);
+    setRejectionReason('');
+    setShowRejectModal(true);
+  };
+
+  // Verificar incapacidad (Supervisor o Gerente)
+  const handleVerify = (incapacity: Incapacidad) => {
+    try {
+      if (!user || !user.id) {
+        console.error('Usuario no disponible para verificar');
+        return;
+      }
+      
+      const verifierId = user.id;
+      const verifierName = user.name || 'Usuario';
+      
+      setIncapacidades(prev => prev.map(inc => {
+        if (inc.id === incapacity.id) {
+          const currentVerifiers = inc.verifiedBy || [];
+          // Evitar verificaciones duplicadas del mismo usuario
+          if (currentVerifiers.includes(verifierId)) {
+            return inc;
+          }
+          
+          const newVerifiers = [...currentVerifiers, verifierId];
+          
+          return {
+            ...inc,
+            verifiedBy: newVerifiers,
+            status: 'verificada',
+            history: [
+              ...inc.history,
+              { date: new Date().toISOString(), action: `Verificado por ${verifierName}`, user: verifierName }
+            ]
+          };
+        }
+        return inc;
+      }));
+      
+      // Cambiar filtro a 'todas' para que la incapacidad siga visible
+      setStatusFilter('todas');
+    } catch (error) {
+      console.error('Error al verificar incapacidad:', error);
+    }
+  };
+
+  // Confirmar registro con reemplazo
+  const confirmRegister = () => {
+    if (!selectedIncapacity) return;
+    
+    let replacementName = '';
+    let replacementDept = undefined;
+    
+    if (selectedReplacement) {
+      const replacementUser = getReplacementUsers(selectedIncapacity, isExternalSupport).find(u => u.id === selectedReplacement);
+      if (replacementUser) {
+        replacementName = replacementUser.name;
+        replacementDept = replacementUser.department;
+      }
+    }
+    
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === selectedIncapacity.id) {
+        const newHistory = [
+          ...inc.history,
+          { date: new Date().toISOString(), action: 'Incapacidad registrada', user: user?.name || 'Supervisor' }
+        ];
+        if (replacementName) {
+          newHistory.push({ 
+            date: new Date().toISOString(), 
+            action: `Reemplazo asignado: ${replacementName}${isExternalSupport ? ' (apoyo externo)' : ''}`, 
+            user: user?.name || 'Supervisor' 
+          });
+        }
+        return {
+          ...inc,
+          status: 'registrada',
+          replacementUserId: selectedReplacement || undefined,
+          replacementUserName: replacementName || undefined,
+          replacementUserDept: replacementDept,
+          isExternalSupport: isExternalSupport || undefined,
+          history: newHistory
+        };
+      }
+      return inc;
+    }));
+    
+    setShowRegisterModal(false);
+    setSelectedIncapacity(null);
+    setSelectedReplacement('');
+    setIsExternalSupport(false);
+    
+    // Cambiar filtro a 'todas' para que la incapacidad siga visible
+    setStatusFilter('todas');
+  };
+
+  // Confirmar rechazo
+  const confirmReject = () => {
+    if (!selectedIncapacity || !rejectionReason.trim()) return;
+    
+    // Actualizar estado local de incapacidades
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === selectedIncapacity.id) {
+        return {
+          ...inc,
+          status: 'rechazada',
+          rejectionReason,
+          history: [
+            ...inc.history,
+            { date: new Date().toISOString(), action: 'Incapacidad rechazada', user: user?.name || 'Supervisor' }
+          ]
+        };
+      }
+      return inc;
+    }));
+    
+    // Eliminar las fechas del calendario global (la incapacidad fue rechazada)
+    const datesToRemove: string[] = [];
+    const [startYear, startMonth, startDay] = selectedIncapacity.startDate.split('-').map(Number);
+    const [endYear, endMonth, endDay] = selectedIncapacity.endDate.split('-').map(Number);
+    const start = new Date(startYear, startMonth - 1, startDay);
+    const end = new Date(endYear, endMonth - 1, endDay);
+    
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      datesToRemove.push(`${year}-${month}-${day}`);
+    }
+    
+    // Solo eliminar fechas que no estén siendo usadas por otras incapacidades activas del mismo usuario
+    _setIncapacityDates(prev => prev.filter(inc => {
+      // Si no es del mismo usuario o no está en las fechas a eliminar, mantener
+      if (inc.userId !== selectedIncapacity.userId) return true;
+      if (!datesToRemove.includes(inc.date)) return true;
+      
+      // Verificar si hay otra incapacidad activa (no rechazada) que use esta fecha
+      const hasOtherActiveIncapacity = incapacidades.some(otherInc => 
+        otherInc.id !== selectedIncapacity.id &&
+        otherInc.userId === selectedIncapacity.userId &&
+        otherInc.status !== 'rechazada' &&
+        inc.date >= otherInc.startDate &&
+        inc.date <= otherInc.endDate
+      );
+      
+      // Mantener la fecha si hay otra incapacidad activa que la use
+      return hasOtherActiveIncapacity;
+    }));
+    
+    setShowRejectModal(false);
+    setSelectedIncapacity(null);
+    setRejectionReason('');
+    
+    // Cambiar filtro a 'todas' para que la incapacidad siga visible
+    setStatusFilter('todas');
+  };
+
+  // Cambiar reemplazo
+  const handleChangeReplacement = (incapacity: Incapacidad) => {
+    setSelectedIncapacity(incapacity);
+    setSelectedReplacement(incapacity.replacementUserId || '');
+    setIsExternalSupport(incapacity.isExternalSupport || false);
+    setShowChangeReplaceModal(true);
+  };
+
+  // Confirmar cambio de reemplazo
+  const confirmChangeReplacement = () => {
+    if (!selectedIncapacity) return;
+    
+    let replacementName = '';
+    let replacementDept = undefined;
+    
+    if (selectedReplacement) {
+      const replacementUser = getReplacementUsers(selectedIncapacity, isExternalSupport).find(u => u.id === selectedReplacement);
+      if (replacementUser) {
+        replacementName = replacementUser.name;
+        replacementDept = replacementUser.department;
+      }
+    }
+    
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === selectedIncapacity.id) {
+        return {
+          ...inc,
+          replacementUserId: selectedReplacement || undefined,
+          replacementUserName: replacementName || undefined,
+          replacementUserDept: replacementDept,
+          isExternalSupport: isExternalSupport || undefined,
+          history: [
+            ...inc.history,
+            { date: new Date().toISOString(), action: `Reemplazo cambiado a: ${replacementName}${isExternalSupport ? ' (apoyo externo)' : ''}`, user: user?.name || 'Supervisor' }
+          ]
+        };
+      }
+      return inc;
+    }));
+    setShowChangeReplaceModal(false);
+    setSelectedIncapacity(null);
+    setSelectedReplacement('');
+    setIsExternalSupport(false);
+  };
+
+  // Agregar nota
+  const addNote = (incapacityId: string) => {
+    if (!newNote.trim()) return;
+    
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === incapacityId) {
+        return {
+          ...inc,
+          notes: [
+            ...inc.notes,
+            { date: new Date().toISOString(), text: newNote, user: user?.name || 'Supervisor' }
+          ]
+        };
+      }
+      return inc;
+    }));
+    setNewNote('');
+  };
+
+  // Solicitar nuevo documento
+  const requestDocument = (incapacityId: string) => {
+    if (!newDocName.trim()) return;
+    
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === incapacityId) {
+        return {
+          ...inc,
+          documents: [
+            ...inc.documents,
+            { id: `doc${Date.now()}`, name: newDocName, requested: true, uploaded: false }
+          ],
+          history: [
+            ...inc.history,
+            { date: new Date().toISOString(), action: `Documento solicitado: ${newDocName}`, user: user?.name || 'Supervisor' }
+          ]
+        };
+      }
+      return inc;
+    }));
+    setNewDocName('');
+  };
+
+  // Subir fotos de documento con archivos reales (múltiples)
+  const uploadDocumentPhotoWithFile = (incapacityId: string, docId: string, fileUrls: string[]) => {
+    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, fileUrls });
+    setIncapacidades(prev => prev.map(inc => {
+      if (inc.id === incapacityId) {
+        const doc = inc.documents.find(d => d.id === docId);
+        const existingUrls = doc?.fileUrls || [];
+        return {
+          ...inc,
+          documents: inc.documents.map(d => 
+            d.id === docId 
+              ? { ...d, uploaded: true, fileUrls: [...existingUrls, ...fileUrls] }
+              : d
+          ),
+          history: [
+            ...inc.history,
+            { date: new Date().toISOString(), action: `${fileUrls.length} archivo(s) subido(s): ${doc?.name}`, user: user?.name || 'Usuario' }
+          ]
+        };
+      }
+      return inc;
+    }));
+    setShowUploadDocModal(false);
+    setSelectedDocForUpload(null);
+  };
+
+  const departments = Object.values(Department);
+  const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL || 
+                                user?.role === Role.DIRECTOR || 
+                                user?.role === Role.GERENTE_OPERACIONES;
+
+  // Filtrar incapacidades del usuario actual para pestaña "Mías"
+  const myIncapacidades = useMemo(() => {
+    return incapacidades.filter(inc => inc.userId === user?.id);
+  }, [incapacidades, user?.id]);
+
+  // Filtrar incapacidades para "Mías" según el filtro seleccionado
+  const filteredMyIncapacidades = useMemo(() => {
+    if (myFilter === 'enviadas') return myIncapacidades.filter(i => i.status === 'pendiente');
+    if (myFilter === 'registradas') return myIncapacidades.filter(i => i.status === 'registrada');
+    if (myFilter === 'rechazadas') return myIncapacidades.filter(i => i.status === 'rechazada');
+    return myIncapacidades; // historial - todas
+  }, [myIncapacidades, myFilter]);
+
+  // Estadísticas mensual y anual para "Mías" (todas las incapacidades, no solo registradas)
+  const myStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const incapacidadesMes = myIncapacidades.filter(inc => {
+      const [year, month] = inc.startDate.split('-').map(Number);
+      return month - 1 === currentMonth && year === currentYear;
+    });
+    
+    const incapacidadesAnio = myIncapacidades.filter(inc => {
+      const year = parseInt(inc.startDate.split('-')[0]);
+      return year === currentYear;
+    });
+    
+    const diasMes = incapacidadesMes.reduce((total, inc) => {
+      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }, 0);
+    
+    const diasAnio = incapacidadesAnio.reduce((total, inc) => {
+      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }, 0);
+    
+    return { diasMes, diasAnio };
+  }, [myIncapacidades]);
+
+  // Estadísticas del departamento para "Equipo" (todas las incapacidades)
+  const deptStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const deptIncapacidades = incapacidades.filter(inc => {
+      if (selectedDepartment !== 'ALL' && inc.userDepartment !== selectedDepartment) return false;
+      return true; // Todas las incapacidades, no solo registradas
+    });
+    
+    // Personas incapacitadas en el mes (únicas)
+    const personasMes = new Set(
+      deptIncapacidades
+        .filter(inc => {
+          const [year, month] = inc.startDate.split('-').map(Number);
+          return month - 1 === currentMonth && year === currentYear;
+        })
+        .map(inc => inc.userId)
+    ).size;
+    
+    // Días incapacitados en el año
+    const diasAnio = deptIncapacidades
+      .filter(inc => {
+        const year = parseInt(inc.startDate.split('-')[0]);
+        return year === currentYear;
+      })
+      .reduce((total, inc) => {
+        const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
+        const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
+        const start = new Date(startYear, startMonth - 1, startDay);
+        const end = new Date(endYear, endMonth - 1, endDay);
+        return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      }, 0);
+    
+    return { personasMes, diasAnio };
+  }, [incapacidades, selectedDepartment]);
+
+  return (
+    <div className="space-y-4">
+      {/* CONTENEDOR: Grid de 4 celdas del mismo tamaño */}
+      <div className="grid grid-cols-4 gap-3">
+        {/* Celdas 1-2: Filtros (unidas) */}
+        <div className="col-span-2 min-w-0">
+          {activeSubTab === 'equipo' ? (
+            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
+              {[
+                { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
+                { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
+                { id: 'verificada', label: 'Verificadas', count: counts.verificada, icon: Check },
+                { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
+                { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
+              ].map((filter) => {
+                const FilterIcon = filter.icon;
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => setStatusFilter(filter.id as typeof statusFilter)}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                      statusFilter === filter.id
+                        ? 'bg-corporate text-white'
+                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                    )}
+                  >
+                    <FilterIcon className="w-4 h-4" />
+                    {filter.label}
+                    {filter.count > 0 && (
+                      <span className={cn(
+                        'px-1.5 py-0.5 text-xs rounded-full',
+                        statusFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                      )}>
+                        {filter.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* Filtros para Mis Incapacidades */
+            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
+              {[
+                { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
+                { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
+                { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
+                { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
+              ].map((filter) => {
+                const FilterIcon = filter.icon;
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => setMyFilter(filter.id as typeof myFilter)}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                      myFilter === filter.id
+                        ? 'bg-corporate text-white'
+                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                    )}
+                  >
+                    <FilterIcon className="w-4 h-4" />
+                    {filter.label}
+                    {filter.count > 0 && (
+                      <span className={cn(
+                        'px-1.5 py-0.5 text-xs rounded-full',
+                        myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                      )}>
+                        {filter.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        
+        {/* Celda 3: Selector de departamento */}
+        <div className="min-w-0">
+          {activeSubTab === 'equipo' ? (
+            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department | 'ALL')}>
+              <SelectTrigger className="w-full h-10">
+                <SelectValue>
+                  {selectedDepartment === 'ALL' ? (
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4" />
+                      <span>Todos</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                      <span className="truncate">{selectedDepartment.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {canViewAllDepartments && (
+                  <SelectItem value="ALL">
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4" />
+                      <span>Todos los departamentos</span>
+                    </div>
+                  </SelectItem>
+                )}
+                {departments.map(dept => (
+                  <SelectItem key={dept} value={dept}>
+                    <div className="flex items-center gap-2">
+                      <DeptIcon department={dept} className="w-4 h-4" />
+                      <span>{dept.replace(/_/g, ' ')}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            /* Espacio reservado para Mis Incapacidades */
+            <div className="h-10" />
+          )}
+        </div>
+        
+        {/* Celda 4: Estadísticas */}
+        <div className="flex gap-2 justify-end h-10 items-center">
+          {activeSubTab === 'mias' ? (
+            <>
+              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-[160px]">
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-corporate" />
+                  <span className="text-[10px] text-[#86868B]">Este mes</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
+                  <span className="text-[10px] text-[#86868B]">días</span>
+                </div>
+              </div>
+              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-[160px]">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="w-3 h-3 text-green-600" />
+                  <span className="text-[10px] text-[#86868B]">Este año</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
+                  <span className="text-[10px] text-[#86868B]">días</span>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-[160px]">
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3 h-3 text-corporate" />
+                  <span className="text-[10px] text-[#86868B]">Este mes</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
+                  <span className="text-[10px] text-[#86868B]">personas</span>
+                </div>
+              </div>
+              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-[160px]">
+                <div className="flex items-center gap-1.5">
+                  <CalendarDays className="w-3 h-3 text-green-600" />
+                  <span className="text-[10px] text-[#86868B]">Este año</span>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
+                  <span className="text-[10px] text-[#86868B]">días</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Lista de incapacidades */}
+      <div className="space-y-3">
+        {(activeSubTab === 'mias' ? filteredMyIncapacidades : filteredIncapacidades).length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <HeartPulse className="w-8 h-8 text-[#C7C7CC]" />
+            </div>
+            <p className="text-[#86868B]">
+              {activeSubTab === 'mias' 
+                ? `No hay incapacidades ${myFilter !== 'historial' ? myFilter : ''}`
+                : `No hay incapacidades ${statusFilter !== 'todas' ? statusConfig[statusFilter].label.toLowerCase() + 's' : ''}`
+              }
+            </p>
+          </div>
+        ) : (
+          (activeSubTab === 'mias' ? filteredMyIncapacidades : filteredIncapacidades).map((incapacidad) => {
+            const typeConfig = incapacityTypeConfig[incapacidad.type];
+            const statusCfg = statusConfig[incapacidad.status];
+            const TypeIcon = typeConfig.icon;
+            const StatusIcon = statusCfg.icon;
+            const startDate = new Date(incapacidad.startDate);
+            const endDate = new Date(incapacidad.endDate);
+            const daysCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+            const isExpanded = expandedIncapacityId === incapacidad.id;
+            
+            return (
+              <div
+                key={incapacidad.id}
+                className={cn(
+                  "bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all overflow-hidden",
+                  isExpanded ? "shadow-[0_4px_16px_rgba(0,0,0,0.12)]" : "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
+                )}
+              >
+                {/* Cabecera de la tarjeta - CLICABLE */}
+                <button
+                  onClick={() => toggleExpand(incapacidad.id)}
+                  className="w-full p-4 text-left"
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Avatar */}
+                    <div className="w-12 h-12 bg-corporate/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-lg font-semibold text-corporate">{incapacidad.userAvatar}</span>
+                    </div>
+                    
+                    {/* Info principal */}
+                    <div className="flex-1 min-w-0">
+                      {/* Fila superior: Nombre y Estado (MÁS VISIBLE) */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+                        <p className="text-sm font-medium text-[#1D1D1F]">{incapacidad.userName}</p>
+                        {/* ESTADO MÁS VISIBLE - Badge grande con borde */}
+                        <span className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border-2",
+                          statusCfg.bgColor,
+                          statusCfg.color,
+                          statusCfg.borderColor
+                        )}>
+                          <StatusIcon className="w-3.5 h-3.5" />
+                          {statusCfg.label}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs text-[#86868B]">
+                        {incapacidad.userDepartment.replace(/_/g, ' ')}
+                      </p>
+                      
+                      {/* Tipo y fechas */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg border", typeConfig.bgColor, typeConfig.borderColor)}>
+                          <TypeIcon className={cn("w-3.5 h-3.5", typeConfig.color)} />
+                          <span className={cn("text-xs font-medium", typeConfig.color)}>{typeConfig.label}</span>
+                        </div>
+                        <span className="text-xs text-[#86868B]">
+                          {startDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          {' '}({daysCount} {daysCount === 1 ? 'día' : 'días'})
+                        </span>
+                      </div>
+                      
+                      {incapacidad.description && (
+                        <p className="text-xs text-[#86868B] mt-2 line-clamp-1">{incapacidad.description}</p>
+                      )}
+                      
+                      {/* Reemplazo asignado (vista previa) */}
+                      {incapacidad.replacementUserName && (
+                        <div className={cn(
+                          "flex items-center gap-1.5 mt-2 text-xs",
+                          incapacidad.isExternalSupport ? "text-amber-600" : "text-green-600"
+                        )}>
+                          <User className="w-3.5 h-3.5" />
+                          <span>
+                            Reemplazo: {incapacidad.replacementUserName}
+                            {incapacidad.isExternalSupport && (
+                              <span className="ml-1 px-1.5 py-0.5 bg-amber-100 rounded text-[10px]">Apoyo externo</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Motivo de rechazo (vista previa) */}
+                      {incapacidad.rejectionReason && (
+                        <div className="flex items-center gap-1.5 mt-2 text-xs text-red-600">
+                          <X className="w-3.5 h-3.5" />
+                          <span>Motivo: {incapacidad.rejectionReason}</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Icono de expansión */}
+                    <div className="flex-shrink-0">
+                      <ChevronRight className={cn(
+                        "w-5 h-5 text-[#C7C7CC] transition-transform",
+                        isExpanded && "rotate-90"
+                      )} />
+                    </div>
+                  </div>
+                </button>
+                
+                {/* CONTENIDO EXPANDIDO */}
+                {isExpanded && (
+                  <div className="border-t border-[#E5E5E7] p-4 bg-[#FAFAFA]">
+                    {/* Botones de acción - SOLO en Equipo */}
+                    {activeSubTab === 'equipo' && (
+                      <div className="flex gap-2 mb-4 flex-wrap">
+                        {/* Botón Verificar - SOLO para RRHH */}
+                        {incapacidad.status === 'pendiente' && 
+                         user?.department === ('RRHH' as Department) && (
+                          <button
+                            onClick={() => handleVerify(incapacidad)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                          >
+                            <Check className="w-4 h-4" />
+                            Verificar
+                          </button>
+                        )}
+                        
+                        {/* Botón Registrar - para Supervisor, Gerente, Director o Director General cuando está verificada y tiene documentos */}
+                        {incapacidad.status === 'verificada' && 
+                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
+                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
+                          user?.role === Role.DIRECTOR_GENERAL) &&
+                         incapacidad.documents.some(d => d.uploaded) && (
+                          <button
+                            onClick={() => handleRegister(incapacidad)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                          >
+                            <Check className="w-4 h-4" />
+                            Registrar
+                          </button>
+                        )}
+                        
+                        {/* Botón Rechazar - para roles autorizados */}
+                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') &&
+                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
+                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
+                          user?.role === Role.DIRECTOR_GENERAL) && (
+                          <button
+                            onClick={() => handleReject(incapacidad)}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                            Rechazar
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Información del reemplazo con botón para cambiar */}
+                    {incapacidad.status === 'registrada' && (
+                      <div className="mb-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-sm font-medium text-[#1D1D1F]">Reemplazo asignado</p>
+                          <button
+                            onClick={() => handleChangeReplacement(incapacidad)}
+                            className="text-xs text-corporate hover:underline"
+                          >
+                            Cambiar reemplazo
+                          </button>
+                        </div>
+                        {incapacidad.replacementUserName ? (
+                          <div className={cn(
+                            "flex items-center gap-3 rounded-xl p-3 border",
+                            incapacidad.isExternalSupport 
+                              ? "bg-amber-50 border-amber-200" 
+                              : "bg-green-50 border-green-200"
+                          )}>
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback className={cn(
+                                "text-white text-sm",
+                                incapacidad.isExternalSupport ? "bg-amber-500" : "bg-green-500"
+                              )}>
+                                {getInitials(incapacidad.replacementUserName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className={cn(
+                                "text-sm font-medium",
+                                incapacidad.isExternalSupport ? "text-amber-700" : "text-green-700"
+                              )}>
+                                {incapacidad.replacementUserName}
+                              </p>
+                              {incapacidad.isExternalSupport && incapacidad.replacementUserDept && (
+                                <p className="text-xs text-amber-600">
+                                  Apoyo de: {incapacidad.replacementUserDept.replace(/_/g, ' ')}
+                                </p>
+                              )}
+                            </div>
+                            {incapacidad.isExternalSupport && (
+                              <span className="ml-auto px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-medium rounded">
+                                Apoyo externo
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="bg-[#F5F5F7] rounded-xl p-4 text-center">
+                            <p className="text-sm text-[#86868B] mb-2">No hay reemplazo asignado</p>
+                            <button
+                              onClick={() => handleChangeReplacement(incapacidad)}
+                              className="text-sm text-corporate hover:underline"
+                            >
+                              + Asignar reemplazo
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Documentos */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium text-[#1D1D1F] flex items-center gap-2">
+                          <ClipboardList className="w-4 h-4" /> Documentos
+                        </p>
+                      </div>
+                      {incapacidad.documents.length > 0 ? (
+                        <div className="space-y-2">
+                          {incapacidad.documents.map(doc => (
+                            <div key={doc.id} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <ClipboardList className="w-4 h-4 text-[#86868B]" />
+                                  <span className="text-sm">{doc.name}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {doc.uploaded ? (
+                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-600 rounded-full">
+                                      Subido ({doc.fileUrls?.length || 0})
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full">
+                                      Pendiente
+                                    </span>
+                                  )}
+                                  {/* Botón para subir foto (solo para el usuario que cargó la incapacidad) */}
+                                  {user?.id === incapacidad.userId && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedIncapacity(incapacidad);
+                                        setSelectedDocForUpload(doc.id);
+                                        setShowUploadDocModal(true);
+                                      }}
+                                      className="flex items-center gap-1 px-2 py-1 bg-corporate/10 text-corporate rounded text-xs hover:bg-corporate/20"
+                                    >
+                                      <Camera className="w-3 h-3" />
+                                      {doc.uploaded ? 'Agregar' : 'Subir'}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              {/* Mostrar fotos subidas - orientación vertical */}
+                              {doc.fileUrls && doc.fileUrls.length > 0 && (
+                                <div className="flex flex-wrap gap-3 mt-3">
+                                  {doc.fileUrls.map((url, idx) => (
+                                    <div key={idx} className="relative group">
+                                      <img 
+                                        src={url} 
+                                        alt={`${doc.name} ${idx + 1}`}
+                                        className="h-32 w-24 object-contain rounded-lg border border-[#E5E5E7] cursor-pointer hover:border-corporate transition-colors bg-[#F5F5F7]"
+                                        onClick={() => setExpandedImage(url)}
+                                      />
+                                      {/* Botón de descargar */}
+                                      <a
+                                        href={url}
+                                        download={`${doc.name}-${idx + 1}.jpg`}
+                                        className="absolute top-1 right-1 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Download className="w-3.5 h-3.5 text-corporate" />
+                                      </a>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-[#86868B]">No hay documentos solicitados</p>
+                      )}
+                      
+                      {/* Solicitar nuevo documento - SOLO en Equipo */}
+                      {activeSubTab === 'equipo' && (
+                        <div className="flex gap-2 mt-2">
+                          <input
+                            type="text"
+                            value={newDocName}
+                            onChange={(e) => setNewDocName(e.target.value)}
+                            className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
+                            placeholder="Solicitar nuevo documento..."
+                          />
+                          <Button 
+                            size="sm"
+                            disabled={!newDocName.trim()}
+                            onClick={() => requestDocument(incapacidad.id)}
+                          >
+                            <Plus className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Historial */}
+                    <div className="mb-4">
+                      <p className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
+                        <History className="w-4 h-4" /> Historial de acciones
+                      </p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                        {incapacidad.history.map((h, i) => (
+                          <div key={i} className="flex items-start gap-3 text-sm">
+                            <div className="w-2 h-2 bg-corporate rounded-full mt-1.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-[#1D1D1F]">{h.action}</p>
+                              <p className="text-xs text-[#86868B]">{h.user} • {new Date(h.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Notas */}
+                    <div>
+                      <p className="text-sm font-medium text-[#1D1D1F] mb-2">Notas</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
+                        {incapacidad.notes.length > 0 ? (
+                          incapacidad.notes.map((note, i) => (
+                            <div key={i} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                              <p className="text-sm text-[#1D1D1F]">{note.text}</p>
+                              <p className="text-xs text-[#86868B] mt-1">{note.user} • {new Date(note.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-sm text-[#86868B]">Sin notas</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
+                          placeholder="Añadir nota..."
+                        />
+                        <Button 
+                          size="sm"
+                          disabled={!newNote.trim()}
+                          onClick={() => addNote(incapacidad.id)}
+                        >
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Modal de Registrar Incapacidad - CON SELECCIÓN DE REEMPLAZO */}
+      <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <Check className="w-4 h-4 text-green-600" />
+              </div>
+              Registrar Incapacidad
+            </DialogTitle>
+          </DialogHeader>
+          {selectedIncapacity && (
+            <div className="space-y-4">
+              {/* Info de la incapacidad */}
+              <div className="bg-[#F5F5F7] rounded-xl p-4">
+                <p className="text-sm font-medium text-[#1D1D1F]">{selectedIncapacity.userName}</p>
+                <p className="text-xs text-[#86868B]">{selectedIncapacity.userDepartment.replace(/_/g, ' ')}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  {(() => {
+                    const config = incapacityTypeConfig[selectedIncapacity.type];
+                    const Icon = config.icon;
+                    return (
+                      <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg", config.bgColor)}>
+                        <Icon className={cn("w-3.5 h-3.5", config.color)} />
+                        <span className={cn("text-xs font-medium", config.color)}>{config.label}</span>
+                      </div>
+                    );
+                  })()}
+                  <span className="text-xs text-[#86868B]">
+                    {new Date(selectedIncapacity.startDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {new Date(selectedIncapacity.endDate).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Selección de reemplazo */}
+              <div>
+                <p className="text-sm font-medium text-[#1D1D1F] mb-2">Seleccionar reemplazo (opcional)</p>
+                
+                {/* Toggle para apoyo externo */}
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onClick={() => {
+                      setIsExternalSupport(false);
+                      setSelectedReplacement('');
+                    }}
+                    className={cn(
+                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                      !isExternalSupport 
+                        ? "bg-corporate text-white" 
+                        : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]"
+                    )}
+                  >
+                    Mismo departamento
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsExternalSupport(true);
+                      setSelectedReplacement('');
+                    }}
+                    className={cn(
+                      "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1",
+                      isExternalSupport 
+                        ? "bg-amber-500 text-white" 
+                        : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]"
+                    )}
+                  >
+                    <Building2 className="w-3.5 h-3.5" />
+                    Apoyo externo
+                  </button>
+                </div>
+                
+                {/* Lista de usuarios */}
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {getReplacementUsers(selectedIncapacity, isExternalSupport).map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => setSelectedReplacement(u.id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left',
+                        selectedReplacement === u.id
+                          ? 'border-corporate bg-corporate/5'
+                          : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
+                      )}
+                    >
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-corporate text-white text-sm">
+                          {getInitials(u.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
+                        <p className="text-xs text-[#86868B]">{u.position}</p>
+                        {isExternalSupport && (
+                          <p className="text-xs text-amber-600">{u.department.replace(/_/g, ' ')}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                  {getReplacementUsers(selectedIncapacity, isExternalSupport).length === 0 && (
+                    <p className="text-sm text-[#86868B] text-center py-4">
+                      No hay usuarios disponibles para reemplazo
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowRegisterModal(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={confirmRegister}
+                >
+                  <Check className="w-4 h-4 mr-1.5" />
+                  Confirmar Registro
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Rechazar Incapacidad */}
+      <Dialog open={showRejectModal} onOpenChange={setShowRejectModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <X className="w-4 h-4 text-red-600" />
+              </div>
+              Rechazar Incapacidad
+            </DialogTitle>
+          </DialogHeader>
+          {selectedIncapacity && (
+            <div className="space-y-4">
+              <div className="bg-[#F5F5F7] rounded-xl p-4">
+                <p className="text-sm font-medium text-[#1D1D1F]">{selectedIncapacity.userName}</p>
+                <p className="text-xs text-[#86868B]">{selectedIncapacity.userDepartment.replace(/_/g, ' ')}</p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Motivo del rechazo *</label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm min-h-[80px] resize-none"
+                  placeholder="Indica el motivo del rechazo..."
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowRejectModal(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  disabled={!rejectionReason.trim()}
+                  onClick={confirmReject}
+                >
+                  <X className="w-4 h-4 mr-1.5" />
+                  Rechazar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Cambiar Reemplazo */}
+      <Dialog open={showChangeReplaceModal} onOpenChange={setShowChangeReplaceModal}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <User className="w-4 h-4 text-blue-600" />
+              </div>
+              Cambiar Reemplazo
+            </DialogTitle>
+          </DialogHeader>
+          {selectedIncapacity && (
+            <div className="space-y-4">
+              <div className="bg-[#F5F5F7] rounded-xl p-4">
+                <p className="text-sm font-medium text-[#1D1D1F]">{selectedIncapacity.userName}</p>
+                <p className="text-xs text-[#86868B]">{selectedIncapacity.userDepartment.replace(/_/g, ' ')}</p>
+              </div>
+              
+              {/* Toggle para apoyo externo */}
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => {
+                    setIsExternalSupport(false);
+                    setSelectedReplacement('');
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                    !isExternalSupport 
+                      ? "bg-corporate text-white" 
+                      : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]"
+                  )}
+                >
+                  Mismo departamento
+                </button>
+                <button
+                  onClick={() => {
+                    setIsExternalSupport(true);
+                    setSelectedReplacement('');
+                  }}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1",
+                    isExternalSupport 
+                      ? "bg-amber-500 text-white" 
+                      : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]"
+                  )}
+                >
+                  <Building2 className="w-3.5 h-3.5" />
+                  Apoyo externo
+                </button>
+              </div>
+              
+              {/* Lista de usuarios */}
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {getReplacementUsers(selectedIncapacity, isExternalSupport).map(u => (
+                  <button
+                    key={u.id}
+                    onClick={() => setSelectedReplacement(u.id)}
+                    className={cn(
+                      'w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left',
+                      selectedReplacement === u.id
+                        ? 'border-corporate bg-corporate/5'
+                        : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
+                    )}
+                  >
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback className="bg-corporate text-white text-sm">
+                        {getInitials(u.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
+                      <p className="text-xs text-[#86868B]">{u.position}</p>
+                      {isExternalSupport && (
+                        <p className="text-xs text-amber-600">{u.department.replace(/_/g, ' ')}</p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+                {getReplacementUsers(selectedIncapacity, isExternalSupport).length === 0 && (
+                  <p className="text-sm text-[#86868B] text-center py-4">
+                    No hay usuarios disponibles para reemplazo
+                  </p>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowChangeReplaceModal(false)}>
+                  Cancelar
+                </Button>
+                <Button 
+                  className="flex-1 bg-corporate hover:bg-corporate/90"
+                  disabled={!selectedReplacement}
+                  onClick={confirmChangeReplacement}
+                >
+                  <Check className="w-4 h-4 mr-1.5" />
+                  Cambiar Reemplazo
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Subir Documento */}
+      <Dialog open={showUploadDocModal} onOpenChange={(open) => {
+        setShowUploadDocModal(open);
+        if (!open) setSelectedFilePreviews([]);
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-corporate/10 rounded-lg flex items-center justify-center">
+                <Camera className="w-4 h-4 text-corporate" />
+              </div>
+              Subir Documento
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Preview de imágenes seleccionadas */}
+            {selectedFilePreviews.length > 0 ? (
+              <div className="bg-[#F5F5F7] rounded-xl p-4">
+                <p className="text-sm text-[#86868B] mb-3 text-center">
+                  {selectedFilePreviews.length} archivo(s) seleccionado(s):
+                </p>
+                <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                  {selectedFilePreviews.map((preview, idx) => (
+                    <div key={idx} className="relative">
+                      <img 
+                        src={preview} 
+                        alt={`Preview ${idx + 1}`} 
+                        className="h-20 w-full object-cover rounded-lg border border-[#E5E5E7]"
+                      />
+                      <button
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        onClick={() => {
+                          setSelectedFilePreviews(prev => prev.filter((_, i) => i !== idx));
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#F5F5F7] rounded-xl p-6 text-center">
+                <div className="w-16 h-16 bg-corporate/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Upload className="w-8 h-8 text-corporate" />
+                </div>
+                <p className="text-sm text-[#86868B] mb-4">
+                  Toma fotos o selecciona archivos para subir
+                </p>
+              </div>
+            )}
+            
+            {/* Input file oculto - múltiples archivos */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  const newUrls = files.map(file => URL.createObjectURL(file));
+                  setSelectedFilePreviews(prev => [...prev, ...newUrls]);
+                }
+              }}
+            />
+            
+            {/* Botones Cámara/Galería - siempre visibles para agregar más */}
+            <div className="flex gap-2">
+              <button 
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors"
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.setAttribute('capture', 'environment');
+                    fileInputRef.current.click();
+                  }
+                }}
+              >
+                <Camera className="w-4 h-4" />
+                Cámara
+              </button>
+              <button 
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg text-sm font-medium border border-[#E5E5E7] hover:bg-[#E5E5E7] transition-colors"
+                onClick={() => {
+                  if (fileInputRef.current) {
+                    fileInputRef.current.removeAttribute('capture');
+                    fileInputRef.current.click();
+                  }
+                }}
+              >
+                <FileImage className="w-4 h-4" />
+                Galería
+              </button>
+            </div>
+            
+            {/* Botones Cancelar / Confirmar */}
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1" 
+                onClick={() => {
+                  setSelectedFilePreviews([]);
+                  setShowUploadDocModal(false);
+                }}
+              >
+                Cancelar
+              </Button>
+              {selectedFilePreviews.length > 0 && (
+                <Button 
+                  className="flex-1 bg-corporate hover:bg-corporate/90"
+                  onClick={() => {
+                    console.log('Confirmar clicked', {
+                      previewsCount: selectedFilePreviews.length,
+                      incapacity: selectedIncapacity,
+                      docId: selectedDocForUpload,
+                      condition: selectedFilePreviews.length > 0 && !!selectedIncapacity && !!selectedDocForUpload
+                    });
+                    if (selectedFilePreviews.length > 0 && selectedIncapacity && selectedDocForUpload) {
+                      uploadDocumentPhotoWithFile(selectedIncapacity.id, selectedDocForUpload, [...selectedFilePreviews]);
+                      setSelectedFilePreviews([]);
+                    } else {
+                      console.log('Condición falló - no se ejecuta uploadDocumentPhotoWithFile');
+                    }
+                  }}
+                >
+                  <Check className="w-4 h-4 mr-1.5" />
+                  Confirmar ({selectedFilePreviews.length})
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de imagen expandida */}
+      <Dialog open={!!expandedImage} onOpenChange={() => setExpandedImage(null)}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/90">
+          {expandedImage && (
+            <div className="relative">
+              <img 
+                src={expandedImage} 
+                alt="Documento ampliado"
+                className="w-full max-h-[80vh] object-contain"
+              />
+              <button
+                onClick={() => setExpandedImage(null)}
+                className="absolute top-4 right-4 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+              <a
+                href={expandedImage}
+                download="documento.jpg"
+                className="absolute bottom-4 right-4 px-4 py-2 bg-corporate text-white rounded-lg flex items-center gap-2 hover:bg-corporate/90 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Descargar
+              </a>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SOLICITUDES TAB - INTERFACES
+// ═══════════════════════════════════════════════════════════════════
+
+interface HistorialItem {
+  fecha: string;
+  accion: string;
+  usuario: string;
+  motivo?: string;
+}
+
+interface Solicitud {
+  id: number;
+  tipo: 'cambio' | 'intercambio';
+  de: string;
+  a: string;
+  deCargo?: string;
+  aCargo?: string;
+  deDept?: string;
+  aDept?: string;
+  // Turnos del usuario que solicita (de)
+  deTurnoActual?: string;
+  deTurnoNuevo?: string;
+  deHorarioActual?: string;
+  deHorarioNuevo?: string;
+  // Turnos del usuario que recibe (a)
+  aTurnoActual?: string;
+  aTurnoNuevo?: string;
+  aHorarioActual?: string;
+  aHorarioNuevo?: string;
+  // Campos legacy para compatibilidad
+  turnoActual?: string;
+  turnoSolicitado?: string;
+  horarioActual?: string;
+  horarioSolicitado?: string;
+  fecha: string;
+  fechaSolicitud: string;
+  fechaRespuesta?: string;
+  estado: 'pendiente' | 'aceptada' | 'rechazada' | 'deshecha';
+  avatar: string;
+  historial?: HistorialItem[];
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // SOLICITUDES TAB
 // ═══════════════════════════════════════════════════════════════════
 
 function SolicitudesTab() {
+  const { user } = useAuth();
+  const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
+  const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
+  const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
+  const [equipoDeptFilter, setEquipoDeptFilter] = useState<Department | 'ALL'>('ALL');
+  
+  // Estado para modal de deshacer cambio
+  const [showUndoModal, setShowUndoModal] = useState(false);
+  const [selectedSolicitud, setSelectedSolicitud] = useState<Solicitud | null>(null);
+  const [undoReason, setUndoReason] = useState('');
+  
+  // Estado para solicitudes (para poder modificarlas)
+  const [solicitudesEquipoState, setSolicitudesEquipoState] = useState<Solicitud[]>([]);
+  const [solicitudesRecibidasState, setSolicitudesRecibidasState] = useState<Solicitud[]>([]);
+  const [solicitudesEnviadasState, setSolicitudesEnviadasState] = useState<Solicitud[]>([]);
+  const [historialState, setHistorialState] = useState<Solicitud[]>([]);
+  const [todasSolicitudes, setTodasSolicitudes] = useState<Solicitud[]>([]);
+  
+  // Inicializar solicitudes desde localStorage y datos de ejemplo
+  useEffect(() => {
+    // Leer solicitudes guardadas en localStorage
+    const savedSolicitudes = localStorage.getItem('waveops_todas_solicitudes');
+    const parsedSolicitudes = savedSolicitudes ? JSON.parse(savedSolicitudes) : [];
+    
+    // Combinar con datos de ejemplo
+    const allSolicitudes = [...parsedSolicitudes, ...solicitudesEquipo, ...solicitudesRecibidas, ...solicitudesEnviadas, ...historial];
+    
+    // Eliminar duplicados por ID
+    const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
+      index === self.findIndex(s => s.id === sol.id)
+    );
+    
+    setTodasSolicitudes(uniqueSolicitudes);
+    setSolicitudesEquipoState(solicitudesEquipo);
+    setSolicitudesRecibidasState(solicitudesRecibidas);
+    setSolicitudesEnviadasState(solicitudesEnviadas);
+    setHistorialState(historial);
+  }, []);
+  
+  // Actualizar localStorage cuando cambian las solicitudes
+  useEffect(() => {
+    if (todasSolicitudes.length > 0) {
+      localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
+    }
+  }, [todasSolicitudes]);
+
+  // Verificar si el usuario puede ver solicitudes de equipo (Supervisores y roles superiores)
+  const canViewEquipo = true; // Temporalmente habilitado para todos, ajustar según permisos reales
+  
+  // Verificar si el usuario puede deshacer cambios (Supervisor+)
+  const canUndoChanges = user?.role === Role.SUPERVISOR || 
+                         user?.role === Role.GERENTE_DEPARTAMENTO || 
+                         user?.role === Role.GERENTE_OPERACIONES || 
+                         user?.role === Role.DIRECTOR || 
+                         user?.role === Role.DIRECTOR_GENERAL;
+  
+  // Función para deshacer cambio
+  const handleUndoChange = () => {
+    if (!selectedSolicitud || !undoReason.trim()) return;
+    
+    const now = new Date().toISOString();
+    const userName = user?.name || 'Supervisor';
+    const newHistorialItem = {
+      fecha: now,
+      accion: 'Cambio deshecho por supervisor',
+      usuario: userName,
+      motivo: undoReason.trim()
+    };
+    
+    const updatedSolicitud: Solicitud = {
+      ...selectedSolicitud,
+      estado: 'deshecha',
+      historial: [...(selectedSolicitud.historial || []), newHistorialItem]
+    };
+    
+    // Actualizar el estado de equipo
+    setSolicitudesEquipoState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
+    
+    // Actualizar historial de Mis Cambios
+    setHistorialState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
+    
+    // Actualizar estado global
+    setTodasSolicitudes(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
+    
+    // Actualizar localStorage
+    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
+    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === selectedSolicitud.id ? updatedSolicitud : s);
+    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
+    
+    // Cerrar modal y limpiar
+    setShowUndoModal(false);
+    setSelectedSolicitud(null);
+    setUndoReason('');
+  };
+
+  // Datos de ejemplo para solicitudes
+  const solicitudesRecibidas: Solicitud[] = [
+    { 
+      id: 1, 
+      tipo: 'cambio', 
+      de: 'Daniel Calderon', 
+      a: 'Tú', 
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      fecha: '2026-04-05', 
+      fechaSolicitud: '2026-04-02T13:01:00',
+      estado: 'pendiente', 
+      avatar: 'DC',
+      historial: [
+        { fecha: '2026-04-02T13:01:00', accion: 'Solicitud creada', usuario: 'Daniel Calderon' }
+      ]
+    },
+    { 
+      id: 2, 
+      tipo: 'intercambio', 
+      de: 'María García', 
+      a: 'Tú',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      aTurnoActual: 'PM',
+      aTurnoNuevo: 'AM',
+      aHorarioActual: '12:30-20:30',
+      aHorarioNuevo: '09:00-13:00',
+      fecha: '2026-04-03', 
+      fechaSolicitud: '2026-04-01T10:30:00',
+      estado: 'pendiente', 
+      avatar: 'MG',
+      historial: [
+        { fecha: '2026-04-01T10:30:00', accion: 'Solicitud de intercambio creada', usuario: 'María García' }
+      ]
+    },
+  ];
+
+  const solicitudesEnviadas: Solicitud[] = [
+    { 
+      id: 3, 
+      tipo: 'cambio', 
+      de: 'Tú', 
+      a: 'Carlos López',
+      aCargo: 'Voluntario',
+      aDept: 'Dive Shop',
+      turnoActual: 'PM', 
+      turnoSolicitado: 'AM', 
+      horarioActual: '12:30-20:30',
+      horarioSolicitado: '09:00-13:00',
+      fecha: '2026-04-02', 
+      fechaSolicitud: '2026-03-30T09:15:00',
+      estado: 'pendiente', 
+      avatar: 'CL' 
+    },
+  ];
+
+  const historial: Solicitud[] = [
+    { 
+      id: 4, 
+      tipo: 'cambio', 
+      de: 'Lixue Pie', 
+      a: 'Tú',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      deTurnoActual: 'PM',
+      deTurnoNuevo: 'AM',
+      deHorarioActual: '12:30-20:30',
+      deHorarioNuevo: '09:00-13:00',
+      fecha: '2026-03-21', 
+      fechaSolicitud: '2026-03-19T11:52:00',
+      fechaRespuesta: '2026-03-19T12:52:00',
+      estado: 'aceptada', 
+      avatar: 'LP',
+      historial: [
+        { fecha: '2026-03-19T11:52:00', accion: 'Solicitud creada', usuario: 'Lixue Pie' },
+        { fecha: '2026-03-19T12:52:00', accion: 'Solicitud aceptada', usuario: 'Tú' }
+      ]
+    },
+    { 
+      id: 5, 
+      tipo: 'intercambio', 
+      de: 'Lixue Pie', 
+      a: 'Daniel Calderon',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      aTurnoActual: 'PM',
+      aTurnoNuevo: 'AM',
+      aHorarioActual: '12:30-20:30',
+      aHorarioNuevo: '09:00-13:00',
+      fecha: '2026-03-21', 
+      fechaSolicitud: '2026-03-19T12:51:00',
+      fechaRespuesta: '2026-03-19T12:52:00',
+      estado: 'rechazada', 
+      avatar: 'LP',
+      historial: [
+        { fecha: '2026-03-19T12:51:00', accion: 'Solicitud de intercambio creada', usuario: 'Lixue Pie' },
+        { fecha: '2026-03-19T12:52:00', accion: 'Solicitud rechazada', usuario: 'Daniel Calderon' }
+      ]
+    },
+    { 
+      id: 9, 
+      tipo: 'cambio', 
+      de: 'Ana Torres', 
+      a: 'Pedro Ruiz',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      fecha: '2026-03-15', 
+      fechaSolicitud: '2026-03-10T09:00:00',
+      fechaRespuesta: '2026-03-10T14:30:00',
+      estado: 'deshecha', 
+      avatar: 'AT',
+      historial: [
+        { fecha: '2026-03-10T09:00:00', accion: 'Solicitud creada', usuario: 'Ana Torres' },
+        { fecha: '2026-03-10T14:30:00', accion: 'Solicitud aceptada', usuario: 'Pedro Ruiz' },
+        { fecha: '2026-03-12T10:15:00', accion: 'Cambio deshecho por supervisor', usuario: 'Supervisor', motivo: 'Error en la asignación de turnos, se requiere reasignar' }
+      ]
+    },
+  ];
+
+  const solicitudesEquipo: Solicitud[] = [
+    { 
+      id: 6, 
+      tipo: 'cambio', 
+      de: 'Pedro Sánchez', 
+      a: 'Laura Díaz',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      aCargo: 'Voluntario',
+      aDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      fecha: '2026-04-01', 
+      fechaSolicitud: '2026-03-28T14:20:00',
+      fechaRespuesta: '2026-03-29T09:00:00',
+      estado: 'aceptada', 
+      avatar: 'PS',
+      historial: [
+        { fecha: '2026-03-28T14:20:00', accion: 'Solicitud creada', usuario: 'Pedro Sánchez' },
+        { fecha: '2026-03-29T09:00:00', accion: 'Solicitud aceptada', usuario: 'Laura Díaz' }
+      ]
+    },
+    { 
+      id: 7, 
+      tipo: 'intercambio', 
+      de: 'Sofía Martínez', 
+      a: 'Diego Flores',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      aCargo: 'Voluntario',
+      aDept: 'Dive Shop',
+      deTurnoActual: 'AM',
+      deTurnoNuevo: 'PM',
+      deHorarioActual: '09:00-13:00',
+      deHorarioNuevo: '12:30-20:30',
+      aTurnoActual: 'PM',
+      aTurnoNuevo: 'AM',
+      aHorarioActual: '12:30-20:30',
+      aHorarioNuevo: '09:00-13:00',
+      fecha: '2026-03-28', 
+      fechaSolicitud: '2026-03-25T11:00:00',
+      fechaRespuesta: '2026-03-26T16:30:00',
+      estado: 'rechazada', 
+      avatar: 'SM',
+      historial: [
+        { fecha: '2026-03-25T11:00:00', accion: 'Solicitud de intercambio creada', usuario: 'Sofía Martínez' },
+        { fecha: '2026-03-26T16:30:00', accion: 'Solicitud rechazada', usuario: 'Diego Flores' }
+      ]
+    },
+    { 
+      id: 8, 
+      tipo: 'cambio', 
+      de: 'Carmen Vega', 
+      a: 'Roberto Paz',
+      deCargo: 'Voluntario',
+      deDept: 'Dive Shop',
+      aCargo: 'Voluntario',
+      aDept: 'Dive Shop',
+      deTurnoActual: 'PM',
+      deTurnoNuevo: 'AM',
+      deHorarioActual: '12:30-20:30',
+      deHorarioNuevo: '09:00-13:00',
+      fecha: '2026-04-04', 
+      fechaSolicitud: '2026-04-01T08:45:00',
+      estado: 'pendiente', 
+      avatar: 'CV' 
+    },
+  ];
+
+  const getFilteredEquipo = () => {
+    let filtered = solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo;
+    
+    // Filtrar por departamento
+    if (equipoDeptFilter !== 'ALL') {
+      filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
+    }
+    
+    // Filtrar por estado
+    if (equipoFilter === 'aceptadas') filtered = filtered.filter(s => s.estado === 'aceptada');
+    if (equipoFilter === 'rechazadas') filtered = filtered.filter(s => s.estado === 'rechazada');
+    if (equipoFilter === 'deshechas') filtered = filtered.filter(s => s.estado === 'deshecha');
+    
+    return filtered;
+  };
+
+  const getFilteredMisCambios = () => {
+    const currentUser = user?.name || 'Usuario';
+    const currentUserId = user?.id || 'current-user';
+    
+    // Combinar todas las solicitudes disponibles
+    const allSolicitudes = [
+      ...todasSolicitudes,
+      ...solicitudesRecibidasState,
+      ...solicitudesEnviadasState,
+      ...historialState,
+      ...solicitudesRecibidas,
+      ...solicitudesEnviadas,
+      ...historial
+    ];
+    
+    // Eliminar duplicados
+    const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
+      index === self.findIndex(s => s.id === sol.id)
+    );
+    
+    let result: Solicitud[] = [];
+    
+    if (misCambiosFilter === 'recibidas') {
+      // Solicitudes donde OTROS usuarios envían AL usuario actual (a === usuario actual) y están pendientes
+      result = uniqueSolicitudes.filter(s => 
+        (s.a === 'Tú' || s.a === currentUser || s.a === currentUserId) && 
+        (s.de !== 'Tú' && s.de !== currentUser && s.de !== currentUserId) &&
+        s.estado === 'pendiente'
+      );
+    } else if (misCambiosFilter === 'enviadas') {
+      // Solicitudes donde el usuario actual envía A OTROS (de === usuario actual) y están pendientes
+      result = uniqueSolicitudes.filter(s => 
+        (s.de === 'Tú' || s.de === currentUser || s.de === currentUserId) && 
+        (s.a !== 'Tú' && s.a !== currentUser && s.a !== currentUserId) &&
+        s.estado === 'pendiente'
+      );
+    } else {
+      // Historial - todas las solicitudes donde el usuario participó (aceptadas, rechazadas, deshechas)
+      result = uniqueSolicitudes.filter(s => 
+        (s.de === 'Tú' || s.a === 'Tú' || s.de === currentUser || s.a === currentUser || s.de === currentUserId || s.a === currentUserId) &&
+        (s.estado === 'aceptada' || s.estado === 'rechazada' || s.estado === 'deshecha')
+      );
+    }
+    
+    // Ordenar cronológicamente de más nueva a más antigua (por fecha de solicitud)
+    return result.sort((a, b) => new Date(b.fechaSolicitud).getTime() - new Date(a.fechaSolicitud).getTime());
+  };
+  
+  // Función para aceptar solicitud
+  const handleAcceptSolicitud = (solicitud: Solicitud) => {
+    const now = new Date().toISOString();
+    const userName = user?.name || 'Usuario';
+    
+    const updatedSolicitud: Solicitud = { 
+      ...solicitud, 
+      estado: 'aceptada', 
+      fechaRespuesta: now,
+      historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud aceptada', usuario: userName }]
+    };
+    
+    // Actualizar estado local
+    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
+    setHistorialState(prev => [...prev, updatedSolicitud]);
+    
+    // Actualizar estado global
+    setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
+    
+    // Actualizar localStorage
+    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
+    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
+    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
+  };
+  
+  // Función para rechazar solicitud
+  const handleRejectSolicitud = (solicitud: Solicitud) => {
+    const now = new Date().toISOString();
+    const userName = user?.name || 'Usuario';
+    
+    const updatedSolicitud: Solicitud = { 
+      ...solicitud, 
+      estado: 'rechazada', 
+      fechaRespuesta: now,
+      historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud rechazada', usuario: userName }]
+    };
+    
+    // Actualizar estado local
+    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
+    setHistorialState(prev => [...prev, updatedSolicitud]);
+    
+    // Actualizar estado global
+    setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
+    
+    // Actualizar localStorage
+    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
+    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
+    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
+  };
+
+  const getStatusBadge = (estado: string) => {
+    switch (estado) {
+      case 'pendiente':
+        return <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">Pendiente</span>;
+      case 'aceptada':
+        return <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">Aceptada</span>;
+      case 'rechazada':
+        return <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">Rechazada</span>;
+      case 'deshecha':
+        return <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">Deshecha</span>;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
-      <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
-        <ClipboardList className="w-8 h-8 text-[#C7C7CC]" />
+    <div className="space-y-4">
+      {/* Header con pestañas */}
+      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#1D1D1F]">Solicitudes de cambio</h3>
+            <p className="text-sm text-[#86868B]">Gestiona tus solicitudes y las del equipo</p>
+          </div>
+        </div>
+
+        {/* Pestañas principales */}
+        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
+          <button
+            onClick={() => setActiveSubTab('mis-cambios')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+              activeSubTab === 'mis-cambios'
+                ? 'bg-white text-corporate shadow-sm'
+                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <User className="w-4 h-4" />
+            Mis cambios
+          </button>
+          {canViewEquipo && (
+            <button
+              onClick={() => setActiveSubTab('equipo')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+                activeSubTab === 'equipo'
+                  ? 'bg-white text-corporate shadow-sm'
+                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <Users className="w-4 h-4" />
+              Equipo
+            </button>
+          )}
+        </div>
       </div>
-      <h3 className="text-lg font-medium text-[#1D1D1F] mb-2">Solicitudes</h3>
-      <p className="text-[#86868B]">No hay solicitudes de cambio de turno</p>
+
+      {/* Contenido según pestaña activa */}
+      {activeSubTab === 'mis-cambios' ? (
+        <div className="space-y-4">
+          {/* Filtros para Mis Cambios */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: solicitudesRecibidas.length },
+              { id: 'enviadas', label: 'Enviadas', icon: Send, count: solicitudesEnviadas.length },
+              { id: 'historial', label: 'Historial', icon: History, count: historial.length },
+            ].map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => setMisCambiosFilter(filter.id as typeof misCambiosFilter)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                  misCambiosFilter === filter.id
+                    ? 'bg-corporate text-white'
+                    : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                )}
+              >
+                <filter.icon className="w-4 h-4" />
+                {filter.label}
+                {filter.count > 0 && (
+                  <span className={cn(
+                    'px-1.5 py-0.5 text-xs rounded-full',
+                    misCambiosFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                  )}>
+                    {filter.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Lista de solicitudes */}
+          <div className="space-y-3">
+            {getFilteredMisCambios().length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <ClipboardList className="w-8 h-8 text-[#C7C7CC]" />
+                </div>
+                <p className="text-[#86868B]">No hay solicitudes {misCambiosFilter}</p>
+              </div>
+            ) : (
+              getFilteredMisCambios().map((solicitud) => {
+                // Determinar el nombre y cargo a mostrar según el filtro
+                const displayName = misCambiosFilter === 'recibidas' ? solicitud.de : 
+                                   misCambiosFilter === 'enviadas' ? solicitud.a : solicitud.de;
+                const displayCargo = misCambiosFilter === 'recibidas' ? solicitud.deCargo : 
+                                    misCambiosFilter === 'enviadas' ? solicitud.aCargo : solicitud.deCargo;
+                const displayDept = misCambiosFilter === 'recibidas' ? solicitud.deDept : 
+                                   misCambiosFilter === 'enviadas' ? solicitud.aDept : solicitud.deDept;
+                
+                return (
+                  <div
+                    key={solicitud.id}
+                    className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+                  >
+                    {/* Header: Avatar + Nombre + Cargo + Estado */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-[#1D1D1F]">{displayName}</p>
+                          <p className="text-xs text-[#86868B]">{displayCargo || 'Voluntario'} • {displayDept || 'Dive Shop'}</p>
+                        </div>
+                      </div>
+                      {getStatusBadge(solicitud.estado)}
+                    </div>
+                    
+                    {/* Tipo de solicitud */}
+                    <div className="mt-3">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
+                        {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
+                      </span>
+                    </div>
+                    
+                    {/* Fecha del cambio */}
+                    <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
+                      <Calendar className="w-4 h-4 text-[#86868B]" />
+                      <span className="text-[#86868B]">Fecha del cambio:</span>
+                      <span className="font-medium">
+                        {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                      </span>
+                    </div>
+                    
+                    {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
+                    {solicitud.tipo === 'cambio' ? (
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        {/* Columna ANTES */}
+                        <div className="bg-[#F5F5F7] rounded-lg p-3">
+                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
+                          <div className="space-y-2">
+                            {/* Usuario que solicita */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                  {solicitud.deTurnoActual || solicitud.turnoActual}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual})</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Columna DESPUÉS */}
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
+                          <div className="space-y-2">
+                            {/* Usuario que solicita */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                  {solicitud.deTurnoNuevo || solicitud.turnoSolicitado}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado})</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : solicitud.tipo === 'intercambio' ? (
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        {/* Columna ANTES */}
+                        <div className="bg-[#F5F5F7] rounded-lg p-3">
+                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
+                          <div className="space-y-2">
+                            {/* Usuario A */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                  {solicitud.deTurnoActual || 'AM'}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
+                              </div>
+                            </div>
+                            {/* Usuario B */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                  {solicitud.aTurnoActual || 'PM'}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Columna DESPUÉS */}
+                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
+                          <div className="space-y-2">
+                            {/* Usuario A */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                  {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
+                              </div>
+                            </div>
+                            {/* Usuario B */}
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                  {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
+                                </span>
+                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    
+                    {/* Footer: Historial completo del cambio */}
+                    <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
+                      <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
+                      <div className="space-y-1">
+                        {(solicitud.historial || []).map((item, idx) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs">
+                            <span className="text-[#86868B] whitespace-nowrap">
+                              {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span className="text-[#1D1D1F]">- {item.accion}</span>
+                            {item.motivo && (
+                              <span className="text-[#86868B] italic">({item.motivo})</span>
+                            )}
+                          </div>
+                        ))}
+                        {/* Fallback si no hay historial */}
+                        {(!solicitud.historial || solicitud.historial.length === 0) && (
+                          <div className="flex items-center justify-between text-xs text-[#86868B]">
+                            <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                            {solicitud.fechaRespuesta && (
+                              <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Botones de acción para recibidas pendientes - MÁS CORTOS */}
+                    {solicitud.estado === 'pendiente' && misCambiosFilter === 'recibidas' && (
+                      <div className="mt-3 flex gap-2 justify-end">
+                        <button 
+                          onClick={() => handleAcceptSolicitud(solicitud)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                          Aceptar
+                        </button>
+                        <button 
+                          onClick={() => handleRejectSolicitud(solicitud)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Filtros para Equipo */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            {/* Selector de departamento */}
+            <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as Department | 'ALL')}>
+              <SelectTrigger className="w-full sm:w-[160px] bg-white border-[#E5E5E7]">
+                <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Todos</SelectItem>
+                {Object.values(Department).map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept.replace(/_/g, ' ')}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {/* Filtros de estado con iconos minimalistas */}
+            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+              {[
+                { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter).length },
+                { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
+                { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
+                { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
+              ].map((filter) => (
+                <button
+                  key={filter.id}
+                  onClick={() => setEquipoFilter(filter.id as typeof equipoFilter)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    equipoFilter === filter.id
+                      ? 'bg-corporate text-white'
+                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                  )}
+                >
+                  <filter.icon className="w-4 h-4" />
+                  {filter.label}
+                  {filter.count > 0 && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 text-xs rounded-full',
+                      equipoFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                    )}>
+                      {filter.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Lista de solicitudes del equipo */}
+          <div className="space-y-3">
+            {getFilteredEquipo().length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-[#C7C7CC]" />
+                </div>
+                <p className="text-[#86868B]">No hay solicitudes del equipo</p>
+              </div>
+            ) : (
+              getFilteredEquipo().map((solicitud) => (
+                <div
+                  key={solicitud.id}
+                  className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+                >
+                  {/* Header: Avatar + Nombre + Cargo + Estado */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.de}</p>
+                        <p className="text-xs text-[#86868B]">{solicitud.deCargo || 'Voluntario'} • {solicitud.deDept || 'Dive Shop'}</p>
+                      </div>
+                    </div>
+                    {getStatusBadge(solicitud.estado)}
+                  </div>
+                  
+                  {/* Tipo de solicitud */}
+                  <div className="mt-3">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
+                      {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
+                    </span>
+                  </div>
+                  
+                  {/* Fecha del cambio */}
+                  <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
+                    <Calendar className="w-4 h-4 text-[#86868B]" />
+                    <span className="text-[#86868B]">Fecha del cambio:</span>
+                    <span className="font-medium">
+                      {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </span>
+                  </div>
+                  
+                  {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
+                  {solicitud.tipo === 'cambio' ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {/* Columna ANTES */}
+                      <div className="bg-[#F5F5F7] rounded-lg p-3">
+                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
+                        <div className="space-y-2">
+                          {/* Usuario que solicita */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                {solicitud.deTurnoActual || solicitud.turnoActual}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Columna DESPUÉS */}
+                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
+                        <div className="space-y-2">
+                          {/* Usuario que solicita */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                {solicitud.deTurnoNuevo || solicitud.turnoSolicitado}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : solicitud.tipo === 'intercambio' ? (
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      {/* Columna ANTES */}
+                      <div className="bg-[#F5F5F7] rounded-lg p-3">
+                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
+                        <div className="space-y-2">
+                          {/* Usuario A */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                                {solicitud.deTurnoActual || 'AM'}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
+                            </div>
+                          </div>
+                          {/* Usuario B */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                {solicitud.aTurnoActual || 'PM'}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Columna DESPUÉS */}
+                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
+                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
+                        <div className="space-y-2">
+                          {/* Usuario A */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                                {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
+                            </div>
+                          </div>
+                          {/* Usuario B */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
+                            <div className="flex items-center gap-1">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
+                              </span>
+                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {/* Footer: Historial completo del cambio */}
+                  <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
+                    <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
+                    <div className="space-y-1">
+                      {(solicitud.historial || []).map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs">
+                          <span className="text-[#86868B] whitespace-nowrap">
+                            {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          <span className="text-[#1D1D1F]">- {item.accion}</span>
+                          {item.motivo && (
+                            <span className="text-[#86868B] italic">({item.motivo})</span>
+                          )}
+                        </div>
+                      ))}
+                      {/* Fallback si no hay historial */}
+                      {(!solicitud.historial || solicitud.historial.length === 0) && (
+                        <div className="flex items-center justify-between text-xs text-[#86868B]">
+                          <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {solicitud.fechaRespuesta && (
+                            <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Botón Deshacer cambio - solo para solicitudes aceptadas y usuarios con permisos */}
+                  {solicitud.estado === 'aceptada' && canUndoChanges && (
+                    <div className="mt-3 flex justify-end">
+                      <button 
+                        onClick={() => {
+                          setSelectedSolicitud(solicitud);
+                          setShowUndoModal(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
+                      >
+                        <History className="w-4 h-4" />
+                        Deshacer cambio
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Modal para deshacer cambio */}
+      <Dialog open={showUndoModal} onOpenChange={setShowUndoModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Deshacer cambio</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <p className="text-sm text-[#86868B]">
+              Estás a punto de deshacer el cambio de turno entre <strong>{selectedSolicitud?.de}</strong> y <strong>{selectedSolicitud?.a}</strong>.
+            </p>
+            <div>
+              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Motivo</label>
+              <textarea
+                value={undoReason}
+                onChange={(e) => setUndoReason(e.target.value)}
+                placeholder="Indica el motivo por el que deshaces este cambio..."
+                className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                rows={3}
+              />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setShowUndoModal(false);
+                setSelectedSolicitud(null);
+                setUndoReason('');
+              }}
+              className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleUndoChange}
+              disabled={!undoReason.trim()}
+              className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Confirmar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
