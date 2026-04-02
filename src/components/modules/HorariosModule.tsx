@@ -2,7 +2,7 @@
 // HORARIOS MODULE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import {
   User,
   Users,
@@ -38,16 +38,17 @@ import {
   AlertTriangle,
   Stethoscope,
   UserX,
+  Filter,
   History,
   Inbox,
   Check,
   X,
+  Eye,
   Camera,
   Plus,
   Upload,
   FileImage,
   XCircle,
-  Download,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
@@ -144,7 +145,7 @@ interface IncapacidadDocument {
   name: string;
   requested: boolean;
   uploaded: boolean;
-  fileUrls?: string[];
+  fileUrl?: string;
 }
 
 interface Incapacidad {
@@ -157,7 +158,7 @@ interface Incapacidad {
   startDate: string;
   endDate: string;
   description: string;
-  status: 'pendiente' | 'verificada' | 'registrada' | 'rechazada';
+  status: 'pendiente' | 'registrada' | 'rechazada';
   history: IncapacidadHistoryItem[];
   notes: IncapacidadNote[];
   documents: IncapacidadDocument[];
@@ -167,7 +168,6 @@ interface Incapacidad {
   replacementUserDept?: Department;
   isExternalSupport?: boolean;
   rejectionReason?: string;
-  verifiedBy?: string[]; // IDs de usuarios que han verificado (supervisor, gerente)
 }
 
 interface IncapacidadesTabProps {
@@ -176,7 +176,6 @@ interface IncapacidadesTabProps {
   getUsersByDepartment: (dept: Department) => { id: string; name: string; department: Department; isActive: boolean; position?: string; avatar?: string; initials?: string }[];
   activeSubTab: 'mias' | 'equipo';
   myFilter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial';
-  setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -191,22 +190,7 @@ export default function HorariosModule() {
   const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
   
   // Estado global de incapacidades compartido entre tabs - ahora con userId
-  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>(() => {
-    const saved = localStorage.getItem('waveops_incapacity_dates');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error al cargar fechas de incapacidad:', e);
-      }
-    }
-    return [];
-  });
-
-  // Guardar fechas de incapacidad en localStorage cuando cambien
-  useEffect(() => {
-    localStorage.setItem('waveops_incapacity_dates', JSON.stringify(incapacityDates));
-  }, [incapacityDates]);
+  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>([]);
   
   const addIncapacity = (dates: string[], type: string, userId: string) => {
     setIncapacityDates(prev => [...prev, ...dates.map(d => ({ date: d, type, userId }))]);
@@ -329,12 +313,41 @@ export default function HorariosModule() {
           )}
         </div>
 
+        {/* Filtros de Mis Incapacidades - debajo de los tabs cuando está activo */}
+        {activeTab === 'incapacidades' && incapacidadesSubTab === 'mias' && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'enviadas', label: 'Enviadas', icon: Send },
+              { id: 'registradas', label: 'Registradas', icon: CheckCircle2 },
+              { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
+              { id: 'historial', label: 'Historial', icon: History },
+            ].map((filter) => {
+              const FilterIcon = filter.icon;
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => setMyIncapacidadesFilter(filter.id as typeof myIncapacidadesFilter)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    myIncapacidadesFilter === filter.id
+                      ? 'bg-corporate text-white'
+                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                  )}
+                >
+                  <FilterIcon className="w-4 h-4" />
+                  {filter.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Content */}
         {activeTab === 'mi-horario' && <MiHorarioTab incapacityDates={incapacityDates} addIncapacity={addIncapacity} getIncapacityForDate={getIncapacityForDate} />}
         {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} />}
         {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} />}
         {activeTab === 'solicitudes' && <SolicitudesTab />}
-        {activeTab === 'incapacidades' && <IncapacidadesTab incapacityDates={incapacityDates} setIncapacityDates={setIncapacityDates} getUsersByDepartment={useShifts().getUsersByDepartment} activeSubTab={incapacidadesSubTab} myFilter={myIncapacidadesFilter} setMyFilter={setMyIncapacidadesFilter} />}
+        {activeTab === 'incapacidades' && <IncapacidadesTab incapacityDates={incapacityDates} setIncapacityDates={setIncapacityDates} getUsersByDepartment={useShifts().getUsersByDepartment} activeSubTab={incapacidadesSubTab} myFilter={myIncapacidadesFilter} />}
       </div>
     </Layout>
   );
@@ -371,17 +384,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const [selectedTargetShift, setSelectedTargetShift] = useState<string | null>(null);
   const [selectedSwapUser, setSelectedSwapUser] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState('');
-  
-  // Estado para solicitudes enviadas desde Mi Horario
-  const [misSolicitudesEnviadas, setMisSolicitudesEnviadas] = useState<Solicitud[]>(() => {
-    const saved = localStorage.getItem('waveops_mis_solicitudes_enviadas');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  // Guardar solicitudes en localStorage
-  useEffect(() => {
-    localStorage.setItem('waveops_mis_solicitudes_enviadas', JSON.stringify(misSolicitudesEnviadas));
-  }, [misSolicitudesEnviadas]);
 
   const today = new Date().toISOString().split('T')[0];
   const todayShifts = user ? getUserShifts(user.id, today) : [];
@@ -825,23 +827,13 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         <button
                           key={i}
                           onClick={() => {
-                            if (!incapacityStartDate) {
-                              // Primer clic: establecer inicio
+                            if (!incapacityStartDate || (incapacityStartDate && incapacityEndDate)) {
                               setIncapacityStartDate(dStr);
-                              setIncapacityEndDate('');
-                            } else if (!incapacityEndDate) {
-                              // Segundo clic: establecer fin
-                              if (dStr < incapacityStartDate) {
-                                // Si clickeó antes del inicio, invertir
-                                setIncapacityEndDate(incapacityStartDate);
-                                setIncapacityStartDate(dStr);
-                              } else {
-                                setIncapacityEndDate(dStr);
-                              }
+                              setIncapacityEndDate(dStr);
+                            } else if (dStr < incapacityStartDate) {
+                              setIncapacityStartDate(dStr);
                             } else {
-                              // Tercer clic: reiniciar con nueva fecha de inicio
-                              setIncapacityStartDate(dStr);
-                              setIncapacityEndDate('');
+                              setIncapacityEndDate(dStr);
                             }
                           }}
                           className={cn(
@@ -1357,61 +1349,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       ? (!selectedShiftForChange || !selectedTargetShift || !selectedSwapUser)
                       : (!selectedSwapUser || dayShifts.length === 0)}
                     onClick={() => {
-                      const now = new Date().toISOString();
-                      const swapUser = selectedSwapUser ? Object.values(Department)
-                        .flatMap(dept => getUsersByDepartment(dept))
-                        .find(u => u.id === selectedSwapUser) : null;
-                      
-                      const selectedShift = dayShifts.find(s => s.id === selectedShiftForChange);
-                      const targetShift = selectedTargetShift ? Object.values(Department)
-                        .flatMap(dept => getUsersByDepartment(dept))
-                        .flatMap(u => getUserShifts(u.id, expandedDate))
-                        .find(s => s.id === selectedTargetShift) : null;
-                      
-                      const swapUserShifts = swapUser ? getUserShifts(swapUser.id, expandedDate) : [];
-                      
-                      const nuevaSolicitud: Solicitud = {
-                        id: Date.now(),
-                        tipo: requestType === 'change' ? 'cambio' : 'intercambio',
-                        de: user?.name || 'Tú',
-                        a: swapUser?.name || 'Usuario',
-                        deCargo: user?.position || 'Voluntario',
-                        aCargo: swapUser?.position || 'Voluntario',
-                        deDept: user?.department || Department.DIVE_SHOP,
-                        aDept: swapUser?.department || Department.DIVE_SHOP,
-                        // Turnos del usuario que solicita (de)
-                        deTurnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
-                        deTurnoNuevo: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
-                        deHorarioActual: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        deHorarioNuevo: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        // Turnos del usuario destinatario (a)
-                        aTurnoActual: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
-                        aTurnoNuevo: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
-                        aHorarioActual: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        aHorarioNuevo: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        // Legacy fields
-                        turnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
-                        turnoSolicitado: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
-                        horarioActual: requestType === 'change' ? `${selectedShift?.startTime}-${selectedShift?.endTime}` : dayShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        horarioSolicitado: requestType === 'change' ? `${targetShift?.startTime}-${targetShift?.endTime}` : swapUserShifts.map(s => `${s.startTime}-${s.endTime}`).join(', '),
-                        fecha: expandedDate || now.split('T')[0],
-                        fechaSolicitud: now,
-                        estado: 'pendiente',
-                        avatar: getInitials(user?.name || 'U'),
-                        historial: [
-                          { fecha: now, accion: 'Solicitud creada', usuario: user?.name || 'Tú' }
-                        ]
-                      };
-                      
-                      // Guardar en estado local
-                      setMisSolicitudesEnviadas(prev => [...prev, nuevaSolicitud]);
-                      
-                      // También guardar en localStorage para que esté disponible en SolicitudesTab
-                      const todasSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-                      todasSolicitudes.push(nuevaSolicitud);
-                      localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
-                      
-                      // Limpiar estados
                       setShowChangeShiftModal(false);
                       setSelectedShiftForChange(null);
                       setSelectedTargetShift(null);
@@ -2375,23 +2312,13 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <button
                           key={i}
                           onClick={() => {
-                            if (!incapacityStartDate) {
-                              // Primer clic: establecer inicio
+                            if (!incapacityStartDate || (incapacityStartDate && incapacityEndDate)) {
                               setIncapacityStartDate(dStr);
-                              setIncapacityEndDate('');
-                            } else if (!incapacityEndDate) {
-                              // Segundo clic: establecer fin
-                              if (dStr < incapacityStartDate) {
-                                // Si clickeó antes del inicio, invertir
-                                setIncapacityEndDate(incapacityStartDate);
-                                setIncapacityStartDate(dStr);
-                              } else {
-                                setIncapacityEndDate(dStr);
-                              }
+                              setIncapacityEndDate(dStr);
+                            } else if (dStr < incapacityStartDate) {
+                              setIncapacityStartDate(dStr);
                             } else {
-                              // Tercer clic: reiniciar con nueva fecha de inicio
-                              setIncapacityStartDate(dStr);
-                              setIncapacityEndDate('');
+                              setIncapacityEndDate(dStr);
                             }
                           }}
                           className={cn(
@@ -3387,12 +3314,12 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
     </div>
   );
 }
-function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDates: _setIncapacityDates, getUsersByDepartment, activeSubTab, myFilter, setMyFilter }: IncapacidadesTabProps) {
+function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDates: _setIncapacityDates, getUsersByDepartment, activeSubTab, myFilter }: IncapacidadesTabProps) {
   const { user } = useAuth();
   
   // Filtros para pestaña "Equipo"
   const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
-  const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
+  const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'registrada' | 'rechazada'>('todas');
   
   const [expandedIncapacityId, setExpandedIncapacityId] = useState<string | null>(null);
   const [selectedIncapacity, setSelectedIncapacity] = useState<Incapacidad | null>(null);
@@ -3411,128 +3338,8 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
   const [newNote, setNewNote] = useState('');
   const [newDocName, setNewDocName] = useState('');
   
-  // Ref para input file
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // Estado para previews de imágenes seleccionadas (múltiples)
-  const [selectedFilePreviews, setSelectedFilePreviews] = useState<string[]>([]);
-  
-  // Estado para imagen expandida
-  const [expandedImage, setExpandedImage] = useState<string | null>(null);
-  
-  // Sincronizar incapacidades del estado global con el estado local
-  // Cada registro (batch de fechas) crea una incapacidad única
-  useEffect(() => {
-    if (_incapacityDates.length === 0) return;
-    
-    // Agrupar por timestamp de creación (simulado por el orden en el array)
-    // Cada vez que se registra, se agregan las fechas en grupo
-    const processedBatches = new Set<string>();
-    const newIncapacidades: Incapacidad[] = [];
-    
-    // Procesar en grupos - cada batch es un registro único
-    let currentBatch: typeof _incapacityDates = [];
-    
-    _incapacityDates.forEach((inc) => {
-      // Si es la primera fecha o es consecutiva a la anterior, agrupar
-      if (currentBatch.length === 0) {
-        currentBatch.push(inc);
-      } else {
-        const lastDate = currentBatch[currentBatch.length - 1].date;
-        const lastDateObj = new Date(lastDate);
-        const currentDateObj = new Date(inc.date);
-        const diffDays = Math.round((currentDateObj.getTime() - lastDateObj.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1 && currentBatch[0].userId === inc.userId && currentBatch[0].type === inc.type) {
-          // Es consecutiva, agregar al batch actual
-          currentBatch.push(inc);
-        } else {
-          // No es consecutiva o es diferente usuario/tipo, crear incapacidad del batch anterior
-          createIncapacityFromBatch(currentBatch);
-          currentBatch = [inc];
-        }
-      }
-    });
-    
-    // Procesar el último batch
-    if (currentBatch.length > 0) {
-      createIncapacityFromBatch(currentBatch);
-    }
-    
-    function createIncapacityFromBatch(batch: typeof _incapacityDates) {
-      if (batch.length === 0) return;
-      
-      const firstInc = batch[0];
-      const lastInc = batch[batch.length - 1];
-      const batchKey = `${firstInc.userId}-${firstInc.type}-${firstInc.date}-${lastInc.date}`;
-      
-      if (processedBatches.has(batchKey)) return;
-      processedBatches.add(batchKey);
-      
-      // Buscar si ya existe esta incapacidad
-      const existing = incapacidades.find(i => 
-        i.userId === firstInc.userId && 
-        i.startDate === firstInc.date && 
-        i.endDate === lastInc.date && 
-        i.type === firstInc.type
-      );
-      
-      if (existing) {
-        newIncapacidades.push(existing);
-      } else {
-        // Crear nueva incapacidad con el batch
-        const userDept = user?.department || Department.DIVE_SHOP;
-        const allUsers = getUsersByDepartment(userDept);
-        const userInfo = allUsers.find(u => u.id === firstInc.userId);
-        
-        newIncapacidades.push({
-          id: `new-${Date.now()}-${batchKey}`,
-          userId: firstInc.userId,
-          userName: userInfo?.name || 'Usuario',
-          userAvatar: userInfo?.initials || 'U',
-          userDepartment: userInfo?.department || userDept,
-          type: firstInc.type,
-          startDate: firstInc.date,
-          endDate: lastInc.date,
-          description: '',
-          status: 'pendiente',
-          history: [{ date: new Date().toISOString(), action: 'Solicitud creada', user: userInfo?.name || 'Usuario' }],
-          notes: [],
-          documents: [],
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
-    
-    // Agregar solo las nuevas que no existan
-    // IMPORTANTE: No sobrescribir incapacidades que ya tienen estado modificado (verificada, registrada, rechazada)
-    setIncapacidades(prev => {
-      const existingIds = new Set(prev.map(i => i.id));
-      const trulyNew = newIncapacidades.filter(i => !existingIds.has(i.id));
-      
-      // Mantener las incapacidades existentes que ya fueron modificadas (no sobrescribir)
-      const modifiedExisting = prev.filter(i => i.status !== 'pendiente');
-      
-      // Para las pendientes, actualizar solo si vienen del nuevo batch
-      const pendingExisting = prev.filter(i => i.status === 'pendiente');
-      const pendingIds = new Set(newIncapacidades.map(i => i.id));
-      const pendingToKeep = pendingExisting.filter(i => pendingIds.has(i.id));
-      
-      return [...modifiedExisting, ...pendingToKeep, ...trulyNew];
-    });
-  }, [_incapacityDates, user?.department]);
-  
-  // Cargar incapacidades desde localStorage o usar datos de ejemplo
-  const [incapacidades, setIncapacidades] = useState<Incapacidad[]>(() => {
-    const saved = localStorage.getItem('waveops_incapacidades');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error al cargar incapacidades:', e);
-      }
-    }
-    return [
+  // Datos de ejemplo de incapacidades
+  const [incapacidades, setIncapacidades] = useState<Incapacidad[]>([
     {
       id: '1',
       userId: 'user1',
@@ -3603,13 +3410,7 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
       ],
       createdAt: addDaysToDate(new Date(), -3).toISOString()
     }
-  ];
-  });
-
-  // Guardar incapacidades en localStorage cuando cambien
-  useEffect(() => {
-    localStorage.setItem('waveops_incapacidades', JSON.stringify(incapacidades));
-  }, [incapacidades]);
+  ]);
 
   // Configuración de tipos de incapacidad
   const incapacityTypeConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, borderColor: string, label: string }> = {
@@ -3622,7 +3423,6 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
   // Configuración de estados - MÁS VISIBLES
   const statusConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string, icon: React.ElementType }> = {
     pendiente: { color: 'text-amber-700', bgColor: 'bg-amber-100', borderColor: 'border-amber-300', label: 'Pendiente', icon: Clock },
-    verificada: { color: 'text-blue-700', bgColor: 'bg-blue-100', borderColor: 'border-blue-300', label: 'Verificada', icon: Check },
     registrada: { color: 'text-green-700', bgColor: 'bg-green-100', borderColor: 'border-green-300', label: 'Registrada', icon: CheckCircle2 },
     rechazada: { color: 'text-red-700', bgColor: 'bg-red-100', borderColor: 'border-red-300', label: 'Rechazada', icon: XCircle },
   };
@@ -3636,21 +3436,13 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     });
   }, [incapacidades, selectedDepartment, statusFilter]);
 
-  // Contadores por estado - filtrados por departamento seleccionado
-  const counts = useMemo(() => {
-    // Filtrar incapacidades por departamento seleccionado
-    const filteredByDept = selectedDepartment === 'ALL' 
-      ? incapacidades 
-      : incapacidades.filter(i => i.userDepartment === selectedDepartment);
-    
-    return {
-      todas: filteredByDept.length,
-      pendiente: filteredByDept.filter(i => i.status === 'pendiente').length,
-      verificada: filteredByDept.filter(i => i.status === 'verificada').length,
-      registrada: filteredByDept.filter(i => i.status === 'registrada').length,
-      rechazada: filteredByDept.filter(i => i.status === 'rechazada').length,
-    };
-  }, [incapacidades, selectedDepartment]);
+  // Contadores por estado
+  const counts = useMemo(() => ({
+    todas: incapacidades.length,
+    pendiente: incapacidades.filter(i => i.status === 'pendiente').length,
+    registrada: incapacidades.filter(i => i.status === 'registrada').length,
+    rechazada: incapacidades.filter(i => i.status === 'rechazada').length,
+  }), [incapacidades]);
 
   // Obtener usuarios disponibles para reemplazo (mismo departamento u otros)
   const getReplacementUsers = (incapacity: Incapacidad, external: boolean = false) => {
@@ -3685,47 +3477,6 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     setSelectedIncapacity(incapacity);
     setRejectionReason('');
     setShowRejectModal(true);
-  };
-
-  // Verificar incapacidad (Supervisor o Gerente)
-  const handleVerify = (incapacity: Incapacidad) => {
-    try {
-      if (!user || !user.id) {
-        console.error('Usuario no disponible para verificar');
-        return;
-      }
-      
-      const verifierId = user.id;
-      const verifierName = user.name || 'Usuario';
-      
-      setIncapacidades(prev => prev.map(inc => {
-        if (inc.id === incapacity.id) {
-          const currentVerifiers = inc.verifiedBy || [];
-          // Evitar verificaciones duplicadas del mismo usuario
-          if (currentVerifiers.includes(verifierId)) {
-            return inc;
-          }
-          
-          const newVerifiers = [...currentVerifiers, verifierId];
-          
-          return {
-            ...inc,
-            verifiedBy: newVerifiers,
-            status: 'verificada',
-            history: [
-              ...inc.history,
-              { date: new Date().toISOString(), action: `Verificado por ${verifierName}`, user: verifierName }
-            ]
-          };
-        }
-        return inc;
-      }));
-      
-      // Cambiar filtro a 'todas' para que la incapacidad siga visible
-      setStatusFilter('todas');
-    } catch (error) {
-      console.error('Error al verificar incapacidad:', error);
-    }
   };
 
   // Confirmar registro con reemplazo
@@ -3768,21 +3519,16 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
       }
       return inc;
     }));
-    
     setShowRegisterModal(false);
     setSelectedIncapacity(null);
     setSelectedReplacement('');
     setIsExternalSupport(false);
-    
-    // Cambiar filtro a 'todas' para que la incapacidad siga visible
-    setStatusFilter('todas');
   };
 
   // Confirmar rechazo
   const confirmReject = () => {
     if (!selectedIncapacity || !rejectionReason.trim()) return;
     
-    // Actualizar estado local de incapacidades
     setIncapacidades(prev => prev.map(inc => {
       if (inc.id === selectedIncapacity.id) {
         return {
@@ -3797,46 +3543,9 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
       }
       return inc;
     }));
-    
-    // Eliminar las fechas del calendario global (la incapacidad fue rechazada)
-    const datesToRemove: string[] = [];
-    const [startYear, startMonth, startDay] = selectedIncapacity.startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = selectedIncapacity.endDate.split('-').map(Number);
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      datesToRemove.push(`${year}-${month}-${day}`);
-    }
-    
-    // Solo eliminar fechas que no estén siendo usadas por otras incapacidades activas del mismo usuario
-    _setIncapacityDates(prev => prev.filter(inc => {
-      // Si no es del mismo usuario o no está en las fechas a eliminar, mantener
-      if (inc.userId !== selectedIncapacity.userId) return true;
-      if (!datesToRemove.includes(inc.date)) return true;
-      
-      // Verificar si hay otra incapacidad activa (no rechazada) que use esta fecha
-      const hasOtherActiveIncapacity = incapacidades.some(otherInc => 
-        otherInc.id !== selectedIncapacity.id &&
-        otherInc.userId === selectedIncapacity.userId &&
-        otherInc.status !== 'rechazada' &&
-        inc.date >= otherInc.startDate &&
-        inc.date <= otherInc.endDate
-      );
-      
-      // Mantener la fecha si hay otra incapacidad activa que la use
-      return hasOtherActiveIncapacity;
-    }));
-    
     setShowRejectModal(false);
     setSelectedIncapacity(null);
     setRejectionReason('');
-    
-    // Cambiar filtro a 'todas' para que la incapacidad siga visible
-    setStatusFilter('todas');
   };
 
   // Cambiar reemplazo
@@ -3926,23 +3635,20 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     setNewDocName('');
   };
 
-  // Subir fotos de documento con archivos reales (múltiples)
-  const uploadDocumentPhotoWithFile = (incapacityId: string, docId: string, fileUrls: string[]) => {
-    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, fileUrls });
+  // Subir foto de documento (simulado)
+  const uploadDocumentPhoto = (incapacityId: string, docId: string) => {
     setIncapacidades(prev => prev.map(inc => {
       if (inc.id === incapacityId) {
-        const doc = inc.documents.find(d => d.id === docId);
-        const existingUrls = doc?.fileUrls || [];
         return {
           ...inc,
-          documents: inc.documents.map(d => 
-            d.id === docId 
-              ? { ...d, uploaded: true, fileUrls: [...existingUrls, ...fileUrls] }
-              : d
+          documents: inc.documents.map(doc => 
+            doc.id === docId 
+              ? { ...doc, uploaded: true, fileUrl: 'data:image/jpeg;base64,simulated' }
+              : doc
           ),
           history: [
             ...inc.history,
-            { date: new Date().toISOString(), action: `${fileUrls.length} archivo(s) subido(s): ${doc?.name}`, user: user?.name || 'Usuario' }
+            { date: new Date().toISOString(), action: `Documento subido: ${inc.documents.find(d => d.id === docId)?.name}`, user: user?.name || 'Supervisor' }
           ]
         };
       }
@@ -3970,42 +3676,38 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     return myIncapacidades; // historial - todas
   }, [myIncapacidades, myFilter]);
 
-  // Estadísticas mensual y anual para "Mías" (todas las incapacidades, no solo registradas)
+  // Estadísticas mensual y anual para "Mías"
   const myStats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
     
     const incapacidadesMes = myIncapacidades.filter(inc => {
-      const [year, month] = inc.startDate.split('-').map(Number);
-      return month - 1 === currentMonth && year === currentYear;
+      const incDate = new Date(inc.startDate);
+      return incDate.getMonth() === currentMonth && incDate.getFullYear() === currentYear && inc.status === 'registrada';
     });
     
     const incapacidadesAnio = myIncapacidades.filter(inc => {
-      const year = parseInt(inc.startDate.split('-')[0]);
-      return year === currentYear;
+      const incDate = new Date(inc.startDate);
+      return incDate.getFullYear() === currentYear && inc.status === 'registrada';
     });
     
     const diasMes = incapacidadesMes.reduce((total, inc) => {
-      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-      const start = new Date(startYear, startMonth - 1, startDay);
-      const end = new Date(endYear, endMonth - 1, endDay);
+      const start = new Date(inc.startDate);
+      const end = new Date(inc.endDate);
       return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     }, 0);
     
     const diasAnio = incapacidadesAnio.reduce((total, inc) => {
-      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-      const start = new Date(startYear, startMonth - 1, startDay);
-      const end = new Date(endYear, endMonth - 1, endDay);
+      const start = new Date(inc.startDate);
+      const end = new Date(inc.endDate);
       return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     }, 0);
     
     return { diasMes, diasAnio };
   }, [myIncapacidades]);
 
-  // Estadísticas del departamento para "Equipo" (todas las incapacidades)
+  // Estadísticas del departamento para "Equipo"
   const deptStats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -4013,15 +3715,15 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     
     const deptIncapacidades = incapacidades.filter(inc => {
       if (selectedDepartment !== 'ALL' && inc.userDepartment !== selectedDepartment) return false;
-      return true; // Todas las incapacidades, no solo registradas
+      return inc.status === 'registrada';
     });
     
     // Personas incapacitadas en el mes (únicas)
     const personasMes = new Set(
       deptIncapacidades
         .filter(inc => {
-          const [year, month] = inc.startDate.split('-').map(Number);
-          return month - 1 === currentMonth && year === currentYear;
+          const incDate = new Date(inc.startDate);
+          return incDate.getMonth() === currentMonth && incDate.getFullYear() === currentYear;
         })
         .map(inc => inc.userId)
     ).size;
@@ -4029,14 +3731,12 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     // Días incapacitados en el año
     const diasAnio = deptIncapacidades
       .filter(inc => {
-        const year = parseInt(inc.startDate.split('-')[0]);
-        return year === currentYear;
+        const incDate = new Date(inc.startDate);
+        return incDate.getFullYear() === currentYear;
       })
       .reduce((total, inc) => {
-        const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-        const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-        const start = new Date(startYear, startMonth - 1, startDay);
-        const end = new Date(endYear, endMonth - 1, endDay);
+        const start = new Date(inc.startDate);
+        const end = new Date(inc.endDate);
         return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       }, 0);
     
@@ -4045,98 +3745,23 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
 
   return (
     <div className="space-y-4">
-      {/* CONTENEDOR: Grid de 4 celdas del mismo tamaño */}
-      <div className="grid grid-cols-4 gap-3">
-        {/* Celdas 1-2: Filtros (unidas) */}
-        <div className="col-span-2 min-w-0">
-          {activeSubTab === 'equipo' ? (
-            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
-              {[
-                { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
-                { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
-                { id: 'verificada', label: 'Verificadas', count: counts.verificada, icon: Check },
-                { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
-                { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
-              ].map((filter) => {
-                const FilterIcon = filter.icon;
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setStatusFilter(filter.id as typeof statusFilter)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                      statusFilter === filter.id
-                        ? 'bg-corporate text-white'
-                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                    )}
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 text-xs rounded-full',
-                        statusFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                      )}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            /* Filtros para Mis Incapacidades */
-            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
-              {[
-                { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
-                { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
-                { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
-                { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
-              ].map((filter) => {
-                const FilterIcon = filter.icon;
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setMyFilter(filter.id as typeof myFilter)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                      myFilter === filter.id
-                        ? 'bg-corporate text-white'
-                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                    )}
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 text-xs rounded-full',
-                        myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                      )}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        
-        {/* Celda 3: Selector de departamento */}
-        <div className="min-w-0">
-          {activeSubTab === 'equipo' ? (
+      {/* Fila superior: Selector de departamento (Equipo) + Estadísticas fijas */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {/* Selector de departamento - solo visible en Equipo */}
+        <div className="sm:flex-1">
+          {activeSubTab === 'equipo' && (
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department | 'ALL')}>
-              <SelectTrigger className="w-full h-10">
+              <SelectTrigger className="w-full sm:w-56">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
                     <div className="flex items-center gap-2">
                       <LayoutGrid className="w-4 h-4" />
-                      <span>Todos</span>
+                      <span>Todos los departamentos</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2">
                       <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                      <span className="truncate">{selectedDepartment.replace(/_/g, ' ')}</span>
+                      <span>{selectedDepartment.replace(/_/g, ' ')}</span>
                     </div>
                   )}
                 </SelectValue>
@@ -4160,14 +3785,11 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                 ))}
               </SelectContent>
             </Select>
-          ) : (
-            /* Espacio reservado para Mis Incapacidades */
-            <div className="h-10" />
           )}
         </div>
         
-        {/* Celda 4: Estadísticas */}
-        <div className="flex gap-2 justify-end h-10 items-center">
+        {/* Estadísticas - siempre alineadas a la derecha */}
+        <div className="flex gap-2 sm:justify-end">
           {activeSubTab === 'mias' ? (
             <>
               <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-[160px]">
@@ -4217,6 +3839,46 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
           )}
         </div>
       </div>
+
+      {/* CONTENIDO PESTAÑA "EQUIPO" - Solo filtros */}
+      {activeSubTab === 'equipo' && (
+        <>
+          {/* Filtros de estado para Equipo - con iconos */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
+              { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
+              { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
+              { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
+            ].map((filter) => {
+              const FilterIcon = filter.icon;
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => setStatusFilter(filter.id as typeof statusFilter)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    statusFilter === filter.id
+                      ? 'bg-corporate text-white'
+                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                  )}
+                >
+                  <FilterIcon className="w-4 h-4" />
+                  {filter.label}
+                  {filter.count > 0 && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 text-xs rounded-full',
+                      statusFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                    )}>
+                      {filter.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Lista de incapacidades */}
       <div className="space-y-3">
@@ -4337,49 +3999,23 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                 {/* CONTENIDO EXPANDIDO */}
                 {isExpanded && (
                   <div className="border-t border-[#E5E5E7] p-4 bg-[#FAFAFA]">
-                    {/* Botones de acción - SOLO en Equipo */}
-                    {activeSubTab === 'equipo' && (
-                      <div className="flex gap-2 mb-4 flex-wrap">
-                        {/* Botón Verificar - SOLO para RRHH */}
-                        {incapacidad.status === 'pendiente' && 
-                         user?.department === ('RRHH' as Department) && (
-                          <button
-                            onClick={() => handleVerify(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
-                          >
-                            <Check className="w-4 h-4" />
-                            Verificar
-                          </button>
-                        )}
-                        
-                        {/* Botón Registrar - para Supervisor, Gerente, Director o Director General cuando está verificada y tiene documentos */}
-                        {incapacidad.status === 'verificada' && 
-                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
-                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) &&
-                         incapacidad.documents.some(d => d.uploaded) && (
-                          <button
-                            onClick={() => handleRegister(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
-                          >
-                            <Check className="w-4 h-4" />
-                            Registrar
-                          </button>
-                        )}
-                        
-                        {/* Botón Rechazar - para roles autorizados */}
-                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') &&
-                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
-                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) && (
-                          <button
-                            onClick={() => handleReject(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
-                          >
-                            <X className="w-4 h-4" />
-                            Rechazar
-                          </button>
-                        )}
+                    {/* Botones de acción para estado pendiente */}
+                    {incapacidad.status === 'pendiente' && (
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          onClick={() => handleRegister(incapacidad)}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                        >
+                          <Check className="w-4 h-4" />
+                          Registrar
+                        </button>
+                        <button
+                          onClick={() => handleReject(incapacidad)}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                          Rechazar
+                        </button>
                       </div>
                     )}
                     
@@ -4453,62 +4089,37 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                       {incapacidad.documents.length > 0 ? (
                         <div className="space-y-2">
                           {incapacidad.documents.map(doc => (
-                            <div key={doc.id} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <ClipboardList className="w-4 h-4 text-[#86868B]" />
-                                  <span className="text-sm">{doc.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  {doc.uploaded ? (
-                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-600 rounded-full">
-                                      Subido ({doc.fileUrls?.length || 0})
-                                    </span>
-                                  ) : (
+                            <div key={doc.id} className="flex items-center justify-between bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                              <div className="flex items-center gap-2">
+                                <ClipboardList className="w-4 h-4 text-[#86868B]" />
+                                <span className="text-sm">{doc.name}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {doc.uploaded ? (
+                                  <span className="text-xs px-2 py-0.5 bg-green-100 text-green-600 rounded-full">
+                                    Subido
+                                  </span>
+                                ) : (
+                                  <>
                                     <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full">
                                       Pendiente
                                     </span>
-                                  )}
-                                  {/* Botón para subir foto (solo para el usuario que cargó la incapacidad) */}
-                                  {user?.id === incapacidad.userId && (
-                                    <button
-                                      onClick={() => {
-                                        setSelectedIncapacity(incapacidad);
-                                        setSelectedDocForUpload(doc.id);
-                                        setShowUploadDocModal(true);
-                                      }}
-                                      className="flex items-center gap-1 px-2 py-1 bg-corporate/10 text-corporate rounded text-xs hover:bg-corporate/20"
-                                    >
-                                      <Camera className="w-3 h-3" />
-                                      {doc.uploaded ? 'Agregar' : 'Subir'}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              {/* Mostrar fotos subidas - orientación vertical */}
-                              {doc.fileUrls && doc.fileUrls.length > 0 && (
-                                <div className="flex flex-wrap gap-3 mt-3">
-                                  {doc.fileUrls.map((url, idx) => (
-                                    <div key={idx} className="relative group">
-                                      <img 
-                                        src={url} 
-                                        alt={`${doc.name} ${idx + 1}`}
-                                        className="h-32 w-24 object-contain rounded-lg border border-[#E5E5E7] cursor-pointer hover:border-corporate transition-colors bg-[#F5F5F7]"
-                                        onClick={() => setExpandedImage(url)}
-                                      />
-                                      {/* Botón de descargar */}
-                                      <a
-                                        href={url}
-                                        download={`${doc.name}-${idx + 1}.jpg`}
-                                        className="absolute top-1 right-1 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                        onClick={(e) => e.stopPropagation()}
+                                    {/* Botón para subir foto (solo para el usuario que cargó la incapacidad) */}
+                                    {user?.id === incapacidad.userId && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedDocForUpload(doc.id);
+                                          setShowUploadDocModal(true);
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-1 bg-corporate/10 text-corporate rounded text-xs hover:bg-corporate/20"
                                       >
-                                        <Download className="w-3.5 h-3.5 text-corporate" />
-                                      </a>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                                        <Camera className="w-3 h-3" />
+                                        Subir
+                                      </button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -4516,25 +4127,23 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                         <p className="text-sm text-[#86868B]">No hay documentos solicitados</p>
                       )}
                       
-                      {/* Solicitar nuevo documento - SOLO en Equipo */}
-                      {activeSubTab === 'equipo' && (
-                        <div className="flex gap-2 mt-2">
-                          <input
-                            type="text"
-                            value={newDocName}
-                            onChange={(e) => setNewDocName(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
-                            placeholder="Solicitar nuevo documento..."
-                          />
-                          <Button 
-                            size="sm"
-                            disabled={!newDocName.trim()}
-                            onClick={() => requestDocument(incapacidad.id)}
-                          >
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      )}
+                      {/* Solicitar nuevo documento */}
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={newDocName}
+                          onChange={(e) => setNewDocName(e.target.value)}
+                          className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
+                          placeholder="Solicitar nuevo documento..."
+                        />
+                        <Button 
+                          size="sm"
+                          disabled={!newDocName.trim()}
+                          onClick={() => requestDocument(incapacidad.id)}
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                     
                     {/* Historial */}
@@ -4867,11 +4476,8 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Subir Documento */}
-      <Dialog open={showUploadDocModal} onOpenChange={(open) => {
-        setShowUploadDocModal(open);
-        if (!open) setSelectedFilePreviews([]);
-      }}>
+      {/* Modal de Subir Documento (Simulado) */}
+      <Dialog open={showUploadDocModal} onOpenChange={setShowUploadDocModal}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -4882,153 +4488,41 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {/* Preview de imágenes seleccionadas */}
-            {selectedFilePreviews.length > 0 ? (
-              <div className="bg-[#F5F5F7] rounded-xl p-4">
-                <p className="text-sm text-[#86868B] mb-3 text-center">
-                  {selectedFilePreviews.length} archivo(s) seleccionado(s):
-                </p>
-                <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto">
-                  {selectedFilePreviews.map((preview, idx) => (
-                    <div key={idx} className="relative">
-                      <img 
-                        src={preview} 
-                        alt={`Preview ${idx + 1}`} 
-                        className="h-20 w-full object-cover rounded-lg border border-[#E5E5E7]"
-                      />
-                      <button
-                        className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
-                        onClick={() => {
-                          setSelectedFilePreviews(prev => prev.filter((_, i) => i !== idx));
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
+            <div className="bg-[#F5F5F7] rounded-xl p-6 text-center">
+              <div className="w-16 h-16 bg-corporate/10 rounded-full flex items-center justify-center mx-auto mb-3">
+                <Upload className="w-8 h-8 text-corporate" />
               </div>
-            ) : (
-              <div className="bg-[#F5F5F7] rounded-xl p-6 text-center">
-                <div className="w-16 h-16 bg-corporate/10 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Upload className="w-8 h-8 text-corporate" />
-                </div>
-                <p className="text-sm text-[#86868B] mb-4">
-                  Toma fotos o selecciona archivos para subir
-                </p>
+              <p className="text-sm text-[#86868B] mb-4">
+                Toma una foto o selecciona un archivo para subir
+              </p>
+              <div className="flex gap-2">
+                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium">
+                  <Camera className="w-4 h-4" />
+                  Cámara
+                </button>
+                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg text-sm font-medium border border-[#E5E5E7]">
+                  <FileImage className="w-4 h-4" />
+                  Galería
+                </button>
               </div>
-            )}
-            
-            {/* Input file oculto - múltiples archivos */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) {
-                  const newUrls = files.map(file => URL.createObjectURL(file));
-                  setSelectedFilePreviews(prev => [...prev, ...newUrls]);
-                }
-              }}
-            />
-            
-            {/* Botones Cámara/Galería - siempre visibles para agregar más */}
-            <div className="flex gap-2">
-              <button 
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors"
-                onClick={() => {
-                  if (fileInputRef.current) {
-                    fileInputRef.current.setAttribute('capture', 'environment');
-                    fileInputRef.current.click();
-                  }
-                }}
-              >
-                <Camera className="w-4 h-4" />
-                Cámara
-              </button>
-              <button 
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#F5F5F7] text-[#1D1D1F] rounded-lg text-sm font-medium border border-[#E5E5E7] hover:bg-[#E5E5E7] transition-colors"
-                onClick={() => {
-                  if (fileInputRef.current) {
-                    fileInputRef.current.removeAttribute('capture');
-                    fileInputRef.current.click();
-                  }
-                }}
-              >
-                <FileImage className="w-4 h-4" />
-                Galería
-              </button>
             </div>
-            
-            {/* Botones Cancelar / Confirmar */}
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="flex-1" 
-                onClick={() => {
-                  setSelectedFilePreviews([]);
-                  setShowUploadDocModal(false);
-                }}
-              >
+              <Button variant="outline" className="flex-1" onClick={() => setShowUploadDocModal(false)}>
                 Cancelar
               </Button>
-              {selectedFilePreviews.length > 0 && (
-                <Button 
-                  className="flex-1 bg-corporate hover:bg-corporate/90"
-                  onClick={() => {
-                    console.log('Confirmar clicked', {
-                      previewsCount: selectedFilePreviews.length,
-                      incapacity: selectedIncapacity,
-                      docId: selectedDocForUpload,
-                      condition: selectedFilePreviews.length > 0 && !!selectedIncapacity && !!selectedDocForUpload
-                    });
-                    if (selectedFilePreviews.length > 0 && selectedIncapacity && selectedDocForUpload) {
-                      uploadDocumentPhotoWithFile(selectedIncapacity.id, selectedDocForUpload, [...selectedFilePreviews]);
-                      setSelectedFilePreviews([]);
-                    } else {
-                      console.log('Condición falló - no se ejecuta uploadDocumentPhotoWithFile');
-                    }
-                  }}
-                >
-                  <Check className="w-4 h-4 mr-1.5" />
-                  Confirmar ({selectedFilePreviews.length})
-                </Button>
-              )}
+              <Button 
+                className="flex-1 bg-corporate hover:bg-corporate/90"
+                onClick={() => {
+                  if (selectedIncapacity && selectedDocForUpload) {
+                    uploadDocumentPhoto(selectedIncapacity.id, selectedDocForUpload);
+                  }
+                }}
+              >
+                <Check className="w-4 h-4 mr-1.5" />
+                Confirmar
+              </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Modal de imagen expandida */}
-      <Dialog open={!!expandedImage} onOpenChange={() => setExpandedImage(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/90">
-          {expandedImage && (
-            <div className="relative">
-              <img 
-                src={expandedImage} 
-                alt="Documento ampliado"
-                className="w-full max-h-[80vh] object-contain"
-              />
-              <button
-                onClick={() => setExpandedImage(null)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              <a
-                href={expandedImage}
-                download="documento.jpg"
-                className="absolute bottom-4 right-4 px-4 py-2 bg-corporate text-white rounded-lg flex items-center gap-2 hover:bg-corporate/90 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Descargar
-              </a>
-            </div>
-          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -5036,467 +4530,63 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// SOLICITUDES TAB - INTERFACES
-// ═══════════════════════════════════════════════════════════════════
-
-interface HistorialItem {
-  fecha: string;
-  accion: string;
-  usuario: string;
-  motivo?: string;
-}
-
-interface Solicitud {
-  id: number;
-  tipo: 'cambio' | 'intercambio';
-  de: string;
-  a: string;
-  deCargo?: string;
-  aCargo?: string;
-  deDept?: string;
-  aDept?: string;
-  // Turnos del usuario que solicita (de)
-  deTurnoActual?: string;
-  deTurnoNuevo?: string;
-  deHorarioActual?: string;
-  deHorarioNuevo?: string;
-  // Turnos del usuario que recibe (a)
-  aTurnoActual?: string;
-  aTurnoNuevo?: string;
-  aHorarioActual?: string;
-  aHorarioNuevo?: string;
-  // Campos legacy para compatibilidad
-  turnoActual?: string;
-  turnoSolicitado?: string;
-  horarioActual?: string;
-  horarioSolicitado?: string;
-  fecha: string;
-  fechaSolicitud: string;
-  fechaRespuesta?: string;
-  estado: 'pendiente' | 'aceptada' | 'rechazada' | 'deshecha';
-  avatar: string;
-  historial?: HistorialItem[];
-}
-
-// ═══════════════════════════════════════════════════════════════════
 // SOLICITUDES TAB
 // ═══════════════════════════════════════════════════════════════════
 
 function SolicitudesTab() {
-  const { user } = useAuth();
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
-  const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
-  const [equipoDeptFilter, setEquipoDeptFilter] = useState<Department | 'ALL'>('ALL');
-  
-  // Estado para modal de deshacer cambio
-  const [showUndoModal, setShowUndoModal] = useState(false);
-  const [selectedSolicitud, setSelectedSolicitud] = useState<Solicitud | null>(null);
-  const [undoReason, setUndoReason] = useState('');
-  
-  // Estado para solicitudes (para poder modificarlas)
-  const [solicitudesEquipoState, setSolicitudesEquipoState] = useState<Solicitud[]>([]);
-  const [solicitudesRecibidasState, setSolicitudesRecibidasState] = useState<Solicitud[]>([]);
-  const [solicitudesEnviadasState, setSolicitudesEnviadasState] = useState<Solicitud[]>([]);
-  const [historialState, setHistorialState] = useState<Solicitud[]>([]);
-  const [todasSolicitudes, setTodasSolicitudes] = useState<Solicitud[]>([]);
-  
-  // Inicializar solicitudes desde localStorage y datos de ejemplo
-  useEffect(() => {
-    // Leer solicitudes guardadas en localStorage
-    const savedSolicitudes = localStorage.getItem('waveops_todas_solicitudes');
-    const parsedSolicitudes = savedSolicitudes ? JSON.parse(savedSolicitudes) : [];
-    
-    // Combinar con datos de ejemplo
-    const allSolicitudes = [...parsedSolicitudes, ...solicitudesEquipo, ...solicitudesRecibidas, ...solicitudesEnviadas, ...historial];
-    
-    // Eliminar duplicados por ID
-    const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-      index === self.findIndex(s => s.id === sol.id)
-    );
-    
-    setTodasSolicitudes(uniqueSolicitudes);
-    setSolicitudesEquipoState(solicitudesEquipo);
-    setSolicitudesRecibidasState(solicitudesRecibidas);
-    setSolicitudesEnviadasState(solicitudesEnviadas);
-    setHistorialState(historial);
-  }, []);
-  
-  // Actualizar localStorage cuando cambian las solicitudes
-  useEffect(() => {
-    if (todasSolicitudes.length > 0) {
-      localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
-    }
-  }, [todasSolicitudes]);
+  const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas'>('todas');
 
   // Verificar si el usuario puede ver solicitudes de equipo (Supervisores y roles superiores)
   const canViewEquipo = true; // Temporalmente habilitado para todos, ajustar según permisos reales
-  
-  // Verificar si el usuario puede deshacer cambios (Supervisor+)
-  const canUndoChanges = user?.role === Role.SUPERVISOR || 
-                         user?.role === Role.GERENTE_DEPARTAMENTO || 
-                         user?.role === Role.GERENTE_OPERACIONES || 
-                         user?.role === Role.DIRECTOR || 
-                         user?.role === Role.DIRECTOR_GENERAL;
-  
-  // Función para deshacer cambio
-  const handleUndoChange = () => {
-    if (!selectedSolicitud || !undoReason.trim()) return;
-    
-    const now = new Date().toISOString();
-    const userName = user?.name || 'Supervisor';
-    const newHistorialItem = {
-      fecha: now,
-      accion: 'Cambio deshecho por supervisor',
-      usuario: userName,
-      motivo: undoReason.trim()
-    };
-    
-    const updatedSolicitud: Solicitud = {
-      ...selectedSolicitud,
-      estado: 'deshecha',
-      historial: [...(selectedSolicitud.historial || []), newHistorialItem]
-    };
-    
-    // Actualizar el estado de equipo
-    setSolicitudesEquipoState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
-    // Actualizar historial de Mis Cambios
-    setHistorialState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
-    // Actualizar estado global
-    setTodasSolicitudes(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === selectedSolicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
-    
-    // Cerrar modal y limpiar
-    setShowUndoModal(false);
-    setSelectedSolicitud(null);
-    setUndoReason('');
-  };
 
   // Datos de ejemplo para solicitudes
+  interface Solicitud {
+    id: number;
+    tipo: 'cambio' | 'intercambio';
+    de: string;
+    a: string;
+    turnoActual?: string;
+    turnoSolicitado?: string;
+    fecha: string;
+    estado: 'pendiente' | 'aceptada' | 'rechazada';
+    avatar: string;
+  }
+
   const solicitudesRecibidas: Solicitud[] = [
-    { 
-      id: 1, 
-      tipo: 'cambio', 
-      de: 'Daniel Calderon', 
-      a: 'Tú', 
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      fecha: '2026-04-05', 
-      fechaSolicitud: '2026-04-02T13:01:00',
-      estado: 'pendiente', 
-      avatar: 'DC',
-      historial: [
-        { fecha: '2026-04-02T13:01:00', accion: 'Solicitud creada', usuario: 'Daniel Calderon' }
-      ]
-    },
-    { 
-      id: 2, 
-      tipo: 'intercambio', 
-      de: 'María García', 
-      a: 'Tú',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      aTurnoActual: 'PM',
-      aTurnoNuevo: 'AM',
-      aHorarioActual: '12:30-20:30',
-      aHorarioNuevo: '09:00-13:00',
-      fecha: '2026-04-03', 
-      fechaSolicitud: '2026-04-01T10:30:00',
-      estado: 'pendiente', 
-      avatar: 'MG',
-      historial: [
-        { fecha: '2026-04-01T10:30:00', accion: 'Solicitud de intercambio creada', usuario: 'María García' }
-      ]
-    },
+    { id: 1, tipo: 'cambio', de: 'Juan Pérez', a: 'Tú', turnoActual: 'AM', turnoSolicitado: 'PM', fecha: '2026-04-05', estado: 'pendiente', avatar: 'JP' },
+    { id: 2, tipo: 'intercambio', de: 'María García', a: 'Tú', fecha: '2026-04-03', estado: 'pendiente', avatar: 'MG' },
   ];
 
   const solicitudesEnviadas: Solicitud[] = [
-    { 
-      id: 3, 
-      tipo: 'cambio', 
-      de: 'Tú', 
-      a: 'Carlos López',
-      aCargo: 'Voluntario',
-      aDept: 'Dive Shop',
-      turnoActual: 'PM', 
-      turnoSolicitado: 'AM', 
-      horarioActual: '12:30-20:30',
-      horarioSolicitado: '09:00-13:00',
-      fecha: '2026-04-02', 
-      fechaSolicitud: '2026-03-30T09:15:00',
-      estado: 'pendiente', 
-      avatar: 'CL' 
-    },
+    { id: 3, tipo: 'cambio', de: 'Tú', a: 'Carlos López', turnoActual: 'PM', turnoSolicitado: 'AM', fecha: '2026-04-02', estado: 'pendiente', avatar: 'CL' },
   ];
 
   const historial: Solicitud[] = [
-    { 
-      id: 4, 
-      tipo: 'cambio', 
-      de: 'Lixue Pie', 
-      a: 'Tú',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      deTurnoActual: 'PM',
-      deTurnoNuevo: 'AM',
-      deHorarioActual: '12:30-20:30',
-      deHorarioNuevo: '09:00-13:00',
-      fecha: '2026-03-21', 
-      fechaSolicitud: '2026-03-19T11:52:00',
-      fechaRespuesta: '2026-03-19T12:52:00',
-      estado: 'aceptada', 
-      avatar: 'LP',
-      historial: [
-        { fecha: '2026-03-19T11:52:00', accion: 'Solicitud creada', usuario: 'Lixue Pie' },
-        { fecha: '2026-03-19T12:52:00', accion: 'Solicitud aceptada', usuario: 'Tú' }
-      ]
-    },
-    { 
-      id: 5, 
-      tipo: 'intercambio', 
-      de: 'Lixue Pie', 
-      a: 'Daniel Calderon',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      aTurnoActual: 'PM',
-      aTurnoNuevo: 'AM',
-      aHorarioActual: '12:30-20:30',
-      aHorarioNuevo: '09:00-13:00',
-      fecha: '2026-03-21', 
-      fechaSolicitud: '2026-03-19T12:51:00',
-      fechaRespuesta: '2026-03-19T12:52:00',
-      estado: 'rechazada', 
-      avatar: 'LP',
-      historial: [
-        { fecha: '2026-03-19T12:51:00', accion: 'Solicitud de intercambio creada', usuario: 'Lixue Pie' },
-        { fecha: '2026-03-19T12:52:00', accion: 'Solicitud rechazada', usuario: 'Daniel Calderon' }
-      ]
-    },
-    { 
-      id: 9, 
-      tipo: 'cambio', 
-      de: 'Ana Torres', 
-      a: 'Pedro Ruiz',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      fecha: '2026-03-15', 
-      fechaSolicitud: '2026-03-10T09:00:00',
-      fechaRespuesta: '2026-03-10T14:30:00',
-      estado: 'deshecha', 
-      avatar: 'AT',
-      historial: [
-        { fecha: '2026-03-10T09:00:00', accion: 'Solicitud creada', usuario: 'Ana Torres' },
-        { fecha: '2026-03-10T14:30:00', accion: 'Solicitud aceptada', usuario: 'Pedro Ruiz' },
-        { fecha: '2026-03-12T10:15:00', accion: 'Cambio deshecho por supervisor', usuario: 'Supervisor', motivo: 'Error en la asignación de turnos, se requiere reasignar' }
-      ]
-    },
+    { id: 4, tipo: 'cambio', de: 'Ana Torres', a: 'Tú', turnoActual: 'AM', turnoSolicitado: 'PM', fecha: '2026-03-15', estado: 'aceptada', avatar: 'AT' },
+    { id: 5, tipo: 'intercambio', de: 'Tú', a: 'Luis Ruiz', fecha: '2026-03-10', estado: 'rechazada', avatar: 'LR' },
   ];
 
   const solicitudesEquipo: Solicitud[] = [
-    { 
-      id: 6, 
-      tipo: 'cambio', 
-      de: 'Pedro Sánchez', 
-      a: 'Laura Díaz',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      aCargo: 'Voluntario',
-      aDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      fecha: '2026-04-01', 
-      fechaSolicitud: '2026-03-28T14:20:00',
-      fechaRespuesta: '2026-03-29T09:00:00',
-      estado: 'aceptada', 
-      avatar: 'PS',
-      historial: [
-        { fecha: '2026-03-28T14:20:00', accion: 'Solicitud creada', usuario: 'Pedro Sánchez' },
-        { fecha: '2026-03-29T09:00:00', accion: 'Solicitud aceptada', usuario: 'Laura Díaz' }
-      ]
-    },
-    { 
-      id: 7, 
-      tipo: 'intercambio', 
-      de: 'Sofía Martínez', 
-      a: 'Diego Flores',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      aCargo: 'Voluntario',
-      aDept: 'Dive Shop',
-      deTurnoActual: 'AM',
-      deTurnoNuevo: 'PM',
-      deHorarioActual: '09:00-13:00',
-      deHorarioNuevo: '12:30-20:30',
-      aTurnoActual: 'PM',
-      aTurnoNuevo: 'AM',
-      aHorarioActual: '12:30-20:30',
-      aHorarioNuevo: '09:00-13:00',
-      fecha: '2026-03-28', 
-      fechaSolicitud: '2026-03-25T11:00:00',
-      fechaRespuesta: '2026-03-26T16:30:00',
-      estado: 'rechazada', 
-      avatar: 'SM',
-      historial: [
-        { fecha: '2026-03-25T11:00:00', accion: 'Solicitud de intercambio creada', usuario: 'Sofía Martínez' },
-        { fecha: '2026-03-26T16:30:00', accion: 'Solicitud rechazada', usuario: 'Diego Flores' }
-      ]
-    },
-    { 
-      id: 8, 
-      tipo: 'cambio', 
-      de: 'Carmen Vega', 
-      a: 'Roberto Paz',
-      deCargo: 'Voluntario',
-      deDept: 'Dive Shop',
-      aCargo: 'Voluntario',
-      aDept: 'Dive Shop',
-      deTurnoActual: 'PM',
-      deTurnoNuevo: 'AM',
-      deHorarioActual: '12:30-20:30',
-      deHorarioNuevo: '09:00-13:00',
-      fecha: '2026-04-04', 
-      fechaSolicitud: '2026-04-01T08:45:00',
-      estado: 'pendiente', 
-      avatar: 'CV' 
-    },
+    { id: 6, tipo: 'cambio', de: 'Pedro Sánchez', a: 'Laura Díaz', turnoActual: 'AM', turnoSolicitado: 'PM', fecha: '2026-04-01', estado: 'aceptada', avatar: 'PS' },
+    { id: 7, tipo: 'intercambio', de: 'Sofía Martínez', a: 'Diego Flores', fecha: '2026-03-28', estado: 'rechazada', avatar: 'SM' },
+    { id: 8, tipo: 'cambio', de: 'Carmen Vega', a: 'Roberto Paz', turnoActual: 'PM', turnoSolicitado: 'AM', fecha: '2026-04-04', estado: 'pendiente', avatar: 'CV' },
   ];
 
   const getFilteredEquipo = () => {
-    let filtered = solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo;
-    
-    // Filtrar por departamento
-    if (equipoDeptFilter !== 'ALL') {
-      filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
-    }
-    
-    // Filtrar por estado
-    if (equipoFilter === 'aceptadas') filtered = filtered.filter(s => s.estado === 'aceptada');
-    if (equipoFilter === 'rechazadas') filtered = filtered.filter(s => s.estado === 'rechazada');
-    if (equipoFilter === 'deshechas') filtered = filtered.filter(s => s.estado === 'deshecha');
-    
-    return filtered;
+    if (equipoFilter === 'todas') return solicitudesEquipo;
+    return solicitudesEquipo.filter(s => {
+      if (equipoFilter === 'aceptadas') return s.estado === 'aceptada';
+      if (equipoFilter === 'rechazadas') return s.estado === 'rechazada';
+      return true;
+    });
   };
 
   const getFilteredMisCambios = () => {
-    const currentUser = user?.name || 'Usuario';
-    const currentUserId = user?.id || 'current-user';
-    
-    // Combinar todas las solicitudes disponibles
-    const allSolicitudes = [
-      ...todasSolicitudes,
-      ...solicitudesRecibidasState,
-      ...solicitudesEnviadasState,
-      ...historialState,
-      ...solicitudesRecibidas,
-      ...solicitudesEnviadas,
-      ...historial
-    ];
-    
-    // Eliminar duplicados
-    const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-      index === self.findIndex(s => s.id === sol.id)
-    );
-    
-    let result: Solicitud[] = [];
-    
-    if (misCambiosFilter === 'recibidas') {
-      // Solicitudes donde OTROS usuarios envían AL usuario actual (a === usuario actual) y están pendientes
-      result = uniqueSolicitudes.filter(s => 
-        (s.a === 'Tú' || s.a === currentUser || s.a === currentUserId) && 
-        (s.de !== 'Tú' && s.de !== currentUser && s.de !== currentUserId) &&
-        s.estado === 'pendiente'
-      );
-    } else if (misCambiosFilter === 'enviadas') {
-      // Solicitudes donde el usuario actual envía A OTROS (de === usuario actual) y están pendientes
-      result = uniqueSolicitudes.filter(s => 
-        (s.de === 'Tú' || s.de === currentUser || s.de === currentUserId) && 
-        (s.a !== 'Tú' && s.a !== currentUser && s.a !== currentUserId) &&
-        s.estado === 'pendiente'
-      );
-    } else {
-      // Historial - todas las solicitudes donde el usuario participó (aceptadas, rechazadas, deshechas)
-      result = uniqueSolicitudes.filter(s => 
-        (s.de === 'Tú' || s.a === 'Tú' || s.de === currentUser || s.a === currentUser || s.de === currentUserId || s.a === currentUserId) &&
-        (s.estado === 'aceptada' || s.estado === 'rechazada' || s.estado === 'deshecha')
-      );
-    }
-    
-    // Ordenar cronológicamente de más nueva a más antigua (por fecha de solicitud)
-    return result.sort((a, b) => new Date(b.fechaSolicitud).getTime() - new Date(a.fechaSolicitud).getTime());
-  };
-  
-  // Función para aceptar solicitud
-  const handleAcceptSolicitud = (solicitud: Solicitud) => {
-    const now = new Date().toISOString();
-    const userName = user?.name || 'Usuario';
-    
-    const updatedSolicitud: Solicitud = { 
-      ...solicitud, 
-      estado: 'aceptada', 
-      fechaRespuesta: now,
-      historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud aceptada', usuario: userName }]
-    };
-    
-    // Actualizar estado local
-    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
-    setHistorialState(prev => [...prev, updatedSolicitud]);
-    
-    // Actualizar estado global
-    setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-    
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
-  };
-  
-  // Función para rechazar solicitud
-  const handleRejectSolicitud = (solicitud: Solicitud) => {
-    const now = new Date().toISOString();
-    const userName = user?.name || 'Usuario';
-    
-    const updatedSolicitud: Solicitud = { 
-      ...solicitud, 
-      estado: 'rechazada', 
-      fechaRespuesta: now,
-      historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud rechazada', usuario: userName }]
-    };
-    
-    // Actualizar estado local
-    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
-    setHistorialState(prev => [...prev, updatedSolicitud]);
-    
-    // Actualizar estado global
-    setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-    
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
+    if (misCambiosFilter === 'recibidas') return solicitudesRecibidas;
+    if (misCambiosFilter === 'enviadas') return solicitudesEnviadas;
+    return historial;
   };
 
   const getStatusBadge = (estado: string) => {
@@ -5507,8 +4597,6 @@ function SolicitudesTab() {
         return <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">Aceptada</span>;
       case 'rechazada':
         return <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">Rechazada</span>;
-      case 'deshecha':
-        return <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs font-medium rounded-full">Deshecha</span>;
       default:
         return null;
     }
@@ -5600,246 +4688,83 @@ function SolicitudesTab() {
                 <p className="text-[#86868B]">No hay solicitudes {misCambiosFilter}</p>
               </div>
             ) : (
-              getFilteredMisCambios().map((solicitud) => {
-                // Determinar el nombre y cargo a mostrar según el filtro
-                const displayName = misCambiosFilter === 'recibidas' ? solicitud.de : 
-                                   misCambiosFilter === 'enviadas' ? solicitud.a : solicitud.de;
-                const displayCargo = misCambiosFilter === 'recibidas' ? solicitud.deCargo : 
-                                    misCambiosFilter === 'enviadas' ? solicitud.aCargo : solicitud.deCargo;
-                const displayDept = misCambiosFilter === 'recibidas' ? solicitud.deDept : 
-                                   misCambiosFilter === 'enviadas' ? solicitud.aDept : solicitud.deDept;
-                
-                return (
-                  <div
-                    key={solicitud.id}
-                    className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
-                  >
-                    {/* Header: Avatar + Nombre + Cargo + Estado */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-[#1D1D1F]">{displayName}</p>
-                          <p className="text-xs text-[#86868B]">{displayCargo || 'Voluntario'} • {displayDept || 'Dive Shop'}</p>
-                        </div>
-                      </div>
-                      {getStatusBadge(solicitud.estado)}
+              getFilteredMisCambios().map((solicitud) => (
+                <div
+                  key={solicitud.id}
+                  className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-corporate/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-corporate">{solicitud.avatar}</span>
                     </div>
-                    
-                    {/* Tipo de solicitud */}
-                    <div className="mt-3">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
-                        {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
-                      </span>
-                    </div>
-                    
-                    {/* Fecha del cambio */}
-                    <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
-                      <Calendar className="w-4 h-4 text-[#86868B]" />
-                      <span className="text-[#86868B]">Fecha del cambio:</span>
-                      <span className="font-medium">
-                        {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </span>
-                    </div>
-                    
-                    {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
-                    {solicitud.tipo === 'cambio' ? (
-                      <div className="mt-3 grid grid-cols-2 gap-3">
-                        {/* Columna ANTES */}
-                        <div className="bg-[#F5F5F7] rounded-lg p-3">
-                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario que solicita */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                  {solicitud.deTurnoActual || solicitud.turnoActual}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Columna DESPUÉS */}
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario que solicita */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                  {solicitud.deTurnoNuevo || solicitud.turnoSolicitado}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-[#1D1D1F]">
+                          {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio de día'}
+                        </p>
+                        {getStatusBadge(solicitud.estado)}
                       </div>
-                    ) : solicitud.tipo === 'intercambio' ? (
-                      <div className="mt-3 grid grid-cols-2 gap-3">
-                        {/* Columna ANTES */}
-                        <div className="bg-[#F5F5F7] rounded-lg p-3">
-                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario A */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                  {solicitud.deTurnoActual || 'AM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario B */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                  {solicitud.aTurnoActual || 'PM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Columna DESPUÉS */}
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario A */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                  {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario B */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                  {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                    
-                    {/* Footer: Historial completo del cambio */}
-                    <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
-                      <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
-                      <div className="space-y-1">
-                        {(solicitud.historial || []).map((item, idx) => (
-                          <div key={idx} className="flex items-start gap-2 text-xs">
-                            <span className="text-[#86868B] whitespace-nowrap">
-                              {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className="text-[#1D1D1F]">- {item.accion}</span>
-                            {item.motivo && (
-                              <span className="text-[#86868B] italic">({item.motivo})</span>
-                            )}
-                          </div>
-                        ))}
-                        {/* Fallback si no hay historial */}
-                        {(!solicitud.historial || solicitud.historial.length === 0) && (
-                          <div className="flex items-center justify-between text-xs text-[#86868B]">
-                            <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                            {solicitud.fechaRespuesta && (
-                              <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-xs text-[#86868B] mt-0.5">
+                        {misCambiosFilter === 'recibidas' ? `De: ${solicitud.de}` : 
+                         misCambiosFilter === 'enviadas' ? `Para: ${solicitud.a}` : 
+                         `${solicitud.de} → ${solicitud.a}`}
+                      </p>
+                      {solicitud.tipo === 'cambio' && solicitud.turnoActual && (
+                        <p className="text-xs text-[#86868B] mt-1">
+                          {solicitud.turnoActual} → {solicitud.turnoSolicitado}
+                        </p>
+                      )}
+                      <p className="text-xs text-[#C7C7CC] mt-2">
+                        {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
+                      </p>
                     </div>
-                    
-                    {/* Botones de acción para recibidas pendientes - MÁS CORTOS */}
                     {solicitud.estado === 'pendiente' && misCambiosFilter === 'recibidas' && (
-                      <div className="mt-3 flex gap-2 justify-end">
-                        <button 
-                          onClick={() => handleAcceptSolicitud(solicitud)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
-                        >
-                          <Check className="w-4 h-4" />
-                          Aceptar
+                      <div className="flex gap-2">
+                        <button className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center hover:bg-green-200 transition-colors">
+                          <Check className="w-4 h-4 text-green-600" />
                         </button>
-                        <button 
-                          onClick={() => handleRejectSolicitud(solicitud)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                          Rechazar
+                        <button className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center hover:bg-red-200 transition-colors">
+                          <X className="w-4 h-4 text-red-600" />
                         </button>
                       </div>
                     )}
                   </div>
-                );
-              })
+                </div>
+              ))
             )}
           </div>
         </div>
       ) : (
         <div className="space-y-4">
           {/* Filtros para Equipo */}
-          <div className="flex flex-col sm:flex-row gap-2">
-            {/* Selector de departamento */}
-            <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as Department | 'ALL')}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-white border-[#E5E5E7]">
-                <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos</SelectItem>
-                {Object.values(Department).map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept.replace(/_/g, ' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            {/* Filtros de estado con iconos minimalistas */}
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-              {[
-                { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter).length },
-                { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
-                { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
-                { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setEquipoFilter(filter.id as typeof equipoFilter)}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                    equipoFilter === filter.id
-                      ? 'bg-corporate text-white'
-                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                  )}
-                >
-                  <filter.icon className="w-4 h-4" />
-                  {filter.label}
-                  {filter.count > 0 && (
-                    <span className={cn(
-                      'px-1.5 py-0.5 text-xs rounded-full',
-                      equipoFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                    )}>
-                      {filter.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'todas', label: 'Todas', count: solicitudesEquipo.length },
+              { id: 'aceptadas', label: 'Aceptadas', count: solicitudesEquipo.filter(s => s.estado === 'aceptada').length },
+              { id: 'rechazadas', label: 'Rechazadas', count: solicitudesEquipo.filter(s => s.estado === 'rechazada').length },
+            ].map((filter) => (
+              <button
+                key={filter.id}
+                onClick={() => setEquipoFilter(filter.id as typeof equipoFilter)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                  equipoFilter === filter.id
+                    ? 'bg-corporate text-white'
+                    : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                )}
+              >
+                <Filter className="w-4 h-4" />
+                {filter.label}
+                {filter.count > 0 && (
+                  <span className={cn(
+                    'px-1.5 py-0.5 text-xs rounded-full',
+                    equipoFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                  )}>
+                    {filter.count}
+                  </span>
+                )}
+              </button>
+            ))}
           </div>
 
           {/* Lista de solicitudes del equipo */}
@@ -5857,220 +4782,39 @@ function SolicitudesTab() {
                   key={solicitud.id}
                   className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
                 >
-                  {/* Header: Avatar + Nombre + Cargo + Estado */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.de}</p>
-                        <p className="text-xs text-[#86868B]">{solicitud.deCargo || 'Voluntario'} • {solicitud.deDept || 'Dive Shop'}</p>
-                      </div>
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 bg-corporate/10 rounded-xl flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-semibold text-corporate">{solicitud.avatar}</span>
                     </div>
-                    {getStatusBadge(solicitud.estado)}
-                  </div>
-                  
-                  {/* Tipo de solicitud */}
-                  <div className="mt-3">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
-                      {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
-                    </span>
-                  </div>
-                  
-                  {/* Fecha del cambio */}
-                  <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
-                    <Calendar className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-[#86868B]">Fecha del cambio:</span>
-                    <span className="font-medium">
-                      {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </span>
-                  </div>
-                  
-                  {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
-                  {solicitud.tipo === 'cambio' ? (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      {/* Columna ANTES */}
-                      <div className="bg-[#F5F5F7] rounded-lg p-3">
-                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario que solicita */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                {solicitud.deTurnoActual || solicitud.turnoActual}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual})</span>
-                            </div>
-                          </div>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-[#1D1D1F]">
+                          {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio de día'}
+                        </p>
+                        {getStatusBadge(solicitud.estado)}
                       </div>
-                      {/* Columna DESPUÉS */}
-                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario que solicita */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                {solicitud.deTurnoNuevo || solicitud.turnoSolicitado}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : solicitud.tipo === 'intercambio' ? (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      {/* Columna ANTES */}
-                      <div className="bg-[#F5F5F7] rounded-lg p-3">
-                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario A */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                {solicitud.deTurnoActual || 'AM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario B */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                {solicitud.aTurnoActual || 'PM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Columna DESPUÉS */}
-                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario A */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario B */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  
-                  {/* Footer: Historial completo del cambio */}
-                  <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
-                    <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
-                    <div className="space-y-1">
-                      {(solicitud.historial || []).map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs">
-                          <span className="text-[#86868B] whitespace-nowrap">
-                            {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-[#1D1D1F]">- {item.accion}</span>
-                          {item.motivo && (
-                            <span className="text-[#86868B] italic">({item.motivo})</span>
-                          )}
-                        </div>
-                      ))}
-                      {/* Fallback si no hay historial */}
-                      {(!solicitud.historial || solicitud.historial.length === 0) && (
-                        <div className="flex items-center justify-between text-xs text-[#86868B]">
-                          <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                          {solicitud.fechaRespuesta && (
-                            <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                          )}
-                        </div>
+                      <p className="text-xs text-[#86868B] mt-0.5">
+                        {solicitud.de} → {solicitud.a}
+                      </p>
+                      {solicitud.tipo === 'cambio' && solicitud.turnoActual && (
+                        <p className="text-xs text-[#86868B] mt-1">
+                          {solicitud.turnoActual} → {solicitud.turnoSolicitado}
+                        </p>
                       )}
+                      <p className="text-xs text-[#C7C7CC] mt-2">
+                        {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}
+                      </p>
                     </div>
+                    <button className="w-8 h-8 bg-[#F5F5F7] rounded-lg flex items-center justify-center hover:bg-[#E5E5E7] transition-colors">
+                      <Eye className="w-4 h-4 text-[#86868B]" />
+                    </button>
                   </div>
-                  
-                  {/* Botón Deshacer cambio - solo para solicitudes aceptadas y usuarios con permisos */}
-                  {solicitud.estado === 'aceptada' && canUndoChanges && (
-                    <div className="mt-3 flex justify-end">
-                      <button 
-                        onClick={() => {
-                          setSelectedSolicitud(solicitud);
-                          setShowUndoModal(true);
-                        }}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg text-sm font-medium hover:bg-amber-100 transition-colors"
-                      >
-                        <History className="w-4 h-4" />
-                        Deshacer cambio
-                      </button>
-                    </div>
-                  )}
                 </div>
               ))
             )}
           </div>
         </div>
       )}
-      
-      {/* Modal para deshacer cambio */}
-      <Dialog open={showUndoModal} onOpenChange={setShowUndoModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Deshacer cambio</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-[#86868B]">
-              Estás a punto de deshacer el cambio de turno entre <strong>{selectedSolicitud?.de}</strong> y <strong>{selectedSolicitud?.a}</strong>.
-            </p>
-            <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Motivo</label>
-              <textarea
-                value={undoReason}
-                onChange={(e) => setUndoReason(e.target.value)}
-                placeholder="Indica el motivo por el que deshaces este cambio..."
-                className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                rows={3}
-              />
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                setShowUndoModal(false);
-                setSelectedSolicitud(null);
-                setUndoReason('');
-              }}
-              className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleUndoChange}
-              disabled={!undoReason.trim()}
-              className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Confirmar
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
