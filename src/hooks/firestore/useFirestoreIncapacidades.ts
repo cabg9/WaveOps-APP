@@ -8,9 +8,10 @@ import {
   onSnapshot,
   query,
   orderBy,
-  DocumentData
+  DocumentData,
+  arrayUnion
 } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { db } from '../../firebase-config';
 
 export interface IncapacidadDocument {
   id: string;
@@ -72,10 +73,14 @@ export function useFirestoreIncapacidades() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Incapacidad[];
+        const data = snapshot.docs.map(doc => {
+          const docData = doc.data();
+          console.log('DEBUG - Doc from Firestore:', doc.id, docData);
+          return {
+            id: doc.id,
+            ...docData
+          };
+        }) as Incapacidad[];
         setIncapacidades(data);
         setLoading(false);
       },
@@ -92,15 +97,31 @@ export function useFirestoreIncapacidades() {
   // Crear nueva incapacidad
   const createIncapacidad = useCallback(async (incapacidad: Omit<Incapacidad, 'id'>) => {
     try {
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const now = new Date().toISOString();
+      const initialHistoryEntry = {
+        date: now,
+        action: 'Incapacidad registrada',
+        user: incapacidad.userName
+      };
+      
+      // Combinar el history inicial con el que viene del objeto
+      const combinedHistory = incapacidad.history?.length > 0 
+        ? [...incapacidad.history, initialHistoryEntry]
+        : [initialHistoryEntry];
+      
+      // Asegurar que notes y documents sean arrays
+      const dataToSave = {
         ...incapacidad,
-        createdAt: new Date().toISOString(),
-        history: [{
-          date: new Date().toISOString(),
-          action: 'Incapacidad registrada',
-          user: incapacidad.userName
-        }]
-      });
+        notes: incapacidad.notes || [],
+        documents: incapacidad.documents || [],
+        createdAt: now,
+        history: combinedHistory
+      };
+      
+      console.log('DEBUG - Creando incapacidad:', dataToSave);
+      
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), dataToSave);
+      console.log('DEBUG - Incapacidad creada con ID:', docRef.id);
       return docRef.id;
     } catch (err) {
       console.error('Error al crear incapacidad:', err);
@@ -128,17 +149,13 @@ export function useFirestoreIncapacidades() {
       const currentVerifiers = incapacidad.verifiedBy || [];
       if (currentVerifiers.includes(userId)) return;
 
-      const newVerifiers = [...currentVerifiers, userId];
       const now = new Date().toISOString();
 
       const docRef = doc(db, COLLECTION_NAME, id);
       await updateDoc(docRef, {
-        verifiedBy: newVerifiers,
+        verifiedBy: arrayUnion(userId),
         status: 'verificada',
-        history: [
-          ...incapacidad.history,
-          { date: now, action: `Verificado por ${userName}`, user: userName }
-        ]
+        history: arrayUnion({ date: now, action: `Verificado por ${userName}`, user: userName })
       });
     } catch (err) {
       console.error('Error al verificar incapacidad:', err);
@@ -162,10 +179,7 @@ export function useFirestoreIncapacidades() {
 
       const updates: any = {
         status: 'registrada',
-        history: [
-          ...incapacidad.history,
-          { date: now, action: 'Incapacidad registrada en RRHH', user: userName }
-        ]
+        history: arrayUnion({ date: now, action: 'Incapacidad registrada en RRHH', user: userName })
       };
 
       if (replacementData) {
@@ -185,19 +199,14 @@ export function useFirestoreIncapacidades() {
   // Rechazar incapacidad
   const rejectIncapacidad = useCallback(async (id: string, userName: string, reason: string) => {
     try {
-      const incapacidad = incapacidades.find(i => i.id === id);
-      if (!incapacidad) return;
-
-      const now = new Date().toISOString();
       const docRef = doc(db, COLLECTION_NAME, id);
+      const now = new Date().toISOString();
 
       await updateDoc(docRef, {
         status: 'rechazada',
         rejectionReason: reason,
-        history: [
-          ...incapacidad.history,
-          { date: now, action: 'Incapacidad rechazada', user: userName }
-        ]
+        notes: arrayUnion({ id: Date.now().toString(), text: `Motivo de rechazo: ${reason}`, date: now, user: userName }),
+        history: arrayUnion({ date: now, action: `Incapacidad rechazada: ${reason}`, user: userName })
       });
     } catch (err) {
       console.error('Error al rechazar incapacidad:', err);
@@ -205,15 +214,17 @@ export function useFirestoreIncapacidades() {
     }
   }, [incapacidades]);
 
-  // Agregar nota
-  const addNote = useCallback(async (id: string, note: Omit<IncapacidadNote, 'id'>) => {
+  // Agregar nota (versión simple con text y user)
+  const addNote = useCallback(async (id: string, text: string, user: string) => {
     try {
-      const incapacidad = incapacidades.find(i => i.id === id);
-      if (!incapacidad) return;
-
       const docRef = doc(db, COLLECTION_NAME, id);
       await updateDoc(docRef, {
-        notes: [...incapacidad.notes, { ...note, id: Date.now().toString() }]
+        notes: arrayUnion({ 
+          id: Date.now().toString(),
+          text, 
+          user,
+          date: new Date().toISOString()
+        })
       });
     } catch (err) {
       console.error('Error al agregar nota:', err);
@@ -221,18 +232,67 @@ export function useFirestoreIncapacidades() {
     }
   }, [incapacidades]);
 
-  // Agregar documento
-  const addDocument = useCallback(async (id: string, document: IncapacidadDocument) => {
+  // Agregar documento (versión simple - solo nombre)
+  const addDocument = useCallback(async (id: string, docName: string) => {
     try {
-      const incapacidad = incapacidades.find(i => i.id === id);
-      if (!incapacidad) return;
-
       const docRef = doc(db, COLLECTION_NAME, id);
       await updateDoc(docRef, {
-        documents: [...incapacidad.documents, document]
+        documents: arrayUnion({
+          id: `doc${Date.now()}`,
+          name: docName,
+          requested: true,
+          uploaded: false,
+          fileUrls: []
+        })
       });
     } catch (err) {
       console.error('Error al agregar documento:', err);
+      throw err;
+    }
+  }, [incapacidades]);
+
+  // Actualizar documento (marcar como subido con URLs)
+  const updateDocument = useCallback(async (id: string, docId: string, fileUrls: string[]) => {
+    try {
+      console.log('updateDocument called', { id, docId, fileUrls });
+      
+      const incapacidad = incapacidades.find(i => i.id === id);
+      if (!incapacidad) {
+        console.error('Incapacidad no encontrada:', id);
+        throw new Error('Incapacidad no encontrada');
+      }
+      
+      console.log('Incapacidad encontrada:', incapacidad);
+      console.log('Documentos actuales:', incapacidad.documents);
+
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const now = new Date().toISOString();
+      
+      // Filtrar solo URLs que no sean blobs (Firestore no acepta blobs)
+      const validUrls = fileUrls.filter(url => !url.startsWith('blob:'));
+      console.log('URLs válidas:', validUrls);
+      
+      // Encontrar el documento y actualizarlo
+      const updatedDocuments = incapacidad.documents.map(d => 
+        d.id === docId 
+          ? { ...d, uploaded: true, fileUrls: [...(d.fileUrls || []), ...validUrls] }
+          : d
+      );
+      
+      console.log('Documentos actualizados:', updatedDocuments);
+
+      await updateDoc(docRef, {
+        documents: updatedDocuments,
+        history: arrayUnion({ 
+          date: now, 
+          action: `Documento subido: ${validUrls.length} archivo(s)`, 
+          user: 'Usuario' 
+        })
+      });
+      
+      console.log('Documento actualizado en Firestore');
+    } catch (err) {
+      console.error('Error al actualizar documento:', err);
       throw err;
     }
   }, [incapacidades]);
@@ -258,6 +318,7 @@ export function useFirestoreIncapacidades() {
     rejectIncapacidad,
     addNote,
     addDocument,
+    updateDocument,
     deleteIncapacidad
   };
 }

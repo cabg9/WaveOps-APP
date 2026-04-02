@@ -12,7 +12,7 @@ import {
   Timestamp,
   DocumentData
 } from 'firebase/firestore';
-import { db } from '../firebase-config';
+import { db } from '../../firebase-config';
 
 export interface Solicitud {
   id?: string;

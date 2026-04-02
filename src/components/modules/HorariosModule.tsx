@@ -53,6 +53,7 @@ import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
+import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFirestoreIncapacidades';
 import { Department, Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users } from '@/data/users';
@@ -177,6 +178,14 @@ interface IncapacidadesTabProps {
   activeSubTab: 'mias' | 'equipo';
   myFilter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial';
   setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
+  // Funciones de Firestore
+  firestoreIncapacidades: Incapacidad[];
+  verifyIncapacidad: (id: string, userId: string) => Promise<void>;
+  rejectIncapacidad: (id: string, reason: string, userId: string) => Promise<void>;
+  registerIncapacidad: (id: string, replacementId?: string, isExternal?: boolean) => Promise<void>;
+  undoIncapacidad: (id: string, reason: string, userId: string) => Promise<void>;
+  addNoteToIncapacidad: (id: string, text: string, user: string) => Promise<void>;
+  addDocumentToIncapacidad: (id: string, docName: string) => Promise<void>;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -190,26 +199,76 @@ export default function HorariosModule() {
   // Estado para sub-pestañas de incapacidades
   const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
   
-  // Estado global de incapacidades compartido entre tabs - ahora con userId
-  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>(() => {
-    const saved = localStorage.getItem('waveops_incapacity_dates');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error al cargar fechas de incapacidad:', e);
-      }
-    }
-    return [];
-  });
-
-  // Guardar fechas de incapacidad en localStorage cuando cambien
-  useEffect(() => {
-    localStorage.setItem('waveops_incapacity_dates', JSON.stringify(incapacityDates));
-  }, [incapacityDates]);
+  // Hook de Firestore para incapacidades
+  const { 
+    incapacidades, 
+    loading: incapacidadesLoading, 
+    error: incapacidadesError,
+    createIncapacidad,
+    updateIncapacidad,
+    verifyIncapacidad,
+    rejectIncapacidad,
+    registerIncapacidad,
+    undoIncapacidad,
+    addNote,
+    addDocument,
+    updateDocument
+  } = useFirestoreIncapacidades();
   
-  const addIncapacity = (dates: string[], type: string, userId: string) => {
-    setIncapacityDates(prev => [...prev, ...dates.map(d => ({ date: d, type, userId }))]);
+  // Estado local de incapacityDates para compatibilidad (derivado de Firestore)
+  const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>([]);
+  
+  // Sincronizar incapacityDates desde Firestore (solo incapacidades activas, no rechazadas)
+  useEffect(() => {
+    const dates: {date: string, type: string, userId: string}[] = [];
+    incapacidades
+      .filter(inc => inc.status !== 'rechazada') // Filtrar rechazadas
+      .forEach(inc => {
+        const start = new Date(inc.startDate + 'T00:00:00'); // Evitar timezone issues
+        const end = new Date(inc.endDate + 'T00:00:00');
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push({
+            date: d.toISOString().split('T')[0],
+            type: inc.type,
+            userId: inc.userId
+          });
+        }
+      });
+    setIncapacityDates(dates);
+    // También guardar en localStorage como respaldo
+    localStorage.setItem('waveops_incapacity_dates', JSON.stringify(dates));
+  }, [incapacidades]);
+  
+  const addIncapacity = async (dates: string[], type: string, userId: string, description?: string) => {
+    // Encontrar usuario
+    const userInfo = users.find(u => u.id === userId);
+    if (!userInfo) return;
+    
+    // Crear notas con la descripción si existe
+    const notes = description?.trim() 
+      ? [{ id: `note-${Date.now()}`, text: description.trim(), date: new Date().toISOString(), user: userInfo.name }]
+      : [];
+    
+    // Crear en Firestore
+    await createIncapacidad({
+      userId,
+      userName: userInfo.name,
+      userAvatar: userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+      userDepartment: userInfo.department,
+      type,
+      startDate: dates[0],
+      endDate: dates[dates.length - 1],
+      description: description?.trim() || `Incapacidad registrada desde el calendario`,
+      status: 'pendiente',
+      history: [{
+        date: new Date().toISOString(),
+        action: 'Incapacidad registrada',
+        user: user?.name || 'Sistema'
+      }],
+      notes: notes.length > 0 ? notes : [],
+      documents: [],
+      createdAt: new Date().toISOString()
+    });
   };
   
   const getIncapacityForDate = (date: string, userId: string) => {
@@ -334,7 +393,23 @@ export default function HorariosModule() {
         {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} />}
         {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} />}
         {activeTab === 'solicitudes' && <SolicitudesTab />}
-        {activeTab === 'incapacidades' && <IncapacidadesTab incapacityDates={incapacityDates} setIncapacityDates={setIncapacityDates} getUsersByDepartment={useShifts().getUsersByDepartment} activeSubTab={incapacidadesSubTab} myFilter={myIncapacidadesFilter} setMyFilter={setMyIncapacidadesFilter} />}
+        {activeTab === 'incapacidades' && (
+          <IncapacidadesTab 
+            incapacityDates={incapacityDates} 
+            setIncapacityDates={setIncapacityDates} 
+            getUsersByDepartment={useShifts().getUsersByDepartment} 
+            activeSubTab={incapacidadesSubTab} 
+            myFilter={myIncapacidadesFilter} 
+            setMyFilter={setMyIncapacidadesFilter}
+            firestoreIncapacidades={incapacidades}
+            verifyIncapacidad={verifyIncapacidad}
+            rejectIncapacidad={rejectIncapacidad}
+            registerIncapacidad={registerIncapacidad}
+            undoIncapacidad={undoIncapacidad}
+            addNoteToIncapacidad={addNote}
+            addDocumentToIncapacidad={addDocument}
+          />
+        )}
       </div>
     </Layout>
   );
@@ -953,7 +1028,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     const day = String(d.getDate()).padStart(2, '0');
                     newDates.push(`${year}-${month}-${day}`);
                   }
-                  addIncapacity(newDates, incapacityType, user?.id || '');
+                  addIncapacity(newDates, incapacityType, user?.id || '', incapacityDescription);
                   setIncapacityStartDate('');
                   setIncapacityEndDate('');
                   setIncapacityType('');
@@ -1622,8 +1697,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       dates.push(`${year}-${month}-${day}`);
     }
     
-    // Registrar la incapacidad en el estado global
-    addIncapacity(dates, incapacityType, selectedUserForIncapacity.id);
+    // Registrar la incapacidad en el estado global (con descripción)
+    addIncapacity(dates, incapacityType, selectedUserForIncapacity.id, incapacityDescription);
     
     setShowRegisterIncapacityModal(false);
     setSelectedUserForIncapacity(null);
@@ -3443,7 +3518,21 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
     </div>
   );
 }
-function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDates: _setIncapacityDates, getUsersByDepartment, activeSubTab, myFilter, setMyFilter }: IncapacidadesTabProps) {
+function IncapacidadesTab({ 
+  incapacityDates: _incapacityDates, 
+  setIncapacityDates: _setIncapacityDates, 
+  getUsersByDepartment, 
+  activeSubTab, 
+  myFilter, 
+  setMyFilter,
+  firestoreIncapacidades,
+  verifyIncapacidad,
+  rejectIncapacidad,
+  registerIncapacidad,
+  undoIncapacidad,
+  addNoteToIncapacidad,
+  addDocumentToIncapacidad
+}: IncapacidadesTabProps) {
   const { user } = useAuth();
   
   // Filtros para pestaña "Equipo"
@@ -3476,197 +3565,13 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
   // Estado para imagen expandida
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   
-  // Sincronizar incapacidades del estado global con el estado local
-  // Cada registro (batch de fechas) crea una incapacidad única
-  useEffect(() => {
-    if (_incapacityDates.length === 0) return;
-    
-    // Agrupar por timestamp de creación (simulado por el orden en el array)
-    // Cada vez que se registra, se agregan las fechas en grupo
-    const processedBatches = new Set<string>();
-    const newIncapacidades: Incapacidad[] = [];
-    
-    // Procesar en grupos - cada batch es un registro único
-    let currentBatch: typeof _incapacityDates = [];
-    
-    _incapacityDates.forEach((inc) => {
-      // Si es la primera fecha o es consecutiva a la anterior, agrupar
-      if (currentBatch.length === 0) {
-        currentBatch.push(inc);
-      } else {
-        const lastDate = currentBatch[currentBatch.length - 1].date;
-        const lastDateObj = new Date(lastDate);
-        const currentDateObj = new Date(inc.date);
-        const diffDays = Math.round((currentDateObj.getTime() - lastDateObj.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays === 1 && currentBatch[0].userId === inc.userId && currentBatch[0].type === inc.type) {
-          // Es consecutiva, agregar al batch actual
-          currentBatch.push(inc);
-        } else {
-          // No es consecutiva o es diferente usuario/tipo, crear incapacidad del batch anterior
-          createIncapacityFromBatch(currentBatch);
-          currentBatch = [inc];
-        }
-      }
-    });
-    
-    // Procesar el último batch
-    if (currentBatch.length > 0) {
-      createIncapacityFromBatch(currentBatch);
-    }
-    
-    function createIncapacityFromBatch(batch: typeof _incapacityDates) {
-      if (batch.length === 0) return;
-      
-      const firstInc = batch[0];
-      const lastInc = batch[batch.length - 1];
-      const batchKey = `${firstInc.userId}-${firstInc.type}-${firstInc.date}-${lastInc.date}`;
-      
-      if (processedBatches.has(batchKey)) return;
-      processedBatches.add(batchKey);
-      
-      // Buscar si ya existe esta incapacidad
-      const existing = incapacidades.find(i => 
-        i.userId === firstInc.userId && 
-        i.startDate === firstInc.date && 
-        i.endDate === lastInc.date && 
-        i.type === firstInc.type
-      );
-      
-      if (existing) {
-        newIncapacidades.push(existing);
-      } else {
-        // Crear nueva incapacidad con el batch
-        const userDept = user?.department || Department.DIVE_SHOP;
-        const allUsers = getUsersByDepartment(userDept);
-        const userInfo = allUsers.find(u => u.id === firstInc.userId);
-        
-        newIncapacidades.push({
-          id: `new-${Date.now()}-${batchKey}`,
-          userId: firstInc.userId,
-          userName: userInfo?.name || 'Usuario',
-          userAvatar: userInfo?.initials || 'U',
-          userDepartment: userInfo?.department || userDept,
-          type: firstInc.type,
-          startDate: firstInc.date,
-          endDate: lastInc.date,
-          description: '',
-          status: 'pendiente',
-          history: [{ date: new Date().toISOString(), action: 'Solicitud creada', user: userInfo?.name || 'Usuario' }],
-          notes: [],
-          documents: [],
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
-    
-    // Agregar solo las nuevas que no existan
-    // IMPORTANTE: No sobrescribir incapacidades que ya tienen estado modificado (verificada, registrada, rechazada)
-    setIncapacidades(prev => {
-      const existingIds = new Set(prev.map(i => i.id));
-      const trulyNew = newIncapacidades.filter(i => !existingIds.has(i.id));
-      
-      // Mantener las incapacidades existentes que ya fueron modificadas (no sobrescribir)
-      const modifiedExisting = prev.filter(i => i.status !== 'pendiente');
-      
-      // Para las pendientes, actualizar solo si vienen del nuevo batch
-      const pendingExisting = prev.filter(i => i.status === 'pendiente');
-      const pendingIds = new Set(newIncapacidades.map(i => i.id));
-      const pendingToKeep = pendingExisting.filter(i => pendingIds.has(i.id));
-      
-      return [...modifiedExisting, ...pendingToKeep, ...trulyNew];
-    });
-  }, [_incapacityDates, user?.department]);
+  // Usar incapacidades directamente desde Firestore
+  const [incapacidades, setIncapacidades] = useState<Incapacidad[]>([]);
   
-  // Cargar incapacidades desde localStorage o usar datos de ejemplo
-  const [incapacidades, setIncapacidades] = useState<Incapacidad[]>(() => {
-    const saved = localStorage.getItem('waveops_incapacidades');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        console.error('Error al cargar incapacidades:', e);
-      }
-    }
-    return [
-    {
-      id: '1',
-      userId: 'user1',
-      userName: 'Juan Pérez',
-      userAvatar: 'JP',
-      userDepartment: Department.DIVE_SHOP,
-      type: 'enfermedad',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: addDaysToDate(new Date(), 3).toISOString().split('T')[0],
-      description: 'Gripe fuerte con fiebre',
-      status: 'pendiente',
-      history: [
-        { date: new Date().toISOString(), action: 'Solicitud creada', user: 'Juan Pérez' }
-      ],
-      notes: [],
-      documents: [
-        { id: 'doc1', name: 'Certificado médico', requested: true, uploaded: false }
-      ],
-      createdAt: new Date().toISOString()
-    },
-    {
-      id: '2',
-      userId: 'user2',
-      userName: 'María García',
-      userAvatar: 'MG',
-      userDepartment: Department.VENTAS,
-      type: 'cita_medica',
-      startDate: addDaysToDate(new Date(), 1).toISOString().split('T')[0],
-      endDate: addDaysToDate(new Date(), 1).toISOString().split('T')[0],
-      description: 'Cita con especialista',
-      status: 'registrada',
-      replacementUserId: 'user3',
-      replacementUserName: 'Carlos López',
-      replacementUserDept: Department.VENTAS,
-      isExternalSupport: false,
-      history: [
-        { date: new Date().toISOString(), action: 'Solicitud creada', user: 'María García' },
-        { date: addDaysToDate(new Date(), 0.5).toISOString(), action: 'Incapacidad registrada', user: 'Supervisor' },
-        { date: addDaysToDate(new Date(), 0.5).toISOString(), action: 'Reemplazo asignado: Carlos López', user: 'Supervisor' }
-      ],
-      notes: [
-        { date: addDaysToDate(new Date(), 0.5).toISOString(), text: 'Se asignó reemplazo del mismo departamento', user: 'Supervisor' }
-      ],
-      documents: [],
-      createdAt: addDaysToDate(new Date(), -1).toISOString()
-    },
-    {
-      id: '3',
-      userId: 'user4',
-      userAvatar: 'AT',
-      userName: 'Ana Torres',
-      userDepartment: Department.DIVE_SHOP,
-      type: 'inasistencia',
-      startDate: addDaysToDate(new Date(), -2).toISOString().split('T')[0],
-      endDate: addDaysToDate(new Date(), -2).toISOString().split('T')[0],
-      description: 'No se presentó al turno',
-      status: 'rechazada',
-      rejectionReason: 'No se proporcionó justificación válida',
-      history: [
-        { date: addDaysToDate(new Date(), -2).toISOString(), action: 'Solicitud creada', user: 'Ana Torres' },
-        { date: addDaysToDate(new Date(), -1).toISOString(), action: 'Incapacidad rechazada', user: 'Supervisor' }
-      ],
-      notes: [
-        { date: addDaysToDate(new Date(), -1).toISOString(), text: 'Se requiere documentación adicional', user: 'Supervisor' }
-      ],
-      documents: [
-        { id: 'doc1', name: 'Justificación escrita', requested: true, uploaded: false }
-      ],
-      createdAt: addDaysToDate(new Date(), -3).toISOString()
-    }
-  ];
-  });
-
-  // Guardar incapacidades en localStorage cuando cambien
   useEffect(() => {
-    localStorage.setItem('waveops_incapacidades', JSON.stringify(incapacidades));
-  }, [incapacidades]);
-
+    setIncapacidades(firestoreIncapacidades);
+  }, [firestoreIncapacidades]);
+  
   // Configuración de tipos de incapacidad
   const incapacityTypeConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, borderColor: string, label: string }> = {
     enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
@@ -3743,156 +3648,75 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     setShowRejectModal(true);
   };
 
-  // Verificar incapacidad (Supervisor o Gerente)
-  const handleVerify = (incapacity: Incapacidad) => {
+  // Verificar incapacidad (Supervisor o Gerente) - usando Firestore
+  const handleVerify = async (incapacity: Incapacidad) => {
     try {
       if (!user || !user.id) {
         console.error('Usuario no disponible para verificar');
         return;
       }
       
-      const verifierId = user.id;
-      const verifierName = user.name || 'Usuario';
-      
-      setIncapacidades(prev => prev.map(inc => {
-        if (inc.id === incapacity.id) {
-          const currentVerifiers = inc.verifiedBy || [];
-          // Evitar verificaciones duplicadas del mismo usuario
-          if (currentVerifiers.includes(verifierId)) {
-            return inc;
-          }
-          
-          const newVerifiers = [...currentVerifiers, verifierId];
-          
-          return {
-            ...inc,
-            verifiedBy: newVerifiers,
-            status: 'verificada',
-            history: [
-              ...inc.history,
-              { date: new Date().toISOString(), action: `Verificado por ${verifierName}`, user: verifierName }
-            ]
-          };
-        }
-        return inc;
-      }));
+      await verifyIncapacidad(incapacity.id!, user.id, user.name || 'Supervisor');
       
       // Cambiar filtro a 'todas' para que la incapacidad siga visible
       setStatusFilter('todas');
     } catch (error) {
       console.error('Error al verificar incapacidad:', error);
+      alert('Error al verificar la incapacidad');
     }
   };
 
-  // Confirmar registro con reemplazo
-  const confirmRegister = () => {
+  // Confirmar registro con reemplazo - usando Firestore
+  const confirmRegister = async () => {
     if (!selectedIncapacity) return;
     
-    let replacementName = '';
-    let replacementDept = undefined;
-    
-    if (selectedReplacement) {
-      const replacementUser = getReplacementUsers(selectedIncapacity, isExternalSupport).find(u => u.id === selectedReplacement);
-      if (replacementUser) {
-        replacementName = replacementUser.name;
-        replacementDept = replacementUser.department;
-      }
-    }
-    
-    setIncapacidades(prev => prev.map(inc => {
-      if (inc.id === selectedIncapacity.id) {
-        const newHistory = [
-          ...inc.history,
-          { date: new Date().toISOString(), action: 'Incapacidad registrada', user: user?.name || 'Supervisor' }
-        ];
-        if (replacementName) {
-          newHistory.push({ 
-            date: new Date().toISOString(), 
-            action: `Reemplazo asignado: ${replacementName}${isExternalSupport ? ' (apoyo externo)' : ''}`, 
-            user: user?.name || 'Supervisor' 
-          });
+    try {
+      let replacementData = undefined;
+      
+      if (selectedReplacement) {
+        const replacementUser = getReplacementUsers(selectedIncapacity, isExternalSupport).find(u => u.id === selectedReplacement);
+        if (replacementUser) {
+          replacementData = {
+            replacementUserId: selectedReplacement,
+            replacementUserName: replacementUser.name,
+            replacementUserDept: replacementUser.department,
+            isExternalSupport: isExternalSupport
+          };
         }
-        return {
-          ...inc,
-          status: 'registrada',
-          replacementUserId: selectedReplacement || undefined,
-          replacementUserName: replacementName || undefined,
-          replacementUserDept: replacementDept,
-          isExternalSupport: isExternalSupport || undefined,
-          history: newHistory
-        };
       }
-      return inc;
-    }));
-    
-    setShowRegisterModal(false);
-    setSelectedIncapacity(null);
-    setSelectedReplacement('');
-    setIsExternalSupport(false);
-    
-    // Cambiar filtro a 'todas' para que la incapacidad siga visible
-    setStatusFilter('todas');
+      
+      await registerIncapacidad(selectedIncapacity.id!, user?.name || 'Supervisor', replacementData);
+      
+      setShowRegisterModal(false);
+      setSelectedIncapacity(null);
+      setSelectedReplacement('');
+      setIsExternalSupport(false);
+      
+      // Cambiar filtro a 'todas' para que la incapacidad siga visible
+      setStatusFilter('todas');
+    } catch (error) {
+      console.error('Error al registrar incapacidad:', error);
+      alert('Error al registrar la incapacidad');
+    }
   };
 
-  // Confirmar rechazo
-  const confirmReject = () => {
+  // Confirmar rechazo - usando Firestore
+  const confirmReject = async () => {
     if (!selectedIncapacity || !rejectionReason.trim()) return;
     
-    // Actualizar estado local de incapacidades
-    setIncapacidades(prev => prev.map(inc => {
-      if (inc.id === selectedIncapacity.id) {
-        return {
-          ...inc,
-          status: 'rechazada',
-          rejectionReason,
-          history: [
-            ...inc.history,
-            { date: new Date().toISOString(), action: 'Incapacidad rechazada', user: user?.name || 'Supervisor' }
-          ]
-        };
-      }
-      return inc;
-    }));
-    
-    // Eliminar las fechas del calendario global (la incapacidad fue rechazada)
-    const datesToRemove: string[] = [];
-    const [startYear, startMonth, startDay] = selectedIncapacity.startDate.split('-').map(Number);
-    const [endYear, endMonth, endDay] = selectedIncapacity.endDate.split('-').map(Number);
-    const start = new Date(startYear, startMonth - 1, startDay);
-    const end = new Date(endYear, endMonth - 1, endDay);
-    
-    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      datesToRemove.push(`${year}-${month}-${day}`);
+    try {
+      await rejectIncapacidad(selectedIncapacity.id!, user?.name || 'Supervisor', rejectionReason);
+      
+      setShowRejectModal(false);
+      setSelectedIncapacity(null);
+      setRejectionReason('');
+      
+      // Cambiar filtro a 'todas' para que la incapacidad siga visible
+      setStatusFilter('todas');
+    } catch (error) {
+      console.error('Error al rechazar incapacidad:', error);
+      alert('Error al rechazar la incapacidad');
     }
-    
-    // Solo eliminar fechas que no estén siendo usadas por otras incapacidades activas del mismo usuario
-    _setIncapacityDates(prev => prev.filter(inc => {
-      // Si no es del mismo usuario o no está en las fechas a eliminar, mantener
-      if (inc.userId !== selectedIncapacity.userId) return true;
-      if (!datesToRemove.includes(inc.date)) return true;
-      
-      // Verificar si hay otra incapacidad activa (no rechazada) que use esta fecha
-      const hasOtherActiveIncapacity = incapacidades.some(otherInc => 
-        otherInc.id !== selectedIncapacity.id &&
-        otherInc.userId === selectedIncapacity.userId &&
-        otherInc.status !== 'rechazada' &&
-        inc.date >= otherInc.startDate &&
-        inc.date <= otherInc.endDate
-      );
-      
-      // Mantener la fecha si hay otra incapacidad activa que la use
-      return hasOtherActiveIncapacity;
-    }));
-    
-    setShowRejectModal(false);
-    setSelectedIncapacity(null);
-    setRejectionReason('');
-    
-    // Cambiar filtro a 'todas' para que la incapacidad siga visible
-    setStatusFilter('todas');
   };
 
   // Cambiar reemplazo
@@ -3940,72 +3764,76 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
     setIsExternalSupport(false);
   };
 
-  // Agregar nota
-  const addNote = (incapacityId: string) => {
+  // Agregar nota - usando Firestore
+  const addNoteLocal = async (incapacityId: string) => {
     if (!newNote.trim()) return;
     
-    setIncapacidades(prev => prev.map(inc => {
-      if (inc.id === incapacityId) {
-        return {
-          ...inc,
-          notes: [
-            ...inc.notes,
-            { date: new Date().toISOString(), text: newNote, user: user?.name || 'Supervisor' }
-          ]
-        };
-      }
-      return inc;
-    }));
-    setNewNote('');
+    try {
+      await addNoteToIncapacidad(incapacityId, newNote.trim(), user?.name || 'Supervisor');
+      setNewNote('');
+    } catch (error) {
+      console.error('Error al agregar nota:', error);
+      alert('Error al agregar la nota');
+    }
   };
 
-  // Solicitar nuevo documento
-  const requestDocument = (incapacityId: string) => {
+  // Solicitar nuevo documento - usando Firestore
+  const requestDocument = async (incapacityId: string) => {
     if (!newDocName.trim()) return;
     
-    setIncapacidades(prev => prev.map(inc => {
-      if (inc.id === incapacityId) {
-        return {
-          ...inc,
-          documents: [
-            ...inc.documents,
-            { id: `doc${Date.now()}`, name: newDocName, requested: true, uploaded: false }
-          ],
-          history: [
-            ...inc.history,
-            { date: new Date().toISOString(), action: `Documento solicitado: ${newDocName}`, user: user?.name || 'Supervisor' }
-          ]
-        };
-      }
-      return inc;
-    }));
-    setNewDocName('');
+    try {
+      await addDocumentToIncapacidad(incapacityId, newDocName.trim());
+      setNewDocName('');
+    } catch (error) {
+      console.error('Error al solicitar documento:', error);
+      alert('Error al solicitar el documento');
+    }
   };
 
-  // Subir fotos de documento con archivos reales (múltiples)
-  const uploadDocumentPhotoWithFile = (incapacityId: string, docId: string, fileUrls: string[]) => {
-    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, fileUrls });
-    setIncapacidades(prev => prev.map(inc => {
-      if (inc.id === incapacityId) {
-        const doc = inc.documents.find(d => d.id === docId);
-        const existingUrls = doc?.fileUrls || [];
-        return {
-          ...inc,
-          documents: inc.documents.map(d => 
-            d.id === docId 
-              ? { ...d, uploaded: true, fileUrls: [...existingUrls, ...fileUrls] }
-              : d
-          ),
-          history: [
-            ...inc.history,
-            { date: new Date().toISOString(), action: `${fileUrls.length} archivo(s) subido(s): ${doc?.name}`, user: user?.name || 'Usuario' }
-          ]
-        };
+  // Subir fotos de documento - usando Firestore directamente
+  const uploadDocumentPhotoWithFile = async (incapacityId: string, docId: string, fileUrls: string[]) => {
+    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, fileUrlsCount: fileUrls.length });
+    try {
+      // Importar firestore dinámicamente
+      const { doc, getDoc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase-config');
+      
+      // Leer el documento actual
+      const docRef = doc(db, 'incapacidades', incapacityId);
+      const snap = await getDoc(docRef);
+      
+      if (!snap.exists()) {
+        throw new Error('Incapacidad no encontrada');
       }
-      return inc;
-    }));
-    setShowUploadDocModal(false);
-    setSelectedDocForUpload(null);
+      
+      const data = snap.data();
+      const currentDocs = data.documents || [];
+      
+      // Actualizar el documento específico
+      const updatedDocs = currentDocs.map((d: any) => 
+        d.id === docId 
+          ? { ...d, uploaded: true, fileUrls: [`foto_${Date.now()}`] }
+          : d
+      );
+      
+      // Guardar el array completo actualizado
+      await updateDoc(docRef, {
+        documents: updatedDocs,
+        history: [...(data.history || []), {
+          date: new Date().toISOString(),
+          action: `Documento subido: ${docId}`,
+          user: user?.name || 'Usuario'
+        }]
+      });
+      
+      setShowUploadDocModal(false);
+      setSelectedDocForUpload(null);
+      setSelectedFilePreviews([]);
+      alert('Documento subido correctamente.');
+    } catch (error) {
+      console.error('Error al subir documento:', error);
+      alert('Error al subir el documento: ' + (error as Error).message);
+    }
   };
 
   const departments = Object.values(Department);
@@ -4294,8 +4122,11 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
             const statusCfg = statusConfig[incapacidad.status];
             const TypeIcon = typeConfig.icon;
             const StatusIcon = statusCfg.icon;
-            const startDate = new Date(incapacidad.startDate);
-            const endDate = new Date(incapacidad.endDate);
+            // Parsear fechas sin timezone issues
+            const [startYear, startMonth, startDay] = incapacidad.startDate.split('-').map(Number);
+            const [endYear, endMonth, endDay] = incapacidad.endDate.split('-').map(Number);
+            const startDate = new Date(startYear, startMonth - 1, startDay);
+            const endDate = new Date(endYear, endMonth - 1, endDay);
             const daysCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
             const isExpanded = expandedIncapacityId === incapacidad.id;
             
@@ -4396,9 +4227,11 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                     {/* Botones de acción - SOLO en Equipo */}
                     {activeSubTab === 'equipo' && (
                       <div className="flex gap-2 mb-4 flex-wrap">
-                        {/* Botón Verificar - SOLO para RRHH */}
+                        {/* Botón Verificar - para Supervisor, Gerente, Director o Director General */}
                         {incapacidad.status === 'pendiente' && 
-                         user?.department === ('RRHH' as Department) && (
+                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
+                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
+                          user?.role === Role.DIRECTOR_GENERAL) && (
                           <button
                             onClick={() => handleVerify(incapacidad)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
@@ -4408,12 +4241,11 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                           </button>
                         )}
                         
-                        {/* Botón Registrar - para Supervisor, Gerente, Director o Director General cuando está verificada y tiene documentos */}
-                        {incapacidad.status === 'verificada' && 
+                        {/* Botón Registrar - para Supervisor, Gerente, Director o Director General cuando está pendiente o verificada */}
+                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && 
                          (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
                           user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) &&
-                         incapacidad.documents.some(d => d.uploaded) && (
+                          user?.role === Role.DIRECTOR_GENERAL) && (
                           <button
                             onClick={() => handleRegister(incapacidad)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
@@ -4423,14 +4255,14 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                           </button>
                         )}
                         
-                        {/* Botón Rechazar - para roles autorizados */}
+                        {/* Botón Rechazar - para roles autorizados (siempre a la derecha) */}
                         {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') &&
                          (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
                           user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
                           user?.role === Role.DIRECTOR_GENERAL) && (
                           <button
                             onClick={() => handleReject(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors ml-auto"
                           >
                             <X className="w-4 h-4" />
                             Rechazar
@@ -4506,7 +4338,7 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                           <ClipboardList className="w-4 h-4" /> Documentos
                         </p>
                       </div>
-                      {incapacidad.documents.length > 0 ? (
+                      {(incapacidad.documents?.length || 0) > 0 ? (
                         <div className="space-y-2">
                           {incapacidad.documents.map(doc => (
                             <div key={doc.id} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
@@ -4546,21 +4378,29 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                                 <div className="flex flex-wrap gap-3 mt-3">
                                   {doc.fileUrls.map((url, idx) => (
                                     <div key={idx} className="relative group">
-                                      <img 
-                                        src={url} 
-                                        alt={`${doc.name} ${idx + 1}`}
-                                        className="h-32 w-24 object-contain rounded-lg border border-[#E5E5E7] cursor-pointer hover:border-corporate transition-colors bg-[#F5F5F7]"
-                                        onClick={() => setExpandedImage(url)}
-                                      />
-                                      {/* Botón de descargar */}
-                                      <a
-                                        href={url}
-                                        download={`${doc.name}-${idx + 1}.jpg`}
-                                        className="absolute top-1 right-1 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <Download className="w-3.5 h-3.5 text-corporate" />
-                                      </a>
+                                      {url.startsWith('http') || url.startsWith('data:') ? (
+                                        <>
+                                          <img 
+                                            src={url} 
+                                            alt={`${doc.name} ${idx + 1}`}
+                                            className="h-32 w-24 object-contain rounded-lg border border-[#E5E5E7] cursor-pointer hover:border-corporate transition-colors bg-[#F5F5F7]"
+                                            onClick={() => setExpandedImage(url)}
+                                          />
+                                          <a
+                                            href={url}
+                                            download={`${doc.name}-${idx + 1}.jpg`}
+                                            className="absolute top-1 right-1 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                            onClick={(e) => e.stopPropagation()}
+                                          >
+                                            <Download className="w-3.5 h-3.5 text-corporate" />
+                                          </a>
+                                        </>
+                                      ) : (
+                                        <div className="h-32 w-24 flex flex-col items-center justify-center rounded-lg border border-green-200 bg-green-50 p-2">
+                                          <Check className="w-8 h-8 text-green-500 mb-1" />
+                                          <span className="text-xs text-green-600 text-center">Documento subido</span>
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -4599,7 +4439,7 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                         <History className="w-4 h-4" /> Historial de acciones
                       </p>
                       <div className="space-y-2 max-h-40 overflow-y-auto bg-white rounded-xl p-3 border border-[#E5E5E7]">
-                        {incapacidad.history.map((h, i) => (
+                        {(incapacidad.history || []).map((h, i) => (
                           <div key={i} className="flex items-start gap-3 text-sm">
                             <div className="w-2 h-2 bg-corporate rounded-full mt-1.5 flex-shrink-0" />
                             <div className="flex-1">
@@ -4615,13 +4455,20 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                     <div>
                       <p className="text-sm font-medium text-[#1D1D1F] mb-2">Notas</p>
                       <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
-                        {incapacidad.notes.length > 0 ? (
-                          incapacidad.notes.map((note, i) => (
-                            <div key={i} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
-                              <p className="text-sm text-[#1D1D1F]">{note.text}</p>
-                              <p className="text-xs text-[#86868B] mt-1">{note.user} • {new Date(note.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                            </div>
-                          ))
+                        {(incapacidad.notes?.length || 0) > 0 ? (
+                          incapacidad.notes!.map((note, i) => {
+                            // Manejar tanto string como Timestamp de Firestore
+                            const noteDate = note.date?.toDate ? note.date.toDate() : new Date(note.date);
+                            const isValidDate = !isNaN(noteDate.getTime());
+                            return (
+                              <div key={i} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                                <p className="text-sm text-[#1D1D1F]">{note.text}</p>
+                                <p className="text-xs text-[#86868B] mt-1">
+                                  {note.user} • {isValidDate ? noteDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Fecha no disponible'}
+                                </p>
+                              </div>
+                            );
+                          })
                         ) : (
                           <p className="text-sm text-[#86868B]">Sin notas</p>
                         )}
@@ -4637,7 +4484,7 @@ function IncapacidadesTab({ incapacityDates: _incapacityDates, setIncapacityDate
                         <Button 
                           size="sm"
                           disabled={!newNote.trim()}
-                          onClick={() => addNote(incapacidad.id)}
+                          onClick={() => addNoteLocal(incapacidad.id!)}
                         >
                           <Send className="w-4 h-4" />
                         </Button>
