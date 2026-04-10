@@ -11,7 +11,7 @@ import {
   updateProfile,
   User as FirebaseUser,
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '@/firebase-config';
 import { User, Department, Role, Permission } from '@/types';
 import { hasPermission as checkPermission } from '@/lib/permissions-config';
@@ -51,13 +51,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setFirebaseUser(fbUser);
       
       if (fbUser) {
-        // Obtener datos adicionales del usuario desde Firestore
+        // Obtener datos adicionales del usuario desde Firestore (buscar por email)
         try {
-          const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', fbUser.email)
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          if (!usersSnapshot.empty) {
+            const userData = usersSnapshot.docs[0].data();
             setUser({
-              id: fbUser.uid,
+              id: usersSnapshot.docs[0].id,
               email: fbUser.email || '',
               name: userData.name || fbUser.displayName || 'Usuario',
               role: userData.role || Role.STAFF,
@@ -104,13 +109,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const fbUser = userCredential.user;
       
-      // Obtener datos del usuario desde Firestore
-      const userDoc = await getDoc(doc(db, 'users', fbUser.uid));
+      // Obtener datos del usuario desde Firestore (buscar por email)
+      const usersQuery = query(
+        collection(db, 'users'),
+        where('email', '==', fbUser.email)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
+      if (!usersSnapshot.empty) {
+        const userData = usersSnapshot.docs[0].data();
         setUser({
-          id: fbUser.uid,
+          id: usersSnapshot.docs[0].id,
           email: fbUser.email || '',
           name: userData.name || fbUser.displayName || 'Usuario',
           role: userData.role || Role.STAFF,
