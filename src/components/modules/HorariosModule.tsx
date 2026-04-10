@@ -51,7 +51,7 @@ import {
   Download,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
 import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFirestoreIncapacidades';
