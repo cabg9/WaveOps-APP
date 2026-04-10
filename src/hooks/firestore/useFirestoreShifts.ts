@@ -51,55 +51,68 @@ export function useFirestoreShifts() {
 
   // Escuchar turnos en tiempo real
   useEffect(() => {
-    const q = query(
-      collection(db, SHIFTS_COLLECTION),
-      where('isActive', '==', true),
-      orderBy('startTime', 'asc')
-    );
+    try {
+      const q = query(
+        collection(db, SHIFTS_COLLECTION),
+        where('isActive', '==', true),
+        orderBy('startTime', 'asc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as FirestoreShift[];
-        setShifts(data);
-      },
-      (err) => {
-        console.error('Error al cargar turnos:', err);
-        setError(err.message);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as FirestoreShift[];
+          setShifts(data);
+        },
+        (err) => {
+          console.error('Error al cargar turnos:', err);
+          setError(err.message);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar turnos:', err);
+      setError(err.message);
+      return () => {};
+    }
   }, []);
 
   // Escuchar asignaciones en tiempo real
   useEffect(() => {
-    const q = query(
-      collection(db, ASSIGNMENTS_COLLECTION),
-      orderBy('createdAt', 'desc')
-    );
+    try {
+      const q = query(
+        collection(db, ASSIGNMENTS_COLLECTION),
+        orderBy('createdAt', 'desc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as FirestoreAssignment[];
-        setAssignments(data);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error al cargar asignaciones:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) =>        {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as FirestoreAssignment[];
+          setAssignments(data);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('Error al cargar asignaciones:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar asignaciones:', err);
+      setError(err.message);
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   // Obtener turnos por departamento
