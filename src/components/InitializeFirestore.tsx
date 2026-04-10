@@ -5,7 +5,8 @@
 
 import { useEffect, useState } from 'react';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
-import { db } from '@/firebase-config';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { db, auth } from '@/firebase-config';
 import { Department } from '@/types';
 
 // Turnos iniciales
@@ -76,7 +77,7 @@ const initialShifts = [
   },
 ];
 
-// Usuarios de prueba
+// Usuarios de prueba con TODOS los roles
 const initialUsers = [
   {
     email: 'director@waveops.com',
@@ -94,6 +95,15 @@ const initialUsers = [
     department: Department.DIVE_SHOP,
     position: 'Gerente de Operaciones',
     level: 4,
+    isActive: true,
+  },
+  {
+    email: 'gerente2@waveops.com',
+    name: 'Pedro Mendoza',
+    role: 'GERENTE_DEPARTAMENTO',
+    department: Department.COCINA,
+    position: 'Chef Ejecutivo',
+    level: 5,
     isActive: true,
   },
   {
@@ -123,6 +133,42 @@ const initialUsers = [
     level: 7,
     isActive: true,
   },
+  {
+    email: 'guia@waveops.com',
+    name: 'Fernando Diaz',
+    role: 'STAFF',
+    department: Department.GUIANZA,
+    position: 'Guía Naturalista',
+    level: 7,
+    isActive: true,
+  },
+  {
+    email: 'cocinero@waveops.com',
+    name: 'Antonio Ruiz',
+    role: 'STAFF',
+    department: Department.COCINA,
+    position: 'Cocinero',
+    level: 7,
+    isActive: true,
+  },
+  {
+    email: 'chofer@waveops.com',
+    name: 'Luis Torres',
+    role: 'STAFF',
+    department: Department.MOVILIDAD,
+    position: 'Chofer',
+    level: 7,
+    isActive: true,
+  },
+  {
+    email: 'rrhh@waveops.com',
+    name: 'Roberto Silva',
+    role: 'RRHH',
+    department: Department.ADMINISTRATIVO,
+    position: 'RRHH',
+    level: 3,
+    isActive: true,
+  },
 ];
 
 export function InitializeFirestore() {
@@ -142,7 +188,7 @@ export function InitializeFirestore() {
           console.log('✅ Turnos creados');
         }
 
-        // Verificar y crear usuarios
+        // Verificar y crear usuarios en Firestore
         const usersSnapshot = await getDocs(collection(db, 'users'));
         if (usersSnapshot.empty) {
           setMessage('Creando usuarios de prueba...');
@@ -152,7 +198,30 @@ export function InitializeFirestore() {
               createdAt: new Date().toISOString(),
             });
           }
-          console.log('✅ Usuarios creados');
+          console.log('✅ Usuarios creados en Firestore');
+        }
+
+        // Crear usuarios en Firebase Auth (todos con contraseña: 123456)
+        setMessage('Creando usuarios en Auth...');
+        for (const user of initialUsers) {
+          try {
+            const userCredential = await createUserWithEmailAndPassword(
+              auth,
+              user.email,
+              '123456'
+            );
+            await updateProfile(userCredential.user, {
+              displayName: user.name,
+            });
+            console.log(`✅ Usuario Auth creado: ${user.email}`);
+          } catch (authErr: any) {
+            // Si el usuario ya existe, ignorar el error
+            if (authErr.code === 'auth/email-already-in-use') {
+              console.log(`⚠️ Usuario ya existe: ${user.email}`);
+            } else {
+              console.error(`❌ Error creando ${user.email}:`, authErr.message);
+            }
+          }
         }
 
         setMessage('¡Datos inicializados!');
