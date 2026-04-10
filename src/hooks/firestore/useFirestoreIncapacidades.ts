@@ -78,11 +78,36 @@ export function useFirestoreIncapacidades() {
         (snapshot) => {
           const data = snapshot.docs.map(doc => {
             const docData = doc.data();
+            // Convertir Timestamps a strings
             return {
               id: doc.id,
-              ...docData
+              ...docData,
+              createdAt: docData.createdAt?.toDate?.() 
+                ? docData.createdAt.toDate().toISOString() 
+                : docData.createdAt || new Date().toISOString(),
+              updatedAt: docData.updatedAt?.toDate?.() 
+                ? docData.updatedAt.toDate().toISOString() 
+                : docData.updatedAt,
+              startDate: docData.startDate?.toDate?.() 
+                ? docData.startDate.toDate().toISOString().split('T')[0]
+                : docData.startDate,
+              endDate: docData.endDate?.toDate?.() 
+                ? docData.endDate.toDate().toISOString().split('T')[0]
+                : docData.endDate,
+              notes: (docData.notes || []).map((note: any) => ({
+                ...note,
+                date: note.date?.toDate?.() 
+                  ? note.date.toDate().toISOString() 
+                  : note.date,
+              })),
+              history: (docData.history || []).map((h: any) => ({
+                ...h,
+                date: h.date?.toDate?.() 
+                  ? h.date.toDate().toISOString() 
+                  : h.date,
+              })),
             };
-          }) as Incapacidad[];
+          }) as unknown as Incapacidad[];
           setIncapacidades(data);
           setLoading(false);
         },
