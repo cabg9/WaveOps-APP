@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/hooks/useAuth';
+import { AuthProvider, useAuth } from '@/hooks/useFirestoreAuth';
 import { TasksProvider } from '@/hooks/useTasks';
 import { ShiftsProvider } from '@/hooks/useShifts';
 import { Layout } from '@/components/Layout';
