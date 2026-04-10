@@ -68,10 +68,23 @@ export function useFirestoreTasks() {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as FirestoreTask[];
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            // Convertir Timestamps a strings
+            return {
+              id: doc.id,
+              ...docData,
+              createdAt: docData.createdAt?.toDate?.() 
+                ? docData.createdAt.toDate().toISOString() 
+                : docData.createdAt || new Date().toISOString(),
+              updatedAt: docData.updatedAt?.toDate?.() 
+                ? docData.updatedAt.toDate().toISOString() 
+                : docData.updatedAt,
+              dueDate: docData.dueDate?.toDate?.() 
+                ? docData.dueDate.toDate().toISOString() 
+                : docData.dueDate || new Date().toISOString(),
+            };
+          }) as FirestoreTask[];
           setTasks(data);
           setLoading(false);
         },
