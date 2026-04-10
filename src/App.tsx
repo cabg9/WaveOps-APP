@@ -10,6 +10,7 @@ import { ShiftsProvider } from '@/hooks/useShifts';
 import { Layout } from '@/components/Layout';
 import { Toaster } from '@/components/ui/sonner';
 import { InitializeFirestore } from '@/components/InitializeFirestore';
+import { CreateAuthUsers } from '@/components/CreateAuthUsers';
 
 // ═══════════════════════════════════════════════════════════════════
 // PÁGINAS
@@ -277,6 +278,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <CreateAuthUsers />
         <InitializeFirestore />
         <TasksProvider>
           <ShiftsProvider>
