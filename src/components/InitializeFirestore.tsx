@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { db, auth } from '@/firebase-config';
 import { Department } from '@/types';
@@ -189,16 +189,22 @@ export function InitializeFirestore() {
         }
 
         // Verificar y crear usuarios en Firestore
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        if (usersSnapshot.empty) {
-          setMessage('Creando usuarios de prueba...');
-          for (const user of initialUsers) {
+        setMessage('Verificando usuarios...');
+        for (const user of initialUsers) {
+          // Buscar si el usuario ya existe
+          const userQuery = query(collection(db, 'users'), where('email', '==', user.email));
+          const userSnapshot = await getDocs(userQuery);
+          
+          if (userSnapshot.empty) {
+            // Crear usuario si no existe
             await addDoc(collection(db, 'users'), {
               ...user,
               createdAt: new Date().toISOString(),
             });
+            console.log(`✅ Usuario creado en Firestore: ${user.email}`);
+          } else {
+            console.log(`⚠️ Usuario ya existe en Firestore: ${user.email}`);
           }
-          console.log('✅ Usuarios creados en Firestore');
         }
 
         // Crear usuarios en Firebase Auth (todos con contraseña: 123456)
