@@ -21,7 +21,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useFirestoreAuth';
 import { getInitials } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
