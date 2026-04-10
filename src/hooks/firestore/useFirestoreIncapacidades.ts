@@ -12,12 +12,14 @@ import {
   arrayUnion
 } from 'firebase/firestore';
 import { db } from '../../firebase-config';
+import { Department } from '@/types';
 
 export interface IncapacidadDocument {
   id: string;
   name: string;
   uploaded: boolean;
   url?: string;
+  fileUrls?: string[];
 }
 
 export interface IncapacidadNote {
@@ -38,7 +40,7 @@ export interface Incapacidad {
   userId: string;
   userName: string;
   userAvatar: string;
-  userDepartment: string;
+  userDepartment: Department;
   type: string;
   startDate: string;
   endDate: string;
@@ -50,7 +52,7 @@ export interface Incapacidad {
   createdAt: string;
   replacementUserId?: string;
   replacementUserName?: string;
-  replacementUserDept?: string;
+  replacementUserDept?: Department;
   isExternalSupport?: boolean;
   rejectionReason?: string;
   verifiedBy?: string[];
@@ -197,7 +199,7 @@ export function useFirestoreIncapacidades() {
   }, [incapacidades]);
 
   // Rechazar incapacidad
-  const rejectIncapacidad = useCallback(async (id: string, userName: string, reason: string) => {
+  const rejectIncapacidad = useCallback(async (id: string, reason: string, userId: string) => {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
       const now = new Date().toISOString();
@@ -205,11 +207,27 @@ export function useFirestoreIncapacidades() {
       await updateDoc(docRef, {
         status: 'rechazada',
         rejectionReason: reason,
-        notes: arrayUnion({ id: Date.now().toString(), text: `Motivo de rechazo: ${reason}`, date: now, user: userName }),
-        history: arrayUnion({ date: now, action: `Incapacidad rechazada: ${reason}`, user: userName })
+        notes: arrayUnion({ id: Date.now().toString(), text: `Motivo de rechazo: ${reason}`, date: now, user: userId }),
+        history: arrayUnion({ date: now, action: `Incapacidad rechazada: ${reason}`, user: userId })
       });
     } catch (err) {
       console.error('Error al rechazar incapacidad:', err);
+      throw err;
+    }
+  }, [incapacidades]);
+
+  // Deshacer incapacidad
+  const undoIncapacidad = useCallback(async (id: string, reason: string, userId: string) => {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      const now = new Date().toISOString();
+
+      await updateDoc(docRef, {
+        status: 'pendiente',
+        history: arrayUnion({ date: now, action: `Incapacidad deshecha: ${reason}`, user: userId })
+      });
+    } catch (err) {
+      console.error('Error al deshacer incapacidad:', err);
       throw err;
     }
   }, [incapacidades]);
@@ -316,6 +334,7 @@ export function useFirestoreIncapacidades() {
     verifyIncapacidad,
     registerIncapacidad,
     rejectIncapacidad,
+    undoIncapacidad,
     addNote,
     addDocument,
     updateDocument,
