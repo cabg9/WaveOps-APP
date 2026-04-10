@@ -21,9 +21,8 @@ import {
   getIncidenciaStatusColor, getIncidenciaStatusLabel,
   formatDateShort, formatRelativeTime, formatHistoryDateTime, getInitials, generateId,
 } from '@/lib/utils';
-import { users } from '@/data/users';
-import { shifts } from '@/data/shifts';
-import { shiftAssignments } from '@/data/shiftAssignments';
+import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -51,6 +50,8 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
   const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia } = useTasks();
+  const { users } = useFirestoreUsers();
+  const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
 
   const [mainTab, setMainTab] = useState<MainTab>('my-tasks');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
