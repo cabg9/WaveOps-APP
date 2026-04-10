@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { TasksProvider } from '@/hooks/useTasks';
 import { ShiftsProvider } from '@/hooks/useShifts';
 import { Layout } from '@/components/Layout';
+import { Toaster } from '@/components/ui/sonner';
 
 // ═══════════════════════════════════════════════════════════════════
 // PÁGINAS
@@ -278,6 +279,7 @@ function App() {
         <TasksProvider>
           <ShiftsProvider>
             <AppRoutes />
+            <Toaster position="top-right" richColors closeButton />
           </ShiftsProvider>
         </TasksProvider>
       </AuthProvider>
