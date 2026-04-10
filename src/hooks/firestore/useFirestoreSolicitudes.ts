@@ -55,29 +55,36 @@ export function useFirestoreSolicitudes() {
 
   // Escuchar cambios en tiempo real
   useEffect(() => {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      orderBy('fechaSolicitud', 'desc')
-    );
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        orderBy('fechaSolicitud', 'desc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Solicitud[];
-        setSolicitudes(data);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error al cargar solicitudes:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Solicitud[];
+          setSolicitudes(data);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('Error al cargar solicitudes:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar solicitudes:', err);
+      setError(err.message);
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   // Crear nueva solicitud
