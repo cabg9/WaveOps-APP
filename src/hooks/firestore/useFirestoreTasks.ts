@@ -59,29 +59,36 @@ export function useFirestoreTasks() {
 
   // Escuchar tareas en tiempo real
   useEffect(() => {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      orderBy('createdAt', 'desc')
-    );
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        orderBy('createdAt', 'desc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as FirestoreTask[];
-        setTasks(data);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error al cargar tareas:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as FirestoreTask[];
+          setTasks(data);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('Error al cargar tareas:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar tareas:', err);
+      setError(err.message);
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   // Obtener todas las tareas
