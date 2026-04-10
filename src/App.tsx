@@ -5,10 +5,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useFirestoreAuth';
-import { TasksProvider } from '@/hooks/firestore/TasksProvider';
-import { ShiftsProvider } from '@/hooks/firestore/ShiftsProvider';
+import { TasksProvider } from '@/hooks/useTasks';
+import { ShiftsProvider } from '@/hooks/useShifts';
 import { Layout } from '@/components/Layout';
 import { Toaster } from '@/components/ui/sonner';
+import { InitializeFirestore } from '@/components/InitializeFirestore';
 
 // ═══════════════════════════════════════════════════════════════════
 // PÁGINAS
@@ -276,6 +277,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <InitializeFirestore />
         <TasksProvider>
           <ShiftsProvider>
             <AppRoutes />
