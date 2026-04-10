@@ -188,15 +188,13 @@ export function InitializeFirestore() {
           console.log('✅ Turnos creados');
         }
 
-        // Verificar y crear usuarios en Firestore
-        setMessage('Verificando usuarios...');
+        // Verificar y crear usuarios en Firestore (INDEPENDIENTE de Auth)
+        setMessage('Verificando usuarios en Firestore...');
         for (const user of initialUsers) {
-          // Buscar si el usuario ya existe
           const userQuery = query(collection(db, 'users'), where('email', '==', user.email));
           const userSnapshot = await getDocs(userQuery);
           
           if (userSnapshot.empty) {
-            // Crear usuario si no existe
             await addDoc(collection(db, 'users'), {
               ...user,
               createdAt: new Date().toISOString(),
@@ -207,8 +205,8 @@ export function InitializeFirestore() {
           }
         }
 
-        // Crear usuarios en Firebase Auth (todos con contraseña: 123456)
-        setMessage('Creando usuarios en Auth...');
+        // Crear usuarios en Firebase Auth (SIEMPRE intentar, independiente de Firestore)
+        setMessage('Verificando usuarios en Auth...');
         for (const user of initialUsers) {
           try {
             const userCredential = await createUserWithEmailAndPassword(
@@ -221,11 +219,10 @@ export function InitializeFirestore() {
             });
             console.log(`✅ Usuario Auth creado: ${user.email}`);
           } catch (authErr: any) {
-            // Si el usuario ya existe, ignorar el error
             if (authErr.code === 'auth/email-already-in-use') {
-              console.log(`⚠️ Usuario ya existe: ${user.email}`);
+              console.log(`⚠️ Usuario Auth ya existe: ${user.email}`);
             } else {
-              console.error(`❌ Error creando ${user.email}:`, authErr.message);
+              console.error(`❌ Error creando Auth ${user.email}:`, authErr.message);
             }
           }
         }
