@@ -67,33 +67,39 @@ export function useFirestoreIncapacidades() {
 
   // Escuchar cambios en tiempo real
   useEffect(() => {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      orderBy('createdAt', 'desc')
-    );
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        orderBy('createdAt', 'desc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => {
-          const docData = doc.data();
-          console.log('DEBUG - Doc from Firestore:', doc.id, docData);
-          return {
-            id: doc.id,
-            ...docData
-          };
-        }) as Incapacidad[];
-        setIncapacidades(data);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error al cargar incapacidades:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return {
+              id: doc.id,
+              ...docData
+            };
+          }) as Incapacidad[];
+          setIncapacidades(data);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('Error al cargar incapacidades:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar incapacidades:', err);
+      setError(err.message);
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   // Crear nueva incapacidad
