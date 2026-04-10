@@ -112,10 +112,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const login = useCallback(async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
+    console.log('DEBUG LOGIN - Intentando login con:', email);
     
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const fbUser = userCredential.user;
+      console.log('DEBUG LOGIN - Firebase Auth exitoso, UID:', fbUser.uid);
       
       // Obtener datos del usuario desde Firestore (buscar por email)
       const usersQuery = query(
@@ -123,9 +125,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         where('email', '==', fbUser.email)
       );
       const usersSnapshot = await getDocs(usersQuery);
+      console.log('DEBUG LOGIN - Documentos encontrados en Firestore:', usersSnapshot.size);
       
       if (!usersSnapshot.empty) {
         const userData = usersSnapshot.docs[0].data();
+        console.log('DEBUG LOGIN - Datos Firestore:', userData);
         setUser({
           id: usersSnapshot.docs[0].id,
           email: fbUser.email || '',
@@ -136,9 +140,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           level: userData.level || 7,
           isActive: userData.isActive !== false,
         });
+        console.log('DEBUG LOGIN - Login exitoso, rol:', userData.role);
         return true;
       } else {
-        // Usuario sin perfil en Firestore
+        console.log('DEBUG LOGIN - Usuario no encontrado en Firestore, usando defaults');
         setUser({
           id: fbUser.uid,
           email: fbUser.email || '',
@@ -152,7 +157,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return true;
       }
     } catch (error: any) {
-      console.error('Error de login:', error.message);
+      console.error('DEBUG LOGIN - Error:', error.code, error.message);
       return false;
     } finally {
       setIsLoading(false);
