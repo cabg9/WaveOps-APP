@@ -63,8 +63,8 @@ export function useFirestoreShifts() {
             ...doc.data(),
           })) as FirestoreShift[];
           const data = rawData
-            .filter(s => s.isActive !== false)
-            .sort((a, b) => a.startTime.localeCompare(b.startTime));
+            .filter(s => s.isActive !== false && s.startTime)
+            .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
           setShifts(data);
         },
         (err) => {
