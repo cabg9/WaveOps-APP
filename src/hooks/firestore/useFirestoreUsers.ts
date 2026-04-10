@@ -54,29 +54,36 @@ export function useFirestoreUsers() {
   // ═══════════════════════════════════════════════════════════════════
 
   useEffect(() => {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      orderBy('name', 'asc')
-    );
+    try {
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        orderBy('name', 'asc')
+      );
 
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as FirestoreUser[];
-        setUsers(data);
-        setLoading(false);
-      },
-      (err) => {
-        console.error('Error al cargar usuarios:', err);
-        setError(err.message);
-        setLoading(false);
-      }
-    );
+      const unsubscribe = onSnapshot(
+        q,
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+          })) as FirestoreUser[];
+          setUsers(data);
+          setLoading(false);
+        },
+        (err) => {
+          console.error('Error al cargar usuarios:', err);
+          setError(err.message);
+          setLoading(false);
+        }
+      );
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (err: any) {
+      console.error('Error al inicializar usuarios:', err);
+      setError(err.message);
+      setLoading(false);
+      return () => {};
+    }
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
