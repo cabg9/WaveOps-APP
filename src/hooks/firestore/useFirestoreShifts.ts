@@ -49,22 +49,22 @@ export function useFirestoreShifts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Escuchar turnos en tiempo real
+  // Escuchar turnos en tiempo real (sin filtro compuesto para evitar índice)
   useEffect(() => {
     try {
-      const q = query(
-        collection(db, SHIFTS_COLLECTION),
-        where('isActive', '==', true),
-        orderBy('startTime', 'asc')
-      );
+      // Consulta simple sin orderBy compuesto
+      const q = query(collection(db, SHIFTS_COLLECTION));
 
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
+          const rawData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
           })) as FirestoreShift[];
+          const data = rawData
+            .filter(s => s.isActive !== false)
+            .sort((a, b) => a.startTime.localeCompare(b.startTime));
           setShifts(data);
         },
         (err) => {
