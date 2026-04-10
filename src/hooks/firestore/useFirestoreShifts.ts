@@ -58,10 +58,16 @@ export function useFirestoreShifts() {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const rawData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as FirestoreShift[];
+          const rawData = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return {
+              id: doc.id,
+              ...docData,
+              createdAt: docData.createdAt?.toDate?.() 
+                ? docData.createdAt.toDate().toISOString() 
+                : docData.createdAt,
+            };
+          }) as unknown as FirestoreShift[];
           const data = rawData
             .filter(s => s.isActive !== false && s.startTime)
             .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
@@ -91,11 +97,20 @@ export function useFirestoreShifts() {
 
       const unsubscribe = onSnapshot(
         q,
-        (snapshot) =>        {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as FirestoreAssignment[];
+        (snapshot) => {
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return {
+              id: doc.id,
+              ...docData,
+              createdAt: docData.createdAt?.toDate?.() 
+                ? docData.createdAt.toDate().toISOString() 
+                : docData.createdAt,
+              publishedAt: docData.publishedAt?.toDate?.() 
+                ? docData.publishedAt.toDate().toISOString() 
+                : docData.publishedAt,
+            };
+          }) as unknown as FirestoreAssignment[];
           setAssignments(data);
           setLoading(false);
         },
