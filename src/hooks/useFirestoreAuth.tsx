@@ -53,14 +53,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       if (fbUser) {
         // Obtener datos adicionales del usuario desde Firestore (buscar por email)
         try {
+          console.log('DEBUG - Buscando usuario con email:', fbUser.email);
+          
           const usersQuery = query(
             collection(db, 'users'),
             where('email', '==', fbUser.email)
           );
           const usersSnapshot = await getDocs(usersQuery);
           
+          console.log('DEBUG - Documentos encontrados:', usersSnapshot.size);
+          
           if (!usersSnapshot.empty) {
             const userData = usersSnapshot.docs[0].data();
+            console.log('DEBUG - Datos del usuario:', userData);
+            console.log('DEBUG - Rol encontrado:', userData.role);
+            
             setUser({
               id: usersSnapshot.docs[0].id,
               email: fbUser.email || '',
@@ -72,6 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
               isActive: userData.isActive !== false,
             });
           } else {
+            console.log('DEBUG - Usuario no encontrado en Firestore, usando defaults');
             // Usuario autenticado pero sin perfil en Firestore
             setUser({
               id: fbUser.uid,
