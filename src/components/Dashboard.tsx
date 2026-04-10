@@ -22,7 +22,7 @@ import {
   Clock3,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useTasks } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
