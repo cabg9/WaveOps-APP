@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import {
   User,
   Users,
@@ -54,6 +55,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
 import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFirestoreIncapacidades';
+import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { Department, Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users } from '@/data/users';
@@ -128,49 +130,6 @@ const getDayFromString = (dateStr: string): number => {
 
 type TabType = 'mi-horario' | 'equipo' | 'asignar' | 'solicitudes' | 'incapacidades';
 
-interface IncapacidadHistoryItem {
-  date: string;
-  action: string;
-  user: string;
-}
-
-interface IncapacidadNote {
-  date: string;
-  text: string;
-  user: string;
-}
-
-interface IncapacidadDocument {
-  id: string;
-  name: string;
-  requested: boolean;
-  uploaded: boolean;
-  fileUrls?: string[];
-}
-
-interface Incapacidad {
-  id: string;
-  userId: string;
-  userName: string;
-  userAvatar: string;
-  userDepartment: Department;
-  type: string;
-  startDate: string;
-  endDate: string;
-  description: string;
-  status: 'pendiente' | 'verificada' | 'registrada' | 'rechazada';
-  history: IncapacidadHistoryItem[];
-  notes: IncapacidadNote[];
-  documents: IncapacidadDocument[];
-  createdAt: string;
-  replacementUserId?: string;
-  replacementUserName?: string;
-  replacementUserDept?: Department;
-  isExternalSupport?: boolean;
-  rejectionReason?: string;
-  verifiedBy?: string[]; // IDs de usuarios que han verificado (supervisor, gerente)
-}
-
 interface IncapacidadesTabProps {
   incapacityDates: { date: string; type: string; userId: string }[];
   setIncapacityDates: React.Dispatch<React.SetStateAction<{ date: string; type: string; userId: string }[]>>;
@@ -180,9 +139,9 @@ interface IncapacidadesTabProps {
   setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
   // Funciones de Firestore
   firestoreIncapacidades: Incapacidad[];
-  verifyIncapacidad: (id: string, userId: string) => Promise<void>;
+  verifyIncapacidad: (id: string, userId: string, userName: string) => Promise<void>;
   rejectIncapacidad: (id: string, reason: string, userId: string) => Promise<void>;
-  registerIncapacidad: (id: string, replacementId?: string, isExternal?: boolean) => Promise<void>;
+  registerIncapacidad: (id: string, userName: string, replacementData?: { replacementUserId: string; replacementUserName: string; replacementUserDept: string; isExternalSupport: boolean }) => Promise<void>;
   undoIncapacidad: (id: string, reason: string, userId: string) => Promise<void>;
   addNoteToIncapacidad: (id: string, text: string, user: string) => Promise<void>;
   addDocumentToIncapacidad: (id: string, docName: string) => Promise<void>;
@@ -202,18 +161,17 @@ export default function HorariosModule() {
   // Hook de Firestore para incapacidades
   const { 
     incapacidades, 
-    loading: incapacidadesLoading, 
-    error: incapacidadesError,
     createIncapacidad,
-    updateIncapacidad,
     verifyIncapacidad,
     rejectIncapacidad,
     registerIncapacidad,
     undoIncapacidad,
     addNote,
-    addDocument,
-    updateDocument
+    addDocument
   } = useFirestoreIncapacidades();
+  
+  // Hook de Storage para subir imágenes
+  useStorageUpload();
   
   // Estado local de incapacityDates para compatibilidad (derivado de Firestore)
   const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>([]);
@@ -239,36 +197,78 @@ export default function HorariosModule() {
     localStorage.setItem('waveops_incapacity_dates', JSON.stringify(dates));
   }, [incapacidades]);
   
-  const addIncapacity = async (dates: string[], type: string, userId: string, description?: string) => {
-    // Encontrar usuario
-    const userInfo = users.find(u => u.id === userId);
-    if (!userInfo) return;
+  const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => {
+    // Encontrar usuario en el array local o usar la info proporcionada
+    let userInfo = users.find(u => u.id === userId);
     
-    // Crear notas con la descripción si existe
-    const notes = description?.trim() 
-      ? [{ id: `note-${Date.now()}`, text: description.trim(), date: new Date().toISOString(), user: userInfo.name }]
-      : [];
+    // Si no se encuentra en el array local pero se proporciona info override, usarla
+    if (!userInfo && userInfoOverride) {
+      userInfo = {
+        id: userId,
+        name: userInfoOverride.name,
+        email: '',
+        role: Role.STAFF,
+        department: userInfoOverride.department,
+        position: '',
+        level: 7,
+        isActive: true,
+      };
+    }
     
-    // Crear en Firestore
-    await createIncapacidad({
-      userId,
-      userName: userInfo.name,
-      userAvatar: userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
-      userDepartment: userInfo.department,
-      type,
-      startDate: dates[0],
-      endDate: dates[dates.length - 1],
-      description: description?.trim() || `Incapacidad registrada desde el calendario`,
-      status: 'pendiente',
-      history: [{
-        date: new Date().toISOString(),
-        action: 'Incapacidad registrada',
-        user: user?.name || 'Sistema'
-      }],
-      notes: notes.length > 0 ? notes : [],
-      documents: [],
-      createdAt: new Date().toISOString()
-    });
+    // Si aún no hay info de usuario, intentar usar el usuario actual
+    if (!userInfo && user) {
+      userInfo = {
+        id: userId,
+        name: user.name,
+        email: user.email || '',
+        role: user.role,
+        department: user.department,
+        position: user.position || '',
+        level: user.level || 7,
+        isActive: true,
+      };
+    }
+    
+    if (!userInfo) {
+      console.error('No se pudo determinar la información del usuario para la incapacidad:', userId);
+      toast.error('Error al registrar incapacidad: No se pudo determinar el usuario');
+      return;
+    }
+    
+    try {
+      // Crear notas con la descripción si existe
+      const notes = description?.trim() 
+        ? [{ id: `note-${Date.now()}`, text: description.trim(), date: new Date().toISOString(), user: userInfo.name }]
+        : [];
+      
+      // Crear en Firestore
+      await createIncapacidad({
+        userId,
+        userName: userInfo.name,
+        userAvatar: userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+        userDepartment: userInfo.department,
+        type,
+        startDate: dates[0],
+        endDate: dates[dates.length - 1],
+        description: description?.trim() || `Incapacidad registrada desde el calendario`,
+        status: 'pendiente',
+        history: [{
+          date: new Date().toISOString(),
+          action: 'Incapacidad registrada',
+          user: user?.name || 'Sistema'
+        }],
+        notes: notes.length > 0 ? notes : [],
+        documents: [],
+        createdAt: new Date().toISOString()
+      });
+      
+      toast.success(`Incapacidad registrada para ${userInfo.name}`, {
+        description: `Del ${dates[0]} al ${dates[dates.length - 1]}`,
+      });
+    } catch (error) {
+      console.error('Error al crear incapacidad:', error);
+      toast.error('Error al registrar la incapacidad');
+    }
   };
   
   const getIncapacityForDate = (date: string, userId: string) => {
@@ -421,7 +421,7 @@ export default function HorariosModule() {
 
 interface MiHorarioTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
-  addIncapacity: (dates: string[], type: string, userId: string) => void;
+  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => Promise<void>;
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
 }
 
@@ -1012,8 +1012,13 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
               </Button>
               <Button 
                 className="flex-1 bg-corporate hover:bg-corporate/90"
-                disabled={!incapacityStartDate || !incapacityEndDate || !incapacityType}
-                onClick={() => {
+                disabled={!incapacityStartDate || !incapacityEndDate || !incapacityType || !user}
+                onClick={async () => {
+                  if (!user) {
+                    toast.error('Debes iniciar sesión para registrar una incapacidad');
+                    return;
+                  }
+                  
                   // Generar array de fechas usando strings YYYY-MM-DD directamente (sin timezone issues)
                   const newDates: string[] = [];
                   const [startYear, startMonth, startDay] = incapacityStartDate.split('-').map(Number);
@@ -1028,7 +1033,15 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     const day = String(d.getDate()).padStart(2, '0');
                     newDates.push(`${year}-${month}-${day}`);
                   }
-                  addIncapacity(newDates, incapacityType, user?.id || '', incapacityDescription);
+                  
+                  await addIncapacity(
+                    newDates, 
+                    incapacityType, 
+                    user.id, 
+                    incapacityDescription,
+                    { name: user.name, department: user.department }
+                  );
+                  
                   setIncapacityStartDate('');
                   setIncapacityEndDate('');
                   setIncapacityType('');
@@ -1571,7 +1584,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 interface EquipoTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
-  addIncapacity: (dates: string[], type: string, userId: string) => void;
+  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => Promise<void>;
 }
 
 function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity }: EquipoTabProps) {
@@ -1679,7 +1692,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   };
 
   // Handler para confirmar registro de incapacidad
-  const handleConfirmRegisterIncapacity = () => {
+  const handleConfirmRegisterIncapacity = async () => {
     if (!selectedUserForIncapacity || !incapacityStartDate || !incapacityEndDate || !incapacityType) return;
     
     // Generar array de fechas entre inicio y fin (usando strings YYYY-MM-DD directamente)
@@ -1697,8 +1710,14 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       dates.push(`${year}-${month}-${day}`);
     }
     
-    // Registrar la incapacidad en el estado global (con descripción)
-    addIncapacity(dates, incapacityType, selectedUserForIncapacity.id, incapacityDescription);
+    // Registrar la incapacidad en Firestore con la info del usuario seleccionado
+    await addIncapacity(
+      dates, 
+      incapacityType, 
+      selectedUserForIncapacity.id, 
+      incapacityDescription,
+      { name: selectedUserForIncapacity.name, department: selectedUserForIncapacity.department }
+    );
     
     setShowRegisterIncapacityModal(false);
     setSelectedUserForIncapacity(null);
@@ -3529,11 +3548,14 @@ function IncapacidadesTab({
   verifyIncapacidad,
   rejectIncapacidad,
   registerIncapacidad,
-  undoIncapacidad,
+  undoIncapacidad: _undoIncapacidad,
   addNoteToIncapacidad,
   addDocumentToIncapacidad
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
+  
+  // Hook de Storage para subir imágenes
+  const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
   
   // Filtros para pestaña "Equipo"
   const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
@@ -3559,7 +3581,8 @@ function IncapacidadesTab({
   // Ref para input file
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Estado para previews de imágenes seleccionadas (múltiples)
+  // Estado para archivos seleccionados (reales) y sus previews
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [selectedFilePreviews, setSelectedFilePreviews] = useState<string[]>([]);
   
   // Estado para imagen expandida
@@ -3790,10 +3813,31 @@ function IncapacidadesTab({
     }
   };
 
-  // Subir fotos de documento - usando Firestore directamente
-  const uploadDocumentPhotoWithFile = async (incapacityId: string, docId: string, fileUrls: string[]) => {
-    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, fileUrlsCount: fileUrls.length });
+  // Subir fotos de documento a Firebase Storage
+  const uploadDocumentPhotoWithFile = async (incapacityId: string, docId: string, files: File[]) => {
+    if (!files || files.length === 0) {
+      alert('No hay archivos seleccionados');
+      return;
+    }
+    
+    console.log('uploadDocumentPhotoWithFile called', { incapacityId, docId, filesCount: files.length });
+    
     try {
+      console.log('=== INICIANDO SUBIDA ===');
+      console.log('Archivos a subir:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
+      
+      // Subir archivos a Storage
+      const downloadUrls = await uploadMultipleImages(
+        files, 
+        `incapacidades/${incapacityId}/documentos`
+      );
+      
+      console.log('=== URLs OBTENIDAS ===', downloadUrls);
+      
+      if (downloadUrls.length === 0) {
+        throw new Error('No se obtuvieron URLs de descarga');
+      }
+      
       // Importar firestore dinámicamente
       const { doc, getDoc, updateDoc } = await import('firebase/firestore');
       const { db } = await import('../../firebase-config');
@@ -3809,10 +3853,10 @@ function IncapacidadesTab({
       const data = snap.data();
       const currentDocs = data.documents || [];
       
-      // Actualizar el documento específico
+      // Actualizar el documento específico con las URLs reales
       const updatedDocs = currentDocs.map((d: any) => 
         d.id === docId 
-          ? { ...d, uploaded: true, fileUrls: [`foto_${Date.now()}`] }
+          ? { ...d, uploaded: true, fileUrls: downloadUrls }
           : d
       );
       
@@ -3821,17 +3865,21 @@ function IncapacidadesTab({
         documents: updatedDocs,
         history: [...(data.history || []), {
           date: new Date().toISOString(),
-          action: `Documento subido: ${docId}`,
+          action: `Documento subido: ${downloadUrls.length} archivo(s)`,
           user: user?.name || 'Usuario'
         }]
       });
       
+      console.log('=== GUARDADO EXITOSO ===');
+      
+      // Limpiar estados
       setShowUploadDocModal(false);
       setSelectedDocForUpload(null);
+      setSelectedFiles([]);
       setSelectedFilePreviews([]);
-      alert('Documento subido correctamente.');
+      alert('Documento subido correctamente a Firebase Storage.');
     } catch (error) {
-      console.error('Error al subir documento:', error);
+      console.error('=== ERROR ===', error);
       alert('Error al subir el documento: ' + (error as Error).message);
     }
   };
@@ -4140,7 +4188,7 @@ function IncapacidadesTab({
               >
                 {/* Cabecera de la tarjeta - CLICABLE */}
                 <button
-                  onClick={() => toggleExpand(incapacidad.id)}
+                  onClick={() => incapacidad.id && toggleExpand(incapacidad.id)}
                   className="w-full p-4 text-left"
                 >
                   <div className="flex items-start gap-4">
@@ -4425,7 +4473,7 @@ function IncapacidadesTab({
                           <Button 
                             size="sm"
                             disabled={!newDocName.trim()}
-                            onClick={() => requestDocument(incapacidad.id)}
+                            onClick={() => incapacidad.id && requestDocument(incapacidad.id)}
                           >
                             <Plus className="w-4 h-4" />
                           </Button>
@@ -4458,7 +4506,7 @@ function IncapacidadesTab({
                         {(incapacidad.notes?.length || 0) > 0 ? (
                           incapacidad.notes!.map((note, i) => {
                             // Manejar tanto string como Timestamp de Firestore
-                            const noteDate = note.date?.toDate ? note.date.toDate() : new Date(note.date);
+                            const noteDate = typeof note.date === 'string' ? new Date(note.date) : new Date();
                             const isValidDate = !isNaN(noteDate.getTime());
                             return (
                               <div key={i} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
@@ -4773,7 +4821,10 @@ function IncapacidadesTab({
       {/* Modal de Subir Documento */}
       <Dialog open={showUploadDocModal} onOpenChange={(open) => {
         setShowUploadDocModal(open);
-        if (!open) setSelectedFilePreviews([]);
+        if (!open) {
+          setSelectedFilePreviews([]);
+          setSelectedFiles([]);
+        }
       }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -4833,6 +4884,9 @@ function IncapacidadesTab({
               onChange={(e) => {
                 const files = Array.from(e.target.files || []);
                 if (files.length > 0) {
+                  // Guardar archivos reales
+                  setSelectedFiles(prev => [...prev, ...files]);
+                  // Crear previews
                   const newUrls = files.map(file => URL.createObjectURL(file));
                   setSelectedFilePreviews(prev => [...prev, ...newUrls]);
                 }
@@ -4882,6 +4936,7 @@ function IncapacidadesTab({
               {selectedFilePreviews.length > 0 && (
                 <Button 
                   className="flex-1 bg-corporate hover:bg-corporate/90"
+                  disabled={uploadingImages}
                   onClick={() => {
                     console.log('Confirmar clicked', {
                       previewsCount: selectedFilePreviews.length,
@@ -4889,16 +4944,29 @@ function IncapacidadesTab({
                       docId: selectedDocForUpload,
                       condition: selectedFilePreviews.length > 0 && !!selectedIncapacity && !!selectedDocForUpload
                     });
-                    if (selectedFilePreviews.length > 0 && selectedIncapacity && selectedDocForUpload) {
-                      uploadDocumentPhotoWithFile(selectedIncapacity.id, selectedDocForUpload, [...selectedFilePreviews]);
-                      setSelectedFilePreviews([]);
+                    if (selectedFilePreviews.length > 0 && selectedFiles.length > 0 && selectedIncapacity?.id && selectedDocForUpload) {
+                      uploadDocumentPhotoWithFile(selectedIncapacity.id, selectedDocForUpload, selectedFiles);
                     } else {
-                      console.log('Condición falló - no se ejecuta uploadDocumentPhotoWithFile');
+                      console.log('Condición falló - no se ejecuta uploadDocumentPhotoWithFile', { 
+                        previews: selectedFilePreviews.length, 
+                        files: selectedFiles.length,
+                        incapacity: !!selectedIncapacity,
+                        docId: !!selectedDocForUpload 
+                      });
                     }
                   }}
                 >
-                  <Check className="w-4 h-4 mr-1.5" />
-                  Confirmar ({selectedFilePreviews.length})
+                  {uploadingImages ? (
+                    <>
+                      <div className="w-4 h-4 mr-1.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Subiendo...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-1.5" />
+                      Confirmar ({selectedFilePreviews.length})
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -4950,14 +5018,17 @@ interface HistorialItem {
 }
 
 interface Solicitud {
-  id: number;
+  id: number | string;
   tipo: 'cambio' | 'intercambio';
   de: string;
+  deId?: string;
   a: string;
+  aId?: string;
   deCargo?: string;
   aCargo?: string;
   deDept?: string;
   aDept?: string;
+  motivo?: string;
   // Turnos del usuario que solicita (de)
   deTurnoActual?: string;
   deTurnoNuevo?: string;
@@ -4975,10 +5046,12 @@ interface Solicitud {
   horarioSolicitado?: string;
   fecha: string;
   fechaSolicitud: string;
-  fechaRespuesta?: string;
+  fechaRespuesta?: string | null;
+  respuesta?: string;
   estado: 'pendiente' | 'aceptada' | 'rechazada' | 'deshecha';
   avatar: string;
   historial?: HistorialItem[];
+  firestoreId?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════
