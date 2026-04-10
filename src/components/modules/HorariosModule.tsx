@@ -56,6 +56,8 @@ import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
 import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFirestoreIncapacidades';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
+import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { Department, Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users } from '@/data/users';
@@ -1500,8 +1502,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       // Guardar en Firestore
                       const saveToFirestore = async () => {
                         try {
-                          const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-                          const { db } = await import('../../firebase-config');
                           
                           const solicitudData = {
                             tipo: nuevaSolicitud.tipo,
@@ -3838,9 +3838,7 @@ function IncapacidadesTab({
         throw new Error('No se obtuvieron URLs de descarga');
       }
       
-      // Importar firestore dinámicamente
-      const { doc, getDoc, updateDoc } = await import('firebase/firestore');
-      const { db } = await import('../../firebase-config');
+      // Usar firestore importado estáticamente
       
       // Leer el documento actual
       const docRef = doc(db, 'incapacidades', incapacityId);
@@ -5083,8 +5081,6 @@ function SolicitudesTab() {
     
     const setupFirestoreListener = async () => {
       try {
-        const { collection, query, orderBy, onSnapshot } = await import('firebase/firestore');
-        const { db } = await import('../../firebase-config');
         
         const q = query(collection(db, 'solicitudes'), orderBy('fechaSolicitud', 'desc'));
         
