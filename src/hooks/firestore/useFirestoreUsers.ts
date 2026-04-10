@@ -63,10 +63,16 @@ export function useFirestoreUsers() {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          })) as FirestoreUser[];
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return {
+              id: doc.id,
+              ...docData,
+              createdAt: docData.createdAt?.toDate?.() 
+                ? docData.createdAt.toDate().toISOString() 
+                : docData.createdAt,
+            };
+          }) as FirestoreUser[];
           setUsers(data);
           setLoading(false);
         },
