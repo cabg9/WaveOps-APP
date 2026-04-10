@@ -64,10 +64,25 @@ export function useFirestoreSolicitudes() {
       const unsubscribe = onSnapshot(
         q,
         (snapshot) => {
-          const data = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as Solicitud[];
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            return {
+              id: doc.id,
+              ...docData,
+              fechaSolicitud: docData.fechaSolicitud?.toDate?.() 
+                ? docData.fechaSolicitud.toDate().toISOString() 
+                : docData.fechaSolicitud,
+              fechaRespuesta: docData.fechaRespuesta?.toDate?.() 
+                ? docData.fechaRespuesta.toDate().toISOString() 
+                : docData.fechaRespuesta,
+              historial: (docData.historial || []).map((h: any) => ({
+                ...h,
+                fecha: h.fecha?.toDate?.() 
+                  ? h.fecha.toDate().toISOString() 
+                  : h.fecha,
+              })),
+            };
+          }) as Solicitud[];
           setSolicitudes(data);
           setLoading(false);
         },
