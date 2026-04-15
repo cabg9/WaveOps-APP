@@ -95,6 +95,18 @@ import {
   useSensors,
   DragEndEvent,
 } from '@dnd-kit/core';
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  doc, 
+  getDoc, 
+  updateDoc,
+  addDoc,
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db } from '@/firebase-config';
 
 // ═══════════════════════════════════════════════════════════════════
 // FUNCIONES AUXILIARES

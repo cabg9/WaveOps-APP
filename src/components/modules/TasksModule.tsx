@@ -31,6 +31,9 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { shiftAssignments } from '@/data/shiftAssignments';
+import { shifts } from '@/data/shifts';
+import { users } from '@/data/users';
 
 const getStatusLabel = (status: TaskStatus): string => {
   const labels: Record<TaskStatus, string> = {
