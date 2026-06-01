@@ -71,6 +71,7 @@ export function useFirestoreTasks() {
           const data = snapshot.docs.map(doc => {
             const docData = doc.data();
             // Convertir Timestamps a strings
+            const rawHistory = docData.history || [];
             return {
               id: doc.id,
               ...docData,
@@ -83,6 +84,13 @@ export function useFirestoreTasks() {
               dueDate: docData.dueDate?.toDate?.() 
                 ? docData.dueDate.toDate().toISOString() 
                 : docData.dueDate || new Date().toISOString(),
+              history: rawHistory.map((h: any) => ({
+                id: h.id || Math.random().toString(36).substr(2, 9),
+                performedBy: h.userId || h.performedBy || '',
+                performedAt: h.date || h.performedAt || new Date().toISOString(),
+                action: h.action || '',
+                note: h.note || '',
+              })),
             };
           }) as FirestoreTask[];
           setTasks(data);

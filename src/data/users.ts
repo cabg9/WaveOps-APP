@@ -1,110 +1,135 @@
 import { User, Department, Role } from '@/types';
 
+// Usuarios sincronizados con Firebase Auth
 export const users: User[] = [
   {
-    id: 'andres',
-    name: 'Andrés Cabrera',
-    email: 'andres@galapagos.com',
+    id: 'director@waveops.com',
+    name: 'Andres Bonilla',
+    email: 'director@waveops.com',
     role: Role.DIRECTOR_GENERAL,
-    department: Department.DIVE_SHOP,
+    department: Department.ADMINISTRATIVO,
     position: 'Director General',
     level: 1,
     isActive: true,
-    phone: '+593-XXX-XXXX',
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=director',
   },
   {
-    id: 'monica',
-    name: 'Mónica',
-    email: 'monica@galapagos.com',
-    role: Role.DIRECTOR,
-    department: Department.ADMINISTRATIVO,
-    position: 'Directora',
-    level: 2,
-    isActive: true,
-  },
-  {
-    id: 'juan',
-    name: 'Juan',
-    email: 'juan@galapagos.com',
+    id: 'gerente@waveops.com',
+    name: 'Carmen Vargas',
+    email: 'gerente@waveops.com',
     role: Role.GERENTE_OPERACIONES,
     department: Department.DIVE_SHOP,
     position: 'Gerente de Operaciones',
-    level: 3,
-    isActive: true,
-  },
-  {
-    id: 'maria',
-    name: 'María',
-    email: 'maria@galapagos.com',
-    role: Role.GERENTE_DEPARTAMENTO,
-    department: Department.VENTAS,
-    position: 'Gerente de Ventas',
     level: 4,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=gerente',
   },
   {
-    id: 'carlos',
-    name: 'Carlos',
-    email: 'carlos@galapagos.com',
-    role: Role.SUPERVISOR,
-    department: Department.DIVE_SHOP,
-    position: 'Supervisor',
+    id: 'gerente2@waveops.com',
+    name: 'Pedro Mendoza',
+    email: 'gerente2@waveops.com',
+    role: Role.GERENTE_DEPARTAMENTO,
+    department: Department.COCINA,
+    position: 'Chef Ejecutivo',
     level: 5,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=gerente2',
   },
   {
-    id: 'ana',
-    name: 'Ana',
-    email: 'ana@galapagos.com',
-    role: Role.STAFF,
-    department: Department.VENTAS,
-    position: 'Vendedora',
-    level: 7,
+    id: 'supervisor@waveops.com',
+    name: 'Jorge Ramirez',
+    email: 'supervisor@waveops.com',
+    role: Role.SUPERVISOR,
+    department: Department.DIVE_SHOP,
+    position: 'Supervisor de Dive Shop',
+    level: 6,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=supervisor',
   },
   {
-    id: 'pedro',
-    name: 'Pedro',
-    email: 'pedro@galapagos.com',
+    id: 'buzo1@waveops.com',
+    name: 'Carlos Mendez',
+    email: 'buzo1@waveops.com',
     role: Role.STAFF,
     department: Department.DIVE_SHOP,
-    position: 'Buceador',
+    position: 'Buzo',
     level: 7,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=buzo1',
   },
   {
-    id: 'laura',
-    name: 'Laura',
-    email: 'laura@galapagos.com',
+    id: 'buzo2@waveops.com',
+    name: 'Maria Gonzalez',
+    email: 'buzo2@waveops.com',
     role: Role.STAFF,
     department: Department.DIVE_SHOP,
-    position: 'Guía',
+    position: 'Buzo',
     level: 7,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=buzo2',
   },
   {
-    id: 'diego',
-    name: 'Diego',
-    email: 'diego@galapagos.com',
+    id: 'guia@waveops.com',
+    name: 'Fernando Diaz',
+    email: 'guia@waveops.com',
     role: Role.STAFF,
-    department: Department.VENTAS,
-    position: 'Vendedor',
+    department: Department.GUIANZA,
+    position: 'Guia Naturalista',
     level: 7,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=guia',
   },
   {
-    id: 'sofia',
-    name: 'Sofía',
-    email: 'sofia@galapagos.com',
+    id: 'cocinero@waveops.com',
+    name: 'Antonio Ruiz',
+    email: 'cocinero@waveops.com',
     role: Role.STAFF,
-    department: Department.DIVE_SHOP,
-    position: 'Instructor',
+    department: Department.COCINA,
+    position: 'Cocinero',
     level: 7,
     isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=cocinero',
+  },
+  {
+    id: 'chofer@waveops.com',
+    name: 'Luis Torres',
+    email: 'chofer@waveops.com',
+    role: Role.STAFF,
+    department: Department.MOVILIDAD,
+    position: 'Chofer',
+    level: 7,
+    isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=chofer',
+  },
+  {
+    id: 'rrhh@waveops.com',
+    name: 'Roberto Silva',
+    email: 'rrhh@waveops.com',
+    role: Role.RRHH,
+    department: Department.ADMINISTRATIVO,
+    position: 'RRHH',
+    level: 3,
+    isActive: true,
+    avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=rrhh',
   },
 ];
 
-// Función auxiliar para buscar usuario por email
 export const getUserByEmail = (email: string): User | undefined => {
   return users.find(u => u.email === email);
+};
+
+export const getUsersByDepartment = (department: Department): User[] => {
+  return users.filter(user => user.department === department && user.isActive);
+};
+
+export const getUsersByRole = (role: Role): User[] => {
+  return users.filter(user => user.role === role && user.isActive);
+};
+
+export const getUsersByLevel = (level: number): User[] => {
+  return users.filter(user => user.level === level && user.isActive);
+};
+
+export const getActiveUsers = (): User[] => {
+  return users.filter(user => user.isActive);
 };

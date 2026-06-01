@@ -33,7 +33,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { shiftAssignments } from '@/data/shiftAssignments';
 import { shifts } from '@/data/shifts';
-import { users } from '@/data/users';
+import { users as staticUsers } from '@/data/users';
+
 
 const getStatusLabel = (status: TaskStatus): string => {
   const labels: Record<TaskStatus, string> = {
@@ -113,8 +114,8 @@ export default function TasksModule() {
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
-    if (mainTab === 'my-tasks' && user) result = result.filter((t) => t.assignedTo.includes(user.id));
-    else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department === user.department);
+    if (mainTab === 'my-tasks' && user) result = result.filter((t) => t.assignedTo && t.assignedTo.includes(user.id));
+    else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department && t.department === user.department);
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
     const today = new Date().toISOString().split('T')[0];
@@ -332,7 +333,7 @@ export default function TasksModule() {
                 </div>
               </div>
             ) : (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }); } setIsCreateModalOpen(false); }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }); } setIsCreateModalOpen(false); }} />
             )}
             </div>
           </DialogContent>
@@ -360,12 +361,12 @@ interface TaskFormModalProps {
 function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, setNewSubtaskTitle, allDepartments, supervisorsByDepartment, calculatedDueDate, calculatedDueTime, onCancel, onSubmit, currentUserId }: TaskFormModalProps) {
   const availableSupervisors = useMemo(() => {
     let filtered = supervisorsByDepartment.filter((s) => s.id !== currentUserId);
-    const currentUser = users.find((u) => u.id === currentUserId);
+    const currentUser = staticUsers.find((u) => u.id === currentUserId);
     if (currentUser?.role === 'GERENTE_OPERACIONES') filtered = supervisorsByDepartment;
     return filtered;
   }, [supervisorsByDepartment, currentUserId]);
 
-  const usersByDepartment = useMemo(() => users.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId), [taskForm.department, currentUserId]);
+  const usersByDepartment = useMemo(() => staticUsers.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId), [taskForm.department, currentUserId]);
 
   // Opciones de recurrencia para tareas específicas
   const recurrenceOptions = [
@@ -504,7 +505,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
                         {assignedUsers.length > 0 ? (
                           <div className="space-y-1 pl-2">
                             {assignedUsers.map((assignment) => {
-                              const user = users.find((u) => u.id === assignment.userId);
+                              const user = staticUsers.find((u) => u.id === assignment.userId);
                               const roleKey = `${shift.id}-${req.role}-${assignment.userId}`;
                               const isSelected = taskForm.selectedShifts.includes(roleKey);
                               return user ? (
@@ -541,7 +542,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
           {taskForm.supportDepartment && (
             <div className="space-y-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 mt-2">
               <div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>
-              {users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => (
+              {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => (
                 <label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
                   <input type="checkbox" checked={taskForm.supportUsers.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } else { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
@@ -550,7 +551,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
                   </div>
                 </label>
               ))}
-              {users.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
+              {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
             </div>
           )}
         </div>
@@ -571,7 +572,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
             <Plus className="w-4 h-4" />
           </Button>
         </div>
-        {taskForm.subtasks.length > 0 && (
+        {taskForm.subtasks && taskForm.subtasks.length > 0 && (
           <div className="space-y-2 mt-2">
             {taskForm.subtasks.map((subtask) => (
               <div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
@@ -619,17 +620,25 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [localSubtasks, setLocalSubtasks] = useState(task.subtasks || []);
-  const [localPhotos, setLocalPhotos] = useState(task.photos);
+  const [localPhotos, setLocalPhotos] = useState(task.photos ?? []);
+  const { users: firestoreUsers } = useFirestoreUsers();
+  const allUsers = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
+  const getUserName = (userId?: string) => {
+    if (!userId) return 'Usuario desconocido';
+    const user = allUsers.find((u) => u.id === userId);
+    if (user) return user.name;
+    const byEmail = allUsers.find((u) => u.email === userId);
+    if (byEmail) return byEmail.name;
+    return userId;
+  };
   const statusColor = getStatusColor(task.status);
   const priorityColor = getPriorityColor(task.priority);
   
-  const creator = users.find((u) => u.id === task.createdBy);
-  const creatorName = creator?.name || task.createdBy;
-  const supervisor = task.supervisorId ? users.find((u) => u.id === task.supervisorId) : null;
-  const supervisorName = supervisor?.name || 'Sin supervisor';
-  const assignees = task.assignedTo.map((id) => { const user = users.find((u) => u.id === id); return user?.name || id; });
+  const creatorName = getUserName(task.createdBy);
+  const supervisorName = getUserName(task.supervisorId);
+  const assignees = (task.assignedTo || []).map((id) => getUserName(id));
   const assignedShifts = task.shiftIds?.map((id) => shifts.find((s) => s.id === id)).filter(Boolean) || [];
-  const canComplete = currentUserId && task.assignedTo.includes(currentUserId);
+  const canComplete = currentUserId && (task.assignedTo || []).includes(currentUserId);
   const canVerify = currentUserId && (task.supervisorId === currentUserId || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
   const toggleSubtask = (subtaskId: string) => { setLocalSubtasks((prev) => prev.map((s) => (s.id === subtaskId ? { ...s, completed: !s.completed } : s))); };
   
@@ -652,15 +661,15 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
           <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
             <div className="flex -space-x-2">
-              {task.assignedTo.slice(0, 10).map((userId, i) => {
-                const assignedUser = users.find((u) => u.id === userId);
+              {(task.assignedTo || []).slice(0, 10).map((userId, i) => {
+                const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
                 return (<Avatar key={i} className="w-6 h-6 border-2 border-white" title={assignedUser?.name || userId}><AvatarFallback className="bg-corporate text-white text-[10px]">{assignedUser ? getInitials(assignedUser.name) : '?'}</AvatarFallback></Avatar>);
               })}
-              {task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
+              {task.assignedTo && task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
             </div>
             <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span>{formatDateShort(task.dueDate)}</span><span>•</span><span>{task.dueTime || '23:59'}</span>{task.status === TaskStatus.OVERDUE && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1">ATRASADA</Badge>)}</div>
             {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
-            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos.length}</span></div>)}
+            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos ? task.photos.length : 0}</span></div>)}
           </div>
         </div>
       </button>
@@ -669,17 +678,17 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
         <div className="px-4 pb-4 border-t border-[#E5E5E7]">
           <div className="py-4 space-y-3">
             <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><span className="text-[#86868B]">Creada por:</span> <span className="text-[#1D1D1F] font-medium">{creatorName}</span>{creator && <span className="text-[#86868B] text-xs ml-1">({creator.department.replace(/_/g, ' ')})</span>}</div>
+              <div><span className="text-[#86868B]">Creada por:</span> <span className="text-[#1D1D1F] font-medium">{creatorName}</span></div>
               <div><span className="text-[#86868B]">Departamento:</span> <span className="text-[#1D1D1F]">{task.department.replace(/_/g, ' ')}</span></div>
               {task.startTime && (<div><span className="text-[#86868B]">Hora inicio:</span> <span className="text-[#1D1D1F]">{task.startTime}</span></div>)}
               {task.estimatedMinutes && (<div><span className="text-[#86868B]">Tiempo estimado:</span> <span className="text-[#1D1D1F]">{Math.floor(task.estimatedMinutes / 60)}h {task.estimatedMinutes % 60}min</span></div>)}
               <div><span className="text-[#86868B]">Fecha límite:</span> <span className="text-[#1D1D1F]">{formatDateShort(task.dueDate)}</span>{task.dueTime && <span className="text-[#1D1D1F]"> • {task.dueTime}</span>}</div>
             </div>
-            <div className="text-sm bg-blue-50 rounded-lg p-2"><span className="text-blue-600 font-medium">Supervisor:</span> <span className="text-[#1D1D1F]">{supervisorName}</span>{supervisor && <span className="text-[#86868B] text-xs ml-1">({supervisor.position})</span>}</div>
+            <div className="text-sm bg-blue-50 rounded-lg p-2"><span className="text-blue-600 font-medium">Supervisor:</span> <span className="text-[#1D1D1F]">{supervisorName}</span></div>
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
             <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{task.description || 'Sin descripción'}</p></div>
-            {localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
+            {localSubtasks && localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos</h5>
@@ -689,14 +698,14 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
                   </Button>
                 )}
               </div>
-              {localPhotos.length > 0 ? (
+              {localPhotos && localPhotos.length > 0 ? (
                 <div className="flex flex-wrap gap-2">{localPhotos.map((photo, idx) => (<div key={idx} className="w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">{photo.startsWith('http') ? <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" /> : <Camera className="w-6 h-6 text-[#86868B]" />}</div>))}</div>
               ) : <p className="text-sm text-[#86868B]">No hay fotos</p>}
             </div>
-            {task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = users.find((u) => u.id === h.performedBy); return (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performer?.name || h.performedBy} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
+            {task.history && task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
             <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
               <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
-              {task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = users.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
+              {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
               {currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}
             </div>
           </div>
@@ -705,7 +714,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {task.status === TaskStatus.PENDING && canComplete && (<Button size="sm" className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.IN_PROGRESS)}>En Progreso</Button>)}
             {task.status === TaskStatus.IN_PROGRESS && canComplete && (
               <>
-                {task.requiresPhoto && localPhotos.length === 0 ? (
+                {task.requiresPhoto && localPhotos && localPhotos.length === 0 ? (
                   <Button size="sm" variant="outline" className="border-amber-500 text-amber-600" onClick={() => setShowPhotoModal(true)}>
                     <Camera className="w-3.5 h-3.5 mr-1" />Agregar foto para completar
                   </Button>
@@ -757,7 +766,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   
   const statusColor = getIncidenciaStatusColor(incidencia.status);
   const priorityColor = getPriorityColor(incidencia.priority);
-  const reporter = users.find((u) => u.id === incidencia.reportedBy);
+  const reporter = staticUsers.find((u) => u.id === incidencia.reportedBy);
   
   // Verificar si el usuario actual ya vio la incidencia
   const hasViewed = currentUserId && viewers.includes(currentUserId);
@@ -799,10 +808,10 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
                 <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartment}</span></div>
-                {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{users.find(u => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}</span></div>)}
-                {incidencia.resolvedBy && (<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-[#86868B]">Resuelto por:</span><span className="text-[#1D1D1F] font-medium">{users.find(u => u.id === incidencia.resolvedBy)?.name || incidencia.resolvedBy}</span></div>)}
-                {incidencia.closedBy && (<div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-[#86868B]">Cerrado por:</span><span className="text-[#1D1D1F] font-medium">{users.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span></div>)}
-                {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{users.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
+                {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}</span></div>)}
+                {incidencia.resolvedBy && (<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-[#86868B]">Resuelto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.resolvedBy)?.name || incidencia.resolvedBy}</span></div>)}
+                {incidencia.closedBy && (<div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-[#86868B]">Cerrado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span></div>)}
+                {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
                 {incidencia.reopenReason && (<div className="w-full bg-[#007AFF]/10 rounded-lg p-2 text-xs"><span className="text-[#007AFF] font-medium">Motivo de reapertura:</span><span className="text-[#1D1D1F] ml-1">{incidencia.reopenReason}</span></div>)}
               </div>
               {viewers.length > 0 && (
@@ -813,7 +822,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {viewers.map((viewerId) => {
-                      const viewer = users.find((u) => u.id === viewerId);
+                      const viewer = staticUsers.find((u) => u.id === viewerId);
                       return viewer ? (
                         <span key={viewerId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
                           <span className="w-2 h-2 rounded-full bg-green-500"></span>
@@ -824,8 +833,8 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   </div>
                 </div>
               )}
-              {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = users.find((u) => u.id === h.performedBy); return (<div key={h.id} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performer?.name || h.performedBy} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.map((note) => { const noteAuthor = users.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
+              {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
+              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
             <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
               {(incidencia.status === IncidenciaStatus.NEW || incidencia.status === IncidenciaStatus.OPEN || incidencia.status === IncidenciaStatus.REOPENED) && canConfirm && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}

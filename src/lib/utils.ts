@@ -42,7 +42,7 @@ export function formatDate(date: string | Date | number): string {
  * Formatea una fecha corta
  * Ej: "25 mar"
  */
-export function formatDateShort(date: string | Date | number): string {
+export function formatDateShort(date: string | Date | number): string { if (!date || date === "") return "-";
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
   return format(d, 'd MMM', { locale: es });
 }
@@ -95,7 +95,7 @@ export function formatDateTimeShort(date: string | Date | number): string {
  * Formatea fecha y hora para historial
  * Ej: "25/03/2025 14:30 por Juan Pérez"
  */
-export function formatHistoryDateTime(date: string | Date | number): string {
+export function formatHistoryDateTime(date: string | Date | number): string { if (!date || date === "") return "-";
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
   return format(d, 'dd/MM/yyyy HH:mm', { locale: es });
 }
@@ -104,7 +104,7 @@ export function formatHistoryDateTime(date: string | Date | number): string {
  * Formatea hora relativa
  * Ej: "Hace 2 horas"
  */
-export function formatRelativeTime(date: string | Date | number): string {
+export function formatRelativeTime(date: string | Date | number): string { if (!date || date === "") return "-";
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
   const now = new Date();
   const diffInMinutes = Math.floor((now.getTime() - d.getTime()) / (1000 * 60));
