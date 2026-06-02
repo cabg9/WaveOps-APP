@@ -78,8 +78,17 @@ export function TasksProvider({ children }: TasksProviderProps) {
         assignedTo: task.assignedTo || '',
         department: task.department || Department.DIVE_SHOP,
         dueDate: task.dueDate || new Date().toISOString(),
+        dueTime: task.dueTime || '',
         createdBy: task.createdBy || '',
         createdAt: new Date().toISOString(),
+        supervisorId: task.supervisorId || '',
+        requiresPhoto: task.requiresPhoto || false,
+        startTime: task.startTime || '',
+        estimatedMinutes: task.estimatedMinutes || 0,
+        subtasks: task.subtasks || [],
+        shiftIds: task.shiftIds || [],
+        supportUserIds: task.supportUserIds || [],
+        recurrence: task.recurrence || 'NONE',
       });
       return { id: Date.now().toString(), ...task };
     },

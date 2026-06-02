@@ -47,6 +47,11 @@ export function formatDateShort(date: string | Date | number): string { if (!dat
   return format(d, 'd MMM', { locale: es });
 }
 
+export function formatDateWithYear(date: string | Date | number): string { if (!date || date === "") return "-";
+  const d = typeof date === 'string' ? parseISO(date) : new Date(date);
+  return format(d, 'dd/MM/yyyy', { locale: es });
+}
+
 /**
  * Formatea una fecha completa corta
  * Ej: "25 de marzo"

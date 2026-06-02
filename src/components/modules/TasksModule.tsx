@@ -2,7 +2,7 @@
 // TASKS MODULE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Plus, Target, AlertCircle, User, Users, LayoutGrid, AlertTriangle,
   Search, List, LayoutTemplate, Calendar, CheckCircle2, Camera,
@@ -10,6 +10,9 @@ import {
   Lock, Unlock, History, MessageSquare,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { CameraCapture } from '@/components/CameraCapture';
+import { EditTaskModal } from '@/components/EditTaskModal';
+
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useTasks } from '@/hooks/useTasks';
 import {
@@ -19,8 +22,9 @@ import {
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
   getIncidenciaStatusColor, getIncidenciaStatusLabel,
-  formatDateShort, formatRelativeTime, formatHistoryDateTime, getInitials, generateId,
+  formatDateShort, formatDateWithYear, formatRelativeTime, formatHistoryDateTime, getInitials, generateId,
 } from '@/lib/utils';
+import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { Button } from '@/components/ui/button';
@@ -53,7 +57,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia } = useTasks();
+  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
 
@@ -64,6 +68,8 @@ export default function TasksModule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
   const allDepartments = useMemo(() => Object.values(Department).sort(), []);
@@ -114,7 +120,7 @@ export default function TasksModule() {
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
-    if (mainTab === 'my-tasks' && user) result = result.filter((t) => t.assignedTo && t.assignedTo.includes(user.id));
+    if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && t.status === TaskStatus.COMPLETED) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
     else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department && t.department === user.department);
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
@@ -137,13 +143,15 @@ export default function TasksModule() {
   const filteredTaskCounts = useMemo(() => {
     const counts = { total: tasksByTabAndTime.length, pending: 0, inProgress: 0, completed: 0, verified: 0, blocked: 0, overdue: 0 };
     tasksByTabAndTime.forEach((task) => {
+      // Calcular si esta atrasada por fecha (independiente del status)
+      const isOverdueByDate = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.VERIFIED;
+      if (isOverdueByDate) counts.overdue++;
       switch (task.status) {
-        case TaskStatus.PENDING: counts.pending++; break;
-        case TaskStatus.IN_PROGRESS: counts.inProgress++; break;
+        case TaskStatus.PENDING: if (!isOverdueByDate) counts.pending++; break;
+        case TaskStatus.IN_PROGRESS: if (!isOverdueByDate) counts.inProgress++; break;
         case TaskStatus.COMPLETED: counts.completed++; break;
-        case TaskStatus.VERIFIED: counts.verified++; break;
+        case TaskStatus.VERIFIED: counts.completed++; counts.verified++; break;
         case TaskStatus.BLOCKED: counts.blocked++; break;
-        case TaskStatus.OVERDUE: counts.overdue++; break;
       }
     });
     return counts;
@@ -153,13 +161,15 @@ export default function TasksModule() {
 
   const filteredTasks = useMemo(() => {
     let result = [...tasksByTabAndTime];
-    if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
+    if (statusFilter === TaskStatus.COMPLETED) result = result.filter((t) => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED);
+    else if (statusFilter === TaskStatus.OVERDUE) result = result.filter((t) => new Date(t.dueDate + 'T' + (t.dueTime || '23:59')) < new Date() && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED);
+    else if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter((t) => t.title.toLowerCase().includes(query) || t.description.toLowerCase().includes(query));
     }
     result.sort((a, b) => {
-      const statusOrder: Record<TaskStatus, number> = { [TaskStatus.OVERDUE]: 0, [TaskStatus.IN_PROGRESS]: 1, [TaskStatus.PENDING]: 2, [TaskStatus.BLOCKED]: 3, [TaskStatus.COMPLETED]: 4, [TaskStatus.VERIFIED]: 5 };
+      const statusOrder: Record<TaskStatus, number> = { [TaskStatus.OVERDUE]: 0, [TaskStatus.IN_PROGRESS]: 1, [TaskStatus.PENDING]: 2, [TaskStatus.BLOCKED]: 3, [TaskStatus.COMPLETED]: 4, [TaskStatus.VERIFIED]: 6 };
       const statusDiff = statusOrder[a.status] - statusOrder[b.status];
       if (statusDiff !== 0) return statusDiff;
       const priorityOrder: Record<TaskPriority, number> = { [TaskPriority.CRITICAL]: 0, [TaskPriority.HIGH]: 1, [TaskPriority.MEDIUM]: 2, [TaskPriority.LOW]: 3 };
@@ -302,7 +312,7 @@ export default function TasksModule() {
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} />
               ) : (
-                <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
+                <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} onToggleSubtask={(taskId, subtaskId) => toggleSubtask(taskId, subtaskId)} onAddPhoto={addPhoto} onDelete={(taskId) => { if (confirm('¿Eliminar esta tarea permanentemente?')) { deleteTask(taskId); } }} onEdit={(task) => { setEditingTask(task); setIsEditModalOpen(true); }} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
               ))}
             </div>
           )}
@@ -338,6 +348,15 @@ export default function TasksModule() {
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Task Modal */}
+        <EditTaskModal
+          task={editingTask}
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          onSave={(taskId, taskUpdates) => updateTask(taskId, taskUpdates)}
+          canEditAll={!!(editingTask && user && (hasPermission('canEditAllTasks') || editingTask.createdBy === user.id))}
+        />
       </div>
     </Layout>
   );
@@ -600,6 +619,10 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
 interface TaskCardProps {
   task: Task;
   onStatusChange?: (taskId: string, status: TaskStatus, reason?: string) => void;
+  onToggleSubtask?: (taskId: string, subtaskId: string) => void;
+  onAddPhoto?: (taskId: string, photoUrl: string) => void;
+  onDelete?: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
   onComplete?: (taskId: string) => void;
   onReopen?: (taskId: string) => void;
   onAddNote?: (taskId: string, content: string, userId: string) => void;
@@ -609,18 +632,24 @@ interface TaskCardProps {
   currentUser?: { id: string; name: string; role: Role; department: Department } | null;
 }
 
-function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, currentUserId, currentUser }: TaskCardProps) {
+function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, currentUserId, currentUser }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showUnblockModal, setShowUnblockModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [reopenReason, setReopenReason] = useState('');
   const [unblockReason, setUnblockReason] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [localSubtasks, setLocalSubtasks] = useState(task.subtasks || []);
+  useEffect(() => { setLocalSubtasks(task.subtasks || []); }, [task.subtasks]);
+  useEffect(() => { setLocalPhotos(task.photos ?? []); }, [task.photos]);
   const [localPhotos, setLocalPhotos] = useState(task.photos ?? []);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoUploaders, setPhotoUploaders] = useState<Record<string, string>>({});
+  const { uploadImage } = useStorageUpload();
   const { users: firestoreUsers } = useFirestoreUsers();
   const allUsers = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
   const getUserName = (userId?: string) => {
@@ -635,28 +664,66 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const priorityColor = getPriorityColor(task.priority);
   
   const creatorName = getUserName(task.createdBy);
-  const supervisorName = getUserName(task.supervisorId);
+  const supervisorName = task.supervisorId ? getUserName(task.supervisorId) : `${creatorName} (Creador)`;
   const assignees = (task.assignedTo || []).map((id) => getUserName(id));
   const assignedShifts = task.shiftIds?.map((id) => shifts.find((s) => s.id === id)).filter(Boolean) || [];
-  const canComplete = currentUserId && (task.assignedTo || []).includes(currentUserId);
-  const canVerify = currentUserId && (task.supervisorId === currentUserId || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
-  const toggleSubtask = (subtaskId: string) => { setLocalSubtasks((prev) => prev.map((s) => (s.id === subtaskId ? { ...s, completed: !s.completed } : s))); };
+  const allSubtasksCompleted = !task.subtasks || task.subtasks.length === 0 || task.subtasks.every((s) => s.completed);
+  const hasRequiredPhotos = !task.requiresPhoto || (task.photos && task.photos.length > 0) || (localPhotos && localPhotos.length > 0);
+  const canComplete = currentUserId && ((task.assignedTo || []).includes(currentUserId) || (task.supportUserIds || []).includes(currentUserId));
+  const canDelete = currentUserId && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL);
+  const canVerify = currentUserId && (task.supervisorId === currentUserId || (!task.supervisorId && task.createdBy === currentUserId) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
+  const toggleSubtask = (subtaskId: string) => {
+    const target = localSubtasks.find(s => s.id === subtaskId);
+    if ((task.status === TaskStatus.COMPLETED || task.status === TaskStatus.VERIFIED) && target?.completed) {
+      return; // No desmarcar subtareas completadas en tareas finalizadas
+    }
+    setLocalSubtasks((prev) => {
+      const updated = prev.map((s) => (s.id === subtaskId ? { ...s, completed: !s.completed } : s));
+      const allCompleted = updated.every((s) => s.completed);
+      const noneCompleted = updated.every((s) => !s.completed);
+      if (task.status === TaskStatus.PENDING && (allCompleted || updated.some((s) => s.completed))) {
+        onStatusChange?.(task.id, TaskStatus.IN_PROGRESS);
+      }
+      if (task.status === TaskStatus.IN_PROGRESS && noneCompleted) {
+        onStatusChange?.(task.id, TaskStatus.PENDING);
+      }
+      onToggleSubtask?.(task.id, subtaskId);
+      return updated;
+    });
+  };
   
-  const handleAddPhoto = (photoUrl: string) => {
-    setLocalPhotos([...localPhotos, photoUrl]);
+  const handleAddPhoto = async (file: File) => {
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadImage(file, `tasks/${task.id}`);
+      setLocalPhotos(prev => [...prev, url]);
+      setPhotoUploaders(prev => ({ ...prev, [url]: currentUserId || '' }));
+      onAddPhoto?.(task.id, url);
+    } catch (err) {
+      console.error('Error subiendo foto:', err);
+      alert('Error al subir la foto');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = (photoUrl: string) => {
+    if (!window.confirm('Eliminar esta foto?')) return;
+    setLocalPhotos(prev => prev.filter(p => p !== photoUrl));
+    setPhotoUploaders(prev => { const copy = { ...prev }; delete copy[photoUrl]; return copy; });
   };
 
   return (
     <div className={cn('bg-white rounded-xl border border-[#E5E5E7] overflow-hidden transition-all', expanded && 'shadow-lg')}>
       <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
-          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />
+          <div className="relative"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />{task.status === TaskStatus.VERIFIED && (<div className="absolute -top-1 -right-1 w-2 h-2 bg-[#34C759] rounded-full border border-white" title="Verificada" />)}</div>
           <span className="text-[10px] font-medium text-[#86868B] whitespace-nowrap">{getStatusLabel(task.status)}</span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <h4 className="font-medium text-[#1D1D1F] truncate">{task.title}</h4>
-            <Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs flex-shrink-0">{getPriorityLabel(task.priority)}</Badge>
+            <div className="flex items-center gap-1.5 flex-shrink-0"><Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge>{task.status === TaskStatus.COMPLETED && canVerify && (<Badge className="text-xs bg-[#5856D6] text-white animate-pulse">Por Verificar</Badge>)}</div>
           </div>
           <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
@@ -665,9 +732,18 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
                 const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
                 return (<Avatar key={i} className="w-6 h-6 border-2 border-white" title={assignedUser?.name || userId}><AvatarFallback className="bg-corporate text-white text-[10px]">{assignedUser ? getInitials(assignedUser.name) : '?'}</AvatarFallback></Avatar>);
               })}
+              {(task.supportUserIds || []).slice(0, 5).map((userId, i) => {
+                const supportUser = allUsers.find((u) => u.id === userId || u.email === userId);
+                return (<Avatar key={`s-${i}`} className="w-6 h-6 border-2 border-dashed border-blue-400" title={`Apoyo: ${supportUser?.name || userId}`}><AvatarFallback className="bg-blue-500 text-white text-[10px]">{supportUser ? getInitials(supportUser.name) : '?'}</AvatarFallback></Avatar>);
+              })}
               {task.assignedTo && task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
             </div>
-            <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span>{formatDateShort(task.dueDate)}</span><span>•</span><span>{task.dueTime || '23:59'}</span>{task.status === TaskStatus.OVERDUE && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1">ATRASADA</Badge>)}</div>
+            {(() => {
+              const isOverdue = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.VERIFIED && task.status !== TaskStatus.COMPLETED;
+              return (
+              <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse">ATRASADA</Badge>)}</div>
+              );
+            })()}
             {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
             {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos ? task.photos.length : 0}</span></div>)}
           </div>
@@ -682,24 +758,29 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               <div><span className="text-[#86868B]">Departamento:</span> <span className="text-[#1D1D1F]">{task.department.replace(/_/g, ' ')}</span></div>
               {task.startTime && (<div><span className="text-[#86868B]">Hora inicio:</span> <span className="text-[#1D1D1F]">{task.startTime}</span></div>)}
               {task.estimatedMinutes && (<div><span className="text-[#86868B]">Tiempo estimado:</span> <span className="text-[#1D1D1F]">{Math.floor(task.estimatedMinutes / 60)}h {task.estimatedMinutes % 60}min</span></div>)}
-              <div><span className="text-[#86868B]">Fecha límite:</span> <span className="text-[#1D1D1F]">{formatDateShort(task.dueDate)}</span>{task.dueTime && <span className="text-[#1D1D1F]"> • {task.dueTime}</span>}</div>
+              <div><span className="text-[#86868B]">Fecha límite:</span> <span className="text-[#1D1D1F]">{formatDateWithYear(task.dueDate)}</span>{task.dueTime && <span className="text-[#1D1D1F]"> • {task.dueTime}</span>}</div>
             </div>
             <div className="text-sm bg-blue-50 rounded-lg p-2"><span className="text-blue-600 font-medium">Supervisor:</span> <span className="text-[#1D1D1F]">{supervisorName}</span></div>
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
+            {task.supportUserIds && task.supportUserIds.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Apoyo:</span> <span className="text-[#1D1D1F] font-medium">{task.supportUserIds.map((id) => getUserName(id)).join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
             <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{task.description || 'Sin descripción'}</p></div>
             {localSubtasks && localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos</h5>
-                {task.requiresPhoto && canComplete && (
-                  <Button size="sm" variant="outline" onClick={() => setShowPhotoModal(true)} className="gap-1">
-                    <Camera className="w-3.5 h-3.5" />Agregar foto
-                  </Button>
+                {canComplete && (
+                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} />
                 )}
               </div>
+              {uploadingPhoto && <div className="text-xs text-[#007AFF] mb-1 flex items-center gap-1"><div className="w-3 h-3 border-2 border-[#007AFF] border-t-transparent rounded-full animate-spin"></div>Subiendo foto...</div>}
               {localPhotos && localPhotos.length > 0 ? (
-                <div className="flex flex-wrap gap-2">{localPhotos.map((photo, idx) => (<div key={idx} className="w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">{photo.startsWith('http') ? <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" /> : <Camera className="w-6 h-6 text-[#86868B]" />}</div>))}</div>
+                <div className="flex flex-wrap gap-2">{localPhotos.map((photo, idx) => {
+                  const isUploaded = photo.startsWith('http') || photo.startsWith('data:image');
+                  const uploader = photoUploaders[photo];
+                  const showDelete = isUploaded && (canDelete || uploader === currentUserId);
+                  return (<div key={idx} className="relative w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden group">{isUploaded ? <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => setMaximizedPhoto(photo)} /> : <Camera className="w-6 h-6 text-[#86868B]" />}{showDelete && (<button onClick={(e) => { e.stopPropagation(); handleRemovePhoto(photo); }} className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600">&times;</button>)}</div>);
+                })}</div>
               ) : <p className="text-sm text-[#86868B]">No hay fotos</p>}
             </div>
             {task.history && task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
@@ -714,27 +795,33 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {task.status === TaskStatus.PENDING && canComplete && (<Button size="sm" className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.IN_PROGRESS)}>En Progreso</Button>)}
             {task.status === TaskStatus.IN_PROGRESS && canComplete && (
               <>
-                {task.requiresPhoto && localPhotos && localPhotos.length === 0 ? (
-                  <Button size="sm" variant="outline" className="border-amber-500 text-amber-600" onClick={() => setShowPhotoModal(true)}>
-                    <Camera className="w-3.5 h-3.5 mr-1" />Agregar foto para completar
+                {!allSubtasksCompleted ? (
+                  <Button size="sm" variant="outline" className="border-amber-500 text-amber-600" disabled title="Completa todas las subtareas primero">
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Completa subtareas
                   </Button>
+                ) : !hasRequiredPhotos ? (
+                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} />
                 ) : (
                   <Button size="sm" className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => setShowCompleteConfirm(true)}>Completar</Button>
                 )}
+                <Button size="sm" variant="outline" className="border-[#8E8E93] text-[#8E8E93]" onClick={() => onStatusChange?.(task.id, TaskStatus.PENDING, 'Tarea marcada como Pendiente')}>Marcar como Pendiente</Button>
               </>
             )}
-            {task.status === TaskStatus.COMPLETED && canVerify && (<><Button size="sm" className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.VERIFIED)}>Verificar</Button>{canReopen && (<Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button>)}</>)}
+            {task.status === TaskStatus.COMPLETED && (canVerify || task.createdBy === currentUserId) && (<><Button size="sm" className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.VERIFIED)}>Verificar</Button><Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button></>)}
             {task.status === TaskStatus.BLOCKED && canUnblock && (<Button size="sm" className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => setShowUnblockModal(true)}>Desbloquear</Button>)}
             {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => onStatusChange?.(task.id, TaskStatus.BLOCKED, 'Tarea bloqueada por el usuario')}>Bloquear</Button>)}
+            {task.status !== TaskStatus.VERIFIED && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30]" onClick={() => { if (window.confirm('¿Eliminar esta tarea permanentemente?')) { onDelete?.(task.id); } }}>Eliminar</Button>)}
+            <Button size="sm" variant="outline" className="border-[#007AFF] text-[#007AFF]" onClick={() => onEdit?.(task)}>Editar</Button>
           </div>
 
           {showCompleteConfirm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">¿Completar tarea?</h3><p className="text-sm text-slate-600 mb-4">¿Confirmas que la tarea "{task.title}" fue completada correctamente?</p><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCompleteConfirm(false)}>Cancelar</Button><Button className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => { onComplete?.(task.id); setShowCompleteConfirm(false); }}>Sí, completar</Button></div></div></div>)}
           {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Marcar como Pendiente</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual la tarea debe volver a pendiente:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { if (reopenReason.trim()) { onReopen?.(task.id); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Marcar como Pendiente</Button></div></div></div>)}
           {showUnblockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Desbloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se desbloquea la tarea:</p><textarea value={unblockReason} onChange={(e) => setUnblockReason(e.target.value)} placeholder="Escribe el motivo del desbloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowUnblockModal(false)}>Cancelar</Button><Button className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => { if (unblockReason.trim()) { onStatusChange?.(task.id, TaskStatus.PENDING, unblockReason); setShowUnblockModal(false); setUnblockReason(''); } }} disabled={!unblockReason.trim()}>Desbloquear</Button></div></div></div>)}
           
-          {showPhotoModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Agregar Foto</h3><p className="text-sm text-slate-600 mb-4">Ingresa la URL de la foto o selecciona un archivo:</p><Input placeholder="https://ejemplo.com/foto.jpg" className="mb-4" onKeyDown={(e) => { if (e.key === 'Enter') { const value = (e.target as HTMLInputElement).value; if (value.trim()) { handleAddPhoto(value.trim()); setShowPhotoModal(false); } } }} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowPhotoModal(false)}>Cancelar</Button><Button className="bg-corporate hover:bg-corporate/90 text-white" onClick={() => { const input = document.querySelector('input[placeholder="https://ejemplo.com/foto.jpg"]') as HTMLInputElement; if (input?.value.trim()) { handleAddPhoto(input.value.trim()); setShowPhotoModal(false); input.value = ''; } }}>Agregar</Button></div></div></div>)}
+          
         </div>
       )}
+      {maximizedPhoto && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setMaximizedPhoto(null)}><img src={maximizedPhoto} className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" alt="Foto maximizada" /><button className="absolute top-4 right-4 text-white text-2xl">&times;</button></div>)}
     </div>
   );
 }

@@ -30,8 +30,16 @@ export interface FirestoreTask {
   assignedToName?: string;
   department: Department;
   dueDate: string;
+  dueTime?: string;
   createdAt: string;
   createdBy: string;
+  supervisorId?: string;
+  requiresPhoto?: boolean;
+  startTime?: string;
+  estimatedMinutes?: number;
+  shiftIds?: string[];
+  supportUserIds?: string[];
+  recurrence?: string;
   updatedAt?: string;
   notes?: Note[];
   subtasks?: Subtask[];
@@ -221,15 +229,16 @@ export function useFirestoreTasks() {
   const changeTaskStatus = useCallback(async (id: string, status: TaskStatus, userId: string, note?: string): Promise<void> => {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
+      const historyEntry: any = {
+        date: new Date().toISOString(),
+        action: `Estado cambiado a ${status}`,
+        userId,
+      };
+      if (note) historyEntry.note = note;
       await updateDoc(docRef, {
         status,
         updatedAt: new Date().toISOString(),
-        history: arrayUnion({
-          date: new Date().toISOString(),
-          action: `Estado cambiado a ${status}`,
-          userId,
-          note,
-        }),
+        history: arrayUnion(historyEntry),
       });
     } catch (err: any) {
       console.error('Error al cambiar estado:', err);
