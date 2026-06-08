@@ -65,6 +65,7 @@ export default function TasksModule() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>('all');
   const [viewType, setViewType] = useState<ViewType>('list');
+  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
@@ -185,9 +186,15 @@ export default function TasksModule() {
     let result = [...incidencias];
     if (user && !(user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH)) {
       result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
+    } else if (user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && incidenciaDepartmentFilter !== 'all') {
+      if (incidenciaDepartmentFilter === 'my-departments') {
+        result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
+      } else {
+        result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
+      }
     }
     return result;
-  }, [incidencias, user]);
+  }, [incidencias, user, incidenciaDepartmentFilter]);
 
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {
@@ -309,6 +316,16 @@ export default function TasksModule() {
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Semanas pasadas' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
               <button key={filter.id} onClick={() => setTimeFilter(filter.id)} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
+            {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
+              <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+                <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los departamentos</SelectItem>
+                  <SelectItem value="my-departments">Mi departamento</SelectItem>
+                  {allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
 
