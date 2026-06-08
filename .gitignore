@@ -49,3 +49,6 @@ coverage/
 *.log
 *.tmp
 *.temp
+*.bak*
+*.bak[0-9]*
+.firebase/
