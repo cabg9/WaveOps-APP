@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════
-// HOOK DE TAREAS - WRAPPER PARA FIRESTORE (SIMPLIFICADO)
+// HOOK DE TAREAS - WRAPPER PARA FIRESTORE
 // ═══════════════════════════════════════════════════════════════════
 
 import React, { createContext, useContext } from 'react';
 import { useFirestoreTasks } from './firestore/useFirestoreTasks';
-import { useFirestoreIncapacidades } from './firestore/useFirestoreIncapacidades';
-import { TaskStatus, TaskType, TaskPriority, Department, IncidenciaStatus } from '@/types';
+import { useFirestoreIncidencias } from './firestore/useFirestoreIncidencias';
+import { TaskStatus, TaskType, TaskPriority, Department } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXT
@@ -23,21 +23,12 @@ interface TasksProviderProps {
 
 export function TasksProvider({ children }: TasksProviderProps) {
   const tasksHook = useFirestoreTasks();
-  const incapacidadesHook = useFirestoreIncapacidades();
+  const incidenciasHook = useFirestoreIncidencias();
 
   const value = {
     tasks: tasksHook.tasks,
-    incidencias: incapacidadesHook.incapacidades.map((inc: any) => ({
-      id: inc.id,
-      title: inc.motivo || 'Incapacidad',
-      description: inc.notes || '',
-      reportedBy: inc.userId,
-      status: IncidenciaStatus.NEW,
-      createdAt: inc.createdAt,
-      updatedAt: inc.updatedAt || inc.createdAt,
-      notes: [],
-    })),
-    isLoading: tasksHook.loading || incapacidadesHook.loading,
+    incidencias: incidenciasHook.incidencias,
+    isLoading: tasksHook.loading || incidenciasHook.loading,
 
     // Tasks
     getTasks: (filters?: any) => {
@@ -141,66 +132,22 @@ export function TasksProvider({ children }: TasksProviderProps) {
       tasksHook.reopenTask(id, userId);
     },
 
-    // Incidencias
+    // Incidencias - ahora leen de coleccion 'incidencias' separada de 'incapacidades'
     getIncidencias: (filters?: any) => {
-      let result = incapacidadesHook.incapacidades.map((inc: any) => ({
-        id: inc.id,
-        title: inc.motivo || 'Incapacidad',
-        description: inc.notes || '',
-        reportedBy: inc.userId,
-        status: IncidenciaStatus.NEW,
-        createdAt: inc.createdAt,
-        updatedAt: inc.updatedAt || inc.createdAt,
-        notes: [],
-      }));
+      let result = [...incidenciasHook.incidencias];
       if (filters?.status) {
         result = result.filter((i: any) => i.status === filters.status);
       }
       return result;
     },
 
-    createIncidencia: (incidencia: any) => {
-      incapacidadesHook.createIncapacidad({
-        userId: incidencia.reportedBy || '',
-        userName: 'Usuario',
-        userAvatar: '',
-        userDepartment: Department.DIVE_SHOP,
-        type: 'incapacidad',
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date().toISOString().split('T')[0],
-        description: incidencia.title || '',
-        status: 'pendiente',
-        history: [],
-        notes: [],
-        createdAt: new Date().toISOString(),
-        documents: [],
-      });
-      return { id: Date.now().toString(), ...incidencia };
-    },
-
-    updateIncidencia: (id: string, updates: any) => {
-      incapacidadesHook.updateIncapacidad(id, updates);
-    },
-
-    confirmIncidencia: (id: string, userId: string) => {
-      incapacidadesHook.verifyIncapacidad(id, userId, 'Usuario');
-    },
-
-    resolveIncidencia: (id: string, userId: string, resolution?: string) => {
-      incapacidadesHook.addNote(id, resolution || 'Resuelta', userId);
-    },
-
-    closeIncidencia: (id: string, userId: string, reason?: string) => {
-      incapacidadesHook.rejectIncapacidad(id, reason || 'Cerrada', userId);
-    },
-
-    reopenIncidencia: (id: string, userId: string, reason?: string) => {
-      incapacidadesHook.undoIncapacidad(id, userId, reason);
-    },
-
-    addIncidenciaNote: (id: string, content: string, userId: string) => {
-      incapacidadesHook.addNote(id, content, userId);
-    },
+    createIncidencia: incidenciasHook.createIncidencia,
+    confirmIncidencia: incidenciasHook.confirmIncidencia,
+    resolveIncidencia: incidenciasHook.resolveIncidencia,
+    closeIncidencia: incidenciasHook.closeIncidencia,
+    reopenIncidencia: incidenciasHook.reopenIncidencia,
+    addIncidenciaNote: incidenciasHook.addNote,
+    addIncidenciaViewer: incidenciasHook.addViewer,
 
     // Contadores
     getTaskCounts: () => {
@@ -217,17 +164,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
       };
     },
 
-    getIncidenciaCounts: () => ({
-      total: incapacidadesHook.incapacidades.length,
-      pending: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'pendiente').length,
-      inProgress: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'verificada').length,
-      resolved: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'registrada').length,
-      closed: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'rechazada').length,
-      new: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'pendiente').length,
-      open: 0,
-      verified: incapacidadesHook.incapacidades.filter((i: any) => i.status === 'verificada').length,
-      reopened: 0,
-    }),
+    getIncidenciaCounts: incidenciasHook.getCounts,
   };
 
   return (

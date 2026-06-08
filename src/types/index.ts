@@ -163,6 +163,9 @@ export interface Incidencia {
   targetDepartment: Department;
   confirmedBy?: string; // userId
   confirmedAt?: string; // ISO date
+  verifiedByList?: string[]; // userIds que han verificado
+  viewers?: string[]; // userIds que han visualizado
+  targetDepartments?: string[]; // departamentos involucrados
   resolvedBy?: string; // userId
   resolvedAt?: string; // ISO date
   closedBy?: string; // userId

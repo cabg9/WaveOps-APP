@@ -100,8 +100,14 @@ export function formatDateTimeShort(date: string | Date | number): string {
  * Formatea fecha y hora para historial
  * Ej: "25/03/2025 14:30 por Juan Pérez"
  */
-export function formatHistoryDateTime(date: string | Date | number): string { if (!date || date === "") return "-";
+export function formatHistoryDateTime(date: string | Date | number | any): string { 
+  if (!date || date === "") return "-";
+  // Manejar Firestore Timestamp
+  if (date && typeof date === 'object' && date.toDate) {
+    return format(date.toDate(), 'dd/MM/yyyy HH:mm', { locale: es });
+  }
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
+  if (isNaN(d.getTime())) return "-";
   return format(d, 'dd/MM/yyyy HH:mm', { locale: es });
 }
 
@@ -109,8 +115,14 @@ export function formatHistoryDateTime(date: string | Date | number): string { if
  * Formatea hora relativa
  * Ej: "Hace 2 horas"
  */
-export function formatRelativeTime(date: string | Date | number): string { if (!date || date === "") return "-";
+export function formatRelativeTime(date: string | Date | number | any): string { 
+  if (!date || date === "") return "-";
+  // Manejar Firestore Timestamp
+  if (date && typeof date === 'object' && date.toDate) {
+    return formatRelativeTime(date.toDate().toISOString());
+  }
   const d = typeof date === 'string' ? parseISO(date) : new Date(date);
+  if (isNaN(d.getTime())) return "-";
   const now = new Date();
   const diffInMinutes = Math.floor((now.getTime() - d.getTime()) / (1000 * 60));
   

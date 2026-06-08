@@ -57,7 +57,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
+  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
 
@@ -101,8 +101,8 @@ export default function TasksModule() {
     }
   }, [taskForm.startDate, taskForm.startTime, taskForm.estimatedHours]);
 
-  const [incidenciaForm, setIncidenciaForm] = useState({
-    title: '', description: '', department: Department.ADMINISTRATIVO, priority: TaskPriority.HIGH,
+  const [incidenciaForm, setIncidenciaForm] = useState<{ title: string; description: string; department: Department; targetDepartments: Department[]; priority: TaskPriority }>({
+    title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH,
   });
 
   const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia') => {
@@ -114,7 +114,7 @@ export default function TasksModule() {
       requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
     });
-    setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, priority: TaskPriority.HIGH });
+    setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [], priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
   };
 
@@ -157,7 +157,7 @@ export default function TasksModule() {
     return counts;
   }, [tasksByTabAndTime]);
 
-  const incidenciaCounts = getIncidenciaCounts();
+  // Contadores se calculan después de filteredIncidencias
 
   const filteredTasks = useMemo(() => {
     let result = [...tasksByTabAndTime];
@@ -180,22 +180,70 @@ export default function TasksModule() {
     return result;
   }, [tasksByTabAndTime, statusFilter, searchQuery]);
 
-  const filteredIncidencias = useMemo(() => {
+  // PASO 1: Filtrar por departamento
+  const incidenciasByDept = useMemo(() => {
     let result = [...incidencias];
+    if (user && !(user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH)) {
+      result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
+    }
+    return result;
+  }, [incidencias, user]);
+
+  // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
+  const incidenciasByTime = useMemo(() => {
+    let result = [...incidenciasByDept];
     const today = new Date().toISOString().split('T')[0];
     const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
     switch (timeFilter) {
-      case TimeFilter.TODAY: result = result.filter((i) => i.createdAt.startsWith(today)); break;
+      case TimeFilter.TODAY:
+        result = result.filter((i) => i.createdAt.startsWith(today) || (i.status !== IncidenciaStatus.RESOLVED && i.status !== IncidenciaStatus.CLOSED));
+        break;
       case TimeFilter.YESTERDAY: result = result.filter((i) => i.createdAt.startsWith(yesterday)); break;
-      case TimeFilter.PAST_WEEKS: result = result.filter((i) => i.createdAt < today); break;
+      case TimeFilter.PAST_WEEKS: result = result.filter((i) => i.createdAt < yesterday); break;
     }
-    if (statusFilter !== 'all') result = result.filter((i) => i.status === statusFilter);
+    return result;
+  }, [incidenciasByDept, timeFilter]);
+
+  // PASO 3: Contadores personales (sobre incidenciasByTime)
+  const incidenciaCounts = useMemo(() => {
+    const base = incidenciasByTime;
+    const uid = user?.id || '';
+    return {
+      total: base.length,
+      new: base.filter((i) => i.status === IncidenciaStatus.NEW).length,
+      open: base.filter((i) => i.viewers?.includes(uid)).length,
+      verified: base.filter((i) => i.verifiedByList?.includes(uid) && i.status === IncidenciaStatus.VERIFIED).length,
+      resolved: base.filter((i) => i.status === IncidenciaStatus.RESOLVED).length,
+      closed: base.filter((i) => i.status === IncidenciaStatus.CLOSED).length,
+      reopened: base.filter((i) => i.status === IncidenciaStatus.REOPENED).length,
+    };
+  }, [incidenciasByTime, user?.id]);
+
+  // PASO 4: Tarjetas personales (incidenciasByTime + statusFilter)
+  const filteredIncidencias = useMemo(() => {
+    let result = [...incidenciasByTime];
+    const uid = user?.id || '';
+    if (statusFilter !== 'all') {
+      switch (statusFilter) {
+        case IncidenciaStatus.NEW:
+          result = result.filter((i) => i.status === IncidenciaStatus.NEW);
+          break;
+        case IncidenciaStatus.OPEN:
+          result = result.filter((i) => i.viewers?.includes(uid));
+          break;
+        case IncidenciaStatus.VERIFIED:
+          result = result.filter((i) => i.verifiedByList?.includes(uid) && i.status === IncidenciaStatus.VERIFIED);
+          break;
+        default:
+          result = result.filter((i) => i.status === statusFilter);
+      }
+    }
     result.sort((a, b) => {
-      const priorityOrder: Record<IncidenciaStatus, number> = { [IncidenciaStatus.NEW]: 0, [IncidenciaStatus.REOPENED]: 1, [IncidenciaStatus.OPEN]: 2, [IncidenciaStatus.VERIFIED]: 3, [IncidenciaStatus.RESOLVED]: 4, [IncidenciaStatus.CLOSED]: 5 };
+      const priorityOrder = { [IncidenciaStatus.NEW]: 0, [IncidenciaStatus.REOPENED]: 1, [IncidenciaStatus.OPEN]: 2, [IncidenciaStatus.VERIFIED]: 3, [IncidenciaStatus.RESOLVED]: 4, [IncidenciaStatus.CLOSED]: 5 };
       return priorityOrder[a.status] - priorityOrder[b.status];
     });
     return result;
-  }, [incidencias, timeFilter, statusFilter]);
+  }, [incidenciasByTime, timeFilter, statusFilter, user?.id]);
 
   const isIncidenciasTab = mainTab === 'incidencias';
   const displayItems = isIncidenciasTab ? filteredIncidencias : filteredTasks;
@@ -232,7 +280,7 @@ export default function TasksModule() {
           {hasPermission('canViewAllDepartments') && (
             <button onClick={() => { setMainTab('all'); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
           )}
-          <button onClick={() => { setMainTab('incidencias'); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
+          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
         </div>
 
         {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
@@ -278,8 +326,8 @@ export default function TasksModule() {
           ) : (
             <>
               <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.total}</span><span>Todas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'bg-[#FF9500] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Abiertas</span></button>
+              {timeFilter === TimeFilter.TODAY && <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>}
+              <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Visualizadas</span></button>
               <button onClick={() => setStatusFilter(IncidenciaStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.VERIFIED ? 'bg-[#5856D6] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.verified}</span><span>Verificadas</span></button>
               <button onClick={() => setStatusFilter(IncidenciaStatus.RESOLVED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.RESOLVED ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.resolved}</span><span>Resueltas</span></button>
               <button onClick={() => setStatusFilter(IncidenciaStatus.CLOSED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.CLOSED ? 'bg-[#8E8E93] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.closed}</span><span>Cerradas</span></button>
@@ -310,7 +358,7 @@ export default function TasksModule() {
           ) : (
             <div className={cn('space-y-3', viewType === 'grid' ? 'grid grid-cols-2 gap-3' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
-                <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} />
+                <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddViewer={addIncidenciaViewer} />
               ) : (
                 <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} onToggleSubtask={(taskId, subtaskId) => toggleSubtask(taskId, subtaskId)} onAddPhoto={addPhoto} onDelete={(taskId) => { if (confirm('¿Eliminar esta tarea permanentemente?')) { deleteTask(taskId); } }} onEdit={(task) => { setEditingTask(task); setIsEditModalOpen(true); }} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
               ))}
@@ -333,13 +381,38 @@ export default function TasksModule() {
               <div className="space-y-4 py-4">
                 <div className="space-y-2"><Label>Título *</Label><Input placeholder="Resumen de la incidencia" value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} /></div>
                 <div className="space-y-2"><Label>Descripción detallada *</Label><Textarea placeholder="Describe el problema..." value={incidenciaForm.description} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, description: e.target.value })} rows={4} /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Departamento</Label><Select value={incidenciaForm.department} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, department: v as Department })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}</SelectContent></Select></div>
-                  <div className="space-y-2"><Label>Prioridad</Label><Select value={incidenciaForm.priority} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, priority: v as TaskPriority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={TaskPriority.LOW}>Baja</SelectItem><SelectItem value={TaskPriority.MEDIUM}>Media</SelectItem><SelectItem value={TaskPriority.HIGH}>Alta</SelectItem><SelectItem value={TaskPriority.CRITICAL}>Crítica</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2">
+                  <Label>Departamento afectado *</Label>
+                  <Select value={incidenciaForm.department} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, department: v as Department, targetDepartments: incidenciaForm.targetDepartments.includes(v as Department) ? incidenciaForm.targetDepartments : [...incidenciaForm.targetDepartments, v as Department] })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>{allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}</SelectContent>
+                  </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Departamentos involucrados *</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {allDepartments.map((dept) => (
+                      <label key={dept} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F5F7] rounded-lg text-sm cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={incidenciaForm.targetDepartments.includes(dept)}
+                          onChange={(e) => {
+                            const newDepts = e.target.checked
+                              ? [...incidenciaForm.targetDepartments, dept]
+                              : incidenciaForm.targetDepartments.filter((d) => d !== dept);
+                            setIncidenciaForm({ ...incidenciaForm, targetDepartments: newDepts, department: newDepts.length > 0 ? newDepts[0] : incidenciaForm.department });
+                          }}
+                          className="rounded border-gray-300"
+                        />
+                        <span>{dept.replace(/_/g, ' ')}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2"><Label>Prioridad</Label><Select value={incidenciaForm.priority} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, priority: v as TaskPriority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={TaskPriority.LOW}>Baja</SelectItem><SelectItem value={TaskPriority.MEDIUM}>Media</SelectItem><SelectItem value={TaskPriority.HIGH}>Alta</SelectItem><SelectItem value={TaskPriority.CRITICAL}>Crítica</SelectItem></SelectContent></Select></div>
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
-                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (user) { createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: incidenciaForm.department, priority: incidenciaForm.priority, reportedBy: user.id }); } setIsCreateModalOpen(false); }} disabled={!incidenciaForm.title || !incidenciaForm.description}>Reportar Incidencia</Button>
+                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
                 </div>
               </div>
             ) : (
@@ -764,7 +837,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
             {task.supportUserIds && task.supportUserIds.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Apoyo:</span> <span className="text-[#1D1D1F] font-medium">{task.supportUserIds.map((id) => getUserName(id)).join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
-            <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{task.description || 'Sin descripción'}</p></div>
+            <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-base text-[#1D1D1F] whitespace-pre-wrap leading-relaxed">{task.description || 'Sin descripción'}</p></div>
             {localSubtasks && localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
@@ -836,9 +909,10 @@ interface IncidenciaCardProps {
   onCloseIncidencia?: (id: string, userId: string, reason?: string) => void;
   onReopenIncidencia?: (id: string, userId: string, reason?: string) => void;
   onAddNote?: (id: string, content: string, userId: string) => void;
+  onAddViewer?: (id: string, userId: string) => void;
 }
 
-function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote }: IncidenciaCardProps) {
+function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer }: IncidenciaCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
@@ -853,21 +927,40 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   
   const statusColor = getIncidenciaStatusColor(incidencia.status);
   const priorityColor = getPriorityColor(incidencia.priority);
+  // DEBUG: log datos de la incidencia
   const reporter = staticUsers.find((u) => u.id === incidencia.reportedBy);
   
   // Verificar si el usuario actual ya vio la incidencia
-  const hasViewed = currentUserId && viewers.includes(currentUserId);
+  const hasViewed = currentUserId && incidencia.viewers?.includes(currentUserId);
   
-  // Registrar visualización cuando se expande
+  // Registrar visualización cuando se expande (persiste en Firestore)
   const handleExpand = () => {
     if (!expanded && currentUserId && !hasViewed) {
-      setViewers([...viewers, currentUserId]);
+      onAddViewer?.(incidencia.id, currentUserId);
     }
     setExpanded(!expanded);
   };
+
+  // Verificadores requeridos: GDs + supervisores de deptos involucrados + superiores
+  const deptosInvolucrados = incidencia.targetDepartments || [incidencia.targetDepartment];
+  const verificadoresRequeridos = staticUsers.filter((u) =>
+    (deptosInvolucrados.includes(u.department) &&
+      (u.role === Role.GERENTE_DEPARTAMENTO || u.role === Role.SUPERVISOR)) ||
+    u.role === Role.GERENTE_OPERACIONES ||
+    u.role === Role.RRHH ||
+    u.role === Role.DIRECTOR ||
+    u.role === Role.DIRECTOR_GENERAL
+  );
+  // Verificación por departamento: cada depto involucrado necesita al menos 1 verificación de su GD/Supervisor
+  const deptosVerificados = new Set<string>((incidencia.verifiedByList || []).map((v) => {
+    const verifier = staticUsers.find((u) => u.id === v || u.email === v);
+    return verifier?.department as string;
+  }).filter(Boolean));
+  const todosVerificaron = deptosInvolucrados.every((d) => deptosVerificados.has(d));
+  const yaVerifico = currentUserId && (incidencia.verifiedByList || []).includes(currentUserId);
   
   const canConfirm = currentUser && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
-  const canResolve = currentUser && incidencia.status === IncidenciaStatus.VERIFIED && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
+  const canResolve = currentUser && incidencia.status === IncidenciaStatus.VERIFIED && todosVerificaron && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
   const canClose = currentUser && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
 
   return (
@@ -882,7 +975,56 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
             </div>
             <p className="text-sm text-[#86868B] line-clamp-2 mt-1">{incidencia.description}</p>
             <div className="flex items-center gap-4 mt-3 text-xs text-[#86868B]">
-              <span>Reportado por: {reporter?.name || incidencia.reportedBy}</span><span>•</span><span>{incidencia.targetDepartment}</span><span>•</span><span>{formatRelativeTime(incidencia.createdAt)}</span>
+              <div className="flex flex-row flex-wrap gap-x-3 gap-y-1 mt-2 text-xs items-center">
+                {incidencia.viewers && incidencia.viewers.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    <User className="w-3 h-3 text-[#FF9500]" />
+                    <span className="text-[#86868B]">Visualizada por:</span>
+                    <span className="text-[#1D1D1F] font-medium">{incidencia.viewers.map((v) => staticUsers.find((u) => u.id === v || u.email === v)?.name || v).join(", ")}</span>
+                  </div>
+                )}
+                {incidencia.closedBy && (
+                  <div className="flex items-center gap-1.5">
+                    <Lock className="w-3 h-3 text-[#8E8E93]" />
+                    <span className="text-[#86868B]">Cerrada por:</span>
+                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span>
+                  </div>
+                )}
+                {incidencia.reopenedBy && (
+                  <div className="flex items-center gap-1.5">
+                    <Unlock className="w-3 h-3 text-[#007AFF]" />
+                    <span className="text-[#86868B]">Reabierta por:</span>
+                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span>
+                  </div>
+                )}
+                {(incidencia.verifiedByList && incidencia.verifiedByList.length > 0) ? (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
+                    <span className="text-[#86868B]">Verificada por:</span>
+                    <span className="text-[#1D1D1F] font-medium">{incidencia.verifiedByList.map((v) => staticUsers.find((u) => u.id === v || u.email === v)?.name || v).join(", ")}</span>
+                  </div>
+                ) : (incidencia as any).verifiedBy ? (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
+                    <span className="text-[#86868B]">Verificada por:</span>
+                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === (incidencia as any).verifiedBy || u.email === (incidencia as any).verifiedBy)?.name || (incidencia as any).verifiedBy}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center gap-1.5">
+                  <LayoutGrid className="w-3 h-3 text-[#86868B]" />
+                  <span className="text-[#86868B]">Desde:</span>
+                  <span className="text-[#1D1D1F] font-medium">{reporter?.department || incidencia.targetDepartment}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Users className="w-3 h-3 text-[#86868B]" />
+                  <span className="text-[#86868B]">Para:</span>
+                  <span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartments ? incidencia.targetDepartments.join(", ") : incidencia.targetDepartment}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-[#86868B]" />
+                  <span className="text-[#86868B]">{formatRelativeTime(incidencia.createdAt)}</span>
+                </div>
+              </div>
             </div>
           </div>
           <div className="text-[#86868B]">{expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}</div>
@@ -891,7 +1033,23 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
         {expanded && (
           <div className="px-4 pb-4 border-t border-[#E5E5E7]">
             <div className="py-4 space-y-4">
+              {/* Descripción */}
               <div className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{incidencia.description}</p></div>
+
+              {/* Resolución con marco verde */}
+              {incidencia.notes && (() => {
+                const resNote = [...incidencia.notes].reverse().find(n => n.content.startsWith('Resolución:'));
+                return resNote ? (
+                  <div className="bg-[#34C759]/10 border border-[#34C759] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="w-4 h-4 text-[#34C759]" />
+                      <span className="text-xs font-semibold text-[#34C759] uppercase tracking-wide">Resolución</span>
+                    </div>
+                    <p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{resNote.content.replace('Resolución: ', '')}</p>
+                    <p className="text-xs text-[#86868B] mt-1">{staticUsers.find(u => u.id === resNote.createdBy || u.email === resNote.createdBy)?.name || resNote.createdBy} • {formatRelativeTime(resNote.createdAt)}</p>
+                  </div>
+                ) : null;
+              })()}
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
                 <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartment}</span></div>
@@ -899,16 +1057,36 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 {incidencia.resolvedBy && (<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-[#86868B]">Resuelto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.resolvedBy)?.name || incidencia.resolvedBy}</span></div>)}
                 {incidencia.closedBy && (<div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-[#86868B]">Cerrado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span></div>)}
                 {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
-                {incidencia.reopenReason && (<div className="w-full bg-[#007AFF]/10 rounded-lg p-2 text-xs"><span className="text-[#007AFF] font-medium">Motivo de reapertura:</span><span className="text-[#1D1D1F] ml-1">{incidencia.reopenReason}</span></div>)}
+                {/* Motivo de cierre con marco gris */}
+                {(incidencia as any).closeReason && (
+                  <div className="w-full bg-[#8E8E93]/10 border border-[#8E8E93] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock className="w-4 h-4 text-[#8E8E93]" />
+                      <span className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Motivo de cierre</span>
+                    </div>
+                    <p className="text-sm text-[#1D1D1F]">{(incidencia as any).closeReason}</p>
+                  </div>
+                )}
+
+                {/* Motivo de reapertura con marco azul */}
+                {incidencia.reopenReason && (
+                  <div className="w-full bg-[#007AFF]/10 border border-[#007AFF] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Unlock className="w-4 h-4 text-[#007AFF]" />
+                      <span className="text-xs font-semibold text-[#007AFF] uppercase tracking-wide">Motivo de reapertura</span>
+                    </div>
+                    <p className="text-sm text-[#1D1D1F]">{incidencia.reopenReason}</p>
+                  </div>
+                )}
               </div>
-              {viewers.length > 0 && (
+              {(incidencia.viewers || []).length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <UserCircle className="w-4 h-4 text-[#86868B]" />
-                    <h5 className="text-sm font-medium text-[#1D1D1F]">Visualizado por</h5>
+                    <h5 className="text-sm font-medium text-[#1D1D1F]">Visualizado por ({(incidencia.viewers || []).length})</h5>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {viewers.map((viewerId) => {
+                    {(incidencia.viewers || []).map((viewerId) => {
                       const viewer = staticUsers.find((u) => u.id === viewerId);
                       return viewer ? (
                         <span key={viewerId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
@@ -921,14 +1099,14 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 </div>
               )}
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
+              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
             <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
-              {(incidencia.status === IncidenciaStatus.NEW || incidencia.status === IncidenciaStatus.OPEN || incidencia.status === IncidenciaStatus.REOPENED) && canConfirm && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}
+              {canConfirm && !yaVerifico && !todosVerificaron && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}
               {incidencia.status === IncidenciaStatus.VERIFIED && canResolve && (<Button size="sm" onClick={() => setShowResolveModal(true)} className="bg-[#34C759] hover:bg-[#34C759]/90 text-white gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Resolver</Button>)}
               {/* Botón Cerrar disponible desde el inicio para supervisores+ */}
-              {canClose && incidencia.status !== IncidenciaStatus.CLOSED && (<Button size="sm" onClick={() => setShowCloseModal(true)} className="bg-[#8E8E93] hover:bg-[#8E8E93]/90 text-white gap-1"><Lock className="w-3.5 h-3.5" />Cerrar</Button>)}
-              {incidencia.status !== IncidenciaStatus.NEW && incidencia.status !== IncidenciaStatus.REOPENED && (<Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)} className="gap-1 border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/5"><Unlock className="w-3.5 h-3.5" />Reabrir</Button>)}
+              {canClose && incidencia.status !== IncidenciaStatus.CLOSED && incidencia.status !== IncidenciaStatus.RESOLVED && (<Button size="sm" onClick={() => setShowCloseModal(true)} className="bg-[#8E8E93] hover:bg-[#8E8E93]/90 text-white gap-1"><Lock className="w-3.5 h-3.5" />Cerrar</Button>)}
+              {(incidencia.status === IncidenciaStatus.CLOSED || incidencia.status === IncidenciaStatus.RESOLVED) && (<Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)} className="gap-1 border-[#007AFF] text-[#007AFF] hover:bg-[#007AFF]/5"><Unlock className="w-3.5 h-3.5" />Reabrir</Button>)}
             </div>
           </div>
         )}
