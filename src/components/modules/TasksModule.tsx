@@ -102,6 +102,14 @@ export default function TasksModule() {
     }
   }, [taskForm.startDate, taskForm.startTime, taskForm.estimatedHours]);
 
+  
+  const { uploadImage } = useStorageUpload();
+
+  const handlePhotoCapture = async (file: File) => {
+    try { const url = await uploadImage(file, 'incidencias/new'); setIncidenciaPhotos(prev => [...prev, url]); }
+    catch (err) { console.error('Error:', err); }
+  };
+  const [incidenciaPhotos, setIncidenciaPhotos] = useState<string[]>([]);
   const [incidenciaForm, setIncidenciaForm] = useState<{ title: string; description: string; department: Department; targetDepartments: Department[]; priority: TaskPriority }>({
     title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH,
   });
@@ -429,7 +437,7 @@ export default function TasksModule() {
                 <div className="space-y-2"><Label>Prioridad</Label><Select value={incidenciaForm.priority} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, priority: v as TaskPriority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={TaskPriority.LOW}>Baja</SelectItem><SelectItem value={TaskPriority.MEDIUM}>Media</SelectItem><SelectItem value={TaskPriority.HIGH}>Alta</SelectItem><SelectItem value={TaskPriority.CRITICAL}>Crítica</SelectItem></SelectContent></Select></div>
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
-                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
+                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
                 </div>
               </div>
             ) : (
@@ -874,7 +882,9 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               ) : <p className="text-sm text-[#86868B]">No hay fotos</p>}
             </div>
             {task.history && task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-            <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
+            
+
+<div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
               <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
               {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
               {currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}
@@ -1050,6 +1060,22 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               {/* Descripción */}
               <div className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{incidencia.description}</p></div>
 
+              {/* Fotos */}
+              {incidencia.photos && incidencia.photos.length > 0 && (
+                <div className="space-y-2">
+                  <h5 className="text-sm font-medium text-[#1D1D1F] flex items-center gap-1">
+                    <ImageIcon className="w-4 h-4 text-[#86868B]" /> Fotos ({incidencia.photos.length})
+                  </h5>
+                  <div className="flex flex-wrap gap-2">
+                    {incidencia.photos.map((photo, idx) => (
+                      <a key={idx} href={photo.url} target="_blank" rel="noopener noreferrer" className="relative w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">
+                        <img src={photo.url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Resolución con marco verde */}
               {incidencia.notes && (() => {
                 const resNote = [...incidencia.notes].reverse().find(n => n.content.startsWith('Resolución:'));
@@ -1133,35 +1159,8 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
               <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
-              {showPhotoUpload && (
-                <div className="space-y-3 p-3 bg-[#F5F5F7] rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <h5 className="text-sm font-medium text-[#1D1D1F]">Agregar Foto</h5>
-                    <button onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); }} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-4 h-4" /></button>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs text-[#86868B]">URL de la imagen (o usa la camara)</label>
-                    <div className="flex gap-2">
-                      <input type="text" value={uploadedPhotoUrl} onChange={(e) => { setUploadedPhotoUrl(e.target.value); setPhotoPreview(e.target.value); }} placeholder="https://..." className="flex-1 rounded-lg border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:border-corporate focus:ring-1 focus:ring-corporate" />
-                      <CameraCapture onCapture={(file) => { const url = URL.createObjectURL(file); setUploadedPhotoUrl(url); setPhotoPreview(url); }} />
-                    </div>
-                  </div>
-                  {photoPreview && (
-                    <div className="relative aspect-video rounded-lg overflow-hidden border border-[#E5E5E7] bg-white">
-                      <img src={photoPreview} alt="Preview" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                    </div>
-                  )}
-                  <div className="flex justify-end gap-2">
-                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); }}>Cancelar</Button>
-                    <Button size="sm" className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={(e) => { e.stopPropagation(); if (currentUserId && uploadedPhotoUrl.trim()) { onAddPhoto?.(incidencia.id, uploadedPhotoUrl.trim(), currentUserId); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); } }} disabled={!uploadedPhotoUrl.trim()}>Subir Foto</Button>
-                  </div>
-                </div>
-              )}
-
-            <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
-                            <Button size="sm" variant="outline" className="border-[#34C759] text-[#34C759] hover:bg-[#34C759]/5" onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(!showPhotoUpload); }}>
-                <Camera className="w-4 h-4 mr-1" /> Foto
-              </Button>
+              
+              <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
               {canConfirm && !yaVerifico && !todosVerificaron && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}
               {incidencia.status === IncidenciaStatus.VERIFIED && canResolve && (<Button size="sm" onClick={() => setShowResolveModal(true)} className="bg-[#34C759] hover:bg-[#34C759]/90 text-white gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Resolver</Button>)}
               {/* Botón Cerrar disponible desde el inicio para supervisores+ */}
