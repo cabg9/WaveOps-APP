@@ -7,7 +7,7 @@ import {
   Plus, Target, AlertCircle, User, Users, LayoutGrid, AlertTriangle,
   Search, List, LayoutTemplate, Calendar, CheckCircle2, Camera,
   ChevronUp, ChevronDown, UserCircle, Building2, CheckSquare,
-  Lock, Unlock, History, MessageSquare,
+  Lock, Unlock, History, MessageSquare, X, Image as ImageIcon,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { CameraCapture } from '@/components/CameraCapture';
@@ -57,7 +57,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
+  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
 
@@ -375,7 +375,7 @@ export default function TasksModule() {
           ) : (
             <div className={cn('space-y-3', viewType === 'grid' ? 'grid grid-cols-2 gap-3' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
-                <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddViewer={addIncidenciaViewer} />
+                <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
                 <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} onToggleSubtask={(taskId, subtaskId) => toggleSubtask(taskId, subtaskId)} onAddPhoto={addPhoto} onDelete={(taskId) => { if (confirm('¿Eliminar esta tarea permanentemente?')) { deleteTask(taskId); } }} onEdit={(task) => { setEditingTask(task); setIsEditModalOpen(true); }} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
               ))}
@@ -927,9 +927,10 @@ interface IncidenciaCardProps {
   onReopenIncidencia?: (id: string, userId: string, reason?: string) => void;
   onAddNote?: (id: string, content: string, userId: string) => void;
   onAddViewer?: (id: string, userId: string) => void;
+  onAddPhoto?: (id: string, photoUrl: string, userId: string) => void;
 }
 
-function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer }: IncidenciaCardProps) {
+function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer, onAddPhoto }: IncidenciaCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
@@ -940,6 +941,9 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   const [resolution, setResolution] = useState('');
   const [closeReason, setCloseReason] = useState('');
   const [reopenReason, setReopenReason] = useState('');
+  const [showPhotoUpload, setShowPhotoUpload] = useState(false);
+  const [uploadedPhotoUrl, setUploadedPhotoUrl] = useState('');
+  const [photoPreview, setPhotoPreview] = useState('');
   const [viewers, setViewers] = useState<string[]>([]);
   
   const statusColor = getIncidenciaStatusColor(incidencia.status);
@@ -1115,10 +1119,57 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   </div>
                 </div>
               )}
+              {incidencia.photos && incidencia.photos.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-[#86868B]" />
+                    <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos ({incidencia.photos.length})</h5>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {incidencia.photos.map((photo) => (
+                      <div key={photo.url} className="relative group aspect-square rounded-lg overflow-hidden border border-[#E5E5E7] bg-[#F5F5F7]">
+                        <img src={photo.url} alt="Foto" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="text-[8px] text-white truncate">{staticUsers.find((u) => u.id === photo.uploadedBy)?.name || photo.uploadedBy}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = staticUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
               <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = staticUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
+              {showPhotoUpload && (
+                <div className="space-y-3 p-3 bg-[#F5F5F7] rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <h5 className="text-sm font-medium text-[#1D1D1F]">Agregar Foto</h5>
+                    <button onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); }} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-4 h-4" /></button>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs text-[#86868B]">URL de la imagen (o usa la camara)</label>
+                    <div className="flex gap-2">
+                      <input type="text" value={uploadedPhotoUrl} onChange={(e) => { setUploadedPhotoUrl(e.target.value); setPhotoPreview(e.target.value); }} placeholder="https://..." className="flex-1 rounded-lg border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:border-corporate focus:ring-1 focus:ring-corporate" />
+                      <CameraCapture onCapture={(file) => { const url = URL.createObjectURL(file); setUploadedPhotoUrl(url); setPhotoPreview(url); }} />
+                    </div>
+                  </div>
+                  {photoPreview && (
+                    <div className="relative aspect-video rounded-lg overflow-hidden border border-[#E5E5E7] bg-white">
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                    </div>
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); }}>Cancelar</Button>
+                    <Button size="sm" className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={(e) => { e.stopPropagation(); if (currentUserId && uploadedPhotoUrl.trim()) { onAddPhoto?.(incidencia.id, uploadedPhotoUrl.trim(), currentUserId); setShowPhotoUpload(false); setPhotoPreview(''); setUploadedPhotoUrl(''); } }} disabled={!uploadedPhotoUrl.trim()}>Subir Foto</Button>
+                  </div>
+                </div>
+              )}
+
             <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
+                            <Button size="sm" variant="outline" className="border-[#34C759] text-[#34C759] hover:bg-[#34C759]/5" onClick={(e) => { e.stopPropagation(); setShowPhotoUpload(!showPhotoUpload); }}>
+                <Camera className="w-4 h-4 mr-1" /> Foto
+              </Button>
               {canConfirm && !yaVerifico && !todosVerificaron && (<Button size="sm" onClick={() => setShowConfirmModal(true)} className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white gap-1"><CheckSquare className="w-3.5 h-3.5" />Verificar</Button>)}
               {incidencia.status === IncidenciaStatus.VERIFIED && canResolve && (<Button size="sm" onClick={() => setShowResolveModal(true)} className="bg-[#34C759] hover:bg-[#34C759]/90 text-white gap-1"><CheckCircle2 className="w-3.5 h-3.5" />Resolver</Button>)}
               {/* Botón Cerrar disponible desde el inicio para supervisores+ */}
