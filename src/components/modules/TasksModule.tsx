@@ -97,7 +97,7 @@ export default function TasksModule() {
       const start = new Date(`${taskForm.startDate}T${taskForm.startTime}`);
       const end = new Date(start.getTime() + taskForm.estimatedHours * 60 * 1000);
       return { date: end.toISOString().split('T')[0], time: end.toTimeString().slice(0, 5) };
-    } catch {
+    } catch (e) {
       return { date: taskForm.startDate, time: taskForm.startTime };
     }
   }, [taskForm.startDate, taskForm.startTime, taskForm.estimatedHours]);
@@ -999,13 +999,6 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               <div className="flex flex-row flex-wrap gap-x-3 gap-y-1 mt-2 text-xs items-center">
                 {incidencia.viewers && incidencia.viewers.length > 0 && (
                   <div className="flex items-center gap-1.5">
-                    <User className="w-3 h-3 text-[#FF9500]" />
-                    <span className="text-[#86868B]">Visualizada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{incidencia.viewers.map((v) => staticUsers.find((u) => u.id === v.userId || u.email === v.userId)?.name || v.userId).join(", ")}</span>
-                  </div>
-                )}
-                {incidencia.closedBy && (
-                  <div className="flex items-center gap-1.5">
                     <Lock className="w-3 h-3 text-[#8E8E93]" />
                     <span className="text-[#86868B]">Cerrada por:</span>
                     <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span>
@@ -1111,8 +1104,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                       const viewer = staticUsers.find((u) => u.id === viewerObj.userId);
                       return viewer ? (
                         <span key={viewerObj.userId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
-                          <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                          {viewer.name}
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>{viewer.name} <span className="text-[#86868B] text-[10px]">({new Date(viewerObj.viewedAt).toLocaleDateString()})</span>
                         </span>
                       ) : null;
                     })}
