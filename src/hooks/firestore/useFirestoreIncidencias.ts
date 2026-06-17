@@ -16,7 +16,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { Incidencia, IncidenciaStatus, TaskPriority, Department } from '@/types';
+import { Incidencia, IncidenciaStatus, TaskPriority, Department, PhotoItem } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════
 // UTILS
@@ -71,6 +71,7 @@ export function useFirestoreIncidencias() {
             reopenedBy: data.reopenedBy || undefined,
             reopenedAt: data.reopenedAt ? timestampToISO(data.reopenedAt) : undefined,
             reopenReason: data.reopenReason || undefined,
+            photos: (data.photos || []).map((p: any) => ({ url: p.url || p, uploadedBy: p.uploadedBy || '', uploadedAt: p.uploadedAt || '' })),
             notes: (data.notes || []).map((n: any) => ({
               id: n.id || Date.now().toString(),
               content: n.content || '',
@@ -110,6 +111,7 @@ export function useFirestoreIncidencias() {
       reportedBy: string;
       targetDepartment: Department;
       targetDepartments?: Department[];
+      photos?: PhotoItem[];
     }) => {
       const docRef = await addDoc(collectionRef, {
         title: data.title,
@@ -119,6 +121,7 @@ export function useFirestoreIncidencias() {
         reportedBy: data.reportedBy,
         targetDepartment: data.targetDepartment,
         targetDepartments: data.targetDepartments || [data.targetDepartment],
+        photos: data.photos || [],
         notes: [],
         history: [
           {
@@ -167,9 +170,9 @@ export function useFirestoreIncidencias() {
       const ref = doc(db, 'incidencias', id);
       const inc = incidencias.find((i) => i.id === id);
       const currentViewers = inc?.viewers || [];
-      if (currentViewers.includes(userId)) return;
+      if (currentViewers.some((v) => v.userId === userId)) return;
       await updateDoc(ref, {
-        viewers: arrayUnion(userId),
+        viewers: arrayUnion({userId, viewedAt: new Date().toISOString()}),
       });
     },
     [incidencias]
@@ -238,6 +241,17 @@ export function useFirestoreIncidencias() {
       });
     },
     [incidencias]
+  );
+
+  // Agregar foto a incidencia
+  const addPhoto = useCallback(
+    async (id: string, photoUrl: string, userId: string) => {
+      const ref = doc(db, 'incidencias', id);
+      await updateDoc(ref, {
+        photos: arrayUnion({ url: photoUrl, uploadedBy: userId, uploadedAt: new Date().toISOString() }),
+      });
+    },
+    []
   );
 
   // Reabrir incidencia (CLOSED -> REOPENED)
@@ -322,6 +336,7 @@ export function useFirestoreIncidencias() {
     resolveIncidencia,
     closeIncidencia,
     reopenIncidencia,
+    addPhoto,
     addNote,
     addViewer,
     getCounts,

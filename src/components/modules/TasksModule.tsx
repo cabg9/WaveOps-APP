@@ -218,7 +218,7 @@ export default function TasksModule() {
     return {
       total: base.length,
       new: base.filter((i) => i.status === IncidenciaStatus.NEW).length,
-      open: base.filter((i) => i.viewers?.includes(uid)).length,
+      open: base.filter((i) => i.viewers?.some((v) => v.userId === uid)).length,
       verified: base.filter((i) => i.verifiedByList?.includes(uid) && i.status === IncidenciaStatus.VERIFIED).length,
       resolved: base.filter((i) => i.status === IncidenciaStatus.RESOLVED).length,
       closed: base.filter((i) => i.status === IncidenciaStatus.CLOSED).length,
@@ -236,7 +236,7 @@ export default function TasksModule() {
           result = result.filter((i) => i.status === IncidenciaStatus.NEW);
           break;
         case IncidenciaStatus.OPEN:
-          result = result.filter((i) => i.viewers?.includes(uid));
+          result = result.filter((i) => i.viewers?.some((v) => v.userId === uid));
           break;
         case IncidenciaStatus.VERIFIED:
           result = result.filter((i) => i.verifiedByList?.includes(uid) && i.status === IncidenciaStatus.VERIFIED);
@@ -948,7 +948,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   const reporter = staticUsers.find((u) => u.id === incidencia.reportedBy);
   
   // Verificar si el usuario actual ya vio la incidencia
-  const hasViewed = currentUserId && incidencia.viewers?.includes(currentUserId);
+  const hasViewed = currentUserId && incidencia.viewers?.some((v) => v.userId === currentUserId);
   
   // Registrar visualización cuando se expande (persiste en Firestore)
   const handleExpand = () => {
@@ -997,7 +997,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   <div className="flex items-center gap-1.5">
                     <User className="w-3 h-3 text-[#FF9500]" />
                     <span className="text-[#86868B]">Visualizada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{incidencia.viewers.map((v) => staticUsers.find((u) => u.id === v || u.email === v)?.name || v).join(", ")}</span>
+                    <span className="text-[#1D1D1F] font-medium">{incidencia.viewers.map((v) => staticUsers.find((u) => u.id === v.userId || u.email === v.userId)?.name || v.userId).join(", ")}</span>
                   </div>
                 )}
                 {incidencia.closedBy && (
@@ -1103,10 +1103,10 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                     <h5 className="text-sm font-medium text-[#1D1D1F]">Visualizado por ({(incidencia.viewers || []).length})</h5>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {(incidencia.viewers || []).map((viewerId) => {
-                      const viewer = staticUsers.find((u) => u.id === viewerId);
+                    {(incidencia.viewers || []).map((viewerObj) => {
+                      const viewer = staticUsers.find((u) => u.id === viewerObj.userId);
                       return viewer ? (
-                        <span key={viewerId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
+                        <span key={viewerObj.userId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
                           <span className="w-2 h-2 rounded-full bg-green-500"></span>
                           {viewer.name}
                         </span>

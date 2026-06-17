@@ -45,6 +45,12 @@ export enum TaskPriority {
   LOW = 'LOW',
 }
 
+export interface PhotoItem {
+  url: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
 export enum IncidenciaStatus {
   NEW = 'NEW',
   OPEN = 'OPEN',
@@ -164,7 +170,7 @@ export interface Incidencia {
   confirmedBy?: string; // userId
   confirmedAt?: string; // ISO date
   verifiedByList?: string[]; // userIds que han verificado
-  viewers?: string[]; // userIds que han visualizado
+  viewers?: { userId: string; viewedAt: string }[]; // usuarios que han visualizado con fecha
   targetDepartments?: string[]; // departamentos involucrados
   resolvedBy?: string; // userId
   resolvedAt?: string; // ISO date
@@ -173,6 +179,9 @@ export interface Incidencia {
   reopenedBy?: string; // userId
   reopenedAt?: string; // ISO date
   reopenReason?: string;
+  closeReason?: string;
+  resolution?: string;
+  photos?: PhotoItem[];
   notes: Note[];
   history: TaskHistory[];
   createdAt: string; // ISO date

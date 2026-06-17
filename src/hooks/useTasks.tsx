@@ -148,6 +148,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
     reopenIncidencia: incidenciasHook.reopenIncidencia,
     addIncidenciaNote: incidenciasHook.addNote,
     addIncidenciaViewer: incidenciasHook.addViewer,
+    addIncidenciaPhoto: incidenciasHook.addPhoto,
 
     // Contadores
     getTaskCounts: () => {
