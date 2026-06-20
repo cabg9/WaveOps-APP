@@ -1074,19 +1074,36 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               {/* Descripción */}
               <div className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{incidencia.description}</p></div>
 
-              {/* Resolución con marco verde */}
-              {incidencia.notes && (() => {
-                const resNote = [...incidencia.notes].reverse().find(n => n.content.startsWith('Resolución:'));
-                return resNote ? (
+
+              {/* Accion: basado en el estado ACTUAL */}
+              {(() => {
+                const histRev = [...(incidencia.history || [])].reverse();
+                const closeHist = histRev.find(h => h.action === "Incidencia cerrada");
+                const reopenHist = histRev.find(h => h.action === "Incidencia reabierta");
+                const resNote = [...(incidencia.notes || [])].reverse().find(n => n.content.replace(/[íi]/g, "i").toLowerCase().startsWith("resolucion:"));
+                // Estado ACTUAL decide el color, no el historial
+                if (incidencia.status === IncidenciaStatus.REOPENED && reopenHist?.note) return (
+                  <div className="bg-[#007AFF]/10 border border-[#007AFF] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-xs font-semibold text-[#007AFF] uppercase tracking-wide">Motivo de reapertura</span></div>
+                    <p className="text-sm text-[#1D1D1F]">{reopenHist.note}</p>
+                    {incidencia.reopenedBy && <p className="text-xs text-[#86868B] mt-1">{staticUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy} • {incidencia.reopenedAt ? formatHistoryDateTime(incidencia.reopenedAt) : ""}</p>}
+                  </div>
+                );
+                if (incidencia.status === IncidenciaStatus.CLOSED && closeHist?.note) return (
+                  <div className="bg-[#8E8E93]/10 border border-[#8E8E93] rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Motivo de cierre</span></div>
+                    <p className="text-sm text-[#1D1D1F]">{closeHist.note}</p>
+                    {incidencia.closedBy && <p className="text-xs text-[#86868B] mt-1">{staticUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy} • {incidencia.closedAt ? formatHistoryDateTime(incidencia.closedAt) : ""}</p>}
+                  </div>
+                );
+                if (incidencia.status === IncidenciaStatus.RESOLVED && resNote) return (
                   <div className="bg-[#34C759]/10 border border-[#34C759] rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#34C759]" />
-                      <span className="text-xs font-semibold text-[#34C759] uppercase tracking-wide">Resolución</span>
-                    </div>
-                    <p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{resNote.content.replace('Resolución: ', '')}</p>
+                    <div className="flex items-center gap-2 mb-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-xs font-semibold text-[#34C759] uppercase tracking-wide">Resolucion</span></div>
+                    <p className="text-sm text-[#1D1D1F]">{resNote.content.replace(/Resoluci[óo]n:\s*/i, "")}</p>
                     <p className="text-xs text-[#86868B] mt-1">{staticUsers.find(u => u.id === resNote.createdBy || u.email === resNote.createdBy)?.name || resNote.createdBy} • {formatRelativeTime(resNote.createdAt)}</p>
                   </div>
-                ) : null;
+                );
+                return null;
               })()}
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
@@ -1095,27 +1112,6 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 {incidencia.resolvedBy && (<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-[#86868B]">Resuelto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.resolvedBy)?.name || incidencia.resolvedBy}</span></div>)}
                 {incidencia.closedBy && (<div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-[#86868B]">Cerrado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span></div>)}
                 {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
-                {/* Motivo de cierre con marco gris */}
-                {(incidencia as any).closeReason && (
-                  <div className="w-full bg-[#8E8E93]/10 border border-[#8E8E93] rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Lock className="w-4 h-4 text-[#8E8E93]" />
-                      <span className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Motivo de cierre</span>
-                    </div>
-                    <p className="text-sm text-[#1D1D1F]">{(incidencia as any).closeReason}</p>
-                  </div>
-                )}
-
-                {/* Motivo de reapertura con marco azul */}
-                {incidencia.reopenReason && (
-                  <div className="w-full bg-[#007AFF]/10 border border-[#007AFF] rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Unlock className="w-4 h-4 text-[#007AFF]" />
-                      <span className="text-xs font-semibold text-[#007AFF] uppercase tracking-wide">Motivo de reapertura</span>
-                    </div>
-                    <p className="text-sm text-[#1D1D1F]">{incidencia.reopenReason}</p>
-                  </div>
-                )}
               </div>
               {(incidencia.viewers || []).length > 0 && (
                 <div className="space-y-2">
