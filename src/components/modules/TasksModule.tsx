@@ -435,6 +435,19 @@ export default function TasksModule() {
                   </div>
                 </div>
                 <div className="space-y-2"><Label>Prioridad</Label><Select value={incidenciaForm.priority} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, priority: v as TaskPriority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={TaskPriority.LOW}>Baja</SelectItem><SelectItem value={TaskPriority.MEDIUM}>Media</SelectItem><SelectItem value={TaskPriority.HIGH}>Alta</SelectItem><SelectItem value={TaskPriority.CRITICAL}>Crítica</SelectItem></SelectContent></Select></div>
+                <div className="space-y-2">
+                  <Label>Fotos</Label>
+                  <CameraCapture onCapture={handlePhotoCapture} />
+                  {incidenciaPhotos.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {incidenciaPhotos.map((url, idx) => (
+                        <div key={idx} className="relative w-16 h-16 rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden">
+                          <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div className="flex justify-end gap-3 pt-4">
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
                   <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
@@ -732,11 +745,11 @@ interface TaskCardProps {
 
 function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, currentUserId, currentUser }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
   const [showReopenModal, setShowReopenModal] = useState(false);
   const [showUnblockModal, setShowUnblockModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [reopenReason, setReopenReason] = useState('');
   const [unblockReason, setUnblockReason] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
@@ -942,6 +955,7 @@ interface IncidenciaCardProps {
 
 function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer, onAddPhoto }: IncidenciaCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
@@ -1060,22 +1074,6 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               {/* Descripción */}
               <div className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{incidencia.description}</p></div>
 
-              {/* Fotos */}
-              {incidencia.photos && incidencia.photos.length > 0 && (
-                <div className="space-y-2">
-                  <h5 className="text-sm font-medium text-[#1D1D1F] flex items-center gap-1">
-                    <ImageIcon className="w-4 h-4 text-[#86868B]" /> Fotos ({incidencia.photos.length})
-                  </h5>
-                  <div className="flex flex-wrap gap-2">
-                    {incidencia.photos.map((photo, idx) => (
-                      <a key={idx} href={photo.url} target="_blank" rel="noopener noreferrer" className="relative w-20 h-20 rounded-lg bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden">
-                        <img src={photo.url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" />
-                      </a>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Resolución con marco verde */}
               {incidencia.notes && (() => {
                 const resNote = [...incidencia.notes].reverse().find(n => n.content.startsWith('Resolución:'));
@@ -1146,7 +1144,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                     {incidencia.photos.map((photo) => (
                       <div key={photo.url} className="relative group aspect-square rounded-lg overflow-hidden border border-[#E5E5E7] bg-[#F5F5F7]">
-                        <img src={photo.url} alt="Foto" className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <img src={photo.url} alt="Foto" className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => setMaximizedPhoto(photo.url)} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                           <p className="text-[8px] text-white truncate">{staticUsers.find((u) => u.id === photo.uploadedBy)?.name || photo.uploadedBy}</p>
                         </div>
@@ -1175,6 +1173,25 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
       {showResolveModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Resolver Incidencia</h3><p className="text-sm text-slate-600 mb-4">Describe cómo se resolvió la incidencia:</p><textarea value={resolution} onChange={(e) => setResolution(e.target.value)} placeholder="Escribe la resolución..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={4} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowResolveModal(false)}>Cancelar</Button><Button className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => { if (currentUserId) { onResolveIncidencia?.(incidencia.id, currentUserId, resolution); setShowResolveModal(false); setResolution(''); } }} disabled={!resolution.trim()}>Resolver</Button></div></div></div>)}
       {showCloseModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Cerrar Incidencia</h3><p className="text-sm text-slate-600 mb-4">Escribe el motivo del cierre:</p><textarea value={closeReason} onChange={(e) => setCloseReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={4} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCloseModal(false)}>Cancelar</Button><Button className="bg-[#8E8E93] hover:bg-[#8E8E93]/90 text-white" onClick={() => { if (currentUserId) { onCloseIncidencia?.(incidencia.id, currentUserId, closeReason); setShowCloseModal(false); setCloseReason(''); } }} disabled={!closeReason.trim()}>Cerrar</Button></div></div></div>)}
       {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Reabrir Incidencia</h3><p className="text-sm text-slate-600 mb-4">Escribe el motivo de la reapertura:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={4} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={() => { if (currentUserId) { onReopenIncidencia?.(incidencia.id, currentUserId, reopenReason); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Reabrir</Button></div></div></div>)}
+      {maximizedPhoto && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setMaximizedPhoto(null)}>
+          <div className="relative max-w-4xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <img src={maximizedPhoto} className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl" alt="Foto maximizada" />
+            <div className="flex items-center gap-4 mt-4">
+              {incidencia.photos.map((photo, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setMaximizedPhoto(photo.url)}
+                  className={`w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${maximizedPhoto === photo.url ? 'border-white scale-110' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                >
+                  <img src={photo.url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+            <button className="absolute top-0 right-0 text-white text-3xl hover:text-gray-300" onClick={() => setMaximizedPhoto(null)}>&times;</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
