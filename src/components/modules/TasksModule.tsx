@@ -27,6 +27,9 @@ import {
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
+  const getLocalDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const getLocalDateFromISO = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -133,8 +136,9 @@ export default function TasksModule() {
     else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department && t.department === user.department);
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const today = getLocalDate();
+    const yesterday = new Date(Date.now() - 86400000);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
     switch (timeFilter) {
@@ -207,14 +211,14 @@ export default function TasksModule() {
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {
     let result = [...incidenciasByDept];
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+    const today = getLocalDate();
+    const yesterday = new Date(Date.now() - 86400000); const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
     switch (timeFilter) {
       case TimeFilter.TODAY:
-        result = result.filter((i) => i.createdAt.startsWith(today) || (i.status !== IncidenciaStatus.RESOLVED && i.status !== IncidenciaStatus.CLOSED));
+        result = result.filter((i) => getLocalDateFromISO(i.createdAt) === today);
         break;
-      case TimeFilter.YESTERDAY: result = result.filter((i) => i.createdAt.startsWith(yesterday)); break;
-      case TimeFilter.PAST_WEEKS: result = result.filter((i) => i.createdAt < yesterday); break;
+      case TimeFilter.YESTERDAY: result = result.filter((i) => getLocalDateFromISO(i.createdAt) === yesterdayStr); break;
+      case TimeFilter.PAST_WEEKS: result = result.filter((i) => getLocalDateFromISO(i.createdAt) < yesterdayStr); break;
     }
     return result;
   }, [incidenciasByDept, timeFilter]);
@@ -225,7 +229,7 @@ export default function TasksModule() {
     const uid = user?.id || '';
     return {
       total: base.length,
-      new: base.filter((i) => i.status === IncidenciaStatus.NEW).length,
+      new: base.filter((i) => getLocalDateFromISO(i.createdAt) === getLocalDate()).length,
       open: base.filter((i) => i.viewers?.some((v) => v.userId === uid)).length,
       verified: base.filter((i) => i.verifiedByList?.includes(uid) && i.status === IncidenciaStatus.VERIFIED).length,
       resolved: base.filter((i) => i.status === IncidenciaStatus.RESOLVED).length,
@@ -241,7 +245,7 @@ export default function TasksModule() {
     if (statusFilter !== 'all') {
       switch (statusFilter) {
         case IncidenciaStatus.NEW:
-          result = result.filter((i) => i.status === IncidenciaStatus.NEW);
+          result = result.filter((i) => getLocalDateFromISO(i.createdAt) === getLocalDate());
           break;
         case IncidenciaStatus.OPEN:
           result = result.filter((i) => i.viewers?.some((v) => v.userId === uid));
@@ -404,39 +408,31 @@ export default function TasksModule() {
             <div className="overflow-y-auto overflow-x-hidden px-4 sm:px-6 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
             {createType === 'incidencia' ? (
               <div className="space-y-4 py-4">
-                <div className="space-y-2"><Label>Título *</Label><Input placeholder="Resumen de la incidencia" value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Descripción detallada *</Label><Textarea placeholder="Describe el problema..." value={incidenciaForm.description} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, description: e.target.value })} rows={4} /></div>
-                <div className="space-y-2">
-                  <Label>Departamento afectado *</Label>
-                  <Select value={incidenciaForm.department} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, department: v as Department, targetDepartments: incidenciaForm.targetDepartments.includes(v as Department) ? incidenciaForm.targetDepartments : [...incidenciaForm.targetDepartments, v as Department] })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>{allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}</SelectContent>
-                  </Select>
+                {/* Departamento que envía */}
+                <div className="bg-[#F5F5F7] rounded-lg p-3">
+                  <span className="text-xs text-[#86868B]">Departamento que envía:</span>
+                  <p className="text-sm font-medium text-[#1D1D1F]">{user?.department?.replace(/_/g, ' ') || 'ADMINISTRATIVO'}</p>
                 </div>
+                <div className="space-y-2"><Label>Título *</Label><Input placeholder="Título de la incidencia..." value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} /></div>
+                <div className="space-y-2"><Label>Descripción detallada *</Label><Textarea placeholder="Describe la incidencia..." value={incidenciaForm.description} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, description: e.target.value })} rows={4} /></div>
                 <div className="space-y-2">
-                  <Label>Departamentos involucrados *</Label>
+                  <Label>Departamentos reportados *</Label>
                   <div className="flex flex-wrap gap-2">
                     {allDepartments.map((dept) => (
-                      <label key={dept} className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F5F7] rounded-lg text-sm cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={incidenciaForm.targetDepartments.includes(dept)}
-                          onChange={(e) => {
-                            const newDepts = e.target.checked
-                              ? [...incidenciaForm.targetDepartments, dept]
-                              : incidenciaForm.targetDepartments.filter((d) => d !== dept);
-                            setIncidenciaForm({ ...incidenciaForm, targetDepartments: newDepts, department: newDepts.length > 0 ? newDepts[0] : incidenciaForm.department });
-                          }}
-                          className="rounded border-gray-300"
-                        />
-                        <span>{dept.replace(/_/g, ' ')}</span>
-                      </label>
+                      <button key={dept} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept) ? prev.targetDepartments.filter(d => d !== dept) : [...prev.targetDepartments, dept] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept) ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.replace(/_/g, ' ')}</button>
                     ))}
                   </div>
                 </div>
-                <div className="space-y-2"><Label>Prioridad</Label><Select value={incidenciaForm.priority} onValueChange={(v) => setIncidenciaForm({ ...incidenciaForm, priority: v as TaskPriority })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value={TaskPriority.LOW}>Baja</SelectItem><SelectItem value={TaskPriority.MEDIUM}>Media</SelectItem><SelectItem value={TaskPriority.HIGH}>Alta</SelectItem><SelectItem value={TaskPriority.CRITICAL}>Crítica</SelectItem></SelectContent></Select></div>
                 <div className="space-y-2">
-                  <Label>Fotos</Label>
+                  <Label>Prioridad</Label>
+                  <div className="flex gap-2">
+                    {[{ value: TaskPriority.CRITICAL, label: 'Crítica', color: '#FF3B30' }, { value: TaskPriority.HIGH, label: 'Alta', color: '#FF9500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: '#007AFF' }, { value: TaskPriority.LOW, label: 'Baja', color: '#8E8E93' }].map((p) => (
+                      <button key={p.value} onClick={() => setIncidenciaForm({ ...incidenciaForm, priority: p.value })} className={cn('flex-1 py-2 rounded-lg text-sm font-medium transition-all', incidenciaForm.priority === p.value ? 'text-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')} style={incidenciaForm.priority === p.value ? { backgroundColor: p.color } : undefined}>{p.label}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Evidencia fotográfica</Label>
                   <CameraCapture onCapture={handlePhotoCapture} />
                   {incidenciaPhotos.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
@@ -1021,31 +1017,28 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
             <p className="text-sm text-[#86868B] line-clamp-2 mt-1">{incidencia.description}</p>
             <div className="flex items-center gap-4 mt-3 text-xs text-[#86868B]">
               <div className="flex flex-row flex-wrap gap-x-3 gap-y-1 mt-2 text-xs items-center">
-                {incidencia.viewers && incidencia.viewers.length > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <Lock className="w-3 h-3 text-[#8E8E93]" />
-                    <span className="text-[#86868B]">Cerrada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span>
-                  </div>
-                )}
-                {incidencia.reopenedBy && (
-                  <div className="flex items-center gap-1.5">
-                    <Unlock className="w-3 h-3 text-[#007AFF]" />
-                    <span className="text-[#86868B]">Reabierta por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span>
-                  </div>
-                )}
-                {(incidencia.verifiedByList && incidencia.verifiedByList.length > 0) ? (
+
+
+
+                {(incidencia.verifiedByList || []).length > 0 ? (
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
                     <span className="text-[#86868B]">Verificada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{incidencia.verifiedByList.map((v) => staticUsers.find((u) => u.id === v || u.email === v)?.name || v).join(", ")}</span>
+                    <span className="text-[#1D1D1F] font-medium">
+                      {incidencia.verifiedByList.map((vId) => {
+                        const vUser = staticUsers.find((u) => u.id === vId || u.email === vId);
+                        const vEntry = (incidencia.history || []).find((h) => h.action === "Incidencia verificada" && (h.performedBy === vId || h.performedBy === vUser?.email));
+                        return (vUser?.name || vId) + (vEntry?.performedAt ? " • " + formatHistoryDateTime(vEntry.performedAt) : "");
+                      }).join(", ")}
+                    </span>
                   </div>
-                ) : (incidencia as any).verifiedBy ? (
+                ) : incidencia.confirmedBy ? (
                   <div className="flex items-center gap-1.5">
                     <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
                     <span className="text-[#86868B]">Verificada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">{staticUsers.find((u) => u.id === (incidencia as any).verifiedBy || u.email === (incidencia as any).verifiedBy)?.name || (incidencia as any).verifiedBy}</span>
+                    <span className="text-[#1D1D1F] font-medium">
+                      {staticUsers.find((u) => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}{incidencia.confirmedAt ? " • " + formatHistoryDateTime(incidencia.confirmedAt) : ""}
+                    </span>
                   </div>
                 ) : null}
                 <div className="flex items-center gap-1.5">
@@ -1109,9 +1102,9 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
                 <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartment}</span></div>
                 {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}</span></div>)}
-                {incidencia.resolvedBy && (<div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-[#86868B]">Resuelto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.resolvedBy)?.name || incidencia.resolvedBy}</span></div>)}
-                {incidencia.closedBy && (<div className="flex items-center gap-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-[#86868B]">Cerrado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy}</span></div>)}
-                {incidencia.reopenedBy && (<div className="flex items-center gap-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-[#86868B]">Reabierto por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy}</span></div>)}
+
+
+
               </div>
               {(incidencia.viewers || []).length > 0 && (
                 <div className="space-y-2">
