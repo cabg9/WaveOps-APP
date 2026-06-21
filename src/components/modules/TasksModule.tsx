@@ -68,7 +68,7 @@ export default function TasksModule() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>('all');
   const [viewType, setViewType] = useState<ViewType>('list');
-  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState('all');
+  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState(user?.department || 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
@@ -199,11 +199,7 @@ export default function TasksModule() {
     if (user && !(user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH)) {
       result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
     } else if (user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && incidenciaDepartmentFilter !== 'all') {
-      if (incidenciaDepartmentFilter === 'my-departments') {
-        result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
-      } else {
-        result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
-      }
+      result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
     }
     return result;
   }, [incidencias, user, incidenciaDepartmentFilter]);
@@ -215,7 +211,7 @@ export default function TasksModule() {
     const yesterday = new Date(Date.now() - 86400000); const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
     switch (timeFilter) {
       case TimeFilter.TODAY:
-        result = result.filter((i) => getLocalDateFromISO(i.createdAt) === today);
+        result = result.filter((i) => getLocalDateFromISO(i.createdAt) === today || (i.status !== IncidenciaStatus.RESOLVED && i.status !== IncidenciaStatus.CLOSED));
         break;
       case TimeFilter.YESTERDAY: result = result.filter((i) => getLocalDateFromISO(i.createdAt) === yesterdayStr); break;
       case TimeFilter.PAST_WEEKS: result = result.filter((i) => getLocalDateFromISO(i.createdAt) < yesterdayStr); break;
@@ -242,6 +238,7 @@ export default function TasksModule() {
   const filteredIncidencias = useMemo(() => {
     let result = [...incidenciasByTime];
     const uid = user?.id || '';
+    const prOrd = { [TaskPriority.CRITICAL]: 0, [TaskPriority.HIGH]: 1, [TaskPriority.MEDIUM]: 2, [TaskPriority.LOW]: 3 };
     if (statusFilter !== 'all') {
       switch (statusFilter) {
         case IncidenciaStatus.NEW:
@@ -257,10 +254,28 @@ export default function TasksModule() {
           result = result.filter((i) => i.status === statusFilter);
       }
     }
-    result.sort((a, b) => {
-      const priorityOrder = { [IncidenciaStatus.NEW]: 0, [IncidenciaStatus.REOPENED]: 1, [IncidenciaStatus.OPEN]: 2, [IncidenciaStatus.VERIFIED]: 3, [IncidenciaStatus.RESOLVED]: 4, [IncidenciaStatus.CLOSED]: 5 };
-      return priorityOrder[a.status] - priorityOrder[b.status];
-    });
+    // Orden especifico por filtro
+    if (statusFilter === 'all' || statusFilter === IncidenciaStatus.NEW) {
+      // TODAS/NUEVAS: no resueltas/cerradas primero, resueltas/cerradas al final. Antiguas a nuevas. Prioridad critica primero.
+      const isDone = (i) => i.status === IncidenciaStatus.RESOLVED || i.status === IncidenciaStatus.CLOSED;
+      const notDone = result.filter(i => !isDone(i));
+      const done = result.filter(i => isDone(i));
+      const sortFn = (a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); };
+      notDone.sort(sortFn); done.sort(sortFn);
+      result = [...notDone, ...done];
+    } else if (statusFilter === IncidenciaStatus.OPEN) {
+      // VISUALIZADAS: antiguas a nuevas. Prioridad critica primero.
+      result.sort((a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); });
+    } else if (statusFilter === IncidenciaStatus.RESOLVED || statusFilter === IncidenciaStatus.CLOSED) {
+      // RESUELTAS/CERRADAS: recientes a antiguas. Prioridad critica primero.
+      result.sort((a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
+    } else if (statusFilter === IncidenciaStatus.REOPENED) {
+      // REABIERTAS: antiguas a nuevas. Prioridad critica primero.
+      result.sort((a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); });
+    } else {
+      // VERIFICADAS y otros: antiguas a nuevas. Prioridad critica primero.
+      result.sort((a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); });
+    }
     return result;
   }, [incidenciasByTime, timeFilter, statusFilter, user?.id]);
 
@@ -309,7 +324,7 @@ export default function TasksModule() {
               <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]"><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}
+                {allDepartments.map((dept) => (<SelectItem key={dept} value={dept} className={dept === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.replace(/_/g, ' ')}{dept === user?.department ? ' (tú)' : ''}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -332,9 +347,8 @@ export default function TasksModule() {
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
                 <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los departamentos</SelectItem>
-                  <SelectItem value="my-departments">Mi departamento</SelectItem>
-                  {allDepartments.map((dept) => (<SelectItem key={dept} value={dept}>{dept.replace(/_/g, ' ')}</SelectItem>))}
+                  <SelectItem value="all">Todos</SelectItem>
+                  {allDepartments.map((dept) => (<SelectItem key={dept} value={dept} className={dept === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.replace(/_/g, ' ')}{dept === user?.department ? ' (tú)' : ''}</SelectItem>))}
                 </SelectContent>
               </Select>
             )}
