@@ -60,13 +60,13 @@ export function TasksProvider({ children }: TasksProviderProps) {
     }),
 
     createTask: (task: any) => {
-      tasksHook.createTask({
+      return tasksHook.createTask({
         title: task.title || '',
         description: task.description || '',
         type: task.type || TaskType.SPECIFIC,
         status: TaskStatus.PENDING,
         priority: task.priority || TaskPriority.MEDIUM,
-        assignedTo: task.assignedTo || '',
+        assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo || []),
         department: task.department || Department.DIVE_SHOP,
         dueDate: task.dueDate || new Date().toISOString(),
         dueTime: task.dueTime || '',
@@ -81,7 +81,6 @@ export function TasksProvider({ children }: TasksProviderProps) {
         supportUserIds: task.supportUserIds || [],
         recurrence: task.recurrence || 'NONE',
       });
-      return { id: Date.now().toString(), ...task };
     },
 
     updateTask: (id: string, updates: any) => {

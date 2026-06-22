@@ -26,7 +26,7 @@ export interface FirestoreTask {
   type: 'SPECIFIC' | 'EXTRA' | 'ROUTINE';
   status: TaskStatus;
   priority: TaskPriority;
-  assignedTo: string;
+  assignedTo: string[];
   assignedToName?: string;
   department: Department;
   dueDate: string;

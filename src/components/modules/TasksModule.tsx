@@ -80,7 +80,7 @@ export default function TasksModule() {
 
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', department: Department.ADMINISTRATIVO,
-    priority: TaskPriority.MEDIUM, startDate: new Date().toISOString().split('T')[0],
+    priority: TaskPriority.MEDIUM, startDate: getLocalDate(),
     startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [] as string[],
     requiresPhoto: false, subtasks: [] as { id: string; title: string; completed: boolean }[],
     selectedShifts: [] as string[], supportDepartment: '' as Department | '',
@@ -99,7 +99,13 @@ export default function TasksModule() {
     try {
       const start = new Date(`${taskForm.startDate}T${taskForm.startTime}`);
       const end = new Date(start.getTime() + taskForm.estimatedHours * 60 * 1000);
-      return { date: end.toISOString().split('T')[0], time: end.toTimeString().slice(0, 5) };
+      // Usar hora local (no toISOString que devuelve UTC)
+      const yr = end.getFullYear();
+      const mo = String(end.getMonth() + 1).padStart(2, '0');
+      const da = String(end.getDate()).padStart(2, '0');
+      const hh = String(end.getHours()).padStart(2, '0');
+      const mm = String(end.getMinutes()).padStart(2, '0');
+      return { date: `${yr}-${mo}-${da}`, time: `${hh}:${mm}` };
     } catch (e) {
       return { date: taskForm.startDate, time: taskForm.startTime };
     }
@@ -121,7 +127,7 @@ export default function TasksModule() {
     setCreateType(type);
     setTaskForm({
       title: '', description: '', department: Department.ADMINISTRATIVO,
-      priority: TaskPriority.MEDIUM, startDate: new Date().toISOString().split('T')[0],
+      priority: TaskPriority.MEDIUM, startDate: getLocalDate(),
       startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [],
       requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
@@ -464,7 +470,7 @@ export default function TasksModule() {
                 </div>
               </div>
             ) : (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }); } setIsCreateModalOpen(false); }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
             )}
             </div>
           </DialogContent>
@@ -516,6 +522,8 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
     { value: TaskRecurrence.YEARLY, label: 'Anual' },
   ];
 
+  const [showApoyo, setShowApoyo] = useState(!!taskForm.supportDepartment);
+
   return (
     <div className="space-y-4 py-4 overflow-y-auto pr-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
       {/* Título */}
@@ -524,25 +532,11 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <Input placeholder="Nombre de la tarea" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
       </div>
 
-      {/* Descripción */}
-      <div className="space-y-2">
-        <Label>Descripción</Label>
-        <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
-      </div>
-
-      {/* Departamento */}
-      <div className="space-y-2">
-        <Label>Departamento</Label>
-        <select value={taskForm.department} onChange={(e) => setTaskForm({ ...taskForm, department: e.target.value as Department })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white">
-          {allDepartments.map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}
-        </select>
-      </div>
-
       {/* Prioridad */}
       <div className="space-y-2">
         <Label>Prioridad</Label>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[{ value: TaskPriority.LOW, label: 'Baja', color: 'bg-green-500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: 'bg-blue-500' }, { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-orange-500' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: 'bg-red-500' }].map((p) => (
+          {[{ value: TaskPriority.LOW, label: 'Baja', color: 'bg-[#8E8E93]' }, { value: TaskPriority.MEDIUM, label: 'Media', color: 'bg-[#007AFF]' }, { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-[#FF9500]' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: 'bg-[#FF3B30]' }].map((p) => (
             <button key={p.value} type="button" onClick={() => setTaskForm({ ...taskForm, priority: p.value })} className={cn('px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.priority === p.value ? `${p.color} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
               {p.label}
             </button>
@@ -550,157 +544,10 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         </div>
       </div>
 
-      {/* Recurrencia - SOLO para tareas específicas */}
-      {createType === 'specific' && (
-        <div className="space-y-2">
-          <Label>Periodicidad de repetición</Label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {recurrenceOptions.map((rec) => (
-              <button key={rec.value} type="button" onClick={() => setTaskForm({ ...taskForm, recurrence: rec.value })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all', taskForm.recurrence === rec.value ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                {rec.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Fecha y hora de inicio */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2 min-w-0 overflow-hidden">
-          <Label className="text-xs sm:text-sm">Fecha de inicio</Label>
-          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm" />
-        </div>
-        <div className="space-y-2 min-w-0 overflow-hidden">
-          <Label className="text-xs sm:text-sm">Hora de inicio (24h)</Label>
-          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm" />
-        </div>
-      </div>
-
-      {/* Tiempo estimado y fecha límite */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2 min-w-0">
-          <Label>Tiempo estimado (minutos)</Label>
-          <Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} className="w-full" />
-          <div className="text-xs text-slate-500">{Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</div>
-        </div>
-        <div className="space-y-2 min-w-0">
-          <Label>Fecha límite (calculada)</Label>
-          <div className="flex items-center gap-2 bg-slate-100 rounded-md px-3 py-2 border border-slate-200 overflow-hidden">
-            <span className="text-slate-700 text-sm truncate">{calculatedDueDate}</span>
-            <span className="text-slate-400 flex-shrink-0">•</span>
-            <span className="text-slate-700 text-sm flex-shrink-0">{calculatedDueTime}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Supervisor */}
+      {/* Descripción */}
       <div className="space-y-2">
-        <Label>Supervisor</Label>
-        <div className="space-y-2">
-          <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all', taskForm.supervisor === '' ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-            Sin supervisor
-          </button>
-          {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
-            <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', taskForm.supervisor === supervisor.id ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-              <span className="truncate">{supervisor.name}</span>
-              <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{supervisor.position}</span>
-            </button>
-          )) : <p className="text-sm text-slate-500 p-2">No hay supervisores disponibles para este departamento</p>}
-        </div>
-        <p className="text-xs text-slate-400">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p>
-      </div>
-
-      {/* Asignación a usuarios - SOLO para tareas EXTRA */}
-      {createType === 'extra' && (
-        <div className="space-y-2">
-          <Label>Asignar a (Usuarios del departamento)</Label>
-          <div className="space-y-2 max-h-40 overflow-y-auto border border-slate-200 rounded-lg p-2">
-            {usersByDepartment.length > 0 ? usersByDepartment.map((user) => (
-              <label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
-                <input type="checkbox" checked={taskForm.assignedTo.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } else { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-sm truncate">{user.name}</div>
-                  <div className="text-xs text-slate-500 truncate">{user.position} - {user.role.replace(/_/g, ' ')}</div>
-                </div>
-              </label>
-            )) : <p className="text-sm text-slate-500 p-2">No hay usuarios disponibles en este departamento</p>}
-          </div>
-        </div>
-      )}
-
-      {/* Asignación a turnos - Para AMBOS tipos de tarea */}
-      <div className="space-y-2">
-        <Label>Asignar a (Turnos del departamento)</Label>
-        <div className="space-y-3 max-h-56 overflow-y-auto border border-slate-200 rounded-lg p-2">
-          {shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').map((shift) => (
-            <div key={shift.id} className="border-b border-slate-100 last:border-0 pb-2 last:pb-0 overflow-hidden">
-              <div className="font-medium text-sm text-slate-700 mb-1 truncate">{shift.name} ({shift.startTime} - {shift.endTime})</div>
-              {shift.requirements && shift.requirements.length > 0 && (
-                <div className="space-y-2 pl-2">
-                  {shift.requirements.map((req, idx) => {
-                    const assignedUsers = shiftAssignments.filter((a) => a.shiftId === shift.id && a.role === req.role);
-                    return (
-                      <div key={idx} className="space-y-1">
-                        <div className="text-xs font-medium text-slate-500 truncate">{req.count} {req.role.replace(/_/g, ' ').toLowerCase()}:</div>
-                        {assignedUsers.length > 0 ? (
-                          <div className="space-y-1 pl-2">
-                            {assignedUsers.map((assignment) => {
-                              const user = staticUsers.find((u) => u.id === assignment.userId);
-                              const roleKey = `${shift.id}-${req.role}-${assignment.userId}`;
-                              const isSelected = taskForm.selectedShifts.includes(roleKey);
-                              return user ? (
-                                <label key={assignment.id} className="flex items-center gap-2 p-1.5 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
-                                  <input type="checkbox" checked={isSelected} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, selectedShifts: [...taskForm.selectedShifts, roleKey] }); } else { setTaskForm({ ...taskForm, selectedShifts: taskForm.selectedShifts.filter((id) => id !== roleKey) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
-                                  <span className="text-sm truncate">{user.name} - {user.position}</span>
-                                </label>
-                              ) : null;
-                            })}
-                          </div>
-                        ) : (<p className="text-xs text-slate-400 pl-2">Sin usuarios asignados</p>)}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {(!shift.requirements || shift.requirements.length === 0) && (<p className="text-xs text-slate-400 pl-2">Sin requisitos definidos</p>)}
-            </div>
-          ))}
-          {shifts.filter((s) => s.department === taskForm.department && s.name !== 'Libre').length === 0 && (
-            <p className="text-sm text-slate-500 p-2">No hay turnos disponibles para este departamento</p>
-          )}
-        </div>
-      </div>
-
-      {/* Apoyo de otros departamentos - SOLO para tareas EXTRA */}
-      {createType === 'extra' && (
-        <div className="space-y-2">
-          <Label>Solicitar apoyo (Otros departamentos)</Label>
-          <select value={taskForm.supportDepartment} onChange={(e) => setTaskForm({ ...taskForm, supportDepartment: e.target.value as Department | '', supportUsers: [] })} className="w-full h-10 px-3 rounded-md border border-slate-300 bg-white">
-            <option value="">Seleccionar departamento...</option>
-            {allDepartments.filter((d) => d !== taskForm.department).map((dept) => (<option key={dept} value={dept}>{dept.replace(/_/g, ' ')}</option>))}
-          </select>
-          {taskForm.supportDepartment && (
-            <div className="space-y-2 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2 mt-2">
-              <div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>
-              {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => (
-                <label key={user.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer overflow-hidden">
-                  <input type="checkbox" checked={taskForm.supportUsers.includes(user.id)} onChange={(e) => { if (e.target.checked) { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } else { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } }} className="w-4 h-4 rounded border-slate-300 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{user.name}</div>
-                    <div className="text-xs text-slate-500 truncate">{user.position} - {user.role.replace(/_/g, ' ')}</div>
-                  </div>
-                </label>
-              ))}
-              {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Requiere foto */}
-      <div className="flex items-center gap-2">
-        <input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-slate-300" />
-        <Label htmlFor="requiresPhoto" className="cursor-pointer text-sm">Requiere foto para completar</Label>
+        <Label>Descripción</Label>
+        <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
       </div>
 
       {/* Subtareas */}
@@ -718,12 +565,162 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               <div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
                 <input type="checkbox" checked={subtask.completed} onChange={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.map((s) => s.id === subtask.id ? { ...s, completed: !s.completed } : s) }); }} className="w-4 h-4" />
                 <span className={cn('text-sm flex-1', subtask.completed && 'line-through text-slate-400')}>{subtask.title}</span>
-                <button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-red-500 hover:text-red-700 px-2">×</button>
+                <button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-red-500 hover:text-red-700 px-2">&times;</button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      <hr className="border-[#C7C7CC] my-6" />
+
+      {/* Departamento - botones */}
+      <div className="space-y-2">
+        <Label>Departamento</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {(() => {
+            const currentUser = staticUsers.find((u) => u.id === currentUserId);
+            let depts = allDepartments;
+            if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
+              depts = [currentUser.department];
+            }
+            return depts.map((dept) => (
+              <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                {dept.replace(/_/g, ' ').toLowerCase()}
+              </button>
+            ));
+          })()}
+        </div>
+      </div>
+
+      {/* Asignación a usuarios - SOLO para tareas EXTRA */}
+      {createType === 'extra' && (
+        <div className="space-y-2">
+          <Label>Asignar a</Label>
+          <div className="space-y-2">
+            {usersByDepartment.length > 0 ? usersByDepartment.map((user) => {
+              const isSelected = taskForm.assignedTo.includes(user.id);
+              return (
+                <button key={user.id} type="button" onClick={() => { if (isSelected) { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSelected ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  <span className="truncate">{user.name}</span>
+                  <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
+                </button>
+              );
+            }) : <p className="text-sm text-slate-500 p-2">No hay usuarios disponibles en este departamento</p>}
+          </div>
+        </div>
+      )}
+
+      {/* Supervisor */}
+      <div className="space-y-2">
+        <Label>Supervisor</Label>
+        <div className="space-y-2">
+          <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all', taskForm.supervisor === '' ? 'bg-[#8B5CF6] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            Sin supervisor
+          </button>
+          {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
+            <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', taskForm.supervisor === supervisor.id ? 'bg-[#8B5CF6] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              <span className="truncate">{supervisor.name}</span>
+              <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{supervisor.position}</span>
+            </button>
+          )) : <p className="text-sm text-slate-500 p-2">No hay supervisores disponibles para este departamento</p>}
+        </div>
+        <p className="text-xs text-slate-400">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p>
+      </div>
+
+      <hr className="border-[#C7C7CC] my-6" />
+
+      {/* Fecha y hora de inicio */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2 min-w-0 overflow-hidden">
+          <Label className="text-xs sm:text-sm">Fecha de inicio</Label>
+          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm" />
+        </div>
+        <div className="space-y-2 min-w-0 overflow-hidden">
+          <Label className="text-xs sm:text-sm">Hora de inicio (24h)</Label>
+          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm" />
+        </div>
+      </div>
+
+      {/* Tiempo estimado - botones rápidos */}
+      <div className="space-y-2">
+        <Label>Tiempo estimado</Label>
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+          {[5, 10, 15, 20, 30, 40, 50, 60].map((m) => (
+            <button key={m} type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: m })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.estimatedHours === m ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              {m}m
+            </button>
+          ))}
+          <button type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: taskForm.estimatedHours < 61 ? 90 : taskForm.estimatedHours })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', !([5,10,15,20,30,40,50,60].includes(taskForm.estimatedHours)) ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            Otro
+          </button>
+        </div>
+        {taskForm.estimatedHours > 60 && (
+          <div className="flex items-center gap-2 pt-1">
+            <Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} className="w-32" />
+            <span className="text-sm text-slate-500">min = {Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</span>
+          </div>
+        )}
+      </div>
+
+      {/* Fecha límite - solo lectura */}
+      <div className="space-y-2">
+        <Label>Fecha límite</Label>
+        <div className="flex items-center gap-2 bg-slate-100 rounded-md px-3 py-2 border border-slate-200 overflow-hidden">
+          <span className="text-slate-700 text-sm truncate">{calculatedDueDate}</span>
+          <span className="text-slate-400 flex-shrink-0">&bull;</span>
+          <span className="text-slate-700 text-sm flex-shrink-0">{calculatedDueTime}</span>
+        </div>
+      </div>
+
+      <hr className="border-[#C7C7CC] my-6" />
+
+      {/* Requiere foto */}
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-slate-300" />
+        <Label htmlFor="requiresPhoto" className="cursor-pointer text-sm">Requiere foto para completar</Label>
+      </div>
+
+      {/* ========== BLOQUE 5: SOLICITAR APOYO ========== */}
+      {createType === 'extra' && (() => { const cu = staticUsers.find((u) => u.id === currentUserId); return cu && (cu.role === Role.GERENTE_DEPARTAMENTO || cu.role === Role.GERENTE_OPERACIONES || cu.role === Role.DIRECTOR || cu.role === Role.DIRECTOR_GENERAL || cu.role === Role.RRHH); })() && (
+        <>
+          <hr className="border-[#C7C7CC] my-6" />
+
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="solicitarApoyo" checked={showApoyo} onChange={(e) => { if (!e.target.checked) { setShowApoyo(false); setTaskForm({ ...taskForm, supportDepartment: '', supportUsers: [] }); } else { setShowApoyo(true); } }} className="w-4 h-4 rounded border-slate-300" />
+            <Label htmlFor="solicitarApoyo" className="cursor-pointer text-sm">Solicitar apoyo</Label>
+          </div>
+
+          {/* Apoyo de otros departamentos */}
+          {showApoyo && (
+            <div className="space-y-2">
+              <Label>Departamento</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {allDepartments.filter((d) => d !== taskForm.department).map((dept) => (
+                  <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                    {dept.replace(/_/g, ' ').toLowerCase()}
+                  </button>
+                ))}
+              </div>
+              {taskForm.supportDepartment && (
+                <div className="space-y-2">
+                  <div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>
+                  {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => {
+                    const isSupSelected = taskForm.supportUsers.includes(user.id);
+                    return (
+                      <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSupSelected ? 'bg-[#FF9500] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                        <span className="truncate">{user.name}</span>
+                        <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
+                      </button>
+                    );
+                  })}
+                  {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
 
       {/* Botones de acción */}
       <div className="flex justify-end gap-3 pt-4">
