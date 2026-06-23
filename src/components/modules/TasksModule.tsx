@@ -760,6 +760,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
   const [unblockReason, setUnblockReason] = useState('');
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [blockReason, setBlockReason] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [localSubtasks, setLocalSubtasks] = useState(task.subtasks || []);
@@ -842,7 +844,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <h4 className="font-medium text-[#1D1D1F] truncate">{task.title}</h4>
-            <div className="flex items-center gap-1.5 flex-shrink-0"><Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge>{task.status === TaskStatus.COMPLETED && canVerify && (<Badge className="text-xs bg-[#5856D6] text-white animate-pulse">Por Verificar</Badge>)}</div>
+            <div className="flex items-center gap-1.5 flex-shrink-0"><Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge>{task.status === TaskStatus.COMPLETED && (<Badge className="text-xs bg-[#5856D6] text-white animate-pulse">Por verificar: {supervisorName}</Badge>)}
+            {task.status === TaskStatus.VERIFIED && (<Badge className="text-xs bg-[#5856D6] text-white">Verificada</Badge>)}</div>
           </div>
           <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
@@ -865,6 +868,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             })()}
             {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
             {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos ? task.photos.length : 0}</span></div>)}
+            {task.status === TaskStatus.COMPLETED && (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium"><CheckCircle2 className="w-3.5 h-3.5" /><span>Por verificar: {supervisorName}</span></div>)}
+            {task.status === TaskStatus.VERIFIED && (() => { const vEntry = task.history?.find((h) => h.action?.includes('VERIFIED')); const verifier = vEntry ? getUserName(vEntry.performedBy) : '—'; return (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium"><CheckCircle2 className="w-3.5 h-3.5" /><span>Verificada por: {verifier}</span></div>); })()}
           </div>
         </div>
       </button>
@@ -930,14 +935,15 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             )}
             {task.status === TaskStatus.COMPLETED && (canVerify || task.createdBy === currentUserId) && (<><Button size="sm" className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.VERIFIED)}>Verificar</Button><Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button></>)}
             {task.status === TaskStatus.BLOCKED && canUnblock && (<Button size="sm" className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => setShowUnblockModal(true)}>Desbloquear</Button>)}
-            {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => onStatusChange?.(task.id, TaskStatus.BLOCKED, 'Tarea bloqueada por el usuario')}>Bloquear</Button>)}
+            {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => setShowBlockModal(true)}>Bloquear</Button>)}
             {task.status !== TaskStatus.VERIFIED && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30]" onClick={() => { if (window.confirm('¿Eliminar esta tarea permanentemente?')) { onDelete?.(task.id); } }}>Eliminar</Button>)}
-            <Button size="sm" variant="outline" className="border-[#007AFF] text-[#007AFF]" onClick={() => onEdit?.(task)}>Editar</Button>
+            {task.type === TaskType.EXTRA && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#007AFF] text-[#007AFF]" onClick={() => onEdit?.(task)}>Editar</Button>)}
           </div>
 
           {showCompleteConfirm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">¿Completar tarea?</h3><p className="text-sm text-slate-600 mb-4">¿Confirmas que la tarea "{task.title}" fue completada correctamente?</p><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCompleteConfirm(false)}>Cancelar</Button><Button className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => { onComplete?.(task.id); setShowCompleteConfirm(false); }}>Sí, completar</Button></div></div></div>)}
           {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Marcar como Pendiente</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual la tarea debe volver a pendiente:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { if (reopenReason.trim()) { onReopen?.(task.id); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Marcar como Pendiente</Button></div></div></div>)}
           {showUnblockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Desbloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se desbloquea la tarea:</p><textarea value={unblockReason} onChange={(e) => setUnblockReason(e.target.value)} placeholder="Escribe el motivo del desbloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowUnblockModal(false)}>Cancelar</Button><Button className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => { if (unblockReason.trim()) { onStatusChange?.(task.id, TaskStatus.PENDING, unblockReason); setShowUnblockModal(false); setUnblockReason(''); } }} disabled={!unblockReason.trim()}>Desbloquear</Button></div></div></div>)}
+          {showBlockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Bloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se bloquea la tarea:</p><textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Escribe el motivo del bloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowBlockModal(false)}>Cancelar</Button><Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (blockReason.trim()) { onStatusChange?.(task.id, TaskStatus.BLOCKED, blockReason); setShowBlockModal(false); setBlockReason(''); } }} disabled={!blockReason.trim()}>Bloquear</Button></div></div></div>)}
           
           
         </div>
