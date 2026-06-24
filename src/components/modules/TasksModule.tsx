@@ -845,11 +845,12 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   };
 
   return (
-    <div className={cn('bg-white rounded-xl border border-[#E5E5E7] overflow-hidden transition-all', expanded && 'shadow-lg')}>
+    <div className={cn('bg-white rounded-xl border overflow-hidden transition-all', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', expanded && 'shadow-lg')}>
       <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
           <div className="relative"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />{task.status === TaskStatus.VERIFIED && (<div className="absolute -top-1 -right-1 w-2 h-2 bg-[#34C759] rounded-full border border-white" title="Verificada" />)}</div>
           <span className="text-[10px] font-medium text-[#86868B] whitespace-nowrap">{getStatusLabel(task.status)}</span>
+          <span className="text-[10px] text-[#C7C7CC] whitespace-nowrap">{task.type === 'EXTRA' ? 'Tarea Extra' : 'Tarea Especifica'}</span>
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
