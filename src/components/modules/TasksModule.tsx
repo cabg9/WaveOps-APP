@@ -420,8 +420,18 @@ export default function TasksModule() {
           <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 overflow-hidden">
             <div className="p-6 border-b">
               <DialogHeader>
-                <DialogTitle className={createType === 'incidencia' ? 'text-red-500' : ''}>
-                  {createType === 'extra' ? 'Nueva Tarea Extra' : createType === 'specific' ? 'Nueva Tarea Específica' : 'Nueva Incidencia'}
+                <DialogTitle className="pb-2">
+                  <span className={cn(
+                    'inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold',
+                    createType === 'extra' && 'bg-amber-500 text-white',
+                    createType === 'specific' && 'border-2 border-corporate text-corporate bg-corporate/5',
+                    createType === 'incidencia' && 'border-2 border-[#FF3B30] text-[#FF3B30] bg-[#FF3B30]/5'
+                  )}>
+                    {createType === 'extra' && <Plus className="w-4 h-4" />}
+                    {createType === 'specific' && <Target className="w-4 h-4" />}
+                    {createType === 'incidencia' && <AlertCircle className="w-4 h-4" />}
+                    {createType === 'extra' ? 'Nueva Tarea Extra' : createType === 'specific' ? 'Nueva Tarea Específica' : 'Nueva Incidencia'}
+                  </span>
                 </DialogTitle>
               </DialogHeader>
             </div>
