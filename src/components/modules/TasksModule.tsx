@@ -66,7 +66,7 @@ export default function TasksModule() {
 
   const [mainTab, setMainTab] = useState<MainTab>('my-tasks');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>(TaskStatus.PENDING);
   const [viewType, setViewType] = useState<ViewType>('list');
   const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState(user?.department || 'all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -315,10 +315,10 @@ export default function TasksModule() {
         </div>
 
         <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-          <button onClick={() => { setMainTab('my-tasks'); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
-          <button onClick={() => { setMainTab('my-department'); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Departamento</button>
+          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
+          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Departamento</button>
           {hasPermission('canViewAllDepartments') && (
-            <button onClick={() => { setMainTab('all'); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
+            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
           )}
           <div className="w-px h-6 bg-[#C7C7CC] mx-1" />
           <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
@@ -340,7 +340,7 @@ export default function TasksModule() {
         {!isIncidenciasTab && (
           <div className="flex items-center gap-2">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
-              <button key={filter.id} onClick={() => setTimeFilter(filter.id)} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
           </div>
         )}
@@ -348,7 +348,7 @@ export default function TasksModule() {
         {isIncidenciasTab && (
           <div className="flex items-center gap-2">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
-              <button key={filter.id} onClick={() => setTimeFilter(filter.id)} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
             {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
