@@ -40,6 +40,7 @@ interface ModuleCardProps {
   stat2: { label: string; value: string | number };
   bottomText: string;
   bottomStatus: 'active' | 'inactive' | 'progress';
+  progress?: number;
   onClick: () => void;
 }
 
@@ -56,6 +57,7 @@ function ModuleCard({
   stat2,
   bottomText,
   bottomStatus,
+  progress,
   onClick,
 }: ModuleCardProps) {
   return (
@@ -66,8 +68,8 @@ function ModuleCard({
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', bgColor)}>
-            <Icon className={cn('w-5 h-5', iconColor)} />
+          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center bg-[#F5F5F7]')}>
+            <Icon className={cn('w-5 h-5', 'text-[#86868B]')} />
           </div>
           <span className="font-medium text-[#1D1D1F]">{title}</span>
         </div>
@@ -75,29 +77,42 @@ function ModuleCard({
       </div>
 
       {/* Stats */}
-      <div className="flex gap-6 mb-3">
-        <div>
+      <div className="flex items-center justify-center mb-3">
+        <div className="text-right pr-5 min-w-[80px]">
           <p className="text-xs text-[#86868B] mb-0.5">{stat1.label}</p>
           <p className="text-xl font-semibold text-[#1D1D1F]">{stat1.value}</p>
         </div>
-        <div>
+        <div className="w-px h-10 bg-[#E5E5E7]" />
+        <div className="text-left pl-5 min-w-[80px]">
           <p className="text-xs text-[#86868B] mb-0.5">{stat2.label}</p>
           <p className="text-xl font-semibold text-[#1D1D1F]">{stat2.value}</p>
         </div>
       </div>
 
       {/* Bottom */}
-      <div className="flex items-center gap-2">
-        <div
-          className={cn(
-            'w-2 h-2 rounded-full',
-            bottomStatus === 'active' && 'bg-[#34C759]',
-            bottomStatus === 'inactive' && 'bg-[#8E8E93]',
-            bottomStatus === 'progress' && 'bg-[#FF9500]'
-          )}
-        />
-        <span className="text-xs text-[#86868B]">{bottomText}</span>
-      </div>
+      {progress !== undefined ? (
+        <div className="mt-1">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-[#86868B]">{bottomText}</span>
+            <span className="font-semibold text-[#1D1D1F]">{progress}%</span>
+          </div>
+          <div className="w-full h-1.5 bg-[#E5E5E7] rounded-full overflow-hidden">
+            <div className="h-full bg-corporate rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div
+            className={cn(
+              'w-2 h-2 rounded-full',
+              bottomStatus === 'active' && 'bg-[#34C759]',
+              bottomStatus === 'inactive' && 'bg-[#8E8E93]',
+              bottomStatus === 'progress' && 'bg-[#FF9500]'
+            )}
+          />
+          <span className="text-xs text-[#86868B]">{bottomText}</span>
+        </div>
+      )}
     </button>
   );
 }
@@ -109,9 +124,45 @@ function ModuleCard({
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { getTaskCounts } = useTasks();
+  const { tasks, getTaskCounts } = useTasks();
 
   const taskCounts = getTaskCounts();
+
+  // ─── CONTEOS PERSONALES DEL USUARIO ACTUAL ───
+  const getLocalDate = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
+  const todayStr = getLocalDate();
+
+  const userId = user?.id;
+  const myTasks = userId ? tasks.filter((t) =>
+    (t.assignedTo?.includes(userId)) ||
+    (t.supportUserIds?.includes(userId)) ||
+    (t.supervisorId === userId)
+  ) : [];
+
+  const myPendingToday    = myTasks.filter((t) => t.dueDate === todayStr && t.status === 'PENDING').length;
+  const myInProgressToday = myTasks.filter((t) => t.dueDate === todayStr && t.status === 'IN_PROGRESS').length;
+  const myCompletedToday  = myTasks.filter((t) => t.dueDate === todayStr && (t.status === 'COMPLETED' || t.status === 'VERIFIED')).length;
+  const myOverdue = myTasks.filter((t) => {
+    if (!t.dueDate) return false;
+    return t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED';
+  }).length;
+
+  const totalTodayMyTasks = myPendingToday + myInProgressToday + myCompletedToday;
+  const progressRaw = totalTodayMyTasks > 0 ? myTasks.filter((t) => t.dueDate === todayStr).reduce((sum, t) => {
+    if (t.status === "COMPLETED" || t.status === "VERIFIED") return sum + 1.0;
+    if (t.status === "IN_PROGRESS") {
+      if (t.subtasks && t.subtasks.length > 0) {
+        const completedSub = t.subtasks.filter((s) => s.completed).length;
+        return sum + (completedSub / t.subtasks.length);
+      }
+      return sum + 0.5;
+    }
+    return sum;
+  }, 0) : 0;
+  const progressPercent = totalTodayMyTasks > 0 ? Math.round((progressRaw / totalTodayMyTasks) * 100) : 0;
 
   // Datos de ejemplo para los módulos
   const modules = [
@@ -121,10 +172,11 @@ export default function Dashboard() {
       icon: ClipboardList,
       iconColor: 'text-corporate',
       bgColor: 'bg-corporate/10',
-      stat1: { label: 'Hoy', value: taskCounts.pending + taskCounts.inProgress },
-      stat2: { label: 'Atrasados', value: taskCounts.overdue },
+      stat1: { label: 'Hoy', value: myPendingToday },
+      stat2: { label: 'Atrasadas', value: myOverdue },
       bottomText: 'Progreso',
       bottomStatus: 'progress' as const,
+      progress: progressPercent,
     },
     {
       id: 'horarios',
