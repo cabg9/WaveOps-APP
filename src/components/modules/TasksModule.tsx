@@ -92,7 +92,7 @@ export default function TasksModule() {
   const supervisorsByDepartment = useMemo(() => {
     return users.filter((u) => u.department === taskForm.department && 
       (u.role === 'GERENTE_DEPARTAMENTO' || u.role === 'SUPERVISOR' || u.role === 'GERENTE_OPERACIONES'))
-      .map((u) => ({ id: u.id, name: u.name, position: u.position, role: u.role }));
+      .map((u) => ({ id: u.email || u.id, name: u.name, position: u.position, role: u.role }));
   }, [taskForm.department]);
 
   const calculatedDueDateTime = useMemo(() => {
@@ -138,7 +138,7 @@ export default function TasksModule() {
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
-    if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && t.status === TaskStatus.COMPLETED) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
+    if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED)) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
     else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department && t.department === user.department);
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
@@ -149,7 +149,7 @@ export default function TasksModule() {
 
     switch (timeFilter) {
       case TimeFilter.TODAY:
-        result = result.filter((t) => t.dueDate === today || (t.dueDate < today && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED));
+        result = result.filter((t) => t.dueDate === today || (t.dueDate < today && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED) || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
         break;
       case TimeFilter.YESTERDAY: result = result.filter((t) => t.dueDate === yesterday); break;
       case TimeFilter.TOMORROW: result = result.filter((t) => t.dueDate === tomorrow); break;
@@ -162,16 +162,17 @@ export default function TasksModule() {
   const filteredTaskCounts = useMemo(() => {
     const counts = { total: tasksByTabAndTime.length, pending: 0, inProgress: 0, completed: 0, verified: 0, blocked: 0, overdue: 0 };
     tasksByTabAndTime.forEach((task) => {
-      // Calcular si esta atrasada por fecha (independiente del status)
-      const isOverdueByDate = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.VERIFIED;
-      if (isOverdueByDate) counts.overdue++;
+      const isOverdue = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.VERIFIED;
+      const isPendingVerification = user && task.supervisorId === user.id && task.status === TaskStatus.COMPLETED;
       switch (task.status) {
-        case TaskStatus.PENDING: if (!isOverdueByDate) counts.pending++; break;
-        case TaskStatus.IN_PROGRESS: if (!isOverdueByDate) counts.inProgress++; break;
+        case TaskStatus.PENDING: counts.pending++; break;
+        case TaskStatus.IN_PROGRESS: counts.inProgress++; break;
         case TaskStatus.COMPLETED: counts.completed++; break;
         case TaskStatus.VERIFIED: counts.completed++; counts.verified++; break;
         case TaskStatus.BLOCKED: counts.blocked++; break;
       }
+      if (isPendingVerification) { counts.pending++; counts.inProgress++; }
+      if (isOverdue) counts.overdue++;
     });
     return counts;
   }, [tasksByTabAndTime]);
@@ -182,7 +183,10 @@ export default function TasksModule() {
     let result = [...tasksByTabAndTime];
     if (statusFilter === TaskStatus.COMPLETED) result = result.filter((t) => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED);
     else if (statusFilter === TaskStatus.OVERDUE) result = result.filter((t) => new Date(t.dueDate + 'T' + (t.dueTime || '23:59')) < new Date() && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED);
-    else if (statusFilter !== 'all') result = result.filter((t) => t.status === statusFilter);
+    else if (statusFilter === TaskStatus.PENDING) result = result.filter((t) => t.status === TaskStatus.PENDING || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
+    else if (statusFilter === TaskStatus.IN_PROGRESS) result = result.filter((t) => t.status === TaskStatus.IN_PROGRESS || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
+    else if (statusFilter === TaskStatus.BLOCKED) result = result.filter((t) => t.status === TaskStatus.BLOCKED);
+    else if (statusFilter === TaskStatus.VERIFIED) result = result.filter((t) => t.status === TaskStatus.VERIFIED);
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter((t) => t.title.toLowerCase().includes(query) || t.description.toLowerCase().includes(query));
@@ -368,10 +372,14 @@ export default function TasksModule() {
               <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
               <button onClick={() => setStatusFilter(TaskStatus.PENDING)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.PENDING ? 'bg-[#8E8E93] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.pending}</span><span>Pendientes</span></button>
               <button onClick={() => setStatusFilter(TaskStatus.IN_PROGRESS)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.IN_PROGRESS ? 'bg-[#007AFF] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.inProgress}</span><span>En Progreso</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'bg-[#5856D6] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
+              {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (<>
+                <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'bg-[#5856D6] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
+              </>)}
               <button onClick={() => setStatusFilter(TaskStatus.BLOCKED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.BLOCKED ? 'bg-[#FF9500] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.blocked}</span><span>Bloqueadas</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
+              {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
+              )}
             </>
           ) : (
             <>
@@ -802,7 +810,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const hasRequiredPhotos = !task.requiresPhoto || (task.photos && task.photos.length > 0) || (localPhotos && localPhotos.length > 0);
   const canComplete = currentUserId && ((task.assignedTo || []).includes(currentUserId) || (task.supportUserIds || []).includes(currentUserId));
   const canDelete = currentUserId && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL);
-  const canVerify = currentUserId && (task.supervisorId === currentUserId || (!task.supervisorId && task.createdBy === currentUserId) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
+  const canVerify = currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId)) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
   const toggleSubtask = (subtaskId: string) => {
     const target = localSubtasks.find(s => s.id === subtaskId);
     if ((task.status === TaskStatus.COMPLETED || task.status === TaskStatus.VERIFIED) && target?.completed) {
@@ -845,7 +853,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   };
 
   return (
-    <div className={cn('bg-white rounded-xl border overflow-hidden transition-all', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', expanded && 'shadow-lg')}>
+    <div className={cn('bg-white rounded-xl border overflow-hidden transition-all', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', task.status === TaskStatus.COMPLETED && currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId))) && 'border-[#5856D6]', expanded && 'shadow-lg')}>
       <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
           <div className="relative"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />{task.status === TaskStatus.VERIFIED && (<div className="absolute -top-1 -right-1 w-2 h-2 bg-[#34C759] rounded-full border border-white" title="Verificada" />)}</div>
