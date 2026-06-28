@@ -933,7 +933,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               <div className="flex items-center justify-between">
                 <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos</h5>
                 {canComplete && (
-                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} />
+                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} hidePreview />
                 )}
               </div>
               {uploadingPhoto && <div className="text-xs text-[#007AFF] mb-1 flex items-center gap-1"><div className="w-3 h-3 border-2 border-[#007AFF] border-t-transparent rounded-full animate-spin"></div>Subiendo foto...</div>}
@@ -965,7 +965,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1" />Completa subtareas
                   </Button>
                 ) : !hasRequiredPhotos ? (
-                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} />
+                  <CameraCapture onCapture={handleAddPhoto} taskRequiresPhoto={task.requiresPhoto} hidePreview />
                 ) : (
                   <Button size="sm" className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => setShowCompleteConfirm(true)}>Completar</Button>
                 )}

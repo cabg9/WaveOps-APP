@@ -3,11 +3,12 @@ import { Camera, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface CameraCaptureProps {
+  hidePreview?: boolean;
   onCapture: (file: File) => void | Promise<void>;
   taskRequiresPhoto?: boolean;
 }
 
-export function CameraCapture({ onCapture, taskRequiresPhoto }: CameraCaptureProps) {
+export function CameraCapture({ onCapture, taskRequiresPhoto, hidePreview }: CameraCaptureProps) {
   const [photos, setPhotos] = useState<string[]>([]);
   const [photoCount, setPhotoCount] = useState(0);
 
@@ -60,7 +61,7 @@ export function CameraCapture({ onCapture, taskRequiresPhoto }: CameraCapturePro
       </label>
 
       {/* Galeria de fotos */}
-      {photos.length > 0 && (
+      {!hidePreview && photos.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {photos.map((photo, i) => (
             <div key={i} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200">
