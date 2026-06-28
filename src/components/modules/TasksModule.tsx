@@ -8,6 +8,7 @@ import {
   Search, List, LayoutTemplate, Calendar, CheckCircle2, Camera,
   ChevronUp, ChevronDown, UserCircle, Building2, CheckSquare,
   Lock, Unlock, History, MessageSquare, X, Image as ImageIcon,
+  ThumbsDown,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { CameraCapture } from '@/components/CameraCapture';
@@ -60,7 +61,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { tasks, incidencias, getIncidenciaCounts, createTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
+  const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
 
@@ -143,15 +144,14 @@ export default function TasksModule() {
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
     const today = getLocalDate();
-    const yesterday = new Date(Date.now() - 86400000);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+    const yesterday = new Date(Date.now() - 86400000); const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
 
     switch (timeFilter) {
       case TimeFilter.TODAY:
         result = result.filter((t) => t.dueDate === today || (t.dueDate < today && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED) || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
         break;
-      case TimeFilter.YESTERDAY: result = result.filter((t) => t.dueDate === yesterday); break;
+      case TimeFilter.YESTERDAY: result = result.filter((t) => t.dueDate === yesterdayStr); break;
       case TimeFilter.TOMORROW: result = result.filter((t) => t.dueDate === tomorrow); break;
       case TimeFilter.PAST_WEEKS: result = result.filter((t) => t.dueDate < today); break;
       case TimeFilter.UPCOMING: result = result.filter((t) => t.dueDate > tomorrow); break;
@@ -163,28 +163,30 @@ export default function TasksModule() {
     const counts = { total: tasksByTabAndTime.length, pending: 0, inProgress: 0, completed: 0, verified: 0, blocked: 0, overdue: 0 };
     tasksByTabAndTime.forEach((task) => {
       const isOverdue = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.COMPLETED && task.status !== TaskStatus.VERIFIED;
-      const isPendingVerification = user && task.supervisorId === user.id && task.status === TaskStatus.COMPLETED;
+      const isPendingVerification = user && (task.supervisorId === user.id || (!task.supervisorId && task.createdBy === user.id)) && task.status === TaskStatus.COMPLETED;
       switch (task.status) {
         case TaskStatus.PENDING: counts.pending++; break;
-        case TaskStatus.IN_PROGRESS: counts.inProgress++; break;
-        case TaskStatus.COMPLETED: counts.completed++; break;
+        case TaskStatus.IN_PROGRESS: counts.inProgress++; counts.pending++; break;
+        case TaskStatus.COMPLETED:
+          if (isPendingVerification) { counts.pending++; counts.completed++; }
+          else counts.completed++;
+          break;
         case TaskStatus.VERIFIED: counts.completed++; counts.verified++; break;
-        case TaskStatus.BLOCKED: counts.blocked++; break;
+        case TaskStatus.BLOCKED: counts.blocked++; counts.pending++; break;
       }
-      if (isPendingVerification) { counts.pending++; counts.inProgress++; }
       if (isOverdue) counts.overdue++;
     });
     return counts;
-  }, [tasksByTabAndTime]);
+  }, [tasksByTabAndTime, user]);
 
   // Contadores se calculan después de filteredIncidencias
 
   const filteredTasks = useMemo(() => {
     let result = [...tasksByTabAndTime];
     if (statusFilter === TaskStatus.COMPLETED) result = result.filter((t) => t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED);
-    else if (statusFilter === TaskStatus.OVERDUE) result = result.filter((t) => new Date(t.dueDate + 'T' + (t.dueTime || '23:59')) < new Date() && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED);
-    else if (statusFilter === TaskStatus.PENDING) result = result.filter((t) => t.status === TaskStatus.PENDING || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
-    else if (statusFilter === TaskStatus.IN_PROGRESS) result = result.filter((t) => t.status === TaskStatus.IN_PROGRESS || (user && t.supervisorId === user.id && t.status === TaskStatus.COMPLETED));
+    else if (statusFilter === TaskStatus.OVERDUE) result = result.filter((t) => (new Date(t.dueDate + 'T' + (t.dueTime || '23:59')) < new Date() && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED) || (user && (t.supervisorId === user.id || (!t.supervisorId && t.createdBy === user.id)) && t.status === TaskStatus.COMPLETED));
+    else if (statusFilter === TaskStatus.PENDING) result = result.filter((t) => t.status === TaskStatus.PENDING || t.status === TaskStatus.IN_PROGRESS || t.status === TaskStatus.BLOCKED || (user && (t.supervisorId === user.id || (!t.supervisorId && t.createdBy === user.id)) && t.status === TaskStatus.COMPLETED));
+    else if (statusFilter === TaskStatus.IN_PROGRESS) result = result.filter((t) => t.status === TaskStatus.IN_PROGRESS || (user && (t.supervisorId === user.id || (!t.supervisorId && t.createdBy === user.id)) && t.status === TaskStatus.COMPLETED));
     else if (statusFilter === TaskStatus.BLOCKED) result = result.filter((t) => t.status === TaskStatus.BLOCKED);
     else if (statusFilter === TaskStatus.VERIFIED) result = result.filter((t) => t.status === TaskStatus.VERIFIED);
     if (searchQuery.trim()) {
@@ -201,7 +203,7 @@ export default function TasksModule() {
       return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
     });
     return result;
-  }, [tasksByTabAndTime, statusFilter, searchQuery]);
+  }, [tasksByTabAndTime, statusFilter, searchQuery, user]);
 
   // PASO 1: Filtrar por departamento
   const incidenciasByDept = useMemo(() => {
@@ -418,7 +420,7 @@ export default function TasksModule() {
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
-                <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} onToggleSubtask={(taskId, subtaskId) => toggleSubtask(taskId, subtaskId)} onAddPhoto={addPhoto} onDelete={(taskId) => { if (confirm('¿Eliminar esta tarea permanentemente?')) { deleteTask(taskId); } }} onEdit={(task) => { setEditingTask(task); setIsEditModalOpen(true); }} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
+                <TaskCard key={item.id} task={item as Task} onStatusChange={(taskId, status, reason) => changeTaskStatus(taskId, status, reason, user?.id)} onComplete={(taskId) => changeTaskStatus(taskId, TaskStatus.COMPLETED, 'Tarea completada', user?.id)} onReopen={(taskId) => reopenTask(taskId, user?.id || '')} onAddNote={addNote} onToggleSubtask={(taskId, subtaskId) => toggleSubtask(taskId, subtaskId)} onAddPhoto={addPhoto} onDelete={(taskId) => { if (confirm('¿Eliminar esta tarea permanentemente?')) { deleteTask(taskId); } }} onEdit={(task) => { setEditingTask(task); setIsEditModalOpen(true); }} onRateTask={(taskId, rating, note, userId) => rateTask(taskId, rating, note, userId)} canReopen={hasPermission('canReopenTask')} canUnblock={hasPermission('canUnblockTask')} currentUserId={user?.id} currentUser={user} />
               ))}
             </div>
           )}
@@ -489,7 +491,7 @@ export default function TasksModule() {
                 </div>
               </div>
             ) : (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || undefined, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || (createType === 'extra' ? user.id : undefined), requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
             )}
             </div>
           </DialogContent>
@@ -760,6 +762,7 @@ interface TaskCardProps {
   onAddPhoto?: (taskId: string, photoUrl: string) => void;
   onDelete?: (taskId: string) => void;
   onEdit?: (task: Task) => void;
+  onRateTask?: (taskId: string, rating: 'good' | 'bad', note: string, userId: string) => void;
   onComplete?: (taskId: string) => void;
   onReopen?: (taskId: string) => void;
   onAddNote?: (taskId: string, content: string, userId: string) => void;
@@ -769,7 +772,7 @@ interface TaskCardProps {
   currentUser?: { id: string; name: string; role: Role; department: Department } | null;
 }
 
-function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, currentUserId, currentUser }: TaskCardProps) {
+function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, onRateTask, currentUserId, currentUser }: TaskCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
@@ -779,6 +782,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const [reopenReason, setReopenReason] = useState('');
   const [unblockReason, setUnblockReason] = useState('');
   const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showRateModal, setShowRateModal] = useState(false);
+  const [rateNote, setRateNote] = useState('');
   const [blockReason, setBlockReason] = useState('');
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [newNote, setNewNote] = useState('');
@@ -811,6 +816,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const canComplete = currentUserId && ((task.assignedTo || []).includes(currentUserId) || (task.supportUserIds || []).includes(currentUserId));
   const canDelete = currentUserId && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL);
   const canVerify = currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId)) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
+  const canRate = currentUserId && (task.status === TaskStatus.VERIFIED) && !task.rating && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId)) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
   const toggleSubtask = (subtaskId: string) => {
     const target = localSubtasks.find(s => s.id === subtaskId);
     if ((task.status === TaskStatus.COMPLETED || task.status === TaskStatus.VERIFIED) && target?.completed) {
@@ -863,8 +869,10 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
             <h4 className="font-medium text-[#1D1D1F] truncate">{task.title}</h4>
-            <div className="flex items-center gap-1.5 flex-shrink-0"><Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge>{task.status === TaskStatus.COMPLETED && (<Badge className="text-xs bg-[#5856D6] text-white animate-pulse">Por verificar: {supervisorName}</Badge>)}
-            {task.status === TaskStatus.VERIFIED && (<Badge className="text-xs bg-[#5856D6] text-white">Verificada</Badge>)}</div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse">Por verificar: {supervisorName}</Badge>)}
+            {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
+            {task.rating === 'bad' && task.ratingNote && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
+            <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
           <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
@@ -904,6 +912,17 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               <div><span className="text-[#86868B]">Fecha límite:</span> <span className="text-[#1D1D1F]">{formatDateWithYear(task.dueDate)}</span>{task.dueTime && <span className="text-[#1D1D1F]"> • {task.dueTime}</span>}</div>
             </div>
             <div className="text-sm bg-blue-50 rounded-lg p-2"><span className="text-blue-600 font-medium">Supervisor:</span> <span className="text-[#1D1D1F]">{supervisorName}</span></div>
+
+            {task.rating === 'bad' && task.ratingNote && (
+              <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-2">
+                <div className="flex items-center gap-1 text-red-600 font-medium">
+                  <ThumbsDown className="w-3.5 h-3.5" />
+                  <span>Calificacion negativa</span>
+                </div>
+                <p className="text-[#1D1D1F] mt-1">{task.ratingNote}</p>
+                {(() => { const rEntry = task.history?.find((h) => h.action?.includes('calificada') || h.action?.includes('Calificada')); const rater = rEntry ? getUserName(rEntry.performedBy) : '—'; const rDate = rEntry?.performedAt ? formatRelativeTime(rEntry.performedAt) : ''; return <p className="text-xs text-[#86868B] mt-1">Por: {rater}{rDate && <span> · {rDate}</span>}</p>; })()}
+              </div>
+            )}
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
             {task.supportUserIds && task.supportUserIds.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Apoyo:</span> <span className="text-[#1D1D1F] font-medium">{task.supportUserIds.map((id) => getUserName(id)).join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
@@ -953,6 +972,18 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               </>
             )}
             {task.status === TaskStatus.COMPLETED && (canVerify || task.createdBy === currentUserId) && (<><Button size="sm" className="bg-[#5856D6] hover:bg-[#5856D6]/90 text-white" onClick={() => onStatusChange?.(task.id, TaskStatus.VERIFIED)}>Verificar</Button><Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button></>)}
+            {task.status === TaskStatus.VERIFIED && (
+              <>
+                {canRate && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30]/10 gap-1" onClick={() => setShowRateModal(true)}><ThumbsDown className="w-4 h-4" />Calificar</Button>)}
+                <Button size="sm" variant="outline" onClick={() => setShowReopenModal(true)}>Marcar como Pendiente</Button>
+                {task.rating === 'bad' && task.ratingNote && canRate && (
+                  <div className="w-full bg-red-50 border border-red-200 rounded-lg p-2 mt-1">
+                    <p className="text-xs text-red-600 font-medium">Calificacion negativa:</p>
+                    <p className="text-sm text-red-700">{task.ratingNote}</p>
+                  </div>
+                )}
+              </>
+            )}
             {task.status === TaskStatus.BLOCKED && canUnblock && (<Button size="sm" className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => setShowUnblockModal(true)}>Desbloquear</Button>)}
             {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => setShowBlockModal(true)}>Bloquear</Button>)}
             {task.status !== TaskStatus.VERIFIED && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30]" onClick={() => { if (window.confirm('¿Eliminar esta tarea permanentemente?')) { onDelete?.(task.id); } }}>Eliminar</Button>)}
@@ -963,6 +994,41 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
           {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Marcar como Pendiente</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual la tarea debe volver a pendiente:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={() => { if (reopenReason.trim()) { onReopen?.(task.id); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Marcar como Pendiente</Button></div></div></div>)}
           {showUnblockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Desbloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se desbloquea la tarea:</p><textarea value={unblockReason} onChange={(e) => setUnblockReason(e.target.value)} placeholder="Escribe el motivo del desbloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowUnblockModal(false)}>Cancelar</Button><Button className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => { if (unblockReason.trim()) { onStatusChange?.(task.id, TaskStatus.PENDING, unblockReason); setShowUnblockModal(false); setUnblockReason(''); } }} disabled={!unblockReason.trim()}>Desbloquear</Button></div></div></div>)}
           {showBlockModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Bloquear Tarea</h3><p className="text-sm text-slate-600 mb-4">Indica el motivo por el cual se bloquea la tarea:</p><textarea value={blockReason} onChange={(e) => setBlockReason(e.target.value)} placeholder="Escribe el motivo del bloqueo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={3} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowBlockModal(false)}>Cancelar</Button><Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (blockReason.trim()) { onStatusChange?.(task.id, TaskStatus.BLOCKED, blockReason); setShowBlockModal(false); setBlockReason(''); } }} disabled={!blockReason.trim()}>Bloquear</Button></div></div></div>)}
+          {showRateModal && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
+                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                  Calificacion Negativa
+                </h3>
+                <p className="text-sm text-slate-600 mb-4">
+                  Indica el motivo por el cual calificas negativamente esta tarea.
+                </p>
+                <textarea
+                  value={rateNote}
+                  onChange={(e) => setRateNote(e.target.value)}
+                  placeholder="Escribe el motivo..."
+                  className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm"
+                  rows={4}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setShowRateModal(false)}>Cancelar</Button>
+                  <Button
+                    className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white gap-1"
+                    onClick={() => {
+                      if (rateNote.trim() && currentUserId) {
+                        onRateTask?.(task.id, 'bad', rateNote, currentUserId);
+                        setShowRateModal(false);
+                        setRateNote('');
+                      }
+                    }}
+                    disabled={!rateNote.trim()}
+                  >
+                    Calificar Negativamente
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           
           
         </div>
@@ -1045,7 +1111,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
     <>
       <div className={cn('bg-white rounded-xl border border-[#E5E5E7] overflow-hidden transition-all', expanded && 'shadow-lg')}>
         <button onClick={handleExpand} className="w-full p-4 flex items-start gap-3 text-left">
-          <Badge style={{ backgroundColor: priorityColor, color: '#fff' }} className="text-xs flex-shrink-0">{getPriorityLabel(incidencia.priority)}</Badge>
+          <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs flex-shrink-0">{getPriorityLabel(incidencia.priority)}</Badge>
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h4 className="font-medium text-[#1D1D1F] truncate">{incidencia.title}</h4>

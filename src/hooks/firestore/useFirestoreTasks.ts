@@ -335,6 +335,8 @@ export function useFirestoreTasks() {
       await updateDoc(docRef, {
         rating,
         ratingNote: note,
+        ratedBy: userId,
+        ratedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         history: arrayUnion({
           date: new Date().toISOString(),

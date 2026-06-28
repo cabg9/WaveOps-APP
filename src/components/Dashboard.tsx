@@ -143,14 +143,15 @@ export default function Dashboard() {
   ) : [];
 
   const myPendingToday    = myTasks.filter((t) => t.dueDate === todayStr && t.status === 'PENDING').length;
+  const myTasksForVerification = myTasks.filter((t) => t.status === 'COMPLETED' && ((t.supervisorId === userId) || (!t.supervisorId && t.createdBy === userId))).length;
   const myInProgressToday = myTasks.filter((t) => t.dueDate === todayStr && t.status === 'IN_PROGRESS').length;
   const myCompletedToday  = myTasks.filter((t) => t.dueDate === todayStr && (t.status === 'COMPLETED' || t.status === 'VERIFIED')).length;
-  const myOverdue = myTasks.filter((t) => {
+  const myOverdue = tasks.filter((t) => {
     if (!t.dueDate) return false;
-    return t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED';
+    return t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED' && userId && ((t.assignedTo?.includes(userId)) || (t.supportUserIds?.includes(userId)));
   }).length;
 
-  const totalTodayMyTasks = myPendingToday + myInProgressToday + myCompletedToday;
+  const totalTodayMyTasks = myPendingToday + myInProgressToday + myCompletedToday + myTasksForVerification + myOverdue;
   const progressRaw = totalTodayMyTasks > 0 ? myTasks.filter((t) => t.dueDate === todayStr).reduce((sum, t) => {
     if (t.status === "COMPLETED" || t.status === "VERIFIED") return sum + 1.0;
     if (t.status === "IN_PROGRESS") {
@@ -172,7 +173,7 @@ export default function Dashboard() {
       icon: ClipboardList,
       iconColor: 'text-corporate',
       bgColor: 'bg-corporate/10',
-      stat1: { label: 'Hoy', value: myPendingToday },
+      stat1: { label: 'Hoy', value: myPendingToday + myTasksForVerification },
       stat2: { label: 'Atrasadas', value: myOverdue },
       bottomText: 'Progreso',
       bottomStatus: 'progress' as const,
