@@ -304,7 +304,7 @@ export default function TasksModule() {
           </div>
           <div className="flex items-center gap-2">
             {hasPermission('canCreateExtraTask') && (
-              <Button onClick={() => handleOpenModal('extra')} className="bg-amber-500 hover:bg-amber-600 text-white rounded-lg gap-2">
+              <Button onClick={() => handleOpenModal('extra')} variant="outline" className="border-amber-500 text-amber-500 hover:bg-amber-50 rounded-lg gap-2">
                 <Plus className="w-4 h-4" />Tarea Extra
               </Button>
             )}
@@ -346,7 +346,7 @@ export default function TasksModule() {
         {!isIncidenciasTab && (
           <div className="flex items-center gap-2">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
           </div>
         )}
@@ -354,7 +354,7 @@ export default function TasksModule() {
         {isIncidenciasTab && (
           <div className="flex items-center gap-2">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
             {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
@@ -371,27 +371,27 @@ export default function TasksModule() {
         <div className="flex items-center gap-2 flex-wrap">
           {!isIncidenciasTab ? (
             <>
-              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.PENDING)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.PENDING ? 'bg-[#8E8E93] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.pending}</span><span>Pendientes</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.IN_PROGRESS)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.IN_PROGRESS ? 'bg-[#007AFF] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.inProgress}</span><span>En Progreso</span></button>
+              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
+              <button onClick={() => setStatusFilter(TaskStatus.PENDING)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.PENDING ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.pending}</span><span>Pendientes</span></button>
+              <button onClick={() => setStatusFilter(TaskStatus.IN_PROGRESS)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.IN_PROGRESS ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.inProgress}</span><span>En Progreso</span></button>
               {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (<>
-                <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
-                <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'bg-[#5856D6] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
               </>)}
-              <button onClick={() => setStatusFilter(TaskStatus.BLOCKED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.BLOCKED ? 'bg-[#FF9500] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.blocked}</span><span>Bloqueadas</span></button>
+              <button onClick={() => setStatusFilter(TaskStatus.BLOCKED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.BLOCKED ? 'border border-[#FF9500] text-[#FF9500] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.blocked}</span><span>Bloqueadas</span></button>
               {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
               )}
             </>
           ) : (
             <>
-              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.total}</span><span>Todas</span></button>
-              {timeFilter === TimeFilter.TODAY && <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'bg-[#FF3B30] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>}
-              <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Visualizadas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.VERIFIED ? 'bg-[#5856D6] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.verified}</span><span>Verificadas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.RESOLVED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.RESOLVED ? 'bg-[#34C759] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.resolved}</span><span>Resueltas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.CLOSED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.CLOSED ? 'bg-[#8E8E93] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.closed}</span><span>Cerradas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.REOPENED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.REOPENED ? 'bg-[#007AFF] text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.reopened}</span><span>Reabiertas</span></button>
+              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.total}</span><span>Todas</span></button>
+              {timeFilter === TimeFilter.TODAY && <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>}
+              <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Visualizadas</span></button>
+              <button onClick={() => setStatusFilter(IncidenciaStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.verified}</span><span>Verificadas</span></button>
+              <button onClick={() => setStatusFilter(IncidenciaStatus.RESOLVED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.RESOLVED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.resolved}</span><span>Resueltas</span></button>
+              <button onClick={() => setStatusFilter(IncidenciaStatus.CLOSED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.CLOSED ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.closed}</span><span>Cerradas</span></button>
+              <button onClick={() => setStatusFilter(IncidenciaStatus.REOPENED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.REOPENED ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.reopened}</span><span>Reabiertas</span></button>
             </>
           )}
         </div>
@@ -428,7 +428,7 @@ export default function TasksModule() {
 
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
           <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 overflow-hidden">
-            <div className="p-6 border-b">
+            <div className="p-6 pb-2 border-b">
               <DialogHeader>
                 <DialogTitle className="mt-8 pb-2">
                   <span className={cn(
@@ -460,7 +460,7 @@ export default function TasksModule() {
                   <Label>Departamentos reportados *</Label>
                   <div className="flex flex-wrap gap-2">
                     {allDepartments.map((dept) => (
-                      <button key={dept} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept) ? prev.targetDepartments.filter(d => d !== dept) : [...prev.targetDepartments, dept] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept) ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.replace(/_/g, ' ')}</button>
+                      <button key={dept} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept) ? prev.targetDepartments.filter(d => d !== dept) : [...prev.targetDepartments, dept] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.replace(/_/g, ' ')}</button>
                     ))}
                   </div>
                 </div>
@@ -485,7 +485,7 @@ export default function TasksModule() {
                     </div>
                   )}
                 </div>
-                <div className="flex justify-end gap-3 pt-4">
+                <div className="flex justify-end gap-3 pt-4 pb-6">
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
                   <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
                 </div>
@@ -509,6 +509,7 @@ export default function TasksModule() {
     </Layout>
   );
 }
+
 
 interface TaskFormModalProps {
   createType: 'extra' | 'specific';
@@ -606,7 +607,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               depts = [currentUser.department];
             }
             return depts.map((dept) => (
-              <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+              <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                 {dept.replace(/_/g, ' ').toLowerCase()}
               </button>
             ));
@@ -622,7 +623,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
             {usersByDepartment.length > 0 ? usersByDepartment.map((user) => {
               const isSelected = taskForm.assignedTo.includes(user.id);
               return (
-                <button key={user.id} type="button" onClick={() => { if (isSelected) { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSelected ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                <button key={user.id} type="button" onClick={() => { if (isSelected) { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSelected ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                   <span className="truncate">{user.name}</span>
                   <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
                 </button>
@@ -652,13 +653,13 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       <hr className="border-[#C7C7CC] my-6" />
 
       {/* Fecha y hora de inicio */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="space-y-2 min-w-0 overflow-hidden">
-          <Label className="text-xs sm:text-sm">Fecha de inicio</Label>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-1.5 min-w-0">
+          <Label className="text-xs">Fecha inicio</Label>
           <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm" />
         </div>
-        <div className="space-y-2 min-w-0 overflow-hidden">
-          <Label className="text-xs sm:text-sm">Hora de inicio (24h)</Label>
+        <div className="space-y-1.5 min-w-0">
+          <Label className="text-xs">Hora inicio</Label>
           <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm" />
         </div>
       </div>
@@ -668,11 +669,11 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <Label>Tiempo estimado</Label>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {[5, 10, 15, 20, 30, 40, 50, 60].map((m) => (
-            <button key={m} type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: m })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.estimatedHours === m ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            <button key={m} type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: m })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.estimatedHours === m ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
               {m}m
             </button>
           ))}
-          <button type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: taskForm.estimatedHours < 61 ? 90 : taskForm.estimatedHours })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', !([5,10,15,20,30,40,50,60].includes(taskForm.estimatedHours)) ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+          <button type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: taskForm.estimatedHours < 61 ? 90 : taskForm.estimatedHours })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', !([5,10,15,20,30,40,50,60].includes(taskForm.estimatedHours)) ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
             Otro
           </button>
         </div>
@@ -718,7 +719,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               <Label>Departamento</Label>
               <div className="grid grid-cols-2 gap-2">
                 {allDepartments.filter((d) => d !== taskForm.department).map((dept) => (
-                  <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept ? 'bg-corporate text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                     {dept.replace(/_/g, ' ').toLowerCase()}
                   </button>
                 ))}
@@ -729,7 +730,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
                   {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => {
                     const isSupSelected = taskForm.supportUsers.includes(user.id);
                     return (
-                      <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSupSelected ? 'bg-[#FF9500] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                      <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSupSelected ? 'border border-[#FF9500] text-[#FF9500] bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                         <span className="truncate">{user.name}</span>
                         <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
                       </button>
@@ -744,7 +745,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       )}
 
       {/* Botones de acción */}
-      <div className="flex justify-end gap-3 pt-4">
+      <div className="flex justify-end gap-3 pt-4 pb-6">
         <Button variant="outline" onClick={onCancel}>Cancelar</Button>
         <Button className={createType === 'extra' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} onClick={onSubmit} disabled={!taskForm.title}>
           Crear Tarea
