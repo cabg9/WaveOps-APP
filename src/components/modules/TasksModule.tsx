@@ -656,11 +656,11 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
         <div className="space-y-1.5 min-w-0 overflow-hidden">
           <Label className="text-xs">Fecha inicio</Label>
-          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-52 text-[6px] min-w-0 max-w-full py-0 px-0 h-10" />
+          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-64 text-[6px] min-w-0 max-w-full py-0 px-0 h-10 text-center" />
         </div>
         <div className="space-y-1.5 min-w-0 overflow-hidden">
           <Label className="text-xs">Hora inicio</Label>
-          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-52 text-[6px] min-w-0 max-w-full py-0 px-0 h-10" />
+          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-64 text-[6px] min-w-0 max-w-full py-0 px-0 h-10 text-center" />
         </div>
       </div>
 
