@@ -427,7 +427,7 @@ export default function TasksModule() {
         </div>
 
         <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-          <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogContent className="w-[95vw] sm:max-w-2xl max-h-[90vh] p-0 overflow-hidden">
             <div className="p-6 pb-2 border-b">
               <DialogHeader>
                 <DialogTitle className="mt-8 pb-2">
@@ -547,7 +547,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
   const [showApoyo, setShowApoyo] = useState(!!taskForm.supportDepartment);
 
   return (
-    <div className="space-y-4 py-4 overflow-y-auto px-2" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+    <div className="space-y-4 py-4 overflow-y-auto overflow-x-hidden px-4" style={{ maxHeight: 'calc(90vh - 120px)' }}>
       {/* Título */}
       <div className="space-y-2">
         <Label>Título *</Label>
@@ -653,14 +653,14 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       <hr className="border-[#C7C7CC] my-6" />
 
       {/* Fecha y hora de inicio */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="space-y-1.5 min-w-0">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <div className="flex flex-col items-center space-y-1.5 min-w-0 overflow-hidden">
           <Label className="text-xs">Fecha inicio</Label>
-          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm" />
+          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-36 text-[6px] min-w-0 max-w-full py-0 px-0 h-10" />
         </div>
-        <div className="space-y-1.5 min-w-0">
+        <div className="flex flex-col items-center space-y-1.5 min-w-0 overflow-hidden">
           <Label className="text-xs">Hora inicio</Label>
-          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm" />
+          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-36 text-[6px] min-w-0 max-w-full py-0 px-0 h-10" />
         </div>
       </div>
 
