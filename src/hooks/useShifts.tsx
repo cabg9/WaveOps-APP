@@ -4,6 +4,7 @@
 
 import React, { createContext, useContext } from 'react';
 import { useFirestoreShifts } from './firestore/useFirestoreShifts';
+import { shifts as staticShifts } from '@/data/shifts';
 import { useFirestoreUsers } from './firestore/useFirestoreUsers';
 import { Department, AssignmentStatus } from '@/types';
 import { addDaysToDate, format } from '@/lib/utils';
@@ -25,9 +26,10 @@ interface ShiftsProviderProps {
 export function ShiftsProvider({ children }: ShiftsProviderProps) {
   const shiftsHook = useFirestoreShifts();
   const usersHook = useFirestoreUsers();
+  const shifts = shiftsHook.shifts.length > 0 ? shiftsHook.shifts : staticShifts;
 
   const value = {
-    shifts: shiftsHook.shifts,
+    shifts: shifts,
     assignments: shiftsHook.assignments.map((a: any) => ({
       id: a.id,
       shiftId: a.shiftId,
@@ -41,22 +43,22 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     isLoading: shiftsHook.loading,
 
     getShiftsByDepartment: (department: Department) => {
-      return shiftsHook.shifts.filter((s: any) => s.department === department);
+      return shifts.filter((s: any) => s.department === department);
     },
 
     getUserShifts: (userId: string, date: string) => {
       const userAssignments = shiftsHook.assignments.filter(
-        (a: any) => a.userId === userId && a.date === date && a.status !== AssignmentStatus.ELIMINADO
+        (a: any) => (a.userId === userId || a.userId?.includes(userId?.split('@')[0])) && a.date === date && a.status === AssignmentStatus.PUBLICADO
       );
       return userAssignments
-        .map((a: any) => shiftsHook.shifts.find((s: any) => s.id === a.shiftId))
+        .map((a: any) => shifts.find((s: any) => s.id === a.shiftId))
         .filter((s: any) => s !== undefined)
         .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
     },
 
     getDepartmentShifts: (department: Department, date: string) => {
       return shiftsHook.assignments.filter((a: any) => {
-        const shift = shiftsHook.shifts.find((s: any) => s.id === a.shiftId);
+        const shift = shifts.find((s: any) => s.id === a.shiftId);
         return shift?.department === department && a.date === date;
       });
     },
@@ -67,7 +69,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       const endStr = format(endDate, 'yyyy-MM-dd');
 
       return shiftsHook.assignments.filter((a: any) => {
-        const shift = shiftsHook.shifts.find((s: any) => s.id === a.shiftId);
+        const shift = shifts.find((s: any) => s.id === a.shiftId);
         if (!shift) return false;
         if ((department as any) !== 'ALL' && shift.department !== department) return false;
         return a.date >= startStr && a.date <= endStr;
@@ -83,7 +85,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     },
 
     getShiftById: (id: string) => {
-      return shiftsHook.shifts.find((s: any) => s.id === id);
+      return shifts.find((s: any) => s.id === id);
     },
 
     getAssignmentById: (id: string) => {
@@ -96,13 +98,13 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
     isUserOnShift: (userId: string, date: string) => {
       return shiftsHook.assignments.some(
-        (a: any) => a.userId === userId && a.date === date && a.status !== AssignmentStatus.ELIMINADO
+        (a: any) => a.userId === userId && a.date === date && a.status === AssignmentStatus.PUBLICADO
       );
     },
 
     getUsersOnShift: (department: Department, date: string) => {
       const deptAssignments = shiftsHook.assignments.filter((a: any) => {
-        const shift = shiftsHook.shifts.find((s: any) => s.id === a.shiftId);
+        const shift = shifts.find((s: any) => s.id === a.shiftId);
         return shift?.department === department && a.date === date;
       });
       

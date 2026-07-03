@@ -1,4 +1,11 @@
-// ═══════════════════════════════════════════════════════════════════
+// Convertir Date a yyyy-MM-dd usando hora LOCAL (no UTC)
+function toLocalISODate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // HORARIOS MODULE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
@@ -13,7 +20,6 @@ import {
   ChevronRight,
   Clock,
   MapPin,
-  Save,
   Send,
   GripVertical,
   CheckCircle2,
@@ -111,6 +117,7 @@ import { db } from '@/firebase-config';
 // ═══════════════════════════════════════════════════════════════════
 // FUNCIONES AUXILIARES
 // ═══════════════════════════════════════════════════════════════════
+
 
 // Función para formatear fecha desde string YYYY-MM-DD sin problema de timezone
 const formatDateFromString = (dateStr: string): string => {
@@ -442,6 +449,11 @@ interface MiHorarioTabProps {
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
   const { user } = useAuth();
   const { getUserShifts, getUsersByDepartment } = useShifts();
+  const { users: firestoreUsers } = useFirestoreUsers();
+  // Encontrar el usuario en Firestore por email para obtener su ID correcto
+  const currentFirestoreUser = user ? firestoreUsers.find((u: any) => u.email === user.email) : null;
+  const userIdForShifts = currentFirestoreUser?.id || user?.id || "";
+
   const { getTasksByUser } = useTasks();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
@@ -472,8 +484,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
     localStorage.setItem('waveops_mis_solicitudes_enviadas', JSON.stringify(misSolicitudesEnviadas));
   }, [misSolicitudesEnviadas]);
 
-  const today = new Date().toISOString().split('T')[0];
-  const todayShifts = user ? getUserShifts(user.id, today) : [];
+  const today = toLocalISODate(new Date());
+  const todayShifts = user ? getUserShifts(userIdForShifts, today, user.email) : [];
   
   // Tasks pendientes ordenados cronológicamente
   const pendingTasks = user ? getTasksByUser(user.id)
@@ -714,9 +726,9 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
         {/* Grid de días */}
         <div className="grid grid-cols-7 gap-1">
           {monthDays.map((date, index) => {
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = toLocalISODate(date);
             const isToday = dateStr === today;
-            const dayShifts = user ? getUserShifts(user.id, dateStr) : [];
+            const dayShifts = user ? getUserShifts(userIdForShifts, dateStr, user.email) : [];
             const hasShifts = dayShifts.length > 0;
             const isExpanded = expandedDate === dateStr;
             const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
@@ -1142,7 +1154,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
           </DialogHeader>
           
           {expandedDate && (() => {
-            const dayShifts = user ? getUserShifts(user.id, expandedDate) : [];
+            const dayShifts = user ? getUserShifts(userIdForShifts, expandedDate) : [];
             
             return (
               <div className="space-y-4 pt-2">
@@ -1658,9 +1670,9 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   }, [getWeekAssignments, selectedDepartment, weekStart]);
 
   const getUserShiftsForDay = (userId: string, date: Date): Shift[] => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalISODate(date);
     const dayAssignments = assignments.filter(
-      a => a.userId === userId && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO
+      a => a.userId === userId && a.date === dateStr && a.status === AssignmentStatus.PUBLICADO
     );
     return dayAssignments
       .map(a => getShiftById(a.shiftId))
@@ -1695,7 +1707,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
     setIncapacityType('enfermedad');
     setIncapacityDescription('');
     // Inicializar fechas de incapacidad
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalISODate(date);
     setIncapacityStartDate(dateStr);
     setIncapacityEndDate(dateStr);
     setIncapacityCalendarMonth(new Date(date));
@@ -1866,7 +1878,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                   </td>
                   {weekDays.map((day, i) => {
                     const dayShifts = getUserShiftsForDay(u.id, day);
-                    const dateStr = day.toISOString().split('T')[0];
+                    const dateStr = toLocalISODate(day);
                     const incapacityInfo = getIncapacityForDate(dateStr, u.id);
                     const hasIncapacity = !!incapacityInfo;
                     
@@ -2009,12 +2021,12 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                 let freeDays = 0;
                 let totalShifts = 0;
                 let incapacityDays = 0;
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = toLocalISODate(new Date());
                 const todayShifts = getUserShifts(selectedUser.id, todayStr);
                 
                 for (let d = 1; d <= daysInMonth; d++) {
                   const date = new Date(year, month, d);
-                  const dateStr = date.toISOString().split('T')[0];
+                  const dateStr = toLocalISODate(date);
                   const dayShifts = getUserShifts(selectedUser.id, dateStr);
                   const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
                   
@@ -2117,13 +2129,13 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                   {/* Grid de días */}
                   <div className="grid grid-cols-7 gap-1">
                     {generateMonthDays(userCalendarMonth.getFullYear(), userCalendarMonth.getMonth()).map((date, index) => {
-                      const dateStr = date.toISOString().split('T')[0];
+                      const dateStr = toLocalISODate(date);
                       const dayShifts = getUserShifts(selectedUser.id, dateStr);
                       const hasShifts = dayShifts.length > 0;
                       const dayTasks = getTasksByUser(selectedUser.id).filter(t => t.dueDate === dateStr);
                       const hasTasks = dayTasks.length > 0;
                       const isExpanded = expandedDayInCalendar?.toISOString().split('T')[0] === dateStr;
-                      const isToday = dateStr === new Date().toISOString().split('T')[0];
+                      const isToday = dateStr === toLocalISODate(new Date());
                       const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
                       const hasIncapacity = !!incapacityInfo;
                       
@@ -2325,7 +2337,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
               {/* Incapacidad - si existe */}
               {(() => {
-                const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                const dateStr = toLocalISODate(selectedDayInfo.date);
                 const incapacityInfo = getIncapacityForDate(dateStr, selectedDayInfo.user.id);
                 if (!incapacityInfo) return null;
                 
@@ -2359,7 +2371,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                   Turnos asignados
                 </h4>
                 {(() => {
-                  const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                  const dateStr = toLocalISODate(selectedDayInfo.date);
                   const dayShifts = getUserShifts(selectedDayInfo.user.id, dateStr);
                   return dayShifts.length > 0 ? (
                     <div className="space-y-2">
@@ -2408,7 +2420,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                   Tareas asignadas
                 </h4>
                 {(() => {
-                  const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                  const dateStr = toLocalISODate(selectedDayInfo.date);
                   const dayTasks = getTasksByUser(selectedDayInfo.user.id).filter(t => t.dueDate === dateStr);
                   return dayTasks.length > 0 ? (
                     <div className="space-y-2">
@@ -2439,7 +2451,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
               {/* Botón para registrar incapacidad - solo si no hay incapacidad */}
               {(() => {
-                const dateStr = selectedDayInfo.date.toISOString().split('T')[0];
+                const dateStr = toLocalISODate(selectedDayInfo.date);
                 const hasIncapacity = !!getIncapacityForDate(dateStr, selectedDayInfo.user.id);
                 if (hasIncapacity) return null;
                 
@@ -2950,7 +2962,8 @@ interface AsignarTabProps {
 function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate }: AsignarTabProps) {
   const { user } = useAuth();
   const { 
-    shifts, 
+    shifts,
+    assignments: allAssignments,
     getShiftsByDepartment, 
     getUsersByDepartment, 
     assignShift, 
@@ -2963,8 +2976,6 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
-  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -3054,7 +3065,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   }, [getWeekAssignments, selectedDepartment, weekStart]);
 
   const getUserAssignmentsForDay = (userId: string, date: Date): ShiftAssignment[] => {
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = toLocalISODate(date);
     // No mostrar las asignaciones marcadas como ELIMINADO
     const userAssignments = assignments.filter(a => a.userId === userId && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO);
     // Ordenar cronológicamente por hora de inicio del turno
@@ -3217,37 +3228,25 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                {(getBorradorCount(selectedDepartment, weekStart) > 0 || pendingDeletions > 0) && (
-                  <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                    {getBorradorCount(selectedDepartment, weekStart)} cambios sin publicar
-                    {pendingDeletions > 0 && ` (${pendingDeletions} eliminaciones)`}
-                  </span>
-                )}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="gap-2"
-                  disabled={getBorradorCount(selectedDepartment, weekStart) === 0 && pendingDeletions === 0}
-                  onClick={() => {
-                    // Simular guardado (en una app real, aquí se guardaría en backend)
-                    setShowSaveSuccess(true);
-                    setTimeout(() => setShowSaveSuccess(false), 2000);
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-sm bg-corporate text-white rounded-lg hover:bg-corporate/90 flex items-center gap-2"
+                  onClick={async () => {
+                    if (user) {
+                      try {
+                        await publishAssignments(selectedDepartment, weekStart, user.id);
+                        toast.success("Turnos publicados exitosamente");
+                      } catch (err) {
+                        console.error("Error publicando:", err);
+                        toast.error("Error al publicar");
+                      }
+                    }
                   }}
-                >
-                  <Save className="w-4 h-4" />
-                  <span className="hidden sm:inline">Guardar borrador</span>
-                  <span className="sm:hidden">Guardar</span>
-                </Button>
-                <Button 
-                  size="sm" 
-                  className="gap-2 bg-corporate hover:bg-corporate/90"
-                  onClick={() => setShowPublishConfirm(true)}
-                  disabled={getBorradorCount(selectedDepartment, weekStart) === 0 && pendingDeletions === 0}
                 >
                   <Send className="w-4 h-4" />
                   Publicar
-                </Button>
+                </button>
               </div>
             </div>
           </div>
@@ -3308,8 +3307,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     </td>
                     {weekDays.map((day, i) => {
                       const dayAssignments = getUserAssignmentsForDay(u.id, day);
-                      const dropId = `${u.id}|${day.toISOString().split('T')[0]}`;
-                      const dateStr = day.toISOString().split('T')[0];
+                      const dropId = `${u.id}|${toLocalISODate(day)}`;
+                      const dateStr = toLocalISODate(day);
                       const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
                       const hasIncapacity = !!incapacityInfo;
                       
@@ -3404,68 +3403,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
         ) : null}
       </DragOverlay>
 
-      {/* Modal de confirmación de guardado */}
-      {showSaveSuccess && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowSaveSuccess(false)}>
-          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 text-center" onClick={e => e.stopPropagation()}>
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-            </div>
-            <h3 className="text-lg font-semibold mb-2">¡Guardado!</h3>
-            <p className="text-sm text-slate-600">
-              Los cambios han sido guardados correctamente.
-            </p>
-          </div>
-        </div>
-      )}
 
-      {/* Modal de confirmación para publicar */}
-      {showPublishConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-2">Publicar cambios</h3>
-            <p className="text-sm text-slate-600 mb-4">
-              Estás a punto de publicar los siguientes cambios:
-            </p>
-            
-            <div className="space-y-2 mb-4">
-              {getBorradorCount(selectedDepartment, weekStart) > 0 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 bg-amber-400 rounded-full"></span>
-                  <span>{getBorradorCount(selectedDepartment, weekStart)} asignación(es) nueva(s)</span>
-                </div>
-              )}
-              {pendingDeletions > 0 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="w-2 h-2 bg-red-400 rounded-full"></span>
-                  <span>{pendingDeletions} asignación(es) serán eliminada(s)</span>
-                </div>
-              )}
-            </div>
-            
-            <p className="text-sm text-slate-500 mb-4">
-              Una vez publicados, estos cambios serán oficiales y visibles para todo el equipo.
-            </p>
-            
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowPublishConfirm(false)}>
-                Cancelar
-              </Button>
-              <Button 
-                className="bg-corporate hover:bg-corporate/90"
-                onClick={() => {
-                  if (user) {
-                    publishAssignments(selectedDepartment, weekStart, user.id);
-                    setShowPublishConfirm(false);
-                  }
-                }}
-              >
-                Confirmar publicación
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </DndContext>
   );
 }
@@ -4176,8 +4115,8 @@ function IncapacidadesTab({
           </div>
         ) : (
           (activeSubTab === 'mias' ? filteredMyIncapacidades : filteredIncapacidades).map((incapacidad) => {
-            const typeConfig = incapacityTypeConfig[incapacidad.type];
-            const statusCfg = statusConfig[incapacidad.status];
+            const typeConfig = incapacityTypeConfig[incapacidad.type] || { icon: HeartPulse, color: 'text-gray-500', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', label: incapacidad.type };
+            const statusCfg = statusConfig[incapacidad.status] || { color: 'text-gray-500', bgColor: 'bg-gray-50', borderColor: 'border-gray-200', label: incapacidad.status, icon: Clock };
             const TypeIcon = typeConfig.icon;
             const StatusIcon = statusCfg.icon;
             // Parsear fechas sin timezone issues

@@ -155,6 +155,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       case 'canCreateSchedule': return level <= 5;
       case 'canViewSchedule': return level <= 7;
       case 'canManageInventory': return level <= 5;
+      case 'canAssignShifts': return level <= 5;
+      case 'canModifyShifts': return level <= 5;
+      case 'canApproveChanges': return level <= 4;
+      case 'canRejectChanges': return level <= 4;
+      case 'canRequestChange': return level <= 7;
       case 'canViewInventory': return level <= 7;
       default: return false;
     }

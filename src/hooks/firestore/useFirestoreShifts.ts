@@ -2,7 +2,7 @@
 // HOOK DE TURNOS FIRESTORE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   collection,
   doc,
@@ -16,6 +16,7 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
+import { shifts as staticShifts } from '@/data/shifts';
 import { Department, AssignmentStatus } from '@/types';
 
 export interface FirestoreShift {
@@ -43,8 +44,17 @@ export interface FirestoreAssignment {
 const SHIFTS_COLLECTION = 'shifts';
 const ASSIGNMENTS_COLLECTION = 'assignments';
 
+// Convertir Date a yyyy-MM-dd usando hora LOCAL (no UTC)
+function toLocalISODate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function useFirestoreShifts() {
   const [shifts, setShifts] = useState<FirestoreShift[]>([]);
+  const allShifts = useMemo(() => { const merged = [...staticShifts]; for (const s of shifts) { if (!merged.find(m => m.id === s.id)) merged.push(s); } return merged; }, [shifts]);
   const [assignments, setAssignments] = useState<FirestoreAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -130,15 +140,15 @@ export function useFirestoreShifts() {
     }
   }, []);
 
-  // Obtener turnos por departamento
-  const getShiftsByDepartment = useCallback((department: Department): FirestoreShift[] => {
-    return shifts.filter(s => s.department === department && s.isActive);
-  }, [shifts]);
 
+  // Obtener turnos por departamento
+  const getShiftsByDepartment = useCallback((department: Department) => {
+    return allShifts.filter(s => s.department === department);
+  }, [allShifts]);
   // Obtener turno por ID
-  const getShiftById = useCallback((id: string): FirestoreShift | undefined => {
-    return shifts.find(s => s.id === id);
-  }, [shifts]);
+  const getShiftById = useCallback((id: string): any => {
+    return allShifts.find(s => s.id === id);
+  }, [allShifts]);
 
   // Obtener turnos de un usuario en una fecha
   const getUserShifts = useCallback((userId: string, date: string): FirestoreShift[] => {
@@ -153,18 +163,15 @@ export function useFirestoreShifts() {
 
   // Obtener asignaciones de una semana
   const getWeekAssignments = useCallback((department: Department | 'ALL', weekStart: Date): FirestoreAssignment[] => {
-    const startStr = weekStart.toISOString().split('T')[0];
+    const startStr = toLocalISODate(weekStart);
     const endDate = new Date(weekStart);
     endDate.setDate(weekStart.getDate() + 6);
-    const endStr = endDate.toISOString().split('T')[0];
+    const endStr = toLocalISODate(endDate);
 
     return assignments.filter(a => {
-      const shift = getShiftById(a.shiftId);
-      if (!shift) return false;
-      if (department !== 'ALL' && shift.department !== department) return false;
       return a.date >= startStr && a.date <= endStr;
     });
-  }, [assignments, getShiftById]);
+  }, [assignments]);
 
   // Asignar turno
   const assignShift = useCallback(async (userId: string, shiftId: string, date: string, assignedBy: string): Promise<string> => {

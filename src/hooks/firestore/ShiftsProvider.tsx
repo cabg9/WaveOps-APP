@@ -11,9 +11,9 @@ interface ShiftsContextType {
   assignments: FirestoreAssignment[];
   loading: boolean;
   error: string | null;
-  getShiftsByDepartment: (department: Department) => FirestoreShift[];
-  getShiftById: (id: string) => FirestoreShift | undefined;
-  getUserShifts: (userId: string, date: string) => FirestoreShift[];
+  getShiftsByDepartment: (department: Department) => any[];
+  getShiftById: (id: string) => any;
+  getUserShifts: (userId: string, date: string) => any[];
   getWeekAssignments: (department: Department | 'ALL', weekStart: Date) => FirestoreAssignment[];
   assignShift: (userId: string, shiftId: string, date: string, assignedBy: string) => Promise<string>;
   removeShift: (assignmentId: string) => Promise<void>;
