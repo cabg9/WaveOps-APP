@@ -5,6 +5,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/hooks/useFirestoreAuth';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { TasksProvider } from '@/hooks/useTasks';
 import { ShiftsProvider } from '@/hooks/useShifts';
 import { Layout } from '@/components/Layout';
@@ -241,7 +242,9 @@ function AppRoutes() {
         path="/develops"
         element={
           <ProtectedRoute>
-            <DevelopsModule />
+            <DevelopsGuard>
+              <DevelopsModule />
+            </DevelopsGuard>
           </ProtectedRoute>
         }
       />
@@ -250,6 +253,14 @@ function AppRoutes() {
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+// Guard para Develops — redirige si no tiene acceso
+function DevelopsGuard({ children }: { children: React.ReactNode }) {
+  const { hasDevelopAccess, loading } = useAppConfig();
+  if (loading) return <div className="flex items-center justify-center h-screen text-[#86868B]">Cargando...</div>;
+  if (!hasDevelopAccess) return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 function App() {

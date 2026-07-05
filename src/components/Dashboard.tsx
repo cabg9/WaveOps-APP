@@ -126,7 +126,7 @@ function ModuleCard({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { visibleModules } = useAppConfig();
+  const { visibleModules, hasDevelopAccess } = useAppConfig();
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
 
@@ -183,7 +183,9 @@ export default function Dashboard() {
     '#1D1D1F': { iconColor: 'text-[#1D1D1F]', bgColor: 'bg-[#1D1D1F]/10' },
   };
 
-  const modules = visibleModules.map((mod) => {
+  const dynamicModules = visibleModules
+    .filter((mod) => mod.id !== 'develops' || hasDevelopAccess)
+    .map((mod) => {
     const colors = colorMap[mod.color] || { iconColor: 'text-corporate', bgColor: 'bg-corporate/10' };
     const IconComponent = (Icons[mod.icon as keyof typeof Icons] || Icons.LayoutDashboard) as React.ElementType;
 
@@ -262,6 +264,7 @@ export default function Dashboard() {
     };
   });
 
+  const modules = dynamicModules;
 
   return (
     <Layout title="Dashboard" showDate={true}>

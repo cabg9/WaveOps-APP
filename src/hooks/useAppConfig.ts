@@ -145,6 +145,8 @@ export function useAppConfig() {
   // ═══════════════════════════════════════════════════════════════════
 
   const hasDevelopAccess = useMemo(() => {
+    console.log("[hasDevelopAccess] user:", { id: user?.id, email: user?.email, role: user?.role, allowedIds: settings.developAccess.allowedUserIds });
+    console.log("[hasDevelopAccess] user:", { id: user?.id, email: user?.email, role: user?.role, allowedIds: settings.developAccess.allowedUserIds });
     if (!user) return false;
 
     const { developAccess } = settings;
@@ -155,7 +157,6 @@ export function useAppConfig() {
     // Por email de usuario (fallback)
     if (user.email && developAccess.allowedUserIds.includes(user.email)) return true;
     // Por rol
-    if (developAccess.allowedRoles.includes(user.role)) return true;
     return false;
   }, [settings, user]);
 

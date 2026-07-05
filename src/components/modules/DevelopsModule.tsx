@@ -11,7 +11,7 @@ import {
   Search, Filter, RefreshCw, CheckCircle, XCircle,
 } from 'lucide-react';
 import {
-  collection, doc, updateDoc, addDoc, deleteDoc, onSnapshot,
+  collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { Layout } from '@/components/Layout';
@@ -21,6 +21,7 @@ import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
@@ -212,7 +213,7 @@ function GeneralTab() {
 // ═══════════════════════════════════════════════════════════════════
 
 function UsuariosTab() {
-  const { users, loading, createUser, updateUser, deactivateUser } = useFirestoreUsers();
+  const { users, loading, createUser, updateUser, deleteUser } = useFirestoreUsers();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
   const [search, setSearch] = useState('');
@@ -220,6 +221,7 @@ function UsuariosTab() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [editingUser, setEditingUser] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
   const [formData, setFormData] = useState({
     name: '', email: '', role: 'STAFF', department: 'DIVE_SHOP',
     position: '', level: 1, isActive: true, phone: '',
@@ -229,7 +231,7 @@ function UsuariosTab() {
   roleTemplates.forEach((r) => { roleLabels[r.id] = r.name; });
 
   const filteredUsers = useMemo(() => {
-    let list = [...users];
+    let list = users.filter((u) => (showInactive ? u.isActive === false : u.isActive !== false));
     if (search) {
       const s = search.toLowerCase();
       list = list.filter((u) =>
@@ -245,7 +247,7 @@ function UsuariosTab() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return list;
-  }, [users, search, sortField, sortDir]);
+  }, [users, search, sortField, sortDir, showInactive]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -288,16 +290,66 @@ function UsuariosTab() {
     setShowForm(true);
   };
 
-  const handleToggleActive = async (u: any) => {
+  const handleToggleActive = async (u: any, makeActive: boolean) => {
     try {
-      await deactivateUser(u.id);
-      await logAction({
-        action: 'USER_DEACTIVATED', targetType: 'user', targetId: u.id,
-        targetName: u.name, impactLevel: 'sensitive',
-        description: `Usuario "${u.name}" desactivado`,
+      const actionLabel = makeActive ? 'activar' : 'desactivar';
+      await executeWithConfirm({
+        level: makeActive ? 'important' : 'sensitive',
+        title: `${makeActive ? 'Activar' : 'Desactivar'} usuario`,
+        description: `Desea ${actionLabel} a "${u.name}"?`,
+        action: async () => {
+          await updateUser(u.id, { isActive: makeActive });
+          await logAction({
+            action: makeActive ? 'USER_UPDATED' : 'USER_DEACTIVATED',
+            targetType: 'user', targetId: u.id, targetName: u.name,
+            impactLevel: makeActive ? 'major' : 'sensitive',
+            description: `Usuario "${u.name}" ${makeActive ? 'activado' : 'desactivado'}`,
+          });
+        },
       });
-    } catch (err) {
-      alert('Error: ' + (err as Error).message);
+    } catch {
+      // Cancelado
+    }
+  };
+
+  const handleDelete = async (u: any) => {
+    const deps: string[] = [];
+    try {
+      const [tasksSnap, shiftsSnap, incapSnap, incidSnap] = await Promise.all([
+        getDocs(query(collection(db, 'tasks'), where('assignedTo', 'array-contains', u.id))),
+        getDocs(query(collection(db, 'shifts'), where('assignedTo', '==', u.id))),
+        getDocs(query(collection(db, 'incapacidades'), where('userId', '==', u.id))),
+        getDocs(query(collection(db, 'incidencias'), where('userId', '==', u.id))),
+      ]);
+      if (!tasksSnap.empty) deps.push(tasksSnap.size + ' tareas');
+      if (!shiftsSnap.empty) deps.push(shiftsSnap.size + ' turnos');
+      if (!incapSnap.empty) deps.push(incapSnap.size + ' incapacidades');
+      if (!incidSnap.empty) deps.push(incidSnap.size + ' incidencias');
+    } catch {
+      // Si falla la verificacion, pedimos confirmacion extra
+    }
+
+    if (deps.length > 0) {
+      alert('No se puede eliminar: el usuario tiene dependencias:\n- ' + deps.join('\n- '));
+      return;
+    }
+
+    try {
+      await executeWithConfirm({
+        level: 'critical',
+        title: 'Eliminar usuario permanentemente',
+        description: `Esta accion eliminara a "${u.name}" y no se puede deshacer.`,
+        action: async () => {
+          await deleteUser(u.id);
+          await logAction({
+            action: 'USER_DELETED', targetType: 'user', targetId: u.id,
+            targetName: u.name, impactLevel: 'critical',
+            description: `Usuario "${u.name}" eliminado permanentemente`,
+          });
+        },
+      });
+    } catch {
+      // Cancelado por el usuario
     }
   };
 
@@ -311,31 +363,54 @@ function UsuariosTab() {
 
   return (
     <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre, email o rol..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-          />
+      {/* Tabs + Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowInactive(false)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+              !showInactive ? 'bg-[#1D1D1F] text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7]'
+            )}
+          >
+            Activos
+          </button>
+          <button
+            onClick={() => setShowInactive(true)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+              showInactive ? 'bg-[#1D1D1F] text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7]'
+            )}
+          >
+            Inactivos
+          </button>
         </div>
-        <Button onClick={() => { setShowForm(true); setEditingUser(null); }} className="gap-2">
-          <Plus className="w-4 h-4" /> Nuevo usuario
-        </Button>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+            <input
+              type="text"
+              placeholder="Buscar..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full sm:w-64 pl-10 pr-4 py-2.5 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+            />
+          </div>
+          {!showInactive && (
+            <Button onClick={() => { setShowForm(true); setEditingUser(null); }} className="gap-2">
+              <Plus className="w-4 h-4" /> Nuevo
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Form */}
+      {/* Form Modal */}
       {showForm && (
-        <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-[#1D1D1F]">{editingUser ? 'Editar usuario' : 'Nuevo usuario'}</h3>
-            <button onClick={() => setShowForm(false)} className="text-[#86868B] hover:text-[#1D1D1F]">
-              <X className="w-5 h-5" />
-            </button>
+            <button onClick={() => setShowForm(false)} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
           </div>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -352,9 +427,7 @@ function UsuariosTab() {
               <label className="block text-xs font-medium text-[#86868B] mb-1">Rol</label>
               <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
                 className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
-                {roleTemplates.map(r => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
+                {roleTemplates.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
             <div>
@@ -388,6 +461,7 @@ function UsuariosTab() {
               <Button type="submit">{editingUser ? 'Guardar cambios' : 'Crear usuario'}</Button>
             </div>
           </form>
+          </div>
         </div>
       )}
 
@@ -397,27 +471,16 @@ function UsuariosTab() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('name')}>
-                  Nombre <SortIcon field="name" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('email')}>
-                  Email <SortIcon field="email" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('role')}>
-                  Rol <SortIcon field="role" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('department')}>
-                  Depto <SortIcon field="department" />
-                </th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('isActive')}>
-                  Estado <SortIcon field="isActive" />
-                </th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('name')}>Nombre <SortIcon field="name" /></th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('email')}>Email <SortIcon field="email" /></th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('role')}>Rol <SortIcon field="role" /></th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-[#86868B] uppercase cursor-pointer" onClick={() => handleSort('department')}>Depto <SortIcon field="department" /></th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-[#86868B] uppercase">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-[#86868B]">No se encontraron usuarios</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-[#86868B]">{showInactive ? 'No hay usuarios inactivos' : 'No se encontraron usuarios'}</td></tr>
               ) : (
                 filteredUsers.map((u) => (
                   <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0 hover:bg-[#F5F5F7]/50">
@@ -430,25 +493,19 @@ function UsuariosTab() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">
-                        {roleLabels[u.role] || u.role}
-                      </span>
-                    </td>
+                    <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
                     <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3">
-                      <span className={cn("text-xs px-2 py-1 rounded-full", u.isActive !== false ? "bg-apple-green/10 text-apple-green" : "bg-apple-red/10 text-apple-red")}>
-                        {u.isActive !== false ? 'Activo' : 'Inactivo'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleToggleActive(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title={u.isActive !== false ? 'Desactivar' : 'Activar'}>
-                          {u.isActive !== false ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
+                        <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
+                        {showInactive ? (
+                          <>
+                            <button onClick={() => handleToggleActive(u, true)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-green" title="Reactivar"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title="Eliminar permanentemente"><Trash2 className="w-4 h-4" /></button>
+                          </>
+                        ) : (
+                          <button onClick={() => handleToggleActive(u, false)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-orange" title="Desactivar"><EyeOff className="w-4 h-4" /></button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -667,44 +724,149 @@ function AuditoriaTab() {
 // ═══════════════════════════════════════════════════════════════════
 
 function SeguridadTab() {
-  const { settings } = useAppConfig();
+  const { settings, roleTemplates } = useAppConfig();
+  const { users } = useFirestoreUsers();
+  const { logAction } = useAudit();
+  const [email, setEmail] = useState('');
+  const [adding, setAdding] = useState(false);
   const sec = settings.security;
+  const access = settings.developAccess;
+
+  const dgUsers = useMemo(() => {
+    return [...new Set(access.allowedUserIds)].map((email) => users.find((u) => u.email === email)).filter(Boolean) as typeof users;
+  }, [users, access.allowedUserIds]);
+
+  const handleAddByEmail = async () => {
+    if (!email.trim()) return;
+    setAdding(true);
+    try {
+      const target = users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+      if (!target) { alert('Usuario no encontrado'); setAdding(false); return; }
+      if (access.allowedUserIds.includes(target.email)) {
+        alert('Ya tiene acceso'); setAdding(false); return;
+      }
+      const newIds = [...access.allowedUserIds, target.email];
+      await updateDoc(doc(db, 'appSettings', 'global'), {
+        'developAccess.allowedUserIds': newIds,
+        updatedAt: new Date().toISOString(),
+      });
+      await logAction({
+        action: 'DEVELOP_ACCESS_GRANTED', targetType: 'develop_access', targetId: target.email,
+        targetName: target.name, impactLevel: 'sensitive',
+        description: `Acceso a Develops otorgado a "${target.name}"`,
+      });
+      setEmail('');
+    } catch (err) {
+      alert('Error: ' + (err as Error).message);
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleRemove = async (target: any) => {
+    try {
+      await executeWithConfirm({
+        level: 'sensitive',
+        title: 'Remover acceso a Develops',
+        description: `Desea remover el acceso de "${target.name}"?`,
+        action: async () => {
+          const newIds = access.allowedUserIds.filter((id: string) => id !== target.email);
+          await updateDoc(doc(db, 'appSettings', 'global'), {
+            'developAccess.allowedUserIds': newIds,
+            updatedAt: new Date().toISOString(),
+          });
+          await logAction({
+            action: 'DEVELOP_ACCESS_REVOKED', targetType: 'develop_access', targetId: target.email,
+            targetName: target.name, impactLevel: 'sensitive',
+            description: `Acceso a Develops revocado a "${target.name}"`,
+          });
+        },
+      });
+    } catch {
+      // Cancelado
+    }
+  };
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-      <h3 className="font-semibold text-[#1D1D1F] mb-4">Politicas de seguridad</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Minimo de caracteres</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordMinLength}</p>
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <h3 className="font-semibold text-[#1D1D1F] mb-4">Politicas de seguridad</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Minimo de caracteres</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordMinLength}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Requiere mayusculas</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireUppercase ? 'Si' : 'No'}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Requiere numeros</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireNumbers ? 'Si' : 'No'}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Intentos maximos de login</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.maxLoginAttempts}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Timeout de sesion (min)</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.sessionTimeoutMinutes}</p>
+          </div>
+          <div className="p-4 rounded-xl border border-[#E5E5E7]">
+            <p className="text-xs text-[#86868B] mb-1">Retencion de logs (dias)</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.auditLogRetentionDays}</p>
+          </div>
         </div>
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Requiere mayusculas</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireUppercase ? 'Si' : 'No'}</p>
+      </div>
+
+      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="w-5 h-5 text-corporate" />
+          <h3 className="font-semibold text-[#1D1D1F]">Usuarios con acceso a Develops</h3>
         </div>
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Requiere numeros</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireNumbers ? 'Si' : 'No'}</p>
+        <div className="flex gap-2 mb-4">
+          <select value={email} onChange={(e) => setEmail(e.target.value)}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white">
+            <option value="">Seleccionar usuario...</option>
+            {users
+              .filter((u) => u.isActive !== false && !access.allowedUserIds.includes(u.email) && u.email)
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((u) => (
+                <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
+              ))}
+          </select>
+          <Button onClick={handleAddByEmail} disabled={adding || !email} className="gap-2">
+            <Plus className="w-4 h-4" /> Agregar
+          </Button>
         </div>
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Intentos maximos de login</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.maxLoginAttempts}</p>
-        </div>
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Timeout de sesion (min)</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.sessionTimeoutMinutes}</p>
-        </div>
-        <div className="p-4 rounded-xl border border-[#E5E5E7]">
-          <p className="text-xs text-[#86868B] mb-1">Retencion de logs (dias)</p>
-          <p className="text-lg font-semibold text-[#1D1D1F]">{sec.auditLogRetentionDays}</p>
+        <div className="space-y-2">
+          {dgUsers.length === 0 ? (
+            <p className="text-sm text-[#86868B] text-center py-4">No hay usuarios con acceso</p>
+          ) : (
+            dgUsers.map((u) => (
+              <div key={u.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E5E5E7]">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-corporate/10 flex items-center justify-center text-xs font-semibold text-corporate">
+                    {u.name?.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
+                    <p className="text-xs text-[#86868B]">{u.email} &middot; {u.role}</p>
+                  </div>
+                </div>
+                <button onClick={() => handleRemove(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title="Remover">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// PESTANA: Papelera — Placeholder
+// // PESTANA: Papelera — Placeholder
 // ═══════════════════════════════════════════════════════════════════
 
 function PapeleraTab() {
