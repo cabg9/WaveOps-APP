@@ -25,6 +25,7 @@ import Dashboard from '@/components/Dashboard';
 // Modules
 import TasksModule from '@/components/modules/TasksModule';
 import HorariosModule from '@/components/modules/HorariosModule';
+import DevelopsModule from '@/components/modules/DevelopsModule';
 
 function ReportesModule() {
   return (
@@ -117,29 +118,6 @@ function VesselsModule() {
         </div>
         <h2 className="text-xl font-semibold text-[#1D1D1F] mb-2">Vessels</h2>
         <p className="text-[#86868B]">Módulo en desarrollo</p>
-      </div>
-    </Layout>
-  );
-}
-
-function DevelopsModule() {
-  const { user } = useAuth();
-  
-  // Solo nivel 1 puede acceder
-  if (!user || user.level !== 1) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return (
-    <Layout title="Develops">
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-16 h-16 bg-apple-gray/10 rounded-2xl flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-apple-gray" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-[#1D1D1F] mb-2">Develops</h2>
-        <p className="text-[#86868B]">Configuración avanzada del sistema</p>
       </div>
     </Layout>
   );

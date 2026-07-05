@@ -21,8 +21,11 @@ import {
   AlertCircle,
   Clock3,
 } from 'lucide-react';
+import * as Icons from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useFirestoreAuth';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +126,7 @@ function ModuleCard({
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { visibleModules } = useAppConfig();
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
 
@@ -166,97 +170,98 @@ export default function Dashboard() {
   const progressPercent = totalTodayMyTasks > 0 ? Math.round((progressRaw / totalTodayMyTasks) * 100) : 0;
 
   // Datos de ejemplo para los módulos
-  const modules = [
-    {
-      id: 'tasks',
-      title: 'Tasks',
-      icon: ClipboardList,
-      iconColor: 'text-corporate',
-      bgColor: 'bg-corporate/10',
-      stat1: { label: 'Hoy', value: myPendingToday + myTasksForVerification },
-      stat2: { label: 'Atrasadas', value: myOverdue },
-      bottomText: 'Progreso',
-      bottomStatus: 'progress' as const,
-      progress: progressPercent,
-    },
-    {
-      id: 'horarios',
-      title: 'Horarios',
-      icon: Clock,
-      iconColor: 'text-apple-blue',
-      bgColor: 'bg-apple-blue/10',
-      stat1: { label: 'Hoy', value: 'Despacho' },
-      stat2: { label: 'Solicitudes', value: 0 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'reportes',
-      title: 'Reportes',
-      icon: FileText,
-      iconColor: 'text-apple-green',
-      bgColor: 'bg-apple-green/10',
-      stat1: { label: 'Pendientes', value: 3 },
-      stat2: { label: 'Generados', value: 12 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'ordenes-pago',
-      title: 'Órdenes de Pago',
-      icon: CreditCard,
-      iconColor: 'text-apple-orange',
-      bgColor: 'bg-apple-orange/10',
-      stat1: { label: 'Pendientes', value: 5 },
-      stat2: { label: 'Aprobadas', value: 8 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'dive-ops',
-      title: 'Dive Ops',
-      icon: IdCard,
-      iconColor: 'text-apple-cyan',
-      bgColor: 'bg-apple-cyan/10',
-      stat1: { label: 'Inmersiones', value: 2 },
-      stat2: { label: 'Buceadores', value: 8 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'requisiciones',
-      title: 'Requisiciones',
-      icon: ShoppingCart,
-      iconColor: 'text-apple-yellow',
-      bgColor: 'bg-apple-yellow/10',
-      stat1: { label: 'Pendientes', value: 4 },
-      stat2: { label: 'Entregadas', value: 15 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'movilidad',
-      title: 'Movilidad',
-      icon: Car,
-      iconColor: 'text-apple-red',
-      bgColor: 'bg-apple-red/10',
-      stat1: { label: 'Vehículos', value: 0 },
-      stat2: { label: 'Rutas', value: 0 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-    {
-      id: 'vessels',
-      title: 'Vessels',
-      icon: Anchor,
-      iconColor: 'text-apple-purple',
-      bgColor: 'bg-apple-purple/10',
-      stat1: { label: 'Barcos', value: 0 },
-      stat2: { label: 'Salidas', value: 0 },
-      bottomText: 'Activo',
-      bottomStatus: 'active' as const,
-    },
-  ];
+  // Módulos dinámicos desde Firestore
+  const colorMap: Record<string, { iconColor: string; bgColor: string }> = {
+    '#007AFF': { iconColor: 'text-corporate', bgColor: 'bg-corporate/10' },
+    '#5856D6': { iconColor: 'text-apple-blue', bgColor: 'bg-apple-blue/10' },
+    '#34C759': { iconColor: 'text-apple-green', bgColor: 'bg-apple-green/10' },
+    '#FF9500': { iconColor: 'text-apple-orange', bgColor: 'bg-apple-orange/10' },
+    '#5AC8FA': { iconColor: 'text-apple-cyan', bgColor: 'bg-apple-cyan/10' },
+    '#FFCC00': { iconColor: 'text-apple-yellow', bgColor: 'bg-apple-yellow/10' },
+    '#FF3B30': { iconColor: 'text-apple-red', bgColor: 'bg-apple-red/10' },
+    '#AF52DE': { iconColor: 'text-apple-purple', bgColor: 'bg-apple-purple/10' },
+    '#1D1D1F': { iconColor: 'text-[#1D1D1F]', bgColor: 'bg-[#1D1D1F]/10' },
+  };
+
+  const modules = visibleModules.map((mod) => {
+    const colors = colorMap[mod.color] || { iconColor: 'text-corporate', bgColor: 'bg-corporate/10' };
+    const IconComponent = (Icons[mod.icon as keyof typeof Icons] || Icons.LayoutDashboard) as React.ElementType;
+
+    // Estadísticas según el módulo
+    const statsByModule: Record<string, {
+      stat1: { label: string; value: string | number };
+      stat2: { label: string; value: string | number };
+      bottomText: string;
+      bottomStatus: 'active' | 'inactive' | 'progress';
+      progress?: number;
+    }> = {
+      tasks: {
+        stat1: { label: 'Hoy', value: myPendingToday + myTasksForVerification },
+        stat2: { label: 'Atrasadas', value: myOverdue },
+        bottomText: 'Progreso',
+        bottomStatus: 'progress',
+        progress: progressPercent,
+      },
+      horarios: {
+        stat1: { label: 'Hoy', value: 'Despacho' },
+        stat2: { label: 'Solicitudes', value: 0 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      reportes: {
+        stat1: { label: 'Pendientes', value: 3 },
+        stat2: { label: 'Generados', value: 12 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      'ordenes-pago': {
+        stat1: { label: 'Pendientes', value: 5 },
+        stat2: { label: 'Aprobadas', value: 8 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      'dive-ops': {
+        stat1: { label: 'Inmersiones', value: 2 },
+        stat2: { label: 'Buceadores', value: 8 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      requisiciones: {
+        stat1: { label: 'Pendientes', value: 4 },
+        stat2: { label: 'Entregadas', value: 15 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      movilidad: {
+        stat1: { label: 'Vehiculos', value: 0 },
+        stat2: { label: 'Rutas', value: 0 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+      vessels: {
+        stat1: { label: 'Barcos', value: 0 },
+        stat2: { label: 'Salidas', value: 0 },
+        bottomText: 'Activo',
+        bottomStatus: 'active',
+      },
+    };
+
+    const stats = statsByModule[mod.id] || {
+      stat1: { label: 'Estado', value: mod.isActive ? 'Activo' : 'Inactivo' },
+      stat2: { label: 'Modulo', value: mod.name },
+      bottomText: mod.isActive ? 'Activo' : 'Inactivo',
+      bottomStatus: ('active' as 'active' | 'inactive' | 'progress'),
+    };
+
+    return {
+      id: mod.id,
+      title: mod.name,
+      icon: IconComponent,
+      ...colors,
+      ...stats,
+    };
+  });
+
 
   return (
     <Layout title="Dashboard" showDate={true}>

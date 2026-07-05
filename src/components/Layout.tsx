@@ -15,13 +15,16 @@ import {
   CreditCard,
   FileText,
   Code2,
+  LayoutDashboard,
   Bell,
   LogOut,
   ChevronDown,
   Menu,
   X,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { getInitials } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
@@ -58,22 +61,35 @@ interface NavItem {
   permission?: string;
 }
 
+const iconMap: Record<string, LucideIcon> = {
+  Home, ClipboardList, Clock, IdCard, Anchor, Car, ShoppingCart, CreditCard, FileText, Code2, LayoutDashboard,
+};
+
 // ═══════════════════════════════════════════════════════════════════
 // NAV ITEMS
 // ═══════════════════════════════════════════════════════════════════
 
-const navItems: NavItem[] = [
-  { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/' },
-  { id: 'tasks', label: 'Tasks', icon: ClipboardList, path: '/tasks' },
-  { id: 'horarios', label: 'Horarios', icon: Clock, path: '/horarios' },
-  { id: 'reportes', label: 'Reportes', icon: FileText, path: '/reportes' },
-  { id: 'ordenes-pago', label: 'Órdenes de Pago', icon: CreditCard, path: '/ordenes-pago' },
-  { id: 'dive-ops', label: 'Dive Ops', icon: IdCard, path: '/dive-ops' },
-  { id: 'requisiciones', label: 'Requisiciones', icon: ShoppingCart, path: '/requisiciones' },
-  { id: 'movilidad', label: 'Movilidad', icon: Car, path: '/movilidad' },
-  { id: 'vessels', label: 'Vessels', icon: Anchor, path: '/vessels' },
-  { id: 'develops', label: 'Develops', icon: Code2, path: '/develops', permission: 'canViewModuleDevelops' },
-];
+function useNavItems(): NavItem[] {
+  const { modules, hasDevelopAccess } = useAppConfig();
+  const { hasPermission } = useAuth();
+
+  const items: NavItem[] = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/' },
+  ];
+
+  modules.forEach((mod) => {
+    if (!mod.isVisible) return;
+    if (mod.id === "develops") return;
+    const IconComponent = iconMap[mod.icon] || LayoutDashboard;
+    items.push({ id: mod.id, label: mod.name, icon: IconComponent, path: mod.route, permission: mod.requiredPermission });
+  });
+
+  if (hasDevelopAccess) {
+    items.push({ id: 'develops', label: 'Develops', icon: Code2, path: '/develops', permission: 'canViewModuleDevelops' });
+  }
+
+  return items;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENTE
@@ -83,6 +99,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
+  const navItems = useNavItems();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Formatear fecha
@@ -126,7 +143,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         {/* Navigation */}
         <nav className="flex-1 flex flex-col items-center gap-1">
           {navItems
-            .filter((item) => !item.permission || hasPermission(item.permission as any))
+            
             .map((item) => {
               const active = isActive(item.path);
               const Icon = item.icon;
@@ -279,7 +296,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                   <nav className="flex-1 p-4">
                     <div className="space-y-1">
                       {navItems
-                        .filter((item) => !item.permission || hasPermission(item.permission as any))
+                        
                         .map((item) => {
                           const active = isActive(item.path);
                           const Icon = item.icon;
