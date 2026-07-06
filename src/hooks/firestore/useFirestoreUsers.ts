@@ -33,6 +33,7 @@ export interface FirestoreUser {
   position: string;
   level: number;
   isActive: boolean;
+  deletedAt?: string;
   phone?: string;
   avatar?: string;
   createdAt?: string;
@@ -44,6 +45,7 @@ export interface FirestoreUser {
 
 export function useFirestoreUsers() {
   const [users, setUsers] = useState<FirestoreUser[]>([]);
+  const [trashedUsers, setTrashedUsers] = useState<FirestoreUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +75,10 @@ export function useFirestoreUsers() {
                 : docData.createdAt,
             };
           }) as FirestoreUser[];
-          setUsers(data);
+          const active = data.filter(u => !u.deletedAt);
+          const deleted = data.filter(u => u.deletedAt);
+          setUsers(active);
+          setTrashedUsers(deleted);
           setLoading(false);
         },
         (err) => {
@@ -253,14 +258,44 @@ export function useFirestoreUsers() {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
-  // ELIMINAR USUARIO (solo Firestore, no auth)
+  // SOFT-DELETE USUARIO
+  // ═══════════════════════════════════════════════════════════════════
+
+  const softDeleteUser = useCallback(async (id: string): Promise<void> => {
+    try {
+      await updateDoc(doc(db, COLLECTION_NAME, id), {
+        deletedAt: new Date().toISOString(),
+        isActive: false,
+      } as DocumentData);
+    } catch (err: any) {
+      console.error('Error al soft-delete usuario:', err);
+      throw err;
+    }
+  }, []);
+
+  // RESTAURAR USUARIO
+  // ═══════════════════════════════════════════════════════════════════
+
+  const restoreUser = useCallback(async (id: string): Promise<void> => {
+    try {
+      await updateDoc(doc(db, COLLECTION_NAME, id), {
+        deletedAt: null,
+        isActive: true,
+      } as DocumentData);
+    } catch (err: any) {
+      console.error('Error al restaurar usuario:', err);
+      throw err;
+    }
+  }, []);
+
+  // ELIMINAR USUARIO PERMANENTEMENTE
   // ═══════════════════════════════════════════════════════════════════
 
   const deleteUser = useCallback(async (id: string): Promise<void> => {
     try {
       await deleteDoc(doc(db, COLLECTION_NAME, id));
     } catch (err: any) {
-      console.error('Error al eliminar usuario:', err);
+      console.error('Error al eliminar usuario permanentemente:', err);
       throw err;
     }
   }, []);
@@ -277,6 +312,9 @@ export function useFirestoreUsers() {
     createUser,
     updateUser,
     deactivateUser,
+    softDeleteUser,
+    restoreUser,
     deleteUser,
+    trashedUsers,
   };
 }

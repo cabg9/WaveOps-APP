@@ -2,14 +2,13 @@
 // DEVELOPS MODULE - Panel maestro de administracion
 // ═══════════════════════════════════════════════════════════════════
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2,
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot,
@@ -214,7 +213,7 @@ function GeneralTab() {
 // ═══════════════════════════════════════════════════════════════════
 
 function UsuariosTab() {
-  const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
+  const { users, loading, createUser, updateUser, deleteUser } = useFirestoreUsers();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
   const [search, setSearch] = useState('');
@@ -341,7 +340,7 @@ function UsuariosTab() {
         title: 'Eliminar usuario permanentemente',
         description: `Esta accion eliminara a "${u.name}" y no se puede deshacer.`,
         action: async () => {
-          await softDeleteUser(u.id);
+          await deleteUser(u.id);
           await logAction({
             action: 'USER_DELETED', targetType: 'user', targetId: u.id,
             targetName: u.name, impactLevel: 'critical',
@@ -588,203 +587,45 @@ function ModulosTab() {
 // PESTANA: Roles — Visualizacion
 // ═══════════════════════════════════════════════════════════════════
 
-
-const levelColor = (level: number) => {
-  if (level <= 2) return "bg-gray-100 text-gray-500 border-gray-200";
-  if (level <= 4) return "bg-gray-100 text-gray-600 border-gray-200";
-  if (level <= 6) return "bg-gray-200 text-gray-700 border-gray-300";
-  return "bg-gray-800 text-white border-gray-800";
-};
-
-interface PermDef { key: string; label: string; }
-interface PermCat { key: string; label: string; icon: React.ReactNode; perms: PermDef[]; }
-
-const PERMISSION_CATEGORIES: PermCat[] = [
-  { key: "modules", label: "Modulos", icon: <LayoutGrid size={16} />, perms: [
-    {key:"canViewDashboard",label:"Ver Dashboard"},{key:"canViewModuleTasks",label:"Ver Tasks"},
-    {key:"canViewModuleHorarios",label:"Ver Horarios"},{key:"canViewModuleDiveOps",label:"Ver DiveOps"},
-    {key:"canViewModuleVessels",label:"Ver Vessels"},{key:"canViewModuleMovilidad",label:"Ver Movilidad"},
-    {key:"canViewModuleRequisiciones",label:"Ver Requisiciones"},{key:"canViewModuleOrdenesPago",label:"Ver Ordenes Pago"},
-    {key:"canViewModuleReportes",label:"Ver Reportes"},{key:"canViewModuleDevelops",label:"Ver Develops"},
-  ]},
-  { key: "tasks", label: "Tasks", icon: <ClipboardList size={16} />, perms: [
-    {key:"canCreateSpecificTask",label:"Crear tarea especifica"},{key:"canCreateExtraTask",label:"Crear tarea extra"},
-    {key:"canEditOwnTasks",label:"Editar propias"},{key:"canDeleteOwnTasks",label:"Eliminar propias"},
-    {key:"canEditAllTasks",label:"Editar todas"},{key:"canDeleteAllTasks",label:"Eliminar todas"},
-    {key:"canVerifyTask",label:"Verificar"},{key:"canRateTask",label:"Calificar"},
-    {key:"canBlockTask",label:"Bloquear"},{key:"canUnblockTask",label:"Desbloquear"},{key:"canReopenTask",label:"Reabrir"},
-  ]},
-  { key: "schedules", label: "Horarios y Turnos", icon: <CalendarClock size={16} />, perms: [
-    {key:"canViewTeam",label:"Ver equipo"},{key:"canAssignShifts",label:"Asignar turnos"},
-    {key:"canModifyShifts",label:"Modificar turnos"},{key:"canApproveChanges",label:"Aprobar cambios"},
-    {key:"canRejectChanges",label:"Rechazar cambios"},{key:"canRequestChange",label:"Solicitar cambios"},
-  ]},
-  { key: "incidents", label: "Incidencias", icon: <AlertTriangle size={16} />, perms: [
-    {key:"canCreateIncidencia",label:"Crear incidencia"},{key:"canViewAllIncidencias",label:"Ver todas"},
-    {key:"canViewOperationalIncidencias",label:"Ver operativas"},{key:"canViewOwnDepartmentIncidencias",label:"Ver mi departamento"},
-    {key:"canConfirmIncidenciaAsManager",label:"Confirmar como gerente"},{key:"canConfirmIncidenciaAsSupervisor",label:"Confirmar como supervisor"},
-    {key:"canResolveIncidencia",label:"Resolver"},{key:"canCloseIncidencia",label:"Cerrar"},{key:"canReopenIncidencia",label:"Reabrir"},
-  ]},
-  { key: "departments", label: "Departamentos", icon: <Users size={16} />, perms: [
-    {key:"canViewAllDepartments",label:"Ver todos"},{key:"canViewOwnDepartment",label:"Ver el mio"},
-  ]},
-];
-
-const PERM_DESCRIPTIONS: Record<string, string> = {
-  "canViewDashboard":"ver el Dashboard","canViewModuleTasks":"ver Tasks","canViewModuleHorarios":"ver Horarios",
-  "canViewModuleDiveOps":"ver DiveOps","canViewModuleVessels":"ver Vessels","canViewModuleMovilidad":"ver Movilidad",
-  "canViewModuleRequisiciones":"ver Requisiciones","canViewModuleOrdenesPago":"ver Ordenes de Pago",
-  "canViewModuleReportes":"ver Reportes","canViewModuleDevelops":"ver Develops",
-  "canCreateSpecificTask":"crear tareas especificas","canCreateExtraTask":"crear tareas extra",
-  "canEditOwnTasks":"editar tareas propias","canDeleteOwnTasks":"eliminar tareas propias",
-  "canEditAllTasks":"editar todas las tareas","canDeleteAllTasks":"eliminar todas las tareas",
-  "canVerifyTask":"verificar tareas","canRateTask":"calificar tareas","canBlockTask":"bloquear tareas",
-  "canUnblockTask":"desbloquear tareas","canReopenTask":"reabrir tareas",
-  "canViewTeam":"ver el equipo","canAssignShifts":"asignar turnos","canModifyShifts":"modificar turnos",
-  "canApproveChanges":"aprobar cambios","canRejectChanges":"rechazar cambios","canRequestChange":"solicitar cambios",
-  "canCreateIncidencia":"crear incidencias","canViewAllIncidencias":"ver todas las incidencias",
-  "canViewOperationalIncidencias":"ver incidencias operativas","canViewOwnDepartmentIncidencias":"ver incidencias de mi departamento",
-  "canConfirmIncidenciaAsManager":"confirmar incidencias como gerente","canConfirmIncidenciaAsSupervisor":"confirmar incidencias como supervisor",
-  "canResolveIncidencia":"resolver incidencias","canCloseIncidencia":"cerrar incidencias","canReopenIncidencia":"reabrir incidencias",
-  "canViewAllDepartments":"ver todos los departamentos","canViewOwnDepartment":"ver mi departamento",
-};
-
-function RoleIcon({ name }: { name: string }) {
-  return <div className="h-10 w-10 rounded-xl bg-gray-100 text-gray-400 flex items-center justify-center text-sm font-semibold">{name.charAt(0).toUpperCase()}</div>;
-}
-
-function PermDescription({ permKey, checked }: { permKey: string; checked: boolean }) {
-  const desc = PERM_DESCRIPTIONS[permKey] || permKey;
-  return <span className="text-[10px] text-gray-400 mt-0.5 block leading-tight">{checked ? "Permite " : "Bloquea "}{desc}</span>;
-}
-
-function useRolePermissions(roleTemplates: any[]) {
-  const [openRole, setOpenRole] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Set<string>>>({});
-  const [dirtyRoles, setDirtyRoles] = useState<Set<string>>(new Set());
-
-  const initDraft = useCallback((roleId: string, perms: string[]) => {
-    setDrafts(prev => { if (prev[roleId]) return prev; return { ...prev, [roleId]: new Set(perms) }; });
-  }, []);
-
-  const toggleRole = useCallback((roleId: string, perms: string[]) => {
-    setOpenRole(prev => { const n = prev === roleId ? null : roleId; if (n) initDraft(n, perms); return n; });
-  }, [initDraft]);
-
-  const togglePerm = useCallback((roleId: string, permKey: string) => {
-    setDrafts(prev => { const d = new Set(prev[roleId]||[]); d.has(permKey) ? d.delete(permKey) : d.add(permKey); return {...prev,[roleId]:d}; });
-    setDirtyRoles(prev => new Set(prev).add(roleId));
-  }, []);
-
-  const cancelRole = useCallback((roleId: string, originalPerms: string[]) => {
-    setDrafts(prev => ({ ...prev, [roleId]: new Set(originalPerms) }));
-    setDirtyRoles(prev => { const n = new Set(prev); n.delete(roleId); return n; });
-  }, []);
-
-  return { openRole, drafts, dirtyRoles, setDirtyRoles, toggleRole, togglePerm, cancelRole, initDraft };
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button onClick={e => { e.stopPropagation(); onChange(); }} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? "bg-gray-700" : "bg-gray-200"}`}>
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-[18px]" : "translate-x-[2px]"}`} />
-    </button>
-  );
-}
-
 function RolesTab() {
   const { roleTemplates } = useAppConfig();
-  const { logAction } = useAudit();
-  const { openRole, drafts, dirtyRoles, setDirtyRoles, toggleRole, togglePerm, cancelRole } = useRolePermissions(roleTemplates);
 
-  const handleSave = useCallback(async (roleId: string, roleName: string) => {
-    const perms = Array.from(drafts[roleId] || []).filter((p): p is string => typeof p === "string");
-    await updateDoc(doc(db, "roleTemplates", roleId), { permissions: perms, updatedAt: new Date().toISOString() });
-    await logAction({ action: "ROLE_UPDATED", targetType: "role", targetId: roleId, targetName: roleName, impactLevel: "major", description: `Permisos actualizados para rol "${roleName}"` });
-    setDirtyRoles((prev: Set<string>) => { const n = new Set(prev); n.delete(roleId); return n; });
-  }, [drafts, logAction]);
-
-  const [savingRole, setSavingRole] = useState<string | null>(null);
+  const levelColor = (level: number) => {
+    if (level >= 6) return 'bg-apple-red/10 text-apple-red';
+    if (level >= 4) return 'bg-apple-orange/10 text-apple-orange';
+    if (level >= 2) return 'bg-apple-blue/10 text-apple-blue';
+    return 'bg-apple-green/10 text-apple-green';
+  };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[#1D1D1F]">Roles y Permisos</h3>
-        <span className="text-sm text-[#86868B]">{roleTemplates.length} roles configurados</span>
-      </div>
+    <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <div className="space-y-3">
-        {roleTemplates.map((role: any) => {
-          const isOpen = openRole === role.id;
-          const isDirty = dirtyRoles.has(role.id);
-          const currentPerms = drafts[role.id] || new Set(role.permissions || []);
-          return (
-            <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-gray-300 shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
-              <button onClick={() => toggleRole(role.id, role.permissions || [])} className="flex w-full items-center justify-between p-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl">
-                <div className="flex items-center gap-3">
-                  <RoleIcon name={role.name} />
-                  <div>
-                    <div className="font-semibold text-[#1D1D1F] text-[15px]">{role.name}</div>
-                    <div className="text-xs text-[#86868B] mt-0.5">{role.permissions?.length || 0} permisos asignados</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium border ${levelColor(role.level || 1)}`}>Nivel {role.level || 1}</span>
-                  {isDirty && <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Modificado</span>}
-                  {isOpen ? <ChevronUp size={18} className="text-[#86868B]" /> : <ChevronDown size={18} className="text-[#86868B]" />}
-                </div>
-              </button>
-              {isOpen && (
-                <div className="px-5 pb-5 pt-1 border-t border-[#E5E5E7]">
-                  {isDirty && (
-                    <div className="flex items-center justify-end gap-2 mb-4 mt-3">
-                      <button onClick={() => cancelRole(role.id, role.permissions || [])} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-[#86868B] hover:bg-gray-100 transition-colors"><X size={14} /> Cancelar</button>
-                      <button onClick={async () => { setSavingRole(role.id); await handleSave(role.id, role.name); setSavingRole(null); }} disabled={savingRole === role.id} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#007AFF] hover:bg-[#0071E3] disabled:opacity-60 transition-colors">
-                        {savingRole === role.id ? <><span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : <><Save size={14} /> Guardar cambios</>}
-                      </button>
-                    </div>
-                  )}
-                  <div className="space-y-3">
-                    {PERMISSION_CATEGORIES.map((cat) => {
-                      const permsList = cat.perms;
-                      const activeInCat = permsList.filter((p) => currentPerms.has(p.key)).length;
-                      return (
-                        <div key={cat.key} className="rounded-xl border border-[#E5E5E7]">
-                          <div className="flex items-center justify-between p-3.5">
-                            <div className="flex items-center gap-3">
-                              <span className="text-gray-400">{cat.icon}</span>
-                              <span className="text-sm font-medium text-[#1D1D1F]">{cat.label}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${activeInCat === permsList.length ? "bg-gray-100 text-gray-500" : activeInCat > 0 ? "bg-gray-200 text-gray-600" : "bg-gray-100 text-gray-500"}`}>{activeInCat}/{permsList.length}</span>
-                            </div>
-                          </div>
-                          <div className="px-3.5 pb-3.5 pt-1 border-t border-[#E5E5E7] bg-gray-50/30">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {permsList.map((perm) => {
-                                const checked = currentPerms.has(perm.key);
-                                return (
-                                  <div key={perm.key} className={`p-2.5 rounded-lg border transition-all ${checked ? "border-gray-300 bg-gray-50" : "border-[#E5E5E7] bg-white hover:border-gray-300"}`}>
-                                    <label className="flex items-center justify-between cursor-pointer">
-                                      <span className={`text-xs font-medium ${checked ? "text-gray-700" : "text-[#3A3A3C]"}`}>{perm.label}</span>
-                                      <Toggle checked={checked} onChange={() => togglePerm(role.id, perm.key)} />
-                                    </label>
-                                    <PermDescription permKey={perm.key} checked={checked} />
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        {roleTemplates.map((role) => (
+          <div key={role.id} className="flex items-center justify-between p-4 rounded-xl border border-[#E5E5E7]">
+            <div className="flex items-center gap-3">
+              <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", levelColor(role.level))}>
+                <Shield className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#1D1D1F]">{role.name}</p>
+                <p className="text-xs text-[#86868B]">{role.description}</p>
+              </div>
             </div>
-          );
-        })}
+            <div className="flex items-center gap-3">
+              <span className={cn("text-xs px-2 py-1 rounded-full", levelColor(role.level))}>Nivel {role.level}</span>
+              <span className="text-xs text-[#86868B]">{role.permissions?.length || 0} permisos</span>
+            </div>
+          </div>
+        ))}
+        {roleTemplates.length === 0 && <p className="text-center py-8 text-[#86868B]">No hay roles configurados</p>}
       </div>
     </div>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// PESTANA: Auditoria — Logs en tiempo real
+// ═══════════════════════════════════════════════════════════════════
 
 function AuditoriaTab() {
   const { logs, loading } = useAudit();
@@ -1029,56 +870,12 @@ function SeguridadTab() {
 // ═══════════════════════════════════════════════════════════════════
 
 function PapeleraTab() {
-  const { logAction } = useAudit();
-  const { restoreUser: _restore, deleteUser: _delete, trashedUsers } = useFirestoreUsers();
-  const [restoringId, setRestoringId] = useState<string | null>(null);
-
-  const handleRestore = async (u: any) => {
-    setRestoringId(u.id);
-    await _restore(u.id);
-    await logAction({ action: "USER_RESTORED", targetType: "user", targetId: u.id, targetName: u.name, impactLevel: "major", description: `Usuario restaurado: "${u.name}"` });
-    setRestoringId(null);
-  };
-
-  const handlePermanentDelete = async (u: any) => {
-    if (!confirm(`Eliminar permanentemente a "${u.name}"? No se puede deshacer.`)) return;
-    await _delete(u.id);
-    await logAction({ action: "USER_DELETED", targetType: "user", targetId: u.id, targetName: u.name, impactLevel: "critical", description: `Usuario eliminado permanentemente: "${u.name}"` });
-  };
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[#1D1D1F]">Papelera</h3>
-        <span className="text-sm text-[#86868B]">{trashedUsers.length} elementos</span>
-      </div>
-      {trashedUsers.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
-          <Trash2 className="w-12 h-12 text-[#C7C7CC] mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[#1D1D1F] mb-2">Papelera vacia</h3>
-          <p className="text-sm text-[#86868B]">Los elementos eliminados apareceran aqui</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {trashedUsers.map((u: any) => (
-            <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-semibold">{(u.name || "?").charAt(0).toUpperCase()}</div>
-                <div>
-                  <div className="font-medium text-[#1D1D1F] text-sm">{u.name}</div>
-                  <div className="text-xs text-[#86868B]">{u.email} &middot; Eliminado {u.deletedAt ? new Date(u.deletedAt).toLocaleDateString() : "recientemente"}</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleRestore(u)} disabled={restoringId === u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 transition-colors">
-                  {restoringId === u.id ? "Restaurando..." : <><RefreshCw size={14} /> Restaurar</>}
-                </button>
-                <button onClick={() => handlePermanentDelete(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500 transition-colors" title="Eliminar permanentemente"><Trash2 size={14} /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+    <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
+      <Trash2 className="w-12 h-12 text-[#C7C7CC] mx-auto mb-4" />
+      <h3 className="text-lg font-semibold text-[#1D1D1F] mb-2">Papelera</h3>
+      <p className="text-sm text-[#86868B] mb-4">Los elementos eliminados apareceran aqui</p>
+      <p className="text-xs text-amber-600 bg-amber-50 px-3 py-1 rounded-full inline-block">Proximamente</p>
     </div>
   );
 }
