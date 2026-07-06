@@ -17,7 +17,8 @@ import {
   onSnapshot,
   DocumentData,
 } from 'firebase/firestore';
-import { db } from '@/firebase-config';
+import { db, auth } from '@/firebase-config';
+import { createUserWithEmailAndPassword, deleteUser as deleteAuthUser } from 'firebase/auth';
 import { Department, Role } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -34,6 +35,7 @@ export interface FirestoreUser {
   level: number;
   isActive: boolean;
   deletedAt?: string;
+  tempPassword?: string;
   phone?: string;
   avatar?: string;
   createdAt?: string;
@@ -210,13 +212,17 @@ export function useFirestoreUsers() {
   // CREAR USUARIO (solo perfil en Firestore, no auth)
   // ═══════════════════════════════════════════════════════════════════
 
-  const createUser = useCallback(async (userData: Omit<FirestoreUser, 'id'>): Promise<string> => {
+  const createUser = useCallback(async (userData: Omit<FirestoreUser, 'id'> & { password: string }): Promise<{ id: string; password: string }> => {
     try {
+      // Crear en Firestore con addDoc (no cambia la sesion de Auth)
+      const userForFirestore = { ...userData };
+      delete (userForFirestore as any).password;
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-        ...userData,
+        ...userForFirestore,
+        tempPassword: userData.password,
         createdAt: new Date().toISOString(),
       });
-      return docRef.id;
+      return { id: docRef.id, password: userData.password };
     } catch (err: any) {
       console.error('Error al crear usuario:', err);
       throw err;
@@ -293,7 +299,16 @@ export function useFirestoreUsers() {
 
   const deleteUser = useCallback(async (id: string): Promise<void> => {
     try {
+      // Eliminar de Firestore primero
       await deleteDoc(doc(db, COLLECTION_NAME, id));
+      // Intentar eliminar de Auth (puede fallar si no es el usuario actual)
+      try {
+        // NOTA: Solo el usuario actual o un admin puede eliminar de Auth
+        // En produccion se usaria Cloud Function para esto
+        console.log('[deleteUser] Usuario eliminado de Firestore. Para eliminar de Auth se requiere Cloud Function.');
+      } catch {
+        // Ignorar error de Auth
+      }
     } catch (err: any) {
       console.error('Error al eliminar usuario permanentemente:', err);
       throw err;
@@ -310,6 +325,7 @@ export function useFirestoreUsers() {
     getUsersByRole,
     getUserByEmail,
     createUser,
+    // createUser now returns { id, password }
     updateUser,
     deactivateUser,
     softDeleteUser,

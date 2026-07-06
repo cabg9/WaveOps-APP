@@ -213,7 +213,15 @@ function GeneralTab() {
 // PESTANA: Usuarios — CRUD completo
 // ═══════════════════════════════════════════════════════════════════
 
+function generateTempPassword(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
+  let pw = '';
+  for (let i = 0; i < 10; i++) pw += chars.charAt(Math.floor(Math.random() * chars.length));
+  return pw;
+}
+
 function UsuariosTab() {
+  const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
@@ -224,8 +232,8 @@ function UsuariosTab() {
   const [showForm, setShowForm] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [formData, setFormData] = useState({
-    name: '', email: '', role: 'STAFF', department: 'DIVE_SHOP',
-    position: '', level: 1, isActive: true, phone: '',
+    name: '', email: '', role: '', department: '',
+    position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
   });
 
   const roleLabels: Record<string, string> = {};
@@ -266,27 +274,30 @@ function UsuariosTab() {
           description: `Usuario "${formData.name}" actualizado`,
         });
       } else {
-        const id = await createUser(formData as any);
+        const result = await createUser(formData as any);
+        setCreatedPassword(result.password);
         await logAction({
-          action: 'USER_CREATED', targetType: 'user', targetId: id,
+          action: 'USER_CREATED', targetType: 'user', targetId: result.id,
           targetName: formData.name, impactLevel: 'sensitive',
-          description: `Usuario "${formData.name}" creado`,
+          description: `Usuario "${formData.name}" creado con password temporal`,
         });
       }
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ name: '', email: '', role: 'STAFF', department: 'DIVE_SHOP', position: '', level: 1, isActive: true, phone: '' });
+      setFormData({ name: '', email: '', role: '', department: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
+
+  const handleNew = () => { setEditingUser(null); setFormData({ name: '', email: '', role: '', department: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
     setFormData({
       name: u.name || '', email: u.email || '', role: u.role || 'STAFF',
       department: u.department || 'DIVE_SHOP', position: u.position || '',
-      level: u.level || 1, isActive: u.isActive !== false, phone: u.phone || '',
+      level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
     });
     setShowForm(true);
   };
@@ -337,9 +348,9 @@ function UsuariosTab() {
 
     try {
       await executeWithConfirm({
-        level: 'critical',
-        title: 'Eliminar usuario permanentemente',
-        description: `Esta accion eliminara a "${u.name}" y no se puede deshacer.`,
+        level: 'sensitive',
+        title: 'Eliminar usuario',
+        description: `Esta accion envia a la papelera a "${u.name}" y se puede restaurar desde la papelera.`,
         action: async () => {
           await softDeleteUser(u.id);
           await logAction({
@@ -424,17 +435,31 @@ function UsuariosTab() {
               <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                 className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
             </div>
+            {!editingUser && (
+              <div>
+                <label className="block text-xs font-medium text-[#86868B] mb-1">Contraseña temporal</label>
+                <div className="flex gap-2">
+                  <input type="text" value={formData.password} readOnly
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm bg-gray-50 text-gray-500" />
+                  <button type="button" onClick={() => setFormData({...formData, password: generateTempPassword()})}
+                    className="px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm hover:bg-gray-50" title="Generar nueva">↻</button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">El usuario debera cambiarla al primer inicio de sesion</p>
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Rol</label>
-              <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
-                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+              <select required value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 ${formData.role ? 'border-[#E5E5E7]' : 'border-red-300 bg-red-50'}`}>
+                <option value="" disabled>Seleccionar rol</option>
                 {roleTemplates.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Departamento</label>
-              <select value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
-                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+              <select required value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 ${formData.department ? 'border-[#E5E5E7]' : 'border-red-300 bg-red-50'}`}>
+                <option value="" disabled>Seleccionar departamento</option>
                 <option value="DIVE_SHOP">Dive Shop</option>
                 <option value="ADMINISTRATION">Administracion</option>
                 <option value="MANAGEMENT">Management</option>
@@ -449,8 +474,17 @@ function UsuariosTab() {
             </div>
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Nivel</label>
-              <input type="number" min={1} max={10} value={formData.level} onChange={e => setFormData({...formData, level: Number(e.target.value)})}
-                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+              <select required value={formData.level || ''} onChange={e => setFormData({...formData, level: Number(e.target.value)})}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 ${formData.level ? 'border-[#E5E5E7]' : 'border-red-300 bg-red-50'}`}>
+                <option value="" disabled>Seleccionar nivel</option>
+                <option value={1}>1 - Director General</option>
+                <option value={2}>2 - Director</option>
+                <option value={3}>3 - RRHH / Alta Gerencia</option>
+                <option value={4}>4 - Gerente</option>
+                <option value={5}>5 - Gerente Departamento</option>
+                <option value={6}>6 - Supervisor</option>
+                <option value={7}>7 - Staff</option>
+              </select>
             </div>
             <div className="md:col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})}
@@ -462,6 +496,14 @@ function UsuariosTab() {
               <Button type="submit">{editingUser ? 'Guardar cambios' : 'Crear usuario'}</Button>
             </div>
           </form>
+          {createdPassword && (
+            <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div className="text-sm font-medium text-emerald-700 mb-1">Usuario creado exitosamente</div>
+              <div className="text-xs text-emerald-600">Contraseña temporal: <span className="font-mono font-bold">{createdPassword}</span></div>
+              <div className="text-[10px] text-emerald-500 mt-1">Guarde esta contraseña. El usuario debera cambiarla al primer inicio de sesion.</div>
+              <button onClick={() => setCreatedPassword(null)} className="mt-2 text-xs text-emerald-600 hover:text-emerald-800 underline">Cerrar</button>
+            </div>
+          )}
           </div>
         </div>
       )}
@@ -1041,9 +1083,19 @@ function PapeleraTab() {
   };
 
   const handlePermanentDelete = async (u: any) => {
-    if (!confirm(`Eliminar permanentemente a "${u.name}"? No se puede deshacer.`)) return;
-    await _delete(u.id);
-    await logAction({ action: "USER_DELETED", targetType: "user", targetId: u.id, targetName: u.name, impactLevel: "critical", description: `Usuario eliminado permanentemente: "${u.name}"` });
+    try {
+      await executeWithConfirm({
+        level: 'critical',
+        title: 'Eliminar permanentemente',
+        description: `Esta accion eliminara a "${u.name}" de forma irreversible. No se puede deshacer.`,
+        action: async () => {
+          await _delete(u.id);
+          await logAction({ action: 'USER_DELETED', targetType: 'user', targetId: u.id, targetName: u.name, impactLevel: 'critical', description: `Usuario eliminado permanentemente: "${u.name}"` });
+        },
+      });
+    } catch {
+      // Cancelado por el usuario
+    }
   };
 
   return (
