@@ -1,8 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import {
-  Pencil, Trash2, Plus, Building2, AlertTriangle, ChevronDown, ChevronUp,
-  X, GitBranch, Shield, Crown, HardHat, Users, Briefcase, Save, UserCog,
-  ExternalLink
+  Pencil, Trash2, Plus, Building2, X, GitBranch,
+  Shield, Crown, HardHat, Users, Briefcase, Save, UserCog
 } from "lucide-react";
 import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
@@ -20,12 +19,6 @@ const DEPARTMENT_COLORS = [
   "#64748b", "#475569", "#334155", "#1e293b", "#0f172a",
   "#94a3b8", "#78716c", "#57534e", "#44403c", "#292524",
 ];
-
-const DEPT_TYPE_LABELS: Record<string, string> = {
-  administrativo: "Administrativo",
-  operativo: "Operativo",
-  otro: "Otro",
-};
 
 const ROLES_LIST = [
   { value: Role.DIRECTOR_GENERAL, label: "Director General", level: 1 },
@@ -64,20 +57,14 @@ function sortUsersByHierarchy(users: any[]) {
   });
 }
 
-// Sync department name across all collections
 async function syncDepartmentName(oldName: string, newName: string): Promise<number> {
   let totalUpdated = 0;
   const batch = writeBatch(db);
-  const collectionsToCheck = ['users', 'tasks', 'shifts'];
-  
+  const collectionsToCheck = ["users", "tasks", "shifts"];
   for (const collName of collectionsToCheck) {
     const snap = await getDocs(query(collection(db, collName), where("department", "==", oldName)));
-    snap.forEach(d => {
-      batch.update(doc(db, collName, d.id), { department: newName.trim() });
-      totalUpdated++;
-    });
+    snap.forEach(d => { batch.update(doc(db, collName, d.id), { department: newName.trim() }); totalUpdated++; });
   }
-  
   if (totalUpdated > 0) await batch.commit();
   return totalUpdated;
 }
@@ -87,40 +74,32 @@ export function DepartamentosTab() {
   const { users, updateUser } = useFirestoreUsers();
   const { logAction } = useAudit();
 
-  const [showModal, setShowModal] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [selectedDept, setSelectedDept] = useState<any>(null);
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
     name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo",
   });
   const [saving, setSaving] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
   const [editLevel, setEditLevel] = useState<number>(7);
   const [editPosition, setEditPosition] = useState("");
 
-  const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId), [departments]);
+  const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId).sort((a: any, b: any) => a.name.localeCompare(b.name)), [departments]);
   const childDepts = useMemo(() => departments.filter((d: any) => d.parentId), [departments]);
-  const deptsById = useMemo(() => {
-    const m = new Map<string, any>();
-    departments.forEach((d: any) => m.set(d.id, d));
-    return m;
-  }, [departments]);
+  const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
+  const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-  const openCreate = () => {
-    setEditingId(null); setOriginalName("");
-    setForm({ name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo" });
-    setShowModal(true);
-  };
-
-  const openEdit = (dept: any) => {
-    setEditingId(dept.id); setOriginalName(dept.name);
-    setForm({ name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId, type: dept.type || "otro" });
-    setShowModal(true);
-  };
-
-  const closeModal = () => { setShowModal(false); setEditingId(null); setOriginalName(""); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo" }); setShowFormModal(true); };
+  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId, type: dept.type || "otro" }); setShowFormModal(true); };
+  const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
+  const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
+  const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
 
   const handleSave = async () => {
     if (!form.name.trim()) { alert("El nombre es obligatorio"); return; }
@@ -130,35 +109,32 @@ export function DepartamentosTab() {
       if (editingId) {
         if (originalName && originalName !== form.name) {
           const updated = await syncDepartmentName(originalName, form.name);
-          console.log(`[Departamentos] ${updated} registros sincronizados de "${originalName}" a "${form.name}"`);
-          await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "critical", description: `Departamento renombrado: "${originalName}" → "${form.name}" (${updated} registros actualizados)` });
+          await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "critical", description: "Renombrado: " + originalName + " -> " + form.name + " (" + updated + " registros)" });
         } else {
-          await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "major", description: "Departamento actualizado: " + form.name });
+          await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "major", description: "Actualizado: " + form.name });
         }
         await updateDepartment(editingId, form);
       } else {
         const id = await createDepartment({ ...form, parentId: form.parentId || null });
-        await logAction({ action: "DEPARTMENT_CREATED", targetType: "department", targetId: id, targetName: form.name, impactLevel: "major", description: "Departamento creado: " + form.name });
+        await logAction({ action: "DEPARTMENT_CREATED", targetType: "department", targetId: id, targetName: form.name, impactLevel: "major", description: "Creado: " + form.name });
       }
-      closeModal();
+      closeFormModal();
     } catch (err: any) { alert("Error: " + err.message); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (dept: any) => {
     const hasChildren = childDepts.some((c: any) => c.parentId === dept.id);
-    if (hasChildren) { alert('No se puede eliminar "' + dept.name + '" porque tiene sub-departamentos.'); return; }
+    if (hasChildren) { alert("No se puede eliminar porque tiene sub-departamentos."); return; }
     const count = await checkUsersInDepartment(dept.name);
-    if (count > 0) { alert('No se puede eliminar "' + dept.name + '" porque tiene ' + count + " usuario(s)."); return; }
+    if (count > 0) { alert("No se puede eliminar porque tiene " + count + " usuario(s)."); return; }
     try {
-      await executeWithConfirm({ level: "sensitive", title: "Eliminar departamento", description: 'Eliminar "' + dept.name + '" permanentemente?', action: async () => {
+      await executeWithConfirm({ level: "sensitive", title: "Eliminar departamento", description: "Eliminar permanentemente?", action: async () => {
         await deleteDepartment(dept.id);
-        await logAction({ action: "DEPARTMENT_DELETED", targetType: "department", targetId: dept.id, targetName: dept.name, impactLevel: "critical", description: "Departamento eliminado: " + dept.name });
+        await logAction({ action: "DEPARTMENT_DELETED", targetType: "department", targetId: dept.id, targetName: dept.name, impactLevel: "critical", description: "Eliminado: " + dept.name });
       }});
     } catch { }
   };
-
-  const toggleExpand = (id: string) => { setExpandedId((prev) => (prev === id ? null : id)); setEditingUserId(null); };
 
   const handleUpdateUser = async (userId: string) => {
     try {
@@ -171,30 +147,24 @@ export function DepartamentosTab() {
     } catch (err: any) { alert("Error: " + err.message); }
   };
 
-  const startEditUser = (u: any) => {
-    setEditingUserId(u.id);
-    setEditRole(u.role || "");
-    setEditLevel(u.level || 7);
-    setEditPosition(u.position || "");
-  };
-
+  const startEditUser = (u: any) => { setEditingUserId(u.id); setEditRole(u.role || ""); setEditLevel(u.level || 7); setEditPosition(u.position || ""); };
   const getDeptUsers = (deptName: string) => users.filter((u: any) => u.department === deptName && u.isActive !== false);
 
-  const renderModal = () => {
-    if (!showModal) return null;
+  const renderFormModal = () => {
+    if (!showFormModal) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeFormModal(); }}>
         <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-100">{editingId ? "Editar departamento" : "Nuevo departamento"}</h3>
-            <button onClick={closeModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+            <button onClick={closeFormModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
           </div>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-slate-300">Nombre *</Label>
               <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Operaciones" className="border-slate-600 bg-slate-700 text-slate-100" />
               {editingId && originalName && originalName !== form.name && (
-                <p className="text-[11px] text-amber-400">Al cambiar el nombre se sincronizara en usuarios, tareas y turnos.</p>
+                <p className="text-[11px] text-amber-400">Se sincronizara en usuarios, tareas y turnos.</p>
               )}
             </div>
             <div className="space-y-1.5">
@@ -230,7 +200,7 @@ export function DepartamentosTab() {
             </div>
           </div>
           <div className="mt-6 flex gap-2 justify-end">
-            <Button variant="ghost" onClick={closeModal} className="text-slate-300 hover:text-slate-100">Cancelar</Button>
+            <Button variant="ghost" onClick={closeFormModal} className="text-slate-300 hover:text-slate-100">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-sky-600 hover:bg-sky-700">{editingId ? "Guardar cambios" : "Crear departamento"}</Button>
           </div>
         </div>
@@ -238,23 +208,142 @@ export function DepartamentosTab() {
     );
   };
 
-  const renderCardHeader = (dept: any, isParent: boolean) => {
+  const renderTeamModal = () => {
+    if (!showTeamModal || !selectedDept) return null;
+    const deptUsers = getDeptUsers(selectedDept.name);
+    const sortedUsers = sortUsersByHierarchy(deptUsers);
+    const myChildren = childrenOf(selectedDept.id);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeTeamModal(); }}>
+        <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-semibold text-slate-100">{selectedDept.name}</h3>
+              <p className="text-xs text-slate-400">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {selectedDept.type}</p>
+            </div>
+            <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+          </div>
+
+          {myChildren.length > 0 && (
+            <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Sub-departamentos ({myChildren.length})</h4>
+              <div className="flex flex-wrap gap-2">
+                {myChildren.map(c => (
+                  <button key={c.id} onClick={() => { setSelectedDept(c); setEditingUserId(null); }} className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-700 hover:text-white">
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="rounded-lg border border-slate-700 bg-slate-900/30">
+            <h4 className="px-4 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Equipo</h4>
+            {sortedUsers.length === 0 ? (
+              <p className="px-4 py-6 text-center text-xs text-slate-500">No hay usuarios asignados.</p>
+            ) : (
+              <div className="overflow-x-auto p-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 pr-4">Nombre</th>
+                      <th className="pb-3 pr-4">Email</th>
+                      <th className="pb-3 pr-4">Nivel</th>
+                      <th className="pb-3 pr-4">Rol</th>
+                      <th className="pb-3 pr-4">Posicion</th>
+                      <th className="pb-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {sortedUsers.map((u: any) => {
+                      const badge = getLevelBadge(u.level || 7);
+                      const BadgeIcon = badge.icon;
+                      const isEditing = editingUserId === u.id;
+                      return (
+                        <tr key={u.id} className="group">
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-300">
+                                {(u.name || "?").charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-slate-200">{u.name || "Sin nombre"}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-slate-400">{u.email}</td>
+                          <td className="py-3 pr-4">
+                            <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>
+                              <BadgeIcon className="h-3 w-3" />{badge.label}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4">
+                            {isEditing ? (
+                              <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
+                                <option value="">Seleccionar rol</option>
+                                {ROLES_LIST.map(r => (<option key={r.value} value={r.value}>{r.label}</option>))}
+                              </select>
+                            ) : (
+                              <span className="text-slate-300">{u.role || "Sin rol"}</span>
+                            )}
+                          </td>
+                          <td className="py-3 pr-4">
+                            {isEditing ? (
+                              <div className="flex flex-col gap-1">
+                                <input value={editPosition} onChange={(e) => setEditPosition(e.target.value)} placeholder="Posicion" className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
+                                <select value={editLevel} onChange={(e) => setEditLevel(Number(e.target.value))} className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
+                                  {LEVELS.map(l => (<option key={l.value} value={l.value}>{l.label}</option>))}
+                                </select>
+                              </div>
+                            ) : (
+                              <div className="text-slate-400">
+                                <div>{u.position || "-"}</div>
+                                <div className="text-[10px] text-slate-500">Nivel {u.level || 7}</div>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 text-right">
+                            {isEditing ? (
+                              <div className="flex items-center gap-1 justify-end">
+                                <button onClick={() => handleUpdateUser(u.id)} className="rounded p-1 text-green-400 hover:bg-green-900/20"><Save className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => { setEditingUserId(null); setEditRole(""); setEditLevel(7); setEditPosition(""); }} className="rounded p-1 text-red-400 hover:bg-red-900/20"><X className="h-3.5 w-3.5" /></button>
+                              </div>
+                            ) : (
+                              <button onClick={() => startEditUser(u)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-sky-400 hover:bg-sky-900/20"><Pencil className="h-3.5 w-3.5" /></button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCard = (dept: any) => {
     const deptUsers = getDeptUsers(dept.name);
     const userCount = deptUsers.length;
-    const isExpanded = expandedId === dept.id;
+    const myChildren = childrenOf(dept.id);
+    const isParent = myChildren.length > 0;
+    const isChild = !!dept.parentId;
 
     return (
       <div
-        onClick={() => toggleExpand(dept.id)}
-        className={`rounded-xl border transition cursor-pointer select-none ${isParent ? "border-slate-300 bg-white shadow-sm hover:shadow" : "border-slate-200 bg-white shadow-sm hover:shadow-md"} ${isExpanded ? "ring-2 ring-sky-200" : ""}`}
+        onClick={() => openTeam(dept)}
+        className={`rounded-xl border transition cursor-pointer select-none hover:shadow-md ${isParent ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white shadow-sm"} ${isChild ? "relative ml-3" : ""}`}
       >
+        {isChild && <div className="absolute -left-3 top-0 bottom-0 w-0.5 bg-slate-200" />}
         <div className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
               <Building2 className="h-5 w-5" style={{ color: dept.color }} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 <h4 className="text-sm font-semibold text-slate-800 truncate">{dept.name}</h4>
                 {isParent && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">PADRE</span>}
                 {!dept.isActive && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">INACTIVO</span>}
@@ -263,20 +352,15 @@ export function DepartamentosTab() {
                 <span className="uppercase tracking-wide text-[10px]">{dept.type || "otro"}</span>
                 <span>·</span>
                 <span>{userCount} usuarios</span>
-                {dept.parentId && (
-                  <>
-                    <span>·</span>
-                    <span className="text-slate-400">hijo de {deptsById.get(dept.parentId)?.name || "?"}</span>
-                  </>
-                )}
+                {isChild && <><span>·</span><span className="text-slate-400">hijo de {deptsById.get(dept.parentId)?.name || "?"}</span></>}
               </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => openEdit(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => handleDelete(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-              <button className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
-                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              </button>
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10px] text-slate-400">{myChildren.length > 0 ? `${myChildren.length} sub-departamentos` : "Sin hijos"}</span>
+            <div className="flex items-center gap-0.5">
+              <button onClick={() => openEdit(dept)} className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-3.5 w-3.5" /></button>
+              <button onClick={() => handleDelete(dept)} className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           </div>
         </div>
@@ -284,113 +368,12 @@ export function DepartamentosTab() {
     );
   };
 
-  const renderExpanded = (dept: any) => {
-    const deptUsers = getDeptUsers(dept.name);
-    const sortedUsers = sortUsersByHierarchy(deptUsers);
-
-    return (
-      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4" onClick={(e) => e.stopPropagation()}>
-        <h5 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Equipo ({sortedUsers.length})</h5>
-        {sortedUsers.length === 0 ? (
-          <p className="text-xs text-slate-400">No hay usuarios asignados.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs text-slate-500 uppercase tracking-wider">
-                  <th className="pb-2 pr-4">Nombre</th>
-                  <th className="pb-2 pr-4">Email</th>
-                  <th className="pb-2 pr-4">Nivel</th>
-                  <th className="pb-2 pr-4">Rol</th>
-                  <th className="pb-2 pr-4">Posicion</th>
-                  <th className="pb-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sortedUsers.map((u: any) => {
-                  const badge = getLevelBadge(u.level || 7);
-                  const BadgeIcon = badge.icon;
-                  const isEditing = editingUserId === u.id;
-                  return (
-                    <tr key={u.id} className="group">
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold" style={{ color: dept.color }}>
-                            {(u.name || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-medium text-slate-800">{u.name || "Sin nombre"}</span>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4 text-xs text-slate-500">{u.email}</td>
-                      <td className="py-2 pr-4">
-                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>
-                          <BadgeIcon className="h-3 w-3" />{badge.label}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {isEditing ? (
-                          <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs">
-                            <option value="">Seleccionar rol</option>
-                            {ROLES_LIST.map(r => (<option key={r.value} value={r.value}>{r.label}</option>))}
-                          </select>
-                        ) : (
-                          <span className="text-slate-700">{u.role || "Sin rol"}</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {isEditing ? (
-                          <div className="flex items-center gap-2">
-                            <input value={editPosition} onChange={(e) => setEditPosition(e.target.value)} placeholder="Posicion" className="w-24 rounded border border-slate-300 px-2 py-1 text-xs" />
-                            <select value={editLevel} onChange={(e) => setEditLevel(Number(e.target.value))} className="rounded border border-slate-300 bg-white px-2 py-1 text-xs">
-                              {LEVELS.map(l => (<option key={l.value} value={l.value}>{l.label}</option>))}
-                            </select>
-                          </div>
-                        ) : (
-                          <span className="text-slate-500">{u.position || "-"}</span>
-                        )}
-                      </td>
-                      <td className="py-2 text-right">
-                        {isEditing ? (
-                          <div className="flex items-center gap-1 justify-end">
-                            <button onClick={() => handleUpdateUser(u.id)} className="rounded p-1 text-green-600 hover:bg-green-50"><Save className="h-3.5 w-3.5" /></button>
-                            <button onClick={() => { setEditingUserId(null); setEditRole(""); setEditLevel(7); setEditPosition(""); }} className="rounded p-1 text-red-400 hover:bg-red-50"><X className="h-3.5 w-3.5" /></button>
-                          </div>
-                        ) : (
-                          <button onClick={() => startEditUser(u)} className="rounded p-1 text-slate-300 opacity-0 group-hover:opacity-100 transition hover:text-sky-600 hover:bg-sky-50"><Pencil className="h-3.5 w-3.5" /></button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Build flat list: parent, then its children immediately after
-  const sortedDepts = useMemo(() => {
-    const result: any[] = [];
-    const sortedParents = [...rootDepts].sort((a, b) => a.name.localeCompare(b.name));
-    sortedParents.forEach(p => {
-      result.push({ ...p, _isParent: true });
-      const children = childDepts.filter((c: any) => c.parentId === p.id).sort((a: any, b: any) => a.name.localeCompare(b.name));
-      children.forEach((c: any) => result.push({ ...c, _isParent: false }));
-    });
-    // Orphans (children whose parent was deleted)
-    const orphanChildren = childDepts.filter((c: any) => !rootDepts.find((r: any) => r.id === c.parentId)).sort((a: any, b: any) => a.name.localeCompare(b.name));
-    orphanChildren.forEach((c: any) => result.push({ ...c, _isParent: false }));
-    return result;
-  }, [rootDepts, childDepts]);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-slate-800">Departamentos</h3>
-          <p className="text-sm text-slate-500">{departments.length} departamento{departments.length !== 1 ? "s" : ""} · {users.filter((u: any) => u.department && u.isActive !== false).length} usuarios asignados</p>
+          <p className="text-sm text-slate-500">{departments.length} departamentos · {users.filter((u: any) => u.department && u.isActive !== false).length} usuarios asignados</p>
         </div>
         <Button onClick={openCreate} className="bg-sky-600 hover:bg-sky-700"><Plus className="mr-1.5 h-4 w-4" />Crear departamento</Button>
       </div>
@@ -405,22 +388,22 @@ export function DepartamentosTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {sortedDepts.map((dept: any) => {
-            const isExpanded = expandedId === dept.id;
-            return (
-              <div key={dept.id} className={dept._isParent ? "" : "relative"}>
-                {!dept._isParent && (
-                  <div className="absolute -left-3 top-5 bottom-0 w-0.5 bg-slate-200" />
-                )}
-                {renderCardHeader(dept, dept._isParent)}
-                {isExpanded && <div className="mt-2">{renderExpanded(dept)}</div>}
-              </div>
-            );
-          })}
+          {rootDepts.map((parent: any) => (
+            <div key={parent.id} className="contents">
+              {renderCard(parent)}
+              {childrenOf(parent.id).map((child: any) => (
+                <div key={child.id}>{renderCard(child)}</div>
+              ))}
+            </div>
+          ))}
+          {childDepts.filter((c: any) => !rootDepts.find((r: any) => r.id === c.parentId)).map((orphan: any) => (
+            <div key={orphan.id}>{renderCard(orphan)}</div>
+          ))}
         </div>
       )}
 
-      {renderModal()}
+      {renderFormModal()}
+      {renderTeamModal()}
     </div>
   );
 }
