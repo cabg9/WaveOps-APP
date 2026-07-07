@@ -5,7 +5,7 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2,
+  Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2, Building2,
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
@@ -23,12 +23,13 @@ import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
+import { DepartamentosTab } from './DepartamentosTab';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera';
+type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera';
 
 interface TabConfig {
   id: DevelopTab;
@@ -1150,6 +1151,7 @@ export default function DevelopsModule() {
     general: <GeneralTab />,
     usuarios: <UsuariosTab />,
     modulos: <ModulosTab />,
+    departamentos: <DepartamentosTab />,
     roles: <RolesTab />,
     auditoria: <AuditoriaTab />,
     seguridad: <SeguridadTab />,
