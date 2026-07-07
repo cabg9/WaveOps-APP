@@ -5,7 +5,8 @@ export interface Department {
   color: string;
   icon: string;
   isActive: boolean;
-  order: number;
+  parentId: string | null;
+  type: 'administrativo' | 'operativo' | 'otro';
   createdAt: string;
   updatedAt: string;
 }

@@ -16,7 +16,8 @@ function docToDepartment(id: string, data: any): Department {
     color: data.color || '#64748b',
     icon: data.icon || 'building',
     isActive: data.isActive !== false,
-    order: typeof data.order === 'number' ? data.order : 0,
+    parentId: data.parentId || null,
+    type: data.type || 'otro',
     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt?.toDate?.().toISOString() || data.updatedAt || new Date().toISOString(),
   };
@@ -31,7 +32,6 @@ export function useFirestoreDepartments() {
     setLoading(true);
     const q = query(
       collection(db, COLLECTION),
-      orderBy('order', 'asc'),
       orderBy('name', 'asc')
     );
     const unsub = onSnapshot(

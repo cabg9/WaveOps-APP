@@ -50,6 +50,7 @@ const TABS: TabConfig[] = [
   { id: 'general', label: 'General', icon: Settings, description: 'Configuracion general y feature flags', impact: 'medium' },
   { id: 'usuarios', label: 'Usuarios', icon: Users, description: 'Gestion de usuarios del sistema', impact: 'high' },
   { id: 'modulos', label: 'Modulos', icon: Puzzle, description: 'Activar/desactivar modulos', impact: 'high' },
+  { id: 'departamentos', label: 'Departamentos', icon: Building2, description: 'Gestion de departamentos', impact: 'high' },
   { id: 'roles', label: 'Roles', icon: UserCog, description: 'Plantillas de roles y permisos', impact: 'high' },
   { id: 'auditoria', label: 'Auditoria', icon: ClipboardList, description: 'Logs de actividad', impact: 'low' },
   { id: 'seguridad', label: 'Seguridad', icon: Lock, description: 'Politicas de seguridad', impact: 'high' },
