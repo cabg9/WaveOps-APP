@@ -220,6 +220,7 @@ export function useFirestoreUsers() {
       const docRef = await addDoc(collection(db, COLLECTION_NAME), {
         ...userForFirestore,
         tempPassword: userData.password,
+        mustChangePassword: true,
         createdAt: new Date().toISOString(),
       });
       return { id: docRef.id, password: userData.password };

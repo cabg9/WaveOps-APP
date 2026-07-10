@@ -95,6 +95,7 @@ export interface User {
   position: string;
   level: number; // 1-7
   isActive: boolean;
+  mustChangePassword?: boolean;
   avatar?: string;
   phone?: string;
 }

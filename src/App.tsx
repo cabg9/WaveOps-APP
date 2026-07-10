@@ -4,6 +4,8 @@
 
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { updateDoc, doc } from 'firebase/firestore';
+import { db } from '@/firebase-config';
 import { AuthProvider, useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { TasksProvider } from '@/hooks/useTasks';
@@ -12,6 +14,7 @@ import { Layout } from '@/components/Layout';
 import { Toaster } from '@/components/ui/sonner';
 import { InitializeFirestore } from '@/components/InitializeFirestore';
 import { CreateAuthUsers } from '@/components/CreateAuthUsers';
+import { ChangePasswordModal } from '@/components/ChangePasswordModal';
 
 // ═══════════════════════════════════════════════════════════════════
 // PÁGINAS
@@ -133,7 +136,28 @@ interface ProtectedRouteProps {
 }
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, updateUser } = useAuth();
+  const [showChangePassword, setShowChangePassword] = React.useState(false);
+
+  React.useEffect(() => {
+    if (user?.mustChangePassword) {
+      setShowChangePassword(true);
+    }
+  }, [user?.mustChangePassword]);
+
+  const handlePasswordChanged = async () => {
+    if (!user?.id) return;
+    try {
+      // Actualizar Firestore
+      const userDoc = doc(db, 'users', user.id);
+      await updateDoc(userDoc, { mustChangePassword: false });
+      // Actualizar estado local
+      updateUser({ mustChangePassword: false });
+      setShowChangePassword(false);
+    } catch (err) {
+      console.error('Error actualizando mustChangePassword:', err);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -150,7 +174,15 @@ function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <ChangePasswordModal 
+        isOpen={showChangePassword} 
+        onPasswordChanged={handlePasswordChanged} 
+      />
+    </>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════

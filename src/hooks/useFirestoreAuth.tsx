@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             position: userData.position || '',
             level: userData.level || 7,
             isActive: userData.isActive !== false,
+            mustChangePassword: userData.mustChangePassword || false,
           });
         } else {
           setUser({
@@ -59,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             position: '',
             level: 7,
             isActive: true,
+            mustChangePassword: false,
           });
         }
       } catch (error) {
