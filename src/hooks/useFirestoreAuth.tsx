@@ -12,7 +12,8 @@ import {
   getDocs 
 } from 'firebase/firestore';
 import { auth, db } from '@/firebase-config';
-import { User, AuthContextType, Role, Department } from '@/types';
+import { User, AuthContextType, Role } from '@/types';
+import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const { defaultDepartment } = useDynamicDepartments();
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser: FirebaseUser | null) => {
       if (!fbUser) {
@@ -42,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: fbUser.email || '',
             name: userData.name || fbUser.displayName || 'Usuario',
             role: userData.role || Role.STAFF,
-            department: userData.department || Department.DIVE_SHOP,
+            department: userData.department || defaultDepartment,
             position: userData.position || '',
             level: userData.level || 7,
             isActive: userData.isActive !== false,
@@ -53,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email: fbUser.email || '',
             name: fbUser.displayName || 'Usuario',
             role: Role.STAFF,
-            department: Department.DIVE_SHOP,
+            department: defaultDepartment,
             position: '',
             level: 7,
             isActive: true,
@@ -85,7 +87,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: fbUser.email || '',
           name: userData.name || fbUser.displayName || 'Usuario',
           role: userData.role || Role.STAFF,
-          department: userData.department || Department.DIVE_SHOP,
+          department: userData.department || defaultDepartment,
           position: userData.position || '',
           level: userData.level || 7,
           isActive: userData.isActive !== false,
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: fbUser.email || '',
           name: fbUser.displayName || 'Usuario',
           role: Role.STAFF,
-          department: Department.DIVE_SHOP,
+          department: defaultDepartment,
           position: '',
           level: 7,
           isActive: true,

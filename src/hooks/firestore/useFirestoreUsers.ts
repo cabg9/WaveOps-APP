@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '@/firebase-config';
 import { createUserWithEmailAndPassword, deleteUser as deleteAuthUser } from 'firebase/auth';
-import { Department, Role } from '@/types';
+import { Role } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
@@ -30,7 +30,7 @@ export interface FirestoreUser {
   email: string;
   name: string;
   role: Role;
-  department: Department;
+  department: string;
   position: string;
   level: number;
   isActive: boolean;
@@ -143,7 +143,7 @@ export function useFirestoreUsers() {
   // OBTENER USUARIOS POR DEPARTAMENTO
   // ═══════════════════════════════════════════════════════════════════
 
-  const getUsersByDepartment = useCallback(async (department: Department): Promise<FirestoreUser[]> => {
+  const getUsersByDepartment = useCallback(async (department: string): Promise<FirestoreUser[]> => {
     try {
       const q = query(
         collection(db, COLLECTION_NAME),

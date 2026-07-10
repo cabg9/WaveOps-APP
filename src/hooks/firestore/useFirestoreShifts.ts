@@ -17,12 +17,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { shifts as staticShifts } from '@/data/shifts';
-import { Department, AssignmentStatus } from '@/types';
+import { AssignmentStatus } from '@/types';
 
 export interface FirestoreShift {
   id: string;
   name: string;
-  department: Department;
+  department: string;
   startTime: string;
   endTime: string;
   color: string;
@@ -142,7 +142,7 @@ export function useFirestoreShifts() {
 
 
   // Obtener turnos por departamento
-  const getShiftsByDepartment = useCallback((department: Department) => {
+  const getShiftsByDepartment = useCallback((department: string) => {
     return allShifts.filter(s => s.department === department);
   }, [allShifts]);
   // Obtener turno por ID
@@ -162,7 +162,7 @@ export function useFirestoreShifts() {
   }, [assignments, getShiftById]);
 
   // Obtener asignaciones de una semana
-  const getWeekAssignments = useCallback((department: Department | 'ALL', weekStart: Date): FirestoreAssignment[] => {
+  const getWeekAssignments = useCallback((department: string | 'ALL', weekStart: Date): FirestoreAssignment[] => {
     const startStr = toLocalISODate(weekStart);
     const endDate = new Date(weekStart);
     endDate.setDate(weekStart.getDate() + 6);
@@ -202,7 +202,7 @@ export function useFirestoreShifts() {
   }, []);
 
   // Publicar asignaciones
-  const publishAssignments = useCallback(async (department: Department | 'ALL', weekStart: Date, publishedBy: string): Promise<void> => {
+  const publishAssignments = useCallback(async (department: string | 'ALL', weekStart: Date, publishedBy: string): Promise<void> => {
     try {
       const weekAssignments = getWeekAssignments(department, weekStart);
       const borradorAssignments = weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR);
@@ -222,7 +222,7 @@ export function useFirestoreShifts() {
   }, [getWeekAssignments]);
 
   // Contar borradores
-  const getBorradorCount = useCallback((department: Department | 'ALL', weekStart: Date): number => {
+  const getBorradorCount = useCallback((department: string | 'ALL', weekStart: Date): number => {
     const weekAssignments = getWeekAssignments(department, weekStart);
     return weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR).length;
   }, [getWeekAssignments]);

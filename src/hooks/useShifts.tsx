@@ -6,7 +6,7 @@ import React, { createContext, useContext } from 'react';
 import { useFirestoreShifts } from './firestore/useFirestoreShifts';
 import { shifts as staticShifts } from '@/data/shifts';
 import { useFirestoreUsers } from './firestore/useFirestoreUsers';
-import { Department, AssignmentStatus } from '@/types';
+import { AssignmentStatus } from '@/types';
 import { addDaysToDate, format } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -42,7 +42,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     })),
     isLoading: shiftsHook.loading,
 
-    getShiftsByDepartment: (department: Department) => {
+    getShiftsByDepartment: (department: string) => {
       return shifts.filter((s: any) => s.department === department);
     },
 
@@ -56,14 +56,14 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
         .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
     },
 
-    getDepartmentShifts: (department: Department, date: string) => {
+    getDepartmentShifts: (department: string, date: string) => {
       return shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
         return shift?.department === department && a.date === date;
       });
     },
 
-    getWeekAssignments: (department: Department, weekStart: Date) => {
+    getWeekAssignments: (department: string, weekStart: Date) => {
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endDate = addDaysToDate(weekStart, 6);
       const endStr = format(endDate, 'yyyy-MM-dd');
@@ -92,7 +92,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       return shiftsHook.assignments.find((a: any) => a.id === id);
     },
 
-    getUsersByDepartment: (department: Department) => {
+    getUsersByDepartment: (department: string) => {
       return usersHook.users.filter((u: any) => u.department === department && u.isActive);
     },
 
@@ -102,7 +102,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       );
     },
 
-    getUsersOnShift: (department: Department, date: string) => {
+    getUsersOnShift: (department: string, date: string) => {
       const deptAssignments = shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
         return shift?.department === department && a.date === date;
@@ -112,15 +112,15 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       return usersHook.users.filter((u: any) => userIds.includes(u.id));
     },
 
-    publishAssignments: (department: Department | 'ALL', weekStart: Date, publishedBy: string) => {
+    publishAssignments: (department: string | 'ALL', weekStart: Date, publishedBy: string) => {
       shiftsHook.publishAssignments(department, weekStart, publishedBy);
     },
 
-    getBorradorCount: (department: Department | 'ALL', weekStart: Date) => {
+    getBorradorCount: (department: string | 'ALL', weekStart: Date) => {
       return shiftsHook.getBorradorCount(department, weekStart);
     },
 
-    validateDayRequirements: (department: Department, date: string) => {
+    validateDayRequirements: (department: string, date: string) => {
       return { isValid: true, errors: [] };
     },
   };

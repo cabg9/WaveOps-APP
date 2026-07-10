@@ -64,7 +64,8 @@ import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFir
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
-import { Department, Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users } from '@/data/users';
 import {
@@ -154,7 +155,7 @@ type TabType = 'mi-horario' | 'equipo' | 'asignar' | 'solicitudes' | 'incapacida
 interface IncapacidadesTabProps {
   incapacityDates: { date: string; type: string; userId: string }[];
   setIncapacityDates: React.Dispatch<React.SetStateAction<{ date: string; type: string; userId: string }[]>>;
-  getUsersByDepartment: (dept: Department) => { id: string; name: string; department: Department; isActive: boolean; position?: string; avatar?: string; initials?: string }[];
+  getUsersByDepartment: (dept: string) => { id: string; name: string; department: string; isActive: boolean; position?: string; avatar?: string; initials?: string }[];
   activeSubTab: 'mias' | 'equipo';
   myFilter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial';
   setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
@@ -218,7 +219,7 @@ export default function HorariosModule() {
     localStorage.setItem('waveops_incapacity_dates', JSON.stringify(dates));
   }, [incapacidades]);
   
-  const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => {
+  const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => {
     // Encontrar usuario en el array local o usar la info proporcionada
     let userInfo = users.find(u => u.id === userId);
     
@@ -229,7 +230,7 @@ export default function HorariosModule() {
         name: userInfoOverride.name,
         email: '',
         role: Role.STAFF,
-        department: userInfoOverride.department,
+        department: userInfoOverride.department as any,
         position: '',
         level: 7,
         isActive: true,
@@ -442,12 +443,13 @@ export default function HorariosModule() {
 
 interface MiHorarioTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
-  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => Promise<void>;
+  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => Promise<void>;
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
 }
 
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
   const { user } = useAuth();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { getUserShifts, getUsersByDepartment } = useShifts();
   const { users: firestoreUsers } = useFirestoreUsers();
   // Encontrar el usuario en Firestore por email para obtener su ID correcto
@@ -1240,7 +1242,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                           const selectedShift = dayShifts.find(s => s.id === selectedShiftForChange);
                           if (!selectedShift) return null;
                           // Obtener turnos del mismo departamento excepto el seleccionado
-                          const availableShifts = Object.values(Department)
+                          const availableShifts = departmentCodes
                             .flatMap(dept => getUsersByDepartment(dept))
                             .flatMap(u => getUserShifts(u.id, expandedDate))
                             .filter(s => s.department === selectedShift.department && s.id !== selectedShift.id)
@@ -1271,7 +1273,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 
                     {/* Compañeros disponibles */}
                     {selectedTargetShift && (() => {
-                      const targetShift = Object.values(Department)
+                      const targetShift = departmentCodes
                         .flatMap(dept => getUsersByDepartment(dept))
                         .flatMap(u => getUserShifts(u.id, expandedDate))
                         .find(s => s.id === selectedTargetShift);
@@ -1279,7 +1281,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       if (!targetShift) return null;
                       
                       // Usuarios que tienen este turno ese día
-                      const availableUsers = Object.values(Department)
+                      const availableUsers = departmentCodes
                         .flatMap(dept => getUsersByDepartment(dept))
                         .filter(u => u.id !== user?.id)
                         .filter(u => {
@@ -1352,7 +1354,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                           if (dayShifts.length === 0) return null;
                           const userDept = dayShifts[0]?.department;
                           
-                          const swapUsers = Object.values(Department)
+                          const swapUsers = departmentCodes
                             .flatMap(dept => getUsersByDepartment(dept))
                             .filter(u => u.id !== user?.id && u.department === userDept)
                             .filter(u => {
@@ -1395,7 +1397,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 
                     {/* Vista previa del intercambio */}
                     {selectedSwapUser && (() => {
-                      const swapUser = Object.values(Department)
+                      const swapUser = departmentCodes
                         .flatMap(dept => getUsersByDepartment(dept))
                         .find(u => u.id === selectedSwapUser);
                       const swapUserShifts = swapUser ? getUserShifts(swapUser.id, expandedDate) : [];
@@ -1472,12 +1474,12 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       : (!selectedSwapUser || dayShifts.length === 0)}
                     onClick={() => {
                       const now = new Date().toISOString();
-                      const swapUser = selectedSwapUser ? Object.values(Department)
+                      const swapUser = selectedSwapUser ? departmentCodes
                         .flatMap(dept => getUsersByDepartment(dept))
                         .find(u => u.id === selectedSwapUser) : null;
                       
                       const selectedShift = dayShifts.find(s => s.id === selectedShiftForChange);
-                      const targetShift = selectedTargetShift ? Object.values(Department)
+                      const targetShift = selectedTargetShift ? departmentCodes
                         .flatMap(dept => getUsersByDepartment(dept))
                         .flatMap(u => getUserShifts(u.id, expandedDate))
                         .find(s => s.id === selectedTargetShift) : null;
@@ -1493,8 +1495,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         a: swapUser?.name || 'Usuario',
                         deCargo: user?.position || 'Voluntario',
                         aCargo: swapUser?.position || 'Voluntario',
-                        deDept: user?.department || Department.DIVE_SHOP,
-                        aDept: swapUser?.department || Department.DIVE_SHOP,
+                        deDept: user?.department || defaultDepartment,
+                        aDept: swapUser?.department || defaultDepartment,
                         // Turnos del usuario que solicita (de)
                         deTurnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
                         deTurnoNuevo: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
@@ -1608,14 +1610,15 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 interface EquipoTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
-  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: Department }) => Promise<void>;
+  addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => Promise<void>;
 }
 
 function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity }: EquipoTabProps) {
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { getTasksByUser } = useTasks();
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
   const [weekOffset, setWeekOffset] = useState(0);
   
   // Modales
@@ -1661,7 +1664,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   const assignments = useMemo(() => {
     if (selectedDepartment === 'ALL') {
       const allAssignments: ShiftAssignment[] = [];
-      Object.values(Department).forEach(dept => {
+      departmentCodes.forEach(dept => {
         allAssignments.push(...getWeekAssignments(dept, weekStart));
       });
       return allAssignments;
@@ -1680,7 +1683,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       .sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
-  const departments = Object.values(Department);
+  const departments = departmentOptions;
   
   const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL || 
                                 user?.role === Role.DIRECTOR || 
@@ -1766,7 +1769,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department | 'ALL')}>
+        <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
           <SelectTrigger className="w-full sm:w-56">
             <SelectValue>
               {selectedDepartment === 'ALL' ? (
@@ -1792,10 +1795,10 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
               </SelectItem>
             )}
             {departments.map(dept => (
-              <SelectItem key={dept} value={dept}>
+              <SelectItem key={dept.code} value={dept.code}>
                 <div className="flex items-center gap-2">
-                  <DeptIcon department={dept} className="w-4 h-4" />
-                  <span>{dept.replace(/_/g, ' ')}</span>
+                  <DeptIcon department={dept.code} className="w-4 h-4" />
+                  <span>{dept.name}</span>
                 </div>
               </SelectItem>
             ))}
@@ -2962,7 +2965,6 @@ interface AsignarTabProps {
 function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate }: AsignarTabProps) {
   const { user } = useAuth();
   const { 
-    shifts,
     assignments: allAssignments,
     getShiftsByDepartment, 
     getUsersByDepartment, 
@@ -2971,9 +2973,11 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     publishAssignments,
     getBorradorCount,
     removeShift,
+    shifts,
   } = useShifts();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   // Permitir 'ALL' para ver todos los departamentos (según permisos)
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -3056,7 +3060,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
         weekDates.push(format(date, 'yyyy-MM-dd'));
       }
       return weekDates.flatMap(date => 
-        Object.values(Department).flatMap(dept => 
+        departmentCodes.flatMap(dept => 
           getWeekAssignments(dept, weekStart).filter(a => a.date === date)
         )
       );
@@ -3080,7 +3084,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
   
   // Contar eliminaciones pendientes
-  const getPendingDeletionsCount = (dept: Department | 'ALL', weekStart: Date): number => {
+  const getPendingDeletionsCount = (dept: string | 'ALL', weekStart: Date): number => {
     const weekDates: string[] = [];
     for (let i = 0; i < 7; i++) {
       const date = addDaysToDate(weekStart, i);
@@ -3123,7 +3127,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     }
   };
 
-  const departments = Object.values(Department);
+  const departments = departmentOptions;
 
   return (
     <DndContext
@@ -3139,7 +3143,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
           </div>
           
           <div className="mb-3 lg:mb-4">
-            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department | 'ALL')}>
+            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
               <SelectTrigger className="w-full">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
@@ -3168,10 +3172,10 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   </SelectItem>
                 )}
                 {departments.map(dept => (
-                  <SelectItem key={dept} value={dept}>
+                  <SelectItem key={dept.code} value={dept.code}>
                     <div className="flex items-center gap-2">
-                      <DeptIcon department={dept} className="w-4 h-4" />
-                      <span>{dept.replace(/_/g, ' ')}</span>
+                      <DeptIcon department={dept.code} className="w-4 h-4" />
+                      <span>{dept.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -3413,7 +3417,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 // COMPONENTE DE ICONO DE DEPARTAMENTO
 // ═══════════════════════════════════════════════════════════════════
 
-function DeptIcon({ department, className = 'w-4 h-4' }: { department: Department; className?: string }) {
+function DeptIcon({ department, className = 'w-4 h-4' }: { department: string; className?: string }) {
   const iconProps = { className };
   
   switch (DEPT_ICON_KEYS[department]) {
@@ -3504,12 +3508,13 @@ function IncapacidadesTab({
   addDocumentToIncapacidad
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   
   // Hook de Storage para subir imágenes
   const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
   
   // Filtros para pestaña "Equipo"
-  const [selectedDepartment, setSelectedDepartment] = useState<Department | 'ALL'>(user?.department || Department.DIVE_SHOP);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
   const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
   
   const [expandedIncapacityId, setExpandedIncapacityId] = useState<string | null>(null);
@@ -3591,14 +3596,14 @@ function IncapacidadesTab({
   const getReplacementUsers = (incapacity: Incapacidad, external: boolean = false) => {
     if (external) {
       // Obtener usuarios de OTROS departamentos
-      return Object.values(Department)
+      return departmentCodes
         .flatMap(dept => dept !== incapacity.userDepartment ? getUsersByDepartment(dept) : [])
         .filter(u => u.id !== incapacity.userId && u.isActive);
     }
     // Usuarios del mismo departamento
     const deptUsers = selectedDepartment === 'ALL' 
       ? getUsersByDepartment(incapacity.userDepartment)
-      : getUsersByDepartment(selectedDepartment as Department);
+      : getUsersByDepartment(selectedDepartment);
     return deptUsers.filter(u => u.id !== incapacity.userId && u.isActive);
   };
 
@@ -3833,7 +3838,7 @@ function IncapacidadesTab({
     }
   };
 
-  const departments = Object.values(Department);
+  const departments = departmentOptions;
   const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL || 
                                 user?.role === Role.DIRECTOR || 
                                 user?.role === Role.GERENTE_OPERACIONES;
@@ -4006,7 +4011,7 @@ function IncapacidadesTab({
         {/* Celda 3: Selector de departamento */}
         <div className="min-w-0">
           {activeSubTab === 'equipo' ? (
-            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as Department | 'ALL')}>
+            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
               <SelectTrigger className="w-full h-10">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
@@ -4032,10 +4037,10 @@ function IncapacidadesTab({
                   </SelectItem>
                 )}
                 {departments.map(dept => (
-                  <SelectItem key={dept} value={dept}>
+                  <SelectItem key={dept.code} value={dept.code}>
                     <div className="flex items-center gap-2">
-                      <DeptIcon department={dept} className="w-4 h-4" />
-                      <span>{dept.replace(/_/g, ' ')}</span>
+                      <DeptIcon department={dept.code} className="w-4 h-4" />
+                      <span>{dept.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -5009,10 +5014,11 @@ interface Solicitud {
 
 function SolicitudesTab() {
   const { user } = useAuth();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
-  const [equipoDeptFilter, setEquipoDeptFilter] = useState<Department | 'ALL'>('ALL');
+  const [equipoDeptFilter, setEquipoDeptFilter] = useState<string | 'ALL'>('ALL');
   
   // Estado para modal de deshacer cambio
   const [showUndoModal, setShowUndoModal] = useState(false);
@@ -5813,16 +5819,16 @@ function SolicitudesTab() {
           {/* Filtros para Equipo */}
           <div className="flex flex-col sm:flex-row gap-2">
             {/* Selector de departamento */}
-            <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as Department | 'ALL')}>
+            <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
               <SelectTrigger className="w-full sm:w-[160px] bg-white border-[#E5E5E7]">
                 <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">Todos</SelectItem>
-                {Object.values(Department).map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept.replace(/_/g, ' ')}
+                {departmentOptions.map((opt) => (
+                  <SelectItem key={opt.code} value={opt.code}>
+                    {opt.name}
                   </SelectItem>
                 ))}
               </SelectContent>

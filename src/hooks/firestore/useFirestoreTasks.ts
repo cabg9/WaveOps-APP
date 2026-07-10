@@ -17,7 +17,7 @@ import {
   arrayUnion,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { TaskStatus, TaskPriority, Department, Note, Subtask } from '@/types';
+import { TaskStatus, TaskPriority, Note, Subtask } from '@/types';
 
 export interface FirestoreTask {
   id: string;
@@ -28,7 +28,7 @@ export interface FirestoreTask {
   priority: TaskPriority;
   assignedTo: string[];
   assignedToName?: string;
-  department: Department;
+  department: string;
   dueDate: string;
   dueTime?: string;
   createdAt: string;
@@ -157,7 +157,7 @@ export function useFirestoreTasks() {
   }, []);
 
   // Obtener tareas por departamento
-  const getTasksByDepartment = useCallback(async (department: Department): Promise<FirestoreTask[]> => {
+  const getTasksByDepartment = useCallback(async (department: string): Promise<FirestoreTask[]> => {
     try {
       const { getDocs } = await import('firebase/firestore');
       const q = query(

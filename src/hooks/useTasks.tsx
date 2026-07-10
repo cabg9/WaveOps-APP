@@ -5,7 +5,8 @@
 import React, { createContext, useContext } from 'react';
 import { useFirestoreTasks } from './firestore/useFirestoreTasks';
 import { useFirestoreIncidencias } from './firestore/useFirestoreIncidencias';
-import { TaskStatus, TaskType, TaskPriority, Department } from '@/types';
+import { TaskStatus, TaskType, TaskPriority } from '@/types';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXT
@@ -23,6 +24,7 @@ interface TasksProviderProps {
 
 export function TasksProvider({ children }: TasksProviderProps) {
   const tasksHook = useFirestoreTasks();
+  const { defaultDepartment } = useDynamicDepartments();
   const incidenciasHook = useFirestoreIncidencias();
 
   const value = {
@@ -49,7 +51,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
 
     getTasksByUser: (userId: string) => tasksHook.tasks.filter((t: any) => t.assignedTo === userId),
 
-    getTasksByDepartment: (department: Department) => tasksHook.tasks.filter((t: any) => t.department === department),
+    getTasksByDepartment: (department: string) => tasksHook.tasks.filter((t: any) => t.department === department),
 
     getTasksByStatus: (status: TaskStatus) => tasksHook.tasks.filter((t: any) => t.status === status),
 
@@ -67,7 +69,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
         status: TaskStatus.PENDING,
         priority: task.priority || TaskPriority.MEDIUM,
         assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo || []),
-        department: task.department || Department.DIVE_SHOP,
+        department: task.department || defaultDepartment,
         dueDate: task.dueDate || new Date().toISOString(),
         dueTime: task.dueTime || '',
         createdBy: task.createdBy || '',

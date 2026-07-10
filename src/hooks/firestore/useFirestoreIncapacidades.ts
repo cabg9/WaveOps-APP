@@ -40,7 +40,7 @@ export interface Incapacidad {
   userId: string;
   userName: string;
   userAvatar: string;
-  userDepartment: Department;
+  userDepartment: string;
   type: string;
   startDate: string;
   endDate: string;

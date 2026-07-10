@@ -16,7 +16,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { Incidencia, IncidenciaStatus, TaskPriority, Department, PhotoItem } from '@/types';
+import { Incidencia, IncidenciaStatus, TaskPriority, PhotoItem } from '@/types';
+import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 
 // ═══════════════════════════════════════════════════════════════════
 // UTILS
@@ -38,6 +39,7 @@ export function useFirestoreIncidencias() {
   const [incidencias, setIncidencias] = useState<Incidencia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { defaultDepartment } = useDynamicDepartments();
 
   const collectionRef = collection(db, 'incidencias');
 
@@ -58,7 +60,7 @@ export function useFirestoreIncidencias() {
             priority: data.priority || TaskPriority.MEDIUM,
             reportedBy: data.reportedBy || '',
             reportedFor: data.reportedFor || undefined,
-            targetDepartment: data.targetDepartment || Department.DIVE_SHOP,
+            targetDepartment: data.targetDepartment || defaultDepartment,
             confirmedBy: data.confirmedBy || undefined,
             confirmedAt: data.confirmedAt ? timestampToISO(data.confirmedAt) : undefined,
             verifiedByList: data.verifiedByList || [],
@@ -109,8 +111,8 @@ export function useFirestoreIncidencias() {
       description: string;
       priority?: TaskPriority;
       reportedBy: string;
-      targetDepartment: Department;
-      targetDepartments?: Department[];
+      targetDepartment: string;
+      targetDepartments?: string[];
       photos?: PhotoItem[];
     }) => {
       const docRef = await addDoc(collectionRef, {

@@ -14,7 +14,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Task, TaskPriority, Department, Subtask } from "@/types";
+import { Task, TaskPriority, Subtask } from "@/types";
+import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +27,6 @@ interface EditTaskModalProps {
   canEditAll: boolean;
 }
 
-const DEPARTMENTS = Object.values(Department);
 
 const priorityConfig: Record<string, { label: string; color: string }> = {
   LOW: { label: "Baja", color: "bg-[#8E8E93]" },
@@ -38,13 +38,14 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 const timeButtons = [5, 10, 15, 20, 30, 40, 50, 60];
 
 export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: EditTaskModalProps) {
+  const { departmentNames, defaultDepartment } = useDynamicDepartments();
   const { users: allUsers } = useFirestoreUsers();
 
   // === ESTADOS ===
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
-  const [department, setDepartment] = useState<Department>(Department.DIVE_SHOP);
+  const [department, setDepartment] = useState<string>(defaultDepartment);
   const [dueDate, setDueDate] = useState("");
   const [dueTime, setDueTime] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState<number | "">("");
@@ -58,7 +59,7 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [showSupport, setShowSupport] = useState(false);
-  const [supportDepartment, setSupportDepartment] = useState<Department | "">("");
+  const [supportDepartment, setSupportDepartment] = useState<string | "">("");
 
   // Cargar datos
   useEffect(() => {
@@ -66,7 +67,7 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
       setTitle(task.title || "");
       setDescription(task.description || "");
       setPriority(task.priority || TaskPriority.MEDIUM);
-      setDepartment(task.department || Department.DIVE_SHOP);
+      setDepartment(task.department || defaultDepartment);
       setDueDate(task.dueDate || "");
       setDueTime(task.dueTime || "");
       setEstimatedMinutes(task.estimatedMinutes || "");
@@ -204,7 +205,7 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
             <div>
               <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Departamento</Label>
               <div className="grid grid-cols-2 gap-2">
-                {DEPARTMENTS.map((dept) => (
+                {departmentNames.map((dept) => (
                   <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setDepartment(dept); setAssignedTo([]); setSupervisorId(""); }}
                     className={cn("py-3 px-4 rounded-xl text-sm font-medium border-2 transition-all capitalize", department === dept ? "border-[#007AFF] bg-[#007AFF]/5 text-[#007AFF]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "opacity-50 cursor-not-allowed")}>
                     {dept.replace(/_/g, " ").toLowerCase()}
@@ -315,7 +316,7 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
                 <div>
                   <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Departamento de apoyo</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    {DEPARTMENTS.filter((d) => d !== department).map((dept) => (
+                    {departmentNames.filter((d) => d !== department).map((dept) => (
                       <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setSupportDepartment(dept); setSupportUserIds([]); }}
                         className={cn("py-3 px-4 rounded-xl text-sm font-medium border-2 transition-all capitalize", supportDepartment === dept ? "border-[#FF9500] bg-[#FF9500]/5 text-[#FF9500]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "opacity-50 cursor-not-allowed")}>
                         {dept.replace(/_/g, " ").toLowerCase()}

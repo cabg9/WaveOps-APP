@@ -91,7 +91,7 @@ export interface User {
   email: string;
   password?: string; // Para usuarios de prueba
   role: Role;
-  department: Department;
+  department: string;
   position: string;
   level: number; // 1-7
   isActive: boolean;
@@ -134,7 +134,7 @@ export interface Task {
   createdBy: string; // userId
   assignedTo: string[]; // userIds
   supervisorId?: string; // userId
-  department: Department;
+  department: string;
   dueDate: string; // ISO date YYYY-MM-DD
   dueTime?: string; // HH:MM - hora límite calculada
   startTime?: string; // HH:MM
@@ -166,7 +166,7 @@ export interface Incidencia {
   priority: TaskPriority;
   reportedBy: string; // userId
   reportedFor?: string; // userId (opcional)
-  targetDepartment: Department;
+  targetDepartment: string;
   confirmedBy?: string; // userId
   confirmedAt?: string; // ISO date
   verifiedByList?: string[]; // userIds que han verificado
@@ -190,7 +190,7 @@ export interface Incidencia {
 export interface Shift {
   id: string;
   name: string;
-  department: Department;
+  department: string;
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   color?: string; // hex color
@@ -221,10 +221,10 @@ export interface ShiftAssignment {
 
 // Validaciones de límites por departamento
 export interface DepartmentValidation {
-  department: Department;
+  department: string;
   minManagerOrSupervisor: boolean; // Siempre debe haber gerente o supervisor
   shiftRequirements: Record<string, ShiftValidationRequirement[]>; // Requisitos por turno
-  crossDepartmentManagers?: Department[]; // Gerentes de otros deptos que pueden cubrir
+  crossDepartmentManagers?: string[]; // Gerentes de otros deptos que pueden cubrir
 }
 
 export interface ShiftValidationRequirement {
@@ -240,7 +240,7 @@ export interface ShiftValidationRequirement {
 export interface TaskFilters {
   status?: TaskStatus;
   priority?: TaskPriority;
-  department?: Department;
+  department?: string;
   assignedTo?: string;
   timeFilter?: TimeFilter;
   search?: string;
@@ -249,7 +249,7 @@ export interface TaskFilters {
 export interface IncidenciaFilters {
   status?: IncidenciaStatus;
   priority?: TaskPriority;
-  department?: Department;
+  department?: string;
   timeFilter?: TimeFilter;
 }
 
@@ -343,7 +343,7 @@ export interface TasksContextType {
   getTasks: (filters?: TaskFilters) => Task[];
   getTaskById: (id: string) => Task | undefined;
   getTasksByUser: (userId: string) => Task[];
-  getTasksByDepartment: (department: Department) => Task[];
+  getTasksByDepartment: (department: string) => Task[];
   getTasksByStatus: (status: TaskStatus) => Task[];
   getOverdueTasks: () => Task[];
   createTask: (task: Partial<Task>) => void;
@@ -377,10 +377,10 @@ export interface ShiftsContextType {
   shifts: Shift[];
   assignments: ShiftAssignment[];
   isLoading: boolean;
-  getShiftsByDepartment: (department: Department) => Shift[];
+  getShiftsByDepartment: (department: string) => Shift[];
   getUserShifts: (userId: string, date: string) => Shift[];
-  getDepartmentShifts: (department: Department, date: string) => ShiftAssignment[];
-  getWeekAssignments: (department: Department, weekStart: Date) => ShiftAssignment[];
+  getDepartmentShifts: (department: string, date: string) => ShiftAssignment[];
+  getWeekAssignments: (department: string, weekStart: Date) => ShiftAssignment[];
   assignShift: (userId: string, shiftId: string, date: string, assignedBy: string) => void;
   removeShift: (assignmentId: string) => void;
   getShiftById: (id: string) => Shift | undefined;

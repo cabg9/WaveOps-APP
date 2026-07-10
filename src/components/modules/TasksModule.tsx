@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useTasks } from '@/hooks/useTasks';
 import {
   Task, TaskStatus, TaskPriority, TaskType, TimeFilter,
-  IncidenciaStatus, Department, Role, Incidencia, TaskRecurrence,
+  IncidenciaStatus, Role, Incidencia, TaskRecurrence,
 } from '@/types';
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
@@ -27,6 +27,7 @@ import {
 } from '@/lib/utils';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
   const getLocalDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
   const getLocalDateFromISO = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -61,6 +62,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
@@ -77,14 +79,14 @@ export default function TasksModule() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
-  const allDepartments = useMemo(() => Object.values(Department).sort(), []);
+  const allDepartments = departmentOptions;
 
   const [taskForm, setTaskForm] = useState({
-    title: '', description: '', department: Department.ADMINISTRATIVO,
+    title: '', description: '', department: defaultDepartment,
     priority: TaskPriority.MEDIUM, startDate: getLocalDate(),
     startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [] as string[],
     requiresPhoto: false, subtasks: [] as { id: string; title: string; completed: boolean }[],
-    selectedShifts: [] as string[], supportDepartment: '' as Department | '',
+    selectedShifts: [] as string[], supportDepartment: '' as string | '',
     supportUsers: [] as string[],
     recurrence: TaskRecurrence.NONE,
   });
@@ -120,20 +122,20 @@ export default function TasksModule() {
     catch (err) { console.error('Error:', err); }
   };
   const [incidenciaPhotos, setIncidenciaPhotos] = useState<string[]>([]);
-  const [incidenciaForm, setIncidenciaForm] = useState<{ title: string; description: string; department: Department; targetDepartments: Department[]; priority: TaskPriority }>({
-    title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH,
+  const [incidenciaForm, setIncidenciaForm] = useState<{ title: string; description: string; department: string; targetDepartments: string[]; priority: TaskPriority }>({
+    title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH,
   });
 
   const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia') => {
     setCreateType(type);
     setTaskForm({
-      title: '', description: '', department: Department.ADMINISTRATIVO,
+      title: '', description: '', department: defaultDepartment,
       priority: TaskPriority.MEDIUM, startDate: getLocalDate(),
       startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [],
       requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
     });
-    setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [], priority: TaskPriority.HIGH });
+    setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
   };
 
@@ -337,7 +339,7 @@ export default function TasksModule() {
               <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]"><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (<SelectItem key={dept} value={dept} className={dept === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.replace(/_/g, ' ')}{dept === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.code === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.code === user?.department ? ' (tú)' : ''}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -361,7 +363,7 @@ export default function TasksModule() {
                 <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {allDepartments.map((dept) => (<SelectItem key={dept} value={dept} className={dept === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.replace(/_/g, ' ')}{dept === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.code === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.code === user?.department ? ' (tú)' : ''}</SelectItem>))}
                 </SelectContent>
               </Select>
             )}
@@ -460,7 +462,7 @@ export default function TasksModule() {
                   <Label>Departamentos reportados *</Label>
                   <div className="flex flex-wrap gap-2">
                     {allDepartments.map((dept) => (
-                      <button key={dept} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept) ? prev.targetDepartments.filter(d => d !== dept) : [...prev.targetDepartments, dept] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.replace(/_/g, ' ')}</button>
+                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.code) ? prev.targetDepartments.filter(d => d !== dept.code) : [...prev.targetDepartments, dept.code] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.code) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
                     ))}
                   </div>
                 </div>
@@ -487,7 +489,7 @@ export default function TasksModule() {
                 </div>
                 <div className="flex justify-end gap-3 pt-4 pb-6">
                   <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
-                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || Department.ADMINISTRATIVO, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: Department.ADMINISTRATIVO, targetDepartments: [] as Department[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
+                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || defaultDepartment, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
                 </div>
               </div>
             ) : (
@@ -513,11 +515,11 @@ export default function TasksModule() {
 
 interface TaskFormModalProps {
   createType: 'extra' | 'specific';
-  taskForm: { title: string; description: string; department: Department; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: Department | ''; supportUsers: string[]; recurrence: TaskRecurrence; };
+  taskForm: { title: string; description: string; department: string; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: string; supportUsers: string[]; recurrence: TaskRecurrence; };
   setTaskForm: React.Dispatch<React.SetStateAction<TaskFormModalProps['taskForm']>>;
   newSubtaskTitle: string;
   setNewSubtaskTitle: React.Dispatch<React.SetStateAction<string>>;
-  allDepartments: Department[];
+  allDepartments: { code: string; name: string }[];
   supervisorsByDepartment: { id: string; name: string; position: string; role: string }[];
   calculatedDueDate: string;
   calculatedDueTime: string;
@@ -602,13 +604,13 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <div className="grid grid-cols-2 gap-2">
           {(() => {
             const currentUser = staticUsers.find((u) => u.id === currentUserId);
-            let depts = allDepartments;
+            let depts = allDepartments.map(d => d.code);
             if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
               depts = [currentUser.department];
             }
-            return depts.map((dept) => (
-              <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                {dept.replace(/_/g, ' ').toLowerCase()}
+            return allDepartments.filter(d => depts.includes(d.code)).map((dept) => (
+              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.code, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                {dept.name.toLowerCase()}
               </button>
             ));
           })()}
@@ -718,9 +720,9 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
             <div className="space-y-2">
               <Label>Departamento</Label>
               <div className="grid grid-cols-2 gap-2">
-                {allDepartments.filter((d) => d !== taskForm.department).map((dept) => (
-                  <button key={dept} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                    {dept.replace(/_/g, ' ').toLowerCase()}
+                {allDepartments.filter((d) => d.code !== taskForm.department).map((dept) => (
+                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                    {dept.name.toLowerCase()}
                   </button>
                 ))}
               </div>
@@ -770,7 +772,7 @@ interface TaskCardProps {
   canReopen?: boolean;
   canUnblock?: boolean;
   currentUserId?: string;
-  currentUser?: { id: string; name: string; role: Role; department: Department } | null;
+  currentUser?: { id: string; name: string; role: Role; department: string } | null;
 }
 
 function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, onRateTask, currentUserId, currentUser }: TaskCardProps) {
