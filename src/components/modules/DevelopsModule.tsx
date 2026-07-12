@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
@@ -225,6 +226,7 @@ function generateTempPassword(): string {
 function UsuariosTab() {
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
+  const { departmentOptions } = useDynamicDepartments();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
   const [search, setSearch] = useState('');
@@ -462,11 +464,9 @@ function UsuariosTab() {
               <select required value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
                 className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 ${formData.department ? 'border-[#E5E5E7]' : 'border-red-300 bg-red-50'}`}>
                 <option value="" disabled>Seleccionar departamento</option>
-                <option value="DIVE_SHOP">Dive Shop</option>
-                <option value="ADMINISTRATION">Administracion</option>
-                <option value="MANAGEMENT">Management</option>
-                <option value="MAINTENANCE">Mantenimiento</option>
-                <option value="TRANSPORT">Transporte</option>
+                {departmentOptions.map(opt => (
+                  <option key={opt.code} value={opt.code}>{opt.name}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -929,6 +929,7 @@ function AuditoriaTab() {
 function SeguridadTab() {
   const { settings, roleTemplates } = useAppConfig();
   const { users } = useFirestoreUsers();
+  const { departmentOptions } = useDynamicDepartments();
   const { logAction } = useAudit();
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
@@ -1075,6 +1076,7 @@ function SeguridadTab() {
 function PapeleraTab() {
   const { logAction } = useAudit();
   const { restoreUser: _restore, deleteUser: _delete, trashedUsers } = useFirestoreUsers();
+  const { departmentOptions } = useDynamicDepartments();
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const handleRestore = async (u: any) => {

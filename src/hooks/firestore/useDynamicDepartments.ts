@@ -80,7 +80,7 @@ export function useDynamicDepartments() {
   const departmentCodes = activeDepartments.map(d => d.code);
   const departmentNames = activeDepartments.map(d => d.name);
   const departmentOptions = activeDepartments.map(d => ({ code: d.code, name: d.name }));
-  const defaultDepartment = departmentCodes[0] || '';
+  const defaultDepartment = departmentNames[0] || '';
 
   const getDeptName = (code: string): string => {
     const dept = departments.find(d => d.code === code);

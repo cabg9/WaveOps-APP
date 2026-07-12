@@ -81,7 +81,7 @@ export function DepartamentosTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
-    name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo",
+    code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo",
   });
   const [saving, setSaving] = useState(false);
 
@@ -95,8 +95,8 @@ export function DepartamentosTab() {
   const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
   const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo" }); setShowFormModal(true); };
-  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId, type: dept.type || "otro" }); setShowFormModal(true); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo" }); setShowFormModal(true); };
+  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId, type: dept.type || "otro" }); setShowFormModal(true); };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
   const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
@@ -148,7 +148,7 @@ export function DepartamentosTab() {
   };
 
   const startEditUser = (u: any) => { setEditingUserId(u.id); setEditRole(u.role || ""); setEditLevel(u.level || 7); setEditPosition(u.position || ""); };
-  const getDeptUsers = (deptName: string) => users.filter((u: any) => u.department === deptName && u.isActive !== false);
+  const getDeptUsers = (dept: any) => users.filter((u: any) => (u.department === dept.code || u.department === dept.name) && u.isActive !== false);
 
   const renderFormModal = () => {
     if (!showFormModal) return null;
@@ -210,7 +210,7 @@ export function DepartamentosTab() {
 
   const renderTeamModal = () => {
     if (!showTeamModal || !selectedDept) return null;
-    const deptUsers = getDeptUsers(selectedDept.name);
+    const deptUsers = getDeptUsers(selectedDept);
     const sortedUsers = sortUsersByHierarchy(deptUsers);
     const myChildren = childrenOf(selectedDept.id);
 
@@ -325,7 +325,7 @@ export function DepartamentosTab() {
   };
 
   const renderCard = (dept: any) => {
-    const deptUsers = getDeptUsers(dept.name);
+    const deptUsers = getDeptUsers(dept);
     const userCount = deptUsers.length;
     const myChildren = childrenOf(dept.id);
     const isParent = myChildren.length > 0;

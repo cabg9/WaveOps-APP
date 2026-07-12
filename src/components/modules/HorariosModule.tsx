@@ -449,7 +449,7 @@ interface MiHorarioTabProps {
 
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
   const { user } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { getUserShifts, getUsersByDepartment } = useShifts();
   const { users: firestoreUsers } = useFirestoreUsers();
   // Encontrar el usuario en Firestore por email para obtener su ID correcto
@@ -1495,7 +1495,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         a: swapUser?.name || 'Usuario',
                         deCargo: user?.position || 'Voluntario',
                         aCargo: swapUser?.position || 'Voluntario',
-                        deDept: user?.department || defaultDepartment,
+                        deDept: user?.department || departmentCodes[0] || '',
                         aDept: swapUser?.department || defaultDepartment,
                         // Turnos del usuario que solicita (de)
                         deTurnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
@@ -1616,9 +1616,9 @@ interface EquipoTabProps {
 function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity }: EquipoTabProps) {
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { getTasksByUser } = useTasks();
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
   
   // Modales
@@ -2975,9 +2975,9 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     removeShift,
     shifts,
   } = useShifts();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   // Permitir 'ALL' para ver todos los departamentos (según permisos)
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -3508,13 +3508,13 @@ function IncapacidadesTab({
   addDocumentToIncapacidad
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   
   // Hook de Storage para subir imágenes
   const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
   
   // Filtros para pestaña "Equipo"
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || defaultDepartment);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
   
   const [expandedIncapacityId, setExpandedIncapacityId] = useState<string | null>(null);
@@ -5014,7 +5014,7 @@ interface Solicitud {
 
 function SolicitudesTab() {
   const { user } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');

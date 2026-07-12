@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
           });
+          console.log("[Auth] Loaded user:", { id: fbUser.email, mustChangePassword: userData.mustChangePassword });
         } else {
           setUser({
             id: fbUser.email || fbUser.uid,

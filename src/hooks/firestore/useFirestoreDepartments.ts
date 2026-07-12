@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   collection, onSnapshot, query, orderBy,
-  addDoc, updateDoc, deleteDoc, doc, getDocs, where,
+  addDoc, updateDoc, deleteDoc, doc, getDoc, getDocs, where,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import type { Department, DepartmentFormData } from '@/types/department';
@@ -11,6 +11,7 @@ const COLLECTION = 'departments';
 function docToDepartment(id: string, data: any): Department {
   return {
     id,
+    code: data.code || data.name?.toUpperCase().replace(/ /g, '_') || id,
     name: data.name || '',
     description: data.description || '',
     color: data.color || '#64748b',
@@ -54,13 +55,25 @@ export function useFirestoreDepartments() {
     const now = new Date().toISOString();
     const docRef = await addDoc(collection(db, COLLECTION), {
       ...data,
+      code: data.code || data.name?.toUpperCase().replace(/ /g, '_'),
       createdAt: now,
       updatedAt: now,
     });
     return docRef.id;
   }, []);
 
-  const updateDepartment = useCallback(async (id: string, data: Partial<DepartmentFormData>) => {
+  const updateDepartment = useCallback(async (id: string, data: Partial<DepartmentFormData>): Promise<void> => {
+    const currentDoc = await getDoc(doc(db, COLLECTION, id));
+    const currentData = currentDoc.data();
+    if (currentData && !currentData.code) {
+      const fallbackCode = (currentData.name || id).toUpperCase().replace(/ /g, '_');
+      await updateDoc(doc(db, COLLECTION, id), {
+        code: fallbackCode,
+        ...data,
+        updatedAt: new Date().toISOString(),
+      });
+      return;
+    }
     await updateDoc(doc(db, COLLECTION, id), {
       ...data,
       updatedAt: new Date().toISOString(),
@@ -71,10 +84,10 @@ export function useFirestoreDepartments() {
     await deleteDoc(doc(db, COLLECTION, id));
   }, []);
 
-  const checkUsersInDepartment = useCallback(async (deptName: string): Promise<number> => {
+  const checkUsersInDepartment = useCallback(async (deptCode: string): Promise<number> => {
     const q = query(
       collection(db, 'users'),
-      where('department', '==', deptName),
+      where('department', '==', deptCode),
       where('isActive', '==', true)
     );
     const snap = await getDocs(q);

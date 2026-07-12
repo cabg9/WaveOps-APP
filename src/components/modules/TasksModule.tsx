@@ -339,7 +339,7 @@ export default function TasksModule() {
               <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]"><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.code === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.code === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.name} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -363,7 +363,7 @@ export default function TasksModule() {
                 <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.code === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.code === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.name} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
                 </SelectContent>
               </Select>
             )}
@@ -462,7 +462,7 @@ export default function TasksModule() {
                   <Label>Departamentos reportados *</Label>
                   <div className="flex flex-wrap gap-2">
                     {allDepartments.map((dept) => (
-                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.code) ? prev.targetDepartments.filter(d => d !== dept.code) : [...prev.targetDepartments, dept.code] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.code) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
+                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.name) ? prev.targetDepartments.filter(d => d !== dept.name) : [...prev.targetDepartments, dept.name] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.name) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
                     ))}
                   </div>
                 </div>
@@ -604,12 +604,12 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <div className="grid grid-cols-2 gap-2">
           {(() => {
             const currentUser = staticUsers.find((u) => u.id === currentUserId);
-            let depts = allDepartments.map(d => d.code);
+            let depts = allDepartments.map(d => d.name);
             if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
               depts = [currentUser.department];
             }
-            return allDepartments.filter(d => depts.includes(d.code)).map((dept) => (
-              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.code, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            return allDepartments.filter(d => depts.includes(d.name)).map((dept) => (
+              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.name, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                 {dept.name.toLowerCase()}
               </button>
             ));
@@ -720,8 +720,8 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
             <div className="space-y-2">
               <Label>Departamento</Label>
               <div className="grid grid-cols-2 gap-2">
-                {allDepartments.filter((d) => d.code !== taskForm.department).map((dept) => (
-                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                {allDepartments.filter((d) => d.name !== taskForm.department).map((dept) => (
+                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.name, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                     {dept.name.toLowerCase()}
                   </button>
                 ))}
