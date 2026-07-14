@@ -1675,7 +1675,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   const getUserShiftsForDay = (userId: string, date: Date): Shift[] => {
     const dateStr = toLocalISODate(date);
     const dayAssignments = assignments.filter(
-      a => a.userId === userId && a.date === dateStr && a.status === AssignmentStatus.PUBLICADO
+      a => a.userId === userId && a.date === dateStr && a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR'
     );
     return dayAssignments
       .map(a => getShiftById(a.shiftId))

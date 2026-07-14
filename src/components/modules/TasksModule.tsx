@@ -92,11 +92,13 @@ export default function TasksModule() {
   });
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
+  const { users: firestoreUsersForSupervisors } = useFirestoreUsers();
   const supervisorsByDepartment = useMemo(() => {
-    return users.filter((u) => u.department === taskForm.department && 
+    const allUsers = firestoreUsersForSupervisors.length > 0 ? firestoreUsersForSupervisors : staticUsers;
+    return allUsers.filter((u) => u.department === taskForm.department && 
       (u.role === 'GERENTE_DEPARTAMENTO' || u.role === 'SUPERVISOR' || u.role === 'GERENTE_OPERACIONES'))
       .map((u) => ({ id: u.email || u.id, name: u.name, position: u.position, role: u.role }));
-  }, [taskForm.department]);
+  }, [taskForm.department, firestoreUsersForSupervisors]);
 
   const calculatedDueDateTime = useMemo(() => {
     try {
@@ -339,7 +341,7 @@ export default function TasksModule() {
               <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]"><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.name} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -363,7 +365,7 @@ export default function TasksModule() {
                 <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.name} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
                 </SelectContent>
               </Select>
             )}
@@ -462,7 +464,7 @@ export default function TasksModule() {
                   <Label>Departamentos reportados *</Label>
                   <div className="flex flex-wrap gap-2">
                     {allDepartments.map((dept) => (
-                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.name) ? prev.targetDepartments.filter(d => d !== dept.name) : [...prev.targetDepartments, dept.name] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.name) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
+                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.code) ? prev.targetDepartments.filter(d => d !== dept.code) : [...prev.targetDepartments, dept.code] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.code) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
                     ))}
                   </div>
                 </div>
@@ -536,7 +538,11 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
     return filtered;
   }, [supervisorsByDepartment, currentUserId]);
 
-  const usersByDepartment = useMemo(() => staticUsers.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId), [taskForm.department, currentUserId]);
+  const { users: firestoreUsersForModal } = useFirestoreUsers();
+  const usersByDepartment = useMemo(() => {
+    const allUsers = firestoreUsersForModal.length > 0 ? firestoreUsersForModal : staticUsers;
+    return allUsers.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId);
+  }, [taskForm.department, currentUserId, firestoreUsersForModal]);
 
   // Opciones de recurrencia para tareas específicas
   const recurrenceOptions = [
@@ -604,12 +610,12 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <div className="grid grid-cols-2 gap-2">
           {(() => {
             const currentUser = staticUsers.find((u) => u.id === currentUserId);
-            let depts = allDepartments.map(d => d.name);
+            let depts = allDepartments.map(d => d.code);
             if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
               depts = [currentUser.department];
             }
-            return allDepartments.filter(d => depts.includes(d.name)).map((dept) => (
-              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.name, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+            return allDepartments.filter(d => depts.includes(d.code)).map((dept) => (
+              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.code, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                 {dept.name.toLowerCase()}
               </button>
             ));
@@ -721,7 +727,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               <Label>Departamento</Label>
               <div className="grid grid-cols-2 gap-2">
                 {allDepartments.filter((d) => d.name !== taskForm.department).map((dept) => (
-                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.name, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                     {dept.name.toLowerCase()}
                   </button>
                 ))}
@@ -1057,6 +1063,7 @@ interface IncidenciaCardProps {
 
 function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer, onAddPhoto }: IncidenciaCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const { getDeptName } = useDynamicDepartments();
   const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
@@ -1150,12 +1157,12 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 <div className="flex items-center gap-1.5">
                   <LayoutGrid className="w-3 h-3 text-[#86868B]" />
                   <span className="text-[#86868B]">Desde:</span>
-                  <span className="text-[#1D1D1F] font-medium">{reporter?.department || incidencia.targetDepartment}</span>
+                  <span className="text-[#1D1D1F] font-medium">{reporter?.department ? getDeptName(reporter.department) : getDeptName(incidencia.targetDepartment)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Users className="w-3 h-3 text-[#86868B]" />
                   <span className="text-[#86868B]">Para:</span>
-                  <span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartments ? incidencia.targetDepartments.join(", ") : incidencia.targetDepartment}</span>
+                  <span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartments ? incidencia.targetDepartments.map(getDeptName).join(", ") : getDeptName(incidencia.targetDepartment)}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3 h-3 text-[#86868B]" />
@@ -1206,7 +1213,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               })()}
               <div className="flex flex-wrap gap-4 text-sm">
                 <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
-                <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{incidencia.targetDepartment}</span></div>
+                <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{getDeptName(incidencia.targetDepartment)}</span></div>
                 {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{staticUsers.find(u => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}</span></div>)}
 
 

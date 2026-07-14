@@ -48,7 +48,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
     getUserShifts: (userId: string, date: string) => {
       const userAssignments = shiftsHook.assignments.filter(
-        (a: any) => (a.userId === userId || a.userId?.includes(userId?.split('@')[0])) && a.date === date && a.status === AssignmentStatus.PUBLICADO
+        (a: any) => {
+        const matchesUser = a.userId === userId || a.userId === (usersHook.users.find(u => u.id === userId)?.email) || a.userId?.includes(userId?.split('@')[0]);
+        return matchesUser && a.date === date && (a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR');
+      }
       );
       return userAssignments
         .map((a: any) => shifts.find((s: any) => s.id === a.shiftId))
@@ -98,7 +101,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
     isUserOnShift: (userId: string, date: string) => {
       return shiftsHook.assignments.some(
-        (a: any) => a.userId === userId && a.date === date && a.status === AssignmentStatus.PUBLICADO
+        (a: any) => a.userId === userId && a.date === date && (a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR')
       );
     },
 
@@ -109,7 +112,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       });
       
       const userIds = deptAssignments.map((a: any) => a.userId);
-      return usersHook.users.filter((u: any) => userIds.includes(u.id));
+      return usersHook.users.filter((u: any) => userIds.includes(u.id) || userIds.includes(u.email));
     },
 
     publishAssignments: (department: string | 'ALL', weekStart: Date, publishedBy: string) => {

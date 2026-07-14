@@ -2,26 +2,26 @@ import { Shift } from '@/types';
 
 // Iconos por departamento (dinamico, sincronizado con Firestore)
 export const DEPT_ICON_KEYS: Record<string, string> = {
-  'Administrativo': 'Building2',
-  'Ventas': 'ShoppingCart',
-  'Guianza': 'Compass',
-  'Dive Shop': 'Waves',
-  'Mantenimiento': 'Wrench',
-  'Operaciones': 'Ship',
-  'Cocina': 'ChefHat',
-  'Logistica': 'Truck',
+  'ADMINISTRATIVO': 'Building2',
+  'VENTAS': 'ShoppingCart',
+  'GUIANZA': 'Compass',
+  'DIVE_SHOP': 'Waves',
+  'MANTENIMIENTO': 'Wrench',
+  'OPERACIONES': 'Ship',
+  'COCINA': 'ChefHat',
+  'LOGISTICA': 'Truck',
 };
 
 // Nombres cortos por departamento
 export const DEPT_SHORT_NAMES: Record<string, string> = {
-  'Administrativo': 'ADM',
-  'Ventas': 'VTA',
-  'Guianza': 'GUIA',
-  'Dive Shop': 'DIVE',
-  'Mantenimiento': 'MANT',
-  'Operaciones': 'OPS',
-  'Cocina': 'COC',
-  'Logistica': 'LOG',
+  'ADMINISTRATIVO': 'ADM',
+  'VENTAS': 'VTA',
+  'GUIANZA': 'GUIA',
+  'DIVE_SHOP': 'DIVE',
+  'MANTENIMIENTO': 'MANT',
+  'OPERACIONES': 'OPS',
+  'COCINA': 'COC',
+  'LOGISTICA': 'LOG',
 };
 
 // Ordenar turnos por hora de inicio
@@ -33,7 +33,7 @@ export const shifts: Shift[] = [
   {
     id: 'ds-morning',
     name: 'Mañana',
-    department: 'Dive Shop',
+    department: 'DIVE_SHOP',
     startTime: '07:00',
     endTime: '15:00',
     color: '#007AFF',
@@ -41,7 +41,7 @@ export const shifts: Shift[] = [
   {
     id: 'ds-afternoon',
     name: 'Tarde',
-    department: 'Dive Shop',
+    department: 'DIVE_SHOP',
     startTime: '15:00',
     endTime: '23:00',
     color: '#5856D6',
@@ -49,7 +49,7 @@ export const shifts: Shift[] = [
   {
     id: 'ds-night',
     name: 'Noche',
-    department: 'Dive Shop',
+    department: 'DIVE_SHOP',
     startTime: '23:00',
     endTime: '07:00',
     color: '#1C1C1E',
@@ -57,7 +57,7 @@ export const shifts: Shift[] = [
   {
     id: 'vn-morning',
     name: 'Mañana',
-    department: 'Ventas',
+    department: 'VENTAS',
     startTime: '08:00',
     endTime: '16:00',
     color: '#34C759',
@@ -65,7 +65,7 @@ export const shifts: Shift[] = [
   {
     id: 'vn-afternoon',
     name: 'Tarde',
-    department: 'Ventas',
+    department: 'VENTAS',
     startTime: '16:00',
     endTime: '00:00',
     color: '#FF9500',
@@ -73,7 +73,7 @@ export const shifts: Shift[] = [
   {
     id: 'ad-day',
     name: 'Día',
-    department: 'Administrativo',
+    department: 'ADMINISTRATIVO',
     startTime: '09:00',
     endTime: '17:00',
     color: '#AF52DE',
@@ -81,7 +81,7 @@ export const shifts: Shift[] = [
   {
     id: 'libre',
     name: 'Libre',
-    department: 'Dive Shop',
+    department: 'DIVE_SHOP',
     startTime: '00:00',
     endTime: '00:00',
     color: '#8E8E93',
