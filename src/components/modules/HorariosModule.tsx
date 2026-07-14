@@ -67,7 +67,7 @@ import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
-import { users } from '@/data/users';
+import { users as staticUsers } from '@/data/users';
 import {
   cn,
   formatWeekRange,
@@ -221,7 +221,7 @@ export default function HorariosModule() {
   
   const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => {
     // Encontrar usuario en el array local o usar la info proporcionada
-    let userInfo = users.find(u => u.id === userId);
+    let userInfo = staticUsers.find(u => u.id === userId);
     
     // Si no se encuentra en el array local pero se proporciona info override, usarla
     if (!userInfo && userInfoOverride) {
@@ -1617,6 +1617,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { users: firestoreUsers } = useFirestoreUsers();
+  const users = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
   const { getTasksByUser } = useTasks();
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -1674,8 +1676,9 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
   const getUserShiftsForDay = (userId: string, date: Date): Shift[] => {
     const dateStr = toLocalISODate(date);
+    const userEmail = users.find(u => u.id === userId)?.email;
     const dayAssignments = assignments.filter(
-      a => a.userId === userId && a.date === dateStr && a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR'
+      a => (a.userId === userId || a.userId === userEmail) && a.date === dateStr && (a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR')
     );
     return dayAssignments
       .map(a => getShiftById(a.shiftId))
@@ -2976,6 +2979,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     shifts,
   } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { users: firestoreUsers2 } = useFirestoreUsers();
+  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
   // Permitir 'ALL' para ver todos los departamentos (según permisos)
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
@@ -3070,8 +3075,9 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
   const getUserAssignmentsForDay = (userId: string, date: Date): ShiftAssignment[] => {
     const dateStr = toLocalISODate(date);
+    const userEmail = users.find(u => u.id === userId)?.email;
     // No mostrar las asignaciones marcadas como ELIMINADO
-    const userAssignments = assignments.filter(a => a.userId === userId && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO);
+    const userAssignments = assignments.filter(a => (a.userId === userId || a.userId === userEmail) && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO);
     // Ordenar cronológicamente por hora de inicio del turno
     return userAssignments.sort((a, b) => {
       const shiftA = shifts.find(s => s.id === a.shiftId);
@@ -3509,6 +3515,8 @@ function IncapacidadesTab({
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { users: firestoreUsers2 } = useFirestoreUsers();
+  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
   
   // Hook de Storage para subir imágenes
   const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
@@ -5015,6 +5023,8 @@ interface Solicitud {
 function SolicitudesTab() {
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { users: firestoreUsers2 } = useFirestoreUsers();
+  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');

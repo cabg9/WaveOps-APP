@@ -26,7 +26,9 @@ interface ShiftsProviderProps {
 export function ShiftsProvider({ children }: ShiftsProviderProps) {
   const shiftsHook = useFirestoreShifts();
   const usersHook = useFirestoreUsers();
-  const shifts = shiftsHook.shifts.length > 0 ? shiftsHook.shifts : staticShifts;
+  // Combinar turnos estáticos con Firestore (los estáticos tienen IDs que las asignaciones usan)
+  const firestoreShiftIds = new Set(shiftsHook.shifts.map(s => s.id));
+  const shifts = [...staticShifts, ...shiftsHook.shifts.filter(s => !firestoreShiftIds.has(s.id))];
 
   const value = {
     shifts: shifts,
@@ -43,7 +45,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     isLoading: shiftsHook.loading,
 
     getShiftsByDepartment: (department: string) => {
-      return shifts.filter((s: any) => s.department === department);
+      return shifts.filter((s: any) => {
+        const deptCode = s.department?.replace(/ /g, '_').toUpperCase();
+        return s.department === department || deptCode === department;
+      });
     },
 
     getUserShifts: (userId: string, date: string) => {
@@ -74,7 +79,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       return shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
         if (!shift) return false;
-        if ((department as any) !== 'ALL' && shift.department !== department) return false;
+        if ((department as any) !== 'ALL') {
+          const deptCode = shift.department?.replace(/ /g, '_').toUpperCase();
+          if (shift.department !== department && deptCode !== department) return false;
+        }
         return a.date >= startStr && a.date <= endStr;
       });
     },
@@ -100,8 +108,9 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     },
 
     isUserOnShift: (userId: string, date: string) => {
+      const userEmail = usersHook.users.find((u: any) => u.id === userId)?.email;
       return shiftsHook.assignments.some(
-        (a: any) => a.userId === userId && a.date === date && (a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR')
+        (a: any) => (a.userId === userId || a.userId === userEmail) && a.date === date && (a.status === AssignmentStatus.PUBLICADO || a.status === 'BORRADOR')
       );
     },
 
