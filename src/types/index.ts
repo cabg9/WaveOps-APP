@@ -98,6 +98,13 @@ export interface User {
   mustChangePassword?: boolean;
   avatar?: string;
   phone?: string;
+  nickname?: string;
+  cedula?: string;
+  birthDate?: string;
+  address?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  photoURL?: string;
 }
 
 export interface Subtask {

@@ -30,6 +30,7 @@ import Dashboard from '@/components/Dashboard';
 import TasksModule from '@/components/modules/TasksModule';
 import HorariosModule from '@/components/modules/HorariosModule';
 import DevelopsModule from '@/components/modules/DevelopsModule';
+import ProfilePage from '@/components/ProfilePage';
 
 function ReportesModule() {
   return (
@@ -281,6 +282,8 @@ function AppRoutes() {
         }
       />
 
+      {/* Perfil */}
+      <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       {/* 404 */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

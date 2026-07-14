@@ -39,6 +39,13 @@ export interface FirestoreUser {
   phone?: string;
   avatar?: string;
   createdAt?: string;
+  nickname?: string;
+  cedula?: string;
+  birthDate?: string;
+  address?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  photoURL?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════

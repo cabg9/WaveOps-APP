@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!usersSnapshot.empty) {
           const userData = usersSnapshot.docs[0].data();
           setUser({
-            id: fbUser.email || usersSnapshot.docs[0].id,
+            id: usersSnapshot.docs[0].id,
             email: fbUser.email || '',
             name: userData.name || fbUser.displayName || 'Usuario',
             role: userData.role || Role.STAFF,
@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
           });
-          console.log("[Auth] Loaded user:", { id: fbUser.email, mustChangePassword: userData.mustChangePassword });
+          console.log("[Auth] Loaded user:", { id: usersSnapshot.docs[0].id, mustChangePassword: userData.mustChangePassword });
         } else {
           setUser({
             id: fbUser.email || fbUser.uid,
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!usersSnapshot.empty) {
         const userData = usersSnapshot.docs[0].data();
         setUser({
-          id: fbUser.email || usersSnapshot.docs[0].id,
+          id: usersSnapshot.docs[0].id,
           email: fbUser.email || '',
           name: userData.name || fbUser.displayName || 'Usuario',
           role: userData.role || Role.STAFF,
