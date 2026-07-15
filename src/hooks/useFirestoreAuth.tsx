@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             level: userData.level || 7,
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
+            photoURL: userData.photoURL || '',
           });
           console.log("[Auth] Loaded user:", { id: usersSnapshot.docs[0].id, mustChangePassword: userData.mustChangePassword });
         } else {
@@ -94,6 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           position: userData.position || '',
           level: userData.level || 7,
           isActive: userData.isActive !== false,
+            photoURL: userData.photoURL || '',
         });
       } else {
         setUser({

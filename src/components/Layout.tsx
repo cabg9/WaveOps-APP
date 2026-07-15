@@ -34,7 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Sheet,
   SheetContent,
@@ -215,7 +215,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
                       <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
                     </div>
-                    <Avatar className="w-9 h-9 bg-corporate">
+                    <Avatar className="w-9 h-9 bg-corporate">{user.photoURL && <AvatarImage src={user.photoURL} />}
                       <AvatarFallback className="bg-corporate text-white text-sm font-medium">
                         {getInitials(user.name)}
                       </AvatarFallback>
@@ -326,7 +326,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <div className="space-y-4">
                         {/* User Info */}
                         <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10 bg-corporate">
+                          <Avatar className="w-10 h-10 bg-corporate">{user.photoURL && <AvatarImage src={user.photoURL} />}
                             <AvatarFallback className="bg-corporate text-white text-sm font-medium">
                               {getInitials(user.name)}
                             </AvatarFallback>

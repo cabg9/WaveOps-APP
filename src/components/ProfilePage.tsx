@@ -20,10 +20,12 @@ import {
 } from 'lucide-react';
 import { updatePassword } from 'firebase/auth';
 import { auth } from '@/firebase-config';
+import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 
 export default function ProfilePage() {
   const { user } = useAuth();
   const { updateUser, users } = useFirestoreUsers();
+  const { uploadImage, uploading: uploadingPhoto } = useStorageUpload();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -32,6 +34,8 @@ export default function ProfilePage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
 
   // Get fresh user data from Firestore
   const freshUser = users.find(u => u.id === user?.id) || user;
@@ -79,6 +83,10 @@ export default function ProfilePage() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      let photoURL = formData.photoURL;
+      if (selectedPhoto) {
+        photoURL = await uploadImage(selectedPhoto, `users/${user.id}`);
+      }
       await updateUser(user.id, {
         name: formData.name,
         phone: formData.phone,
@@ -88,9 +96,11 @@ export default function ProfilePage() {
         address: formData.address,
         emergencyContact: formData.emergencyContact,
         emergencyPhone: formData.emergencyPhone,
-        photoURL: formData.photoURL,
+        photoURL,
       });
       setIsEditing(false);
+      setSelectedPhoto(null);
+      setPhotoPreview('');
       toast.success('Perfil actualizado correctamente');
     } catch (err: any) {
       console.error('Error updating profile:', err);
@@ -206,14 +216,32 @@ export default function ProfilePage() {
             {isEditing ? (
               <>
                 <div className="space-y-2">
-                  <Label>Foto URL</Label>
-                  <div className="flex items-center gap-2">
-                    <Camera className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.photoURL}
-                      onChange={(e) => setFormData({ ...formData, photoURL: e.target.value })}
-                      placeholder="https://..."
-                    />
+                  <Label>Foto de perfil</Label>
+                  <div className="flex items-center gap-4">
+                    <Avatar className="w-16 h-16">
+                      {photoPreview || formData.photoURL ? (
+                        <AvatarImage src={photoPreview || formData.photoURL} alt={user.name} />
+                      ) : null}
+                      <AvatarFallback className="bg-corporate text-white text-xl">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setSelectedPhoto(file);
+                            const reader = new FileReader();
+                            reader.onloadend = () => setPhotoPreview(reader.result as string);
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-[#86868B] mt-1">Selecciona una foto de tu galería</p>
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -297,8 +325,8 @@ export default function ProfilePage() {
                     />
                   </div>
                 </div>
-                <Button onClick={handleSave} disabled={saving} className="bg-corporate hover:bg-corporate/90">
-                  {saving ? 'Guardando...' : 'Guardar Cambios'}
+                <Button onClick={handleSave} disabled={saving || uploadingPhoto} className="bg-corporate hover:bg-corporate/90">
+                  {uploadingPhoto ? 'Subiendo foto...' : saving ? 'Guardando...' : 'Guardar Cambios'}
                 </Button>
               </>
             ) : (
