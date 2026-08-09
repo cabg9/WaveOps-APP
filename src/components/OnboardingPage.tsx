@@ -219,7 +219,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
-    if (user?.profileComplete) { navigate('/'); }
+    if (user?.profileComplete) { window.location.href = '/'; }
   }, [user, navigate]);
 
   const handleChange = (field: string, value: string) => {
@@ -309,7 +309,7 @@ export default function OnboardingPage() {
         profileComplete: true,
         updatedAt: new Date().toISOString(),
       });
-      navigate('/');
+      window.location.href = '/';
     } catch (err: any) {
       alert('Error: ' + err.message);
     } finally { setLoading(false); }

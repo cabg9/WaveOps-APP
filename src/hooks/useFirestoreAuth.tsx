@@ -40,9 +40,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const usersSnapshot = await getDocs(usersQuery);
         
         if (!usersSnapshot.empty) {
-          const userData = usersSnapshot.docs[0].data();
+          const userDoc = usersSnapshot.docs[0];
+          const userData = userDoc.data();
           setUser({
-            id: usersSnapshot.docs[0].id,
+            id: userDoc.id,
             email: fbUser.email || '',
             name: userData.name || fbUser.displayName || 'Usuario',
             role: userData.role || Role.STAFF,
@@ -55,6 +56,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             profileComplete: userData.profileComplete || false,
           });
           if (userData.photoURL) localStorage.setItem('cachedPhotoURL', userData.photoURL);
+          
+          // Listener en tiempo real para expulsar si desactivan al usuario
+          const unsubscribeDoc = onSnapshot(doc(db, 'users', userDoc.id), (snap) => {
+            if (!snap.exists() || snap.data()?.isActive === false) {
+              console.error('[Auth] Usuario desactivado o eliminado — expulsando');
+              signOut(auth);
+              setUser(null);
+            }
+          });
+          // Guardar para cleanup
+          (window as any).__authUnsubscribe = unsubscribeDoc;
         } else {
           // BUG FIX: Usuario no existe en Firestore — no debe tener acceso
           console.error('[Auth] Usuario', fbUser.email, 'existe en Auth pero NO en Firestore — deslogueando');
@@ -80,32 +92,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const usersQuery = query(collection(db, 'users'), where('email', '==', fbUser.email));
       const usersSnapshot = await getDocs(usersQuery);
       
-      if (!usersSnapshot.empty) {
-        const userData = usersSnapshot.docs[0].data();
-        setUser({
-          id: usersSnapshot.docs[0].id,
-          email: fbUser.email || '',
-          name: userData.name || fbUser.displayName || 'Usuario',
-          role: userData.role || Role.STAFF,
-          department: userData.department || defaultDepartment,
-          position: userData.position || '',
-          level: userData.level || 7,
-          isActive: userData.isActive !== false,
-            photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
-            profileComplete: userData.profileComplete || false,
-        });
-      } else {
-        setUser({
-          id: fbUser.email || fbUser.uid,
-          email: fbUser.email || '',
-          name: fbUser.displayName || 'Usuario',
-          role: Role.STAFF,
-          department: defaultDepartment,
-          position: '',
-          level: 7,
-          isActive: true,
-        });
+      if (usersSnapshot.empty) {
+        console.error('[Login] Usuario', fbUser.email, 'no existe en Firestore');
+        await signOut(auth);
+        setUser(null);
+        return false;
       }
+      
+      const userData = usersSnapshot.docs[0].data();
+      if (userData.isActive === false) {
+        console.error('[Login] Usuario', fbUser.email, 'está desactivado');
+        await signOut(auth);
+        setUser(null);
+        return false;
+      }
+      
+      setUser({
+        id: usersSnapshot.docs[0].id,
+        email: fbUser.email || '',
+        name: userData.name || fbUser.displayName || 'Usuario',
+        role: userData.role || Role.STAFF,
+        department: userData.department || defaultDepartment,
+        position: userData.position || '',
+        level: userData.level || 7,
+        isActive: userData.isActive !== false,
+        photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
+        profileComplete: userData.profileComplete || false,
+      });
       return true;
     } catch (error: any) {
       console.error('Error de login:', error.code, error.message);

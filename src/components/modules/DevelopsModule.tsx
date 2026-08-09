@@ -242,7 +242,7 @@ function UsuariosTab() {
   const [showInactive, setShowInactive] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    name: '', email: '', role: '', department: '',
+    name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
     position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
   });
@@ -278,7 +278,7 @@ function UsuariosTab() {
     e.preventDefault();
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, formData as any);
+        await updateUser(editingUser.id, {...formData, name: (formData.name + (formData.lastName ? " " + formData.lastName : "")).trim()} as any);
         await logAction({
           action: 'USER_UPDATED', targetType: 'user', targetId: editingUser.id,
           targetName: formData.name, impactLevel: 'major',
@@ -288,7 +288,7 @@ function UsuariosTab() {
         const userToCreate = sendInvite 
           ? { ...formData, password: undefined }  // No enviar password temporal
           : formData;
-        const result = await createUser(userToCreate as any);
+        const result = await createUser({...userToCreate, name: (userToCreate.name + (userToCreate.lastName ? " " + userToCreate.lastName : "")).trim()} as any);
         if (sendInvite) {
           try {
             const ir = await sendInvitation({email: formData.email, name: formData.name, role: formData.role, department: formData.department, userId: result.id});
@@ -299,20 +299,20 @@ function UsuariosTab() {
       }
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ name: '', email: '', role: '', department: '',
+      setFormData({ name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
 
-  const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', email: '', role: '', department: '',
+  const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
     setFormData({
-      name: u.name || '', email: u.email || '', role: u.role || 'STAFF',
+      name: u.name?.split(' ')[0] || '', lastName: u.name?.split(' ').slice(1).join(' ') || '', email: u.email || '', role: u.role || 'STAFF',
       department: u.department || 'DIVE_SHOP', joinDate: u.joinDate || '', position: u.position || '',
       level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
     });
@@ -463,6 +463,11 @@ function UsuariosTab() {
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre</label>
               <input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-[#86868B] mb-1">Apellido</label>
+              <input value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})}
                 className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
             </div>
             <div>
