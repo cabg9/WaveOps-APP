@@ -13,7 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 
 export default function LoginScreen() {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,9 +22,13 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Si ya está autenticado, redirigir al dashboard
-  if (isAuthenticated) {
-    navigate('/', { replace: true });
+  // Si ya está autenticado, redirigir al dashboard o onboarding
+  if (isAuthenticated && user) {
+    if (user.profileComplete === false) {
+      navigate('/onboarding', { replace: true });
+    } else {
+      navigate('/', { replace: true });
+    }
     return null;
   }
 
@@ -53,7 +57,7 @@ export default function LoginScreen() {
     try {
       const success = await login(email, password);
       if (success) {
-        navigate('/', { replace: true });
+        window.location.href = '/';
       } else {
         setError('Credenciales inválidas. Por favor verifica e intenta nuevamente.');
       }
