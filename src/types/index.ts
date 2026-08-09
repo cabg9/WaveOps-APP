@@ -105,6 +105,14 @@ export interface User {
   emergencyContact?: string;
   emergencyPhone?: string;
   photoURL?: string;
+  authUid?: string;
+  profileComplete?: boolean;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  bloodType?: string;
+  certificationNumber?: string;
+  certificationExpiry?: string;
+  joinDate?: string;
 }
 
 export interface Subtask {

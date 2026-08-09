@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2, Building2,
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
-  ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff,
+  ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
   LayoutGrid, CalendarClock, Save, Clock,
 } from 'lucide-react';
@@ -229,7 +229,7 @@ function generateTempPassword(): string {
 function UsuariosTab() {
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const { sendInvitation } = useInvitation();
-  const [sendInvite, setSendInvite] = useState(false);
+  const [sendInvite, setSendInvite] = useState(true);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
   const { departmentOptions } = useDynamicDepartments();
   const { settings, roleTemplates } = useAppConfig();
@@ -240,6 +240,7 @@ function UsuariosTab() {
   const [editingUser, setEditingUser] = useState<any>(null);
   const [showForm, setShowForm] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '', email: '', role: '', department: '',
     position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
@@ -332,6 +333,24 @@ function UsuariosTab() {
     } catch {
       // Cancelado
     }
+  };
+
+  const handleResendInvitation = async (u: any) => {
+    if (!u.email || !u.name) { alert('Faltan datos del usuario'); return; }
+    setResendingId(u.id);
+    try {
+      const result = await sendInvitation({
+        email: u.email, name: u.name, role: u.role || 'STAFF',
+        department: u.department || 'DIVE_SHOP', userId: u.id
+      });
+      if (result.emailSent) {
+        alert('Invitacion reenviada exitosamente a ' + u.email);
+      } else {
+        alert('Email no enviado. Error: ' + (result.error || 'Desconocido'));
+      }
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally { setResendingId(null); }
   };
 
   const handleDelete = async (u: any) => {
@@ -555,6 +574,12 @@ function UsuariosTab() {
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
+                        {/* @ts-ignore */}
+                        {!u.authUid && u.isActive && (
+                          <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
+                            {resendingId === u.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                          </button>
+                        )}
                         {showInactive ? (
                           <>
                             <button onClick={() => handleToggleActive(u, true)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-green" title="Reactivar"><Eye className="w-4 h-4" /></button>

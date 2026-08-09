@@ -33,7 +33,8 @@ import DevelopsModule from '@/components/modules/DevelopsModule';
 import ProfilePage from '@/components/ProfilePage';
 import { PersistentAvatar } from '@/components/PersistentAvatar';
 import SettingsPage from '@/components/SettingsPage';
-import InvitationPage from '@/components/InvitationPage';
+import InvitationPage from './components/InvitationPage';
+import OnboardingPage from './components/OnboardingPage';
 
 function ReportesModule() {
   return (
@@ -289,7 +290,9 @@ function AppRoutes() {
       <Route path="/configuracion" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       {/* 404 */}
-      <Route path="/invitation" element={<InvitationPage />} />\n      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/invitation" element={<InvitationPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
