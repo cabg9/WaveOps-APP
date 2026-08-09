@@ -16,7 +16,6 @@ import {
   DocumentData,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { shifts as staticShifts } from '@/data/shifts';
 import { AssignmentStatus } from '@/types';
 
 export interface FirestoreShift {
@@ -54,7 +53,7 @@ function toLocalISODate(date: Date): string {
 
 export function useFirestoreShifts() {
   const [shifts, setShifts] = useState<FirestoreShift[]>([]);
-  const allShifts = useMemo(() => { const merged = [...staticShifts]; for (const s of shifts) { if (!merged.find(m => m.id === s.id)) merged.push(s); } return merged; }, [shifts]);
+  const allShifts = shifts;
   const [assignments, setAssignments] = useState<FirestoreAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

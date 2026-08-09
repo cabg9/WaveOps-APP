@@ -39,7 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     appName: 'WaveOps',
     logoUrl: '',
     primaryColor: '#007AFF',
-    companyName: 'Galapagos Dive & Surf',
+    companyName: 'Dive X Surf',
   },
   modulesOrder: [],
   updatedAt: new Date().toISOString(),
@@ -145,7 +145,6 @@ export function useAppConfig() {
   // ═══════════════════════════════════════════════════════════════════
 
   const hasDevelopAccess = useMemo(() => {
-    console.log("[hasDevelopAccess] user:", { id: user?.id, email: user?.email, role: user?.role, allowedIds: settings.developAccess.allowedUserIds });
     console.log("[hasDevelopAccess] user:", { id: user?.id, email: user?.email, role: user?.role, allowedIds: settings.developAccess.allowedUserIds });
     if (!user) return false;
 

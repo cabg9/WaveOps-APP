@@ -4,7 +4,6 @@
 
 import React, { createContext, useContext } from 'react';
 import { useFirestoreShifts } from './firestore/useFirestoreShifts';
-import { shifts as staticShifts } from '@/data/shifts';
 import { useFirestoreUsers } from './firestore/useFirestoreUsers';
 import { AssignmentStatus } from '@/types';
 import { addDaysToDate, format } from '@/lib/utils';
@@ -27,8 +26,8 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
   const shiftsHook = useFirestoreShifts();
   const usersHook = useFirestoreUsers();
   // Combinar turnos estáticos con Firestore (los estáticos tienen IDs que las asignaciones usan)
-  const firestoreShiftIds = new Set(shiftsHook.shifts.map(s => s.id));
-  const shifts = [...staticShifts, ...shiftsHook.shifts.filter(s => !firestoreShiftIds.has(s.id))];
+
+  const shifts = shiftsHook.shifts;
 
   const value = {
     shifts: shifts,

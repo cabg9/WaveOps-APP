@@ -64,7 +64,6 @@ export function useDynamicDepartments() {
         });
       });
       depts.sort((a, b) => a.order - b.order);
-      console.log('[useDynamicDepartments] Loaded', depts.length, 'departments:', depts.map(d => d.name));
       setDepartments(depts);
       setLoading(false);
     }, (error) => {

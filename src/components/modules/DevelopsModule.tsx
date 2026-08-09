@@ -9,7 +9,7 @@ import {
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save,
+  LayoutGrid, CalendarClock, Save, Clock,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot,
@@ -21,16 +21,18 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useInvitation } from '@/hooks/useInvitation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
 import { DepartamentosTab } from './DepartamentosTab';
+import { TurnosTab } from './TurnosTab';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera';
+type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos';
 
 interface TabConfig {
   id: DevelopTab;
@@ -56,6 +58,7 @@ const TABS: TabConfig[] = [
   { id: 'auditoria', label: 'Auditoria', icon: ClipboardList, description: 'Logs de actividad', impact: 'low' },
   { id: 'seguridad', label: 'Seguridad', icon: Lock, description: 'Politicas de seguridad', impact: 'high' },
   { id: 'papelera', label: 'Papelera', icon: Trash2, description: 'Elementos eliminados', impact: 'medium' },
+  { id: 'turnos', label: 'Turnos', icon: Clock, description: 'Gestion de turnos por departamento', impact: 'high' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -225,6 +228,8 @@ function generateTempPassword(): string {
 
 function UsuariosTab() {
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const { sendInvitation } = useInvitation();
+  const [sendInvite, setSendInvite] = useState(false);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
   const { departmentOptions } = useDynamicDepartments();
   const { settings, roleTemplates } = useAppConfig();
@@ -279,12 +284,13 @@ function UsuariosTab() {
         });
       } else {
         const result = await createUser(formData as any);
-        setCreatedPassword(result.password);
-        await logAction({
-          action: 'USER_CREATED', targetType: 'user', targetId: result.id,
-          targetName: formData.name, impactLevel: 'sensitive',
-          description: `Usuario "${formData.name}" creado con password temporal`,
-        });
+        if (sendInvite) {
+          try {
+            const ir = await sendInvitation({email: formData.email, name: formData.name, role: formData.role, department: formData.department, userId: result.id});
+            setCreatedPassword(ir.emailSent ? 'INVITACION_ENVIADA' : 'EMAIL_FALLIDO');
+          } catch { setCreatedPassword('INVITACION_ERROR'); }
+        } else { setCreatedPassword(result.password); }
+        await logAction({action: 'USER_CREATED', targetType: 'user', targetId: result.id, targetName: formData.name, impactLevel: 'sensitive', description: sendInvite ? `Usuario "${formData.name}" invitado` : `Usuario "${formData.name}" creado`});
       }
       setShowForm(false);
       setEditingUser(null);
@@ -294,7 +300,7 @@ function UsuariosTab() {
     }
   };
 
-  const handleNew = () => { setEditingUser(null); setFormData({ name: '', email: '', role: '', department: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setShowForm(true); };
+  const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', email: '', role: '', department: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
@@ -439,7 +445,7 @@ function UsuariosTab() {
               <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                 className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
             </div>
-            {!editingUser && (
+            {!editingUser && !sendInvite && (
               <div>
                 <label className="block text-xs font-medium text-[#86868B] mb-1">Contraseña temporal</label>
                 <div className="flex gap-2">
@@ -488,6 +494,13 @@ function UsuariosTab() {
                 <option value={7}>7 - Staff</option>
               </select>
             </div>
+            {!editingUser && (
+              <div className="md:col-span-2 flex items-center gap-2">
+                <input type="checkbox" checked={sendInvite} onChange={e => setSendInvite(e.target.checked)}
+                  className="w-4 h-4 rounded border-[#E5E5E7]" />
+                <label className="text-sm text-[#1D1D1F]">Enviar invitacion por email (el usuario creara su propia contrasena)</label>
+              </div>
+            )}
             <div className="md:col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})}
                 className="w-4 h-4 rounded border-[#E5E5E7]" />
@@ -501,8 +514,7 @@ function UsuariosTab() {
           {createdPassword && (
             <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
               <div className="text-sm font-medium text-emerald-700 mb-1">Usuario creado exitosamente</div>
-              <div className="text-xs text-emerald-600">Contraseña temporal: <span className="font-mono font-bold">{createdPassword}</span></div>
-              <div className="text-[10px] text-emerald-500 mt-1">Guarde esta contraseña. El usuario debera cambiarla al primer inicio de sesion.</div>
+              {createdPassword === 'INVITACION_ENVIADA' ? (<><div className="text-xs text-emerald-600">Invitacion enviada por email.</div><div className="text-[10px] text-emerald-500 mt-1">El usuario recibira un email para configurar su cuenta.</div></>) : createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? (<><div className="text-xs text-amber-600">No se pudo enviar el email.</div><div className="text-[10px] text-amber-500 mt-1">Envia el enlace de invitacion manualmente.</div></>) : (<><div className="text-xs text-emerald-600">Contraseña temporal: <span className="font-mono font-bold">{createdPassword}</span></div><div className="text-[10px] text-emerald-500 mt-1">Guarde esta contraseña.</div></>)}
               <button onClick={() => setCreatedPassword(null)} className="mt-2 text-xs text-emerald-600 hover:text-emerald-800 underline">Cerrar</button>
             </div>
           )}
@@ -1076,14 +1088,78 @@ function SeguridadTab() {
 function PapeleraTab() {
   const { logAction } = useAudit();
   const { restoreUser: _restore, deleteUser: _delete, trashedUsers } = useFirestoreUsers();
-  const { departmentOptions } = useDynamicDepartments();
+  const { departmentOptions, getDeptName } = useDynamicDepartments();
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [trashedShifts, setTrashedShifts] = useState<any[]>([]);
+  const [trashedDepartments, setTrashedDepartments] = useState<any[]>([]);
 
-  const handleRestore = async (u: any) => {
+  // Escuchar turnos eliminados
+  React.useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'shifts'), (snap) => {
+      const deleted = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((s: any) => s.isActive === false);
+      setTrashedShifts(deleted);
+    });
+    return () => unsub();
+  }, []);
+
+  // Escuchar departamentos eliminados
+  React.useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'departments'), (snap) => {
+      const deleted = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter((s: any) => s.isActive === false);
+      setTrashedDepartments(deleted);
+    });
+    return () => unsub();
+  }, []);
+
+  const totalItems = trashedUsers.length + trashedShifts.length + trashedDepartments.length;
+
+  const handleRestoreUser = async (u: any) => {
     setRestoringId(u.id);
     await _restore(u.id);
     await logAction({ action: "USER_RESTORED", targetType: "user", targetId: u.id, targetName: u.name, impactLevel: "major", description: `Usuario restaurado: "${u.name}"` });
     setRestoringId(null);
+  };
+
+  const handleRestoreShift = async (shift: any) => {
+    try {
+      await updateDoc(doc(db, 'shifts', shift._docId || shift.id), { isActive: true, deletedAt: null });
+      await logAction({ action: "SHIFT_UPDATED", targetType: "shift", targetId: shift.id, targetName: shift.name, impactLevel: "major", description: `Turno restaurado: "${shift.name}"` });
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handlePermanentDeleteShift = async (shift: any) => {
+    if (!confirm(`Eliminar permanentemente el turno "${shift.name}"? No se puede deshacer.`)) return;
+    try {
+      await deleteDoc(doc(db, 'shifts', shift._docId || shift.id));
+      await logAction({ action: "SHIFT_DELETED", targetType: "shift", targetId: shift.id, targetName: shift.name, impactLevel: "critical", description: `Turno eliminado permanentemente: "${shift.name}"` });
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handleRestoreDepartment = async (dept: any) => {
+    try {
+      await updateDoc(doc(db, 'departments', dept._docId || dept.id), { isActive: true, deletedAt: null });
+      await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: dept.id, targetName: dept.name, impactLevel: "major", description: `Departamento restaurado: "${dept.name}"` });
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const handlePermanentDeleteDepartment = async (dept: any) => {
+    if (!confirm(`Eliminar permanentemente el departamento "${dept.name}"? No se puede deshacer.`)) return;
+    try {
+      await deleteDoc(doc(db, 'departments', dept._docId || dept.id));
+      await logAction({ action: "DEPARTMENT_DELETED", targetType: "department", targetId: dept.id, targetName: dept.name, impactLevel: "critical", description: `Departamento eliminado permanentemente: "${dept.name}"` });
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
   };
 
   const handlePermanentDelete = async (u: any) => {
@@ -1091,31 +1167,70 @@ function PapeleraTab() {
       await executeWithConfirm({
         level: 'critical',
         title: 'Eliminar permanentemente',
-        description: `Esta accion eliminara a "${u.name}" de forma irreversible. No se puede deshacer.`,
+        description: `Esta accion eliminara a "${u.name}" de forma irreversible.`,
         action: async () => {
           await _delete(u.id);
-          await logAction({ action: 'USER_DELETED', targetType: 'user', targetId: u.id, targetName: u.name, impactLevel: 'critical', description: `Usuario eliminado permanentemente: "${u.name}"` });
+          await logAction({ action: 'USER_DELETED', targetType: 'user', targetId: u.id, targetName: u.name, impactLevel: 'critical', description: `Usuario eliminado: "${u.name}"` });
         },
       });
-    } catch {
-      // Cancelado por el usuario
-    }
+    } catch { /* Cancelado */ }
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-[#1D1D1F]">Papelera</h3>
-        <span className="text-sm text-[#86868B]">{trashedUsers.length} elementos</span>
+        <span className="text-sm text-[#86868B]">{totalItems} elementos</span>
       </div>
-      {trashedUsers.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
-          <Trash2 className="w-12 h-12 text-[#C7C7CC] mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-[#1D1D1F] mb-2">Papelera vacia</h3>
-          <p className="text-sm text-[#86868B]">Los elementos eliminados apareceran aqui</p>
-        </div>
-      ) : (
+
+      {/* Turnos eliminados */}
+      {trashedShifts.length > 0 && (
         <div className="space-y-3">
+          <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Turnos eliminados</h4>
+          {trashedShifts.map((shift: any) => (
+            <div key={shift.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: shift.color || '#8E8E93' }}>{(shift.name || "?").charAt(0).toUpperCase()}</div>
+                <div>
+                  <div className="font-medium text-[#1D1D1F] text-sm">{shift.name}</div>
+                  <div className="text-xs text-[#86868B]">{getDeptName(shift.department)} &middot; {shift.startTime} - {shift.endTime}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleRestoreShift(shift)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><RefreshCw size={14} /> Restaurar</button>
+                <button onClick={() => handlePermanentDeleteShift(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Departamentos eliminados */}
+      {trashedDepartments.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Departamentos eliminados</h4>
+          {trashedDepartments.map((dept: any) => (
+            <div key={dept.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: dept.color || '#8E8E93' }}>{(dept.name || "?").charAt(0).toUpperCase()}</div>
+                <div>
+                  <div className="font-medium text-[#1D1D1F] text-sm">{dept.name}</div>
+                  <div className="text-xs text-[#86868B]">{dept.email || dept.manager || 'Sin email'} &middot; Eliminado {dept.deletedAt ? new Date(dept.deletedAt).toLocaleDateString() : "recientemente"}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleRestoreDepartment(dept)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><RefreshCw size={14} /> Restaurar</button>
+                <button onClick={() => handlePermanentDeleteDepartment(dept)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Usuarios eliminados */}
+      {trashedUsers.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Usuarios eliminados</h4>
           {trashedUsers.map((u: any) => (
             <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1126,22 +1241,24 @@ function PapeleraTab() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={() => handleRestore(u)} disabled={restoringId === u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 transition-colors">
-                  {restoringId === u.id ? "Restaurando..." : <><RefreshCw size={14} /> Restaurar</>}
-                </button>
-                <button onClick={() => handlePermanentDelete(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500 transition-colors" title="Eliminar permanentemente"><Trash2 size={14} /></button>
+                <button onClick={() => handleRestoreUser(u)} disabled={restoringId === u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 transition-colors">{restoringId === u.id ? "Restaurando..." : <><RefreshCw size={14} /> Restaurar</>}</button>
+                <button onClick={() => handlePermanentDelete(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {totalItems === 0 && (
+        <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
+          <Trash2 className="w-12 h-12 text-[#C7C7CC] mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-[#1D1D1F] mb-2">Papelera vacia</h3>
+          <p className="text-sm text-[#86868B]">Los elementos eliminados apareceran aqui</p>
+        </div>
+      )}
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════
-// COMPONENTE PRINCIPAL
-// ═══════════════════════════════════════════════════════════════════
 
 export default function DevelopsModule() {
   const navigate = useNavigate();
@@ -1159,6 +1276,7 @@ export default function DevelopsModule() {
     auditoria: <AuditoriaTab />,
     seguridad: <SeguridadTab />,
     papelera: <PapeleraTab />,
+    turnos: <TurnosTab />,
   };
 
   return (

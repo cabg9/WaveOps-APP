@@ -31,6 +31,9 @@ import TasksModule from '@/components/modules/TasksModule';
 import HorariosModule from '@/components/modules/HorariosModule';
 import DevelopsModule from '@/components/modules/DevelopsModule';
 import ProfilePage from '@/components/ProfilePage';
+import { PersistentAvatar } from '@/components/PersistentAvatar';
+import SettingsPage from '@/components/SettingsPage';
+import InvitationPage from '@/components/InvitationPage';
 
 function ReportesModule() {
   return (
@@ -283,9 +286,10 @@ function AppRoutes() {
       />
 
       {/* Perfil */}
+      <Route path="/configuracion" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
       <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       {/* 404 */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/invitation" element={<InvitationPage />} />\n      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
@@ -306,7 +310,7 @@ function App() {
         <InitializeFirestore />
         <TasksProvider>
           <ShiftsProvider>
-            <AppRoutes />
+            <><PersistentAvatar /><AppRoutes /></>
             <Toaster position="top-right" richColors closeButton />
           </ShiftsProvider>
         </TasksProvider>

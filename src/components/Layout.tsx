@@ -2,7 +2,7 @@
 // LAYOUT PRINCIPAL - WAVEOPS
 // ═══════════════════════════════════════════════════════════════════
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home,
@@ -135,9 +135,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
       <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-16 bg-white border-r border-[#E5E5E7] flex-col items-center py-4 z-50">
         {/* Logo */}
         <div className="mb-6">
-          <div className="w-10 h-10 bg-corporate rounded-xl flex items-center justify-center">
-            <span className="text-white font-bold text-lg">G</span>
-          </div>
+          <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
         </div>
 
         {/* Navigation */}
@@ -215,11 +213,18 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
                       <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
                     </div>
-                    <Avatar className="w-9 h-9 bg-corporate">{user.photoURL && <AvatarImage src={user.photoURL} />}
-                      <AvatarFallback className="bg-corporate text-white text-sm font-medium">
-                        {getInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    {(() => {
+                      const cached = localStorage.getItem("cachedPhotoURL");
+                      const src = user.photoURL || cached;
+                      return (
+                        <Avatar className="w-9 h-9 bg-corporate">
+                          {src ? <AvatarImage src={src} /> : null}
+                          <AvatarFallback className="bg-corporate text-white text-sm font-medium">
+                            {getInitials(user.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      );
+                    })()}
                     <ChevronDown className="w-4 h-4 text-[#86868B]" />
                   </button>
                 </DropdownMenuTrigger>
@@ -245,9 +250,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
           <div className="flex items-center justify-between px-4 py-3">
             {/* Left: Logo & Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-corporate rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">G</span>
-              </div>
+              <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
               <div>
                 {title && (
                   <h1 className="text-lg font-semibold text-[#1D1D1F]">{title}</h1>
@@ -281,14 +284,8 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                   {/* Sheet Header */}
                   <SheetHeader className="p-4 border-b border-[#E5E5E7]">
                     <div className="flex items-center justify-between">
-                      <div className="w-10 h-10 bg-corporate rounded-xl flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">G</span>
-                      </div>
-                      <SheetClose asChild>
-                        <button className="w-8 h-8 rounded-lg flex items-center justify-center text-[#86868B] hover:bg-[#F5F5F7] transition-all">
-                          <X className="w-5 h-5" />
-                        </button>
-                      </SheetClose>
+                      <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
+
                     </div>
                   </SheetHeader>
 
@@ -326,11 +323,18 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <div className="space-y-4">
                         {/* User Info */}
                         <div className="flex items-center gap-3">
-                          <Avatar className="w-10 h-10 bg-corporate">{user.photoURL && <AvatarImage src={user.photoURL} />}
-                            <AvatarFallback className="bg-corporate text-white text-sm font-medium">
-                              {getInitials(user.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          {(() => {
+                            const cached = localStorage.getItem("cachedPhotoURL");
+                            const src = user.photoURL || cached;
+                            return (
+                              <Avatar className="w-10 h-10 bg-corporate">
+                                {src ? <AvatarImage src={src} /> : null}
+                                <AvatarFallback className="bg-corporate text-white text-sm font-medium">
+                                  {getInitials(user.name)}
+                                </AvatarFallback>
+                              </Avatar>
+                            );
+                          })()}
                           <div>
                             <p className="font-medium text-[#1D1D1F]">{user.name}</p>
                             <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>

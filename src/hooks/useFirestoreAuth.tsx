@@ -49,9 +49,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             level: userData.level || 7,
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
-            photoURL: userData.photoURL || '',
+            photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
           });
-          console.log("[Auth] Loaded user:", { id: usersSnapshot.docs[0].id, mustChangePassword: userData.mustChangePassword });
+          if (userData.photoURL) localStorage.setItem('cachedPhotoURL', userData.photoURL);
         } else {
           setUser({
             id: fbUser.email || fbUser.uid,
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           position: userData.position || '',
           level: userData.level || 7,
           isActive: userData.isActive !== false,
-            photoURL: userData.photoURL || '',
+            photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
         });
       } else {
         setUser({

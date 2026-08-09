@@ -40,8 +40,6 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { shiftAssignments } from '@/data/shiftAssignments';
-import { shifts } from '@/data/shifts';
 import { users as staticUsers } from '@/data/users';
 
 
@@ -805,6 +803,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const { uploadImage } = useStorageUpload();
   const { users: firestoreUsers } = useFirestoreUsers();
   const allUsers = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
+  const { shifts } = useFirestoreShifts();
   const getUserName = (userId?: string) => {
     if (!userId) return 'Usuario desconocido';
     const user = allUsers.find((u) => u.id === userId);

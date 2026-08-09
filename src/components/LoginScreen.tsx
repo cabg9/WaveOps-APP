@@ -82,10 +82,7 @@ export default function LoginScreen() {
         <div className="bg-white/95 backdrop-blur-sm rounded-[20px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-8">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 bg-corporate rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <Anchor className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-[#1D1D1F]">Galapagos Tasks</h1>
+            <img src="/logo-waveops.png" alt="WaveOps" className="w-80 mx-auto mb-4" />
             <p className="text-sm text-[#86868B] mt-1">Sistema de Gestión Operativa</p>
           </div>
 
