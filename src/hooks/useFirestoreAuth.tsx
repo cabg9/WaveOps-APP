@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
             photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
+            profileComplete: userData.profileComplete || false,
           });
           if (userData.photoURL) localStorage.setItem('cachedPhotoURL', userData.photoURL);
         } else {
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           level: userData.level || 7,
           isActive: userData.isActive !== false,
             photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
+            profileComplete: userData.profileComplete || false,
         });
       } else {
         setUser({
