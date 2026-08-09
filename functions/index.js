@@ -287,3 +287,30 @@ exports.cleanupUserData = onRequest(
     }
   }
 );
+
+exports.cleanupExpiredInvitations = onRequest(
+  {region: "us-central1", cors: true},
+  async (req, res) => {
+    setCorsHeaders(res);
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+    try {
+      const now = new Date().toISOString();
+      const allSnap = await db.collection("invitations").get();
+      const expired = allSnap.docs.filter(d => {
+        const data = d.data();
+        return data.status === "PENDING" && data.expiresAt < now;
+      });
+      
+      const batch = db.batch();
+      expired.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      
+      console.log(`[cleanupExpiredInvitations] Deleted ${expired.length} expired invitations`);
+      res.json({success: true, deleted: expired.length});
+    } catch (err) {
+      console.error("[cleanupExpiredInvitations] Error:", err.message);
+      res.status(500).json({error: err.message});
+    }
+  }
+);

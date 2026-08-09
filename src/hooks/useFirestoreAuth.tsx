@@ -9,7 +9,9 @@ import {
   collection, 
   query, 
   where, 
-  getDocs 
+  getDocs,
+  onSnapshot,
+  doc
 } from 'firebase/firestore';
 import { auth, db } from '@/firebase-config';
 import { User, AuthContextType, Role } from '@/types';
@@ -54,17 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
           if (userData.photoURL) localStorage.setItem('cachedPhotoURL', userData.photoURL);
         } else {
-          setUser({
-            id: fbUser.email || fbUser.uid,
-            email: fbUser.email || '',
-            name: fbUser.displayName || 'Usuario',
-            role: Role.STAFF,
-            department: defaultDepartment,
-            position: '',
-            level: 7,
-            isActive: true,
-            mustChangePassword: false,
-          });
+          // BUG FIX: Usuario no existe en Firestore — no debe tener acceso
+          console.error('[Auth] Usuario', fbUser.email, 'existe en Auth pero NO en Firestore — deslogueando');
+          await signOut(auth);
+          setUser(null);
         }
       } catch (error) {
         console.error('Error al obtener datos del usuario:', error);
