@@ -77,12 +77,17 @@ exports.createAuthUser = onDocumentCreated("users/{userId}", async (event) => {
 });
 
 exports.sendInvitationEmail = onRequest(
-  {region: "us-central1", cors: true, secrets: ["SENDGRID_API_KEY"]},
+  {region: "us-central1", cors: true},
   async (req, res) => {
     setCorsHeaders(res);
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    const sendgridKey = process.env.SENDGRID_API_KEY;
+    if (!sendgridKey) {
+      res.status(500).json({error: "SendGrid API key no configurada"});
+      return;
+    }
+    sgMail.setApiKey(sendgridKey);
 
     try {
       const {email, name, role, department, userId} = req.body;
