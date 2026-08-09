@@ -204,9 +204,11 @@ function AppRoutes() {
       <Route
         path="/"
         element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
 
@@ -214,65 +216,81 @@ function AppRoutes() {
       <Route
         path="/tasks"
         element={
-          <ProtectedRoute>
-            <TasksModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <TasksModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/horarios"
         element={
-          <ProtectedRoute>
-            <HorariosModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <HorariosModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/reportes"
         element={
-          <ProtectedRoute>
-            <ReportesModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <ReportesModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/ordenes-pago"
         element={
-          <ProtectedRoute>
-            <OrdenesPagoModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <OrdenesPagoModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/dive-ops"
         element={
-          <ProtectedRoute>
-            <DiveOpsModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <DiveOpsModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/requisiciones"
         element={
-          <ProtectedRoute>
-            <RequisicionesModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <RequisicionesModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/movilidad"
         element={
-          <ProtectedRoute>
-            <MovilidadModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <MovilidadModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
         path="/vessels"
         element={
-          <ProtectedRoute>
-            <VesselsModule />
-          </ProtectedRoute>
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <VesselsModule />
+            </ProtectedRoute>
+          </RequireProfileComplete>
         }
       />
       <Route
@@ -287,8 +305,8 @@ function AppRoutes() {
       />
 
       {/* Perfil */}
-      <Route path="/configuracion" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-      <Route path="/perfil" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+      <Route path="/configuracion" element={<RequireProfileComplete><ProtectedRoute><SettingsPage /></ProtectedRoute></RequireProfileComplete>} />
+      <Route path="/perfil" element={<RequireProfileComplete><ProtectedRoute><ProfilePage /></ProtectedRoute></RequireProfileComplete>} />
       {/* 404 */}
       <Route path="/invitation" element={<InvitationPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
@@ -302,6 +320,15 @@ function DevelopsGuard({ children }: { children: React.ReactNode }) {
   const { hasDevelopAccess, loading } = useAppConfig();
   if (loading) return <div className="flex items-center justify-center h-screen text-[#86868B]">Cargando...</div>;
   if (!hasDevelopAccess) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
+function RequireProfileComplete({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center">Cargando...</div>;
+  if (user && user.isActive !== false && !user.profileComplete && user.mustChangePassword === false) {
+    return <Navigate to="/onboarding" replace />;
+  }
   return <>{children}</>;
 }
 

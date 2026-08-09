@@ -41,8 +41,8 @@ export default function InvitationPage() {
   };
 
   if (checking) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center"><Loader2 className="w-8 h-8 text-corporate animate-spin" /></div>;
-  if (error && !invitationData) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center"><div className="bg-white p-8 rounded-2xl text-center"><AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4"/><p>{error}</p><Button onClick={() => navigate('/login')} className="mt-4 bg-corporate">Login</Button></div></div>;
-  if (success) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center"><div className="bg-white p-8 rounded-2xl text-center"><CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4"/><h2 className="text-lg font-semibold">Cuenta creada!</h2><Button onClick={() => navigate('/login')} className="mt-4 bg-corporate">Iniciar sesion</Button></div></div>;
+  if (error && !invitationData) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center"><div className="bg-white p-8 rounded-2xl text-center"><AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4"/><p>{error}</p><Button onClick={() => window.location.href = '/login'} className="mt-4 bg-corporate">Login</Button></div></div>;
+  if (success) return <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center"><div className="bg-white p-8 rounded-2xl text-center"><CheckCircle className="w-12 h-12 text-green-500 mx-auto mb-4"/><h2 className="text-lg font-semibold">Cuenta creada!</h2><Button onClick={() => window.location.href = '/login'} className="mt-4 bg-corporate">Iniciar sesion</Button></div></div>;
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4">

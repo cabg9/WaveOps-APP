@@ -586,7 +586,7 @@ function UsuariosTab() {
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
                         {/* @ts-ignore */}
-                        {!u.authUid && u.isActive && (
+                        {(u.invitationPending || (!u.authUid && u.isActive)) && !showInactive && (
                           <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
                             {resendingId === u.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                           </button>
@@ -1205,7 +1205,7 @@ function PapeleraTab() {
         title: 'Eliminar permanentemente',
         description: `Esta accion eliminara a "${u.name}" de forma irreversible.`,
         action: async () => {
-          await _delete(u.id);
+          await _delete(u);
           await logAction({ action: 'USER_DELETED', targetType: 'user', targetId: u.id, targetName: u.name, impactLevel: 'critical', description: `Usuario eliminado: "${u.name}"` });
         },
       });

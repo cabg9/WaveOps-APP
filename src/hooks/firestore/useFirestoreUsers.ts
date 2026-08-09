@@ -266,13 +266,25 @@ export function useFirestoreUsers() {
   // DESACTIVAR USUARIO (no eliminar, solo desactivar)
   // ═══════════════════════════════════════════════════════════════════
 
-  const deactivateUser = useCallback(async (id: string): Promise<void> => {
+  const deactivateUser = useCallback(async (user: any): Promise<void> => {
     try {
-      const docRef = doc(db, COLLECTION_NAME, id);
+      const docRef = doc(db, COLLECTION_NAME, user.id);
       await updateDoc(docRef, {
         isActive: false,
         deactivatedAt: new Date().toISOString(),
       } as DocumentData);
+      // Desactivar en Firebase Auth para que no pueda hacer login
+      if (user.authUid) {
+        try {
+          await fetch('https://us-central1-wve-b3db5.cloudfunctions.net/setAuthUserDisabled', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({uid: user.authUid, disabled: true}),
+          });
+        } catch (err) {
+          console.error('[deactivateUser] Error disabling auth:', err);
+        }
+      }
     } catch (err: any) {
       console.error('Error al desactivar usuario:', err);
       throw err;
@@ -313,17 +325,21 @@ export function useFirestoreUsers() {
   // ELIMINAR USUARIO PERMANENTEMENTE
   // ═══════════════════════════════════════════════════════════════════
 
-  const deleteUser = useCallback(async (id: string): Promise<void> => {
+  const deleteUser = useCallback(async (user: any): Promise<void> => {
     try {
-      // Eliminar de Firestore primero
-      await deleteDoc(doc(db, COLLECTION_NAME, id));
-      // Intentar eliminar de Auth (puede fallar si no es el usuario actual)
+      // Llamar Cloud Function para cleanup (Auth + invitaciones + Firestore)
       try {
-        // NOTA: Solo el usuario actual o un admin puede eliminar de Auth
-        // En produccion se usaria Cloud Function para esto
-        console.log('[deleteUser] Usuario eliminado de Firestore. Para eliminar de Auth se requiere Cloud Function.');
-      } catch {
-        // Ignorar error de Auth
+        const res = await fetch('https://us-central1-wve-b3db5.cloudfunctions.net/cleanupUserData', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({userId: user.id, email: user.email}),
+        });
+        const result = await res.json();
+        console.log('[deleteUser] Cleanup:', result);
+      } catch (err) {
+        console.error('[deleteUser] Error cleanup:', err);
+        // Fallback: eliminar solo de Firestore
+        await deleteDoc(doc(db, COLLECTION_NAME, user.id));
       }
     } catch (err: any) {
       console.error('Error al eliminar usuario permanentemente:', err);

@@ -100,6 +100,11 @@ exports.sendInvitationEmail = onRequest(
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 72);
 
+      await db.collection("users").doc(userId).update({
+        invitationPending: true,
+        invitedAt: new Date().toISOString(),
+      });
+
       await db.collection("invitations").doc(token).set({
         email, name, role, department, userId, token,
         status: "PENDING",
@@ -184,6 +189,7 @@ exports.acceptInvitation = onRequest(
         isActive: true,
         mustChangePassword: false,
         profileComplete: false,
+        invitationPending: false,
       });
       await invRef.update({
         status: "ACCEPTED",
@@ -194,6 +200,89 @@ exports.acceptInvitation = onRequest(
       res.json({success: true, uid: authUser.uid});
     } catch (err) {
       console.error("[acceptInvitation] Error:", err.message);
+      res.status(500).json({error: err.message});
+    }
+  }
+);
+
+exports.deleteAuthUser = onRequest(
+  {region: "us-central1", cors: true},
+  async (req, res) => {
+    setCorsHeaders(res);
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+    try {
+      const {uid} = req.body;
+      if (!uid) {
+        res.status(400).json({error: "Falta uid"});
+        return;
+      }
+      await auth.deleteUser(uid);
+      console.log(`[deleteAuthUser] Deleted auth user ${uid}`);
+      res.json({success: true});
+    } catch (err) {
+      console.error("[deleteAuthUser] Error:", err.message);
+      res.status(500).json({error: err.message});
+    }
+  }
+);
+
+exports.setAuthUserDisabled = onRequest(
+  {region: "us-central1", cors: true},
+  async (req, res) => {
+    setCorsHeaders(res);
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+    try {
+      const {uid, disabled} = req.body;
+      if (!uid) {
+        res.status(400).json({error: "Falta uid"});
+        return;
+      }
+      await auth.updateUser(uid, { disabled: disabled !== false });
+      console.log(`[setAuthUserDisabled] User ${uid} disabled=${disabled !== false}`);
+      res.json({success: true});
+    } catch (err) {
+      console.error("[setAuthUserDisabled] Error:", err.message);
+      res.status(500).json({error: err.message});
+    }
+  }
+);
+
+exports.cleanupUserData = onRequest(
+  {region: "us-central1", cors: true},
+  async (req, res) => {
+    setCorsHeaders(res);
+    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+    try {
+      const {userId, email} = req.body;
+      
+      // Eliminar invitaciones pendientes para este email
+      if (email) {
+        const invitationsSnap = await db.collection("invitations")
+          .where("email", "==", email)
+          .where("status", "==", "PENDING")
+          .get();
+        const batch = db.batch();
+        invitationsSnap.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+        console.log(`[cleanupUserData] Deleted ${invitationsSnap.size} pending invitations for ${email}`);
+      }
+      
+      // Eliminar documento de users
+      if (userId) {
+        await db.collection("users").doc(userId).delete();
+        console.log(`[cleanupUserData] Deleted user doc ${userId}`);
+      }
+      
+      let invitationsDeleted = 0;
+      if (email) {
+        invitationsDeleted = invitationsSnap.size;
+      }
+      res.json({success: true, invitationsDeleted});
+    } catch (err) {
+      console.error("[cleanupUserData] Error:", err.message);
       res.status(500).json({error: err.message});
     }
   }
