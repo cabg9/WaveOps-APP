@@ -183,6 +183,7 @@ exports.acceptInvitation = onRequest(
         authCreatedAt: new Date().toISOString(),
         isActive: true,
         mustChangePassword: false,
+        profileComplete: false,
       });
       await invRef.update({
         status: "ACCEPTED",

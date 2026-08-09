@@ -219,17 +219,25 @@ export function useFirestoreUsers() {
   // CREAR USUARIO (solo perfil en Firestore, no auth)
   // ═══════════════════════════════════════════════════════════════════
 
-  const createUser = useCallback(async (userData: Omit<FirestoreUser, 'id'> & { password: string }): Promise<{ id: string; password: string }> => {
+  const createUser = useCallback(async (userData: Omit<FirestoreUser, 'id'> & { password?: string; joinDate?: string }): Promise<{ id: string; password?: string }> => {
     try {
-      // Crear en Firestore con addDoc (no cambia la sesion de Auth)
       const userForFirestore = { ...userData };
       delete (userForFirestore as any).password;
-      const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+      const docData: any = {
         ...userForFirestore,
-        tempPassword: userData.password,
-        mustChangePassword: true,
         createdAt: new Date().toISOString(),
-      });
+      };
+      // Solo guardar tempPassword si se proporcionó (sin invitación)
+      if (userData.password) {
+        docData.tempPassword = userData.password;
+        docData.mustChangePassword = true;
+      } else {
+        docData.mustChangePassword = false;
+      }
+      if (userData.joinDate) {
+        docData.joinDate = userData.joinDate;
+      }
+      const docRef = await addDoc(collection(db, COLLECTION_NAME), docData);
       return { id: docRef.id, password: userData.password };
     } catch (err: any) {
       console.error('Error al crear usuario:', err);
