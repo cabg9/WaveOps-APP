@@ -3,11 +3,14 @@ const {getAuth} = require("firebase-admin/auth");
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
 const {onRequest} = require("firebase-functions/v2/https");
+const {defineSecret} = require("firebase-functions/params");
 const sgMail = require("@sendgrid/mail");
 
 initializeApp();
 const auth = getAuth();
 const db = getFirestore();
+
+const sendgridApiKey = defineSecret("SENDGRID_API_KEY");
 
 const LOGO_URL = "https://wve-b3db5.web.app/logo-waveops.png";
 
@@ -77,12 +80,16 @@ exports.createAuthUser = onDocumentCreated("users/{userId}", async (event) => {
 });
 
 exports.sendInvitationEmail = onRequest(
-  {region: "us-central1", cors: true},
+  {
+    region: "us-central1",
+    cors: true,
+    secrets: [sendgridApiKey]
+  },
   async (req, res) => {
     setCorsHeaders(res);
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
-    const sendgridKey = process.env.SENDGRID_API_KEY;
+    const sendgridKey = sendgridApiKey.value();
     if (!sendgridKey) {
       res.status(500).json({error: "SendGrid API key no configurada"});
       return;
@@ -197,3 +204,4 @@ exports.acceptInvitation = onRequest(
     }
   }
 );
+// Deploy timestamp: Sat Aug  8 23:04:10 -05 2026

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 
-const FUNCTION_BASE = 'https://us-central1-wve-b3db5.cloudfunctions.net';
+const SEND_INVITATION_URL = 'https://sendinvitationemail-fex6pa2byq-uc.a.run.app';
+const ACCEPT_INVITATION_URL = 'https://acceptinvitation-fex6pa2byq-uc.a.run.app';
 
 export function useInvitation() {
   const [loading, setLoading] = useState(false);
@@ -11,7 +12,7 @@ export function useInvitation() {
   }) => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`${FUNCTION_BASE}/sendInvitationEmail`, {
+      const res = await fetch(SEND_INVITATION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -26,7 +27,7 @@ export function useInvitation() {
   const acceptInvitation = useCallback(async (token: string, password: string) => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`${FUNCTION_BASE}/acceptInvitation`, {
+      const res = await fetch(ACCEPT_INVITATION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, password }),
