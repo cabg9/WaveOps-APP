@@ -1,107 +1,218 @@
 // ═══════════════════════════════════════════════════════════════════
-// PROFILE PAGE - Perfil de Usuario
+// PROFILE PAGE - WaveOps
+// Modern, Apple-inspired design
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { db, storage } from '@/firebase-config';
+import { doc, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getInitials } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
-  Mail, Phone, Building2, Briefcase, Lock,
-  MapPin, Calendar, UserCircle, Contact, Camera
+  Mail, Phone, MapPin, Calendar, User, Globe, Droplets,
+  AlertTriangle, Pill, Award, CreditCard, Camera, Edit3,
+  Check, X, ChevronRight, Shield, Briefcase, Building2,
+  Heart, UserCircle, Flag, Droplet, BadgeCheck, IdCard
 } from 'lucide-react';
-import { updatePassword } from 'firebase/auth';
-import { auth } from '@/firebase-config';
-import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 
-export default function ProfilePage() {
-  const { user } = useAuth();
+// Country codes for display
+const COUNTRY_NAMES: Record<string, string> = {
+  '+593': 'Ecuador', '+1': 'USA', '+44': 'UK', '+34': 'España',
+  '+49': 'Alemania', '+33': 'Francia', '+39': 'Italia', '+51': 'Perú',
+  '+56': 'Chile', '+57': 'Colombia', '+54': 'Argentina', '+55': 'Brasil',
+  '+52': 'México', '+598': 'Uruguay', '+591': 'Bolivia', '+507': 'Panamá',
+  '+61': 'Australia', '+81': 'Japón', '+86': 'China', '+91': 'India',
+};
+
+// Blood type colors
+const BLOOD_TYPE_COLORS: Record<string, string> = {
+  'A+': 'bg-red-100 text-red-700', 'A-': 'bg-red-50 text-red-600',
+  'B+': 'bg-blue-100 text-blue-700', 'B-': 'bg-blue-50 text-blue-600',
+  'AB+': 'bg-purple-100 text-purple-700', 'AB-': 'bg-purple-50 text-purple-600',
+  'O+': 'bg-green-100 text-green-700', 'O-': 'bg-green-50 text-green-600',
+};
+
+interface ProfilePageProps {
+  userId?: string; // For admin editing other users
+  onClose?: () => void; // For modal mode
+}
+
+export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) {
+  const { user: currentUser } = useAuth();
   const { updateUser, users } = useFirestoreUsers();
-  const { uploadImage, uploading: uploadingPhoto } = useStorageUpload();
-
   const [isEditing, setIsEditing] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>('');
 
-  // Get fresh user data from Firestore
-  const freshUser = users.find(u => u.id === user?.id) || user;
+  // Determine which user to display
+  const isAdmin = !userId || (currentUser?.level || 7) <= 3;
+  const targetUserId = userId || currentUser?.id;
+  const freshUser = users.find(u => u.id === targetUserId) || currentUser;
 
   const [formData, setFormData] = useState({
     name: '',
+    displayName: '',
+    email: '',
     phone: '',
-    position: '',
-    nickname: '',
-    cedula: '',
+    phoneCountry: '+593',
+    nationality: '',
     birthDate: '',
+    cedula: '',
+    passport: '',
     address: '',
-    emergencyContact: '',
-    emergencyPhone: '',
+    bloodType: '',
+    allergies: '',
+    medications: '',
+    emergencyContactName: '',
+    emergencyContactPhone: '',
+    emergencyContactRelation: '',
+    certificationNumber: '',
+    certificationExpiry: '',
+    apneaCert: '',
+    bankCountry: '',
+    bankName: '',
+    accountType: '',
+    accountNumber: '',
+    routingNumber: '',
     photoURL: '',
+    role: '',
+    department: '',
+    position: '',
+    level: 7,
+    joinDate: '',
   });
 
   useEffect(() => {
     if (freshUser) {
       setFormData({
         name: freshUser.name || '',
+        displayName: freshUser.displayName || '',
+        email: freshUser.email || '',
         phone: freshUser.phone || '',
-        position: freshUser.position || '',
-        nickname: freshUser.nickname || '',
-        cedula: freshUser.cedula || '',
+        phoneCountry: freshUser.phone?.split(' ')[0] || '+593',
+        nationality: freshUser.nationality || '',
         birthDate: freshUser.birthDate || '',
+        cedula: freshUser.cedula || '',
+        passport: freshUser.passport || '',
         address: freshUser.address || '',
-        emergencyContact: freshUser.emergencyContact || '',
-        emergencyPhone: freshUser.emergencyPhone || '',
+        bloodType: freshUser.bloodType || '',
+        allergies: freshUser.allergies || '',
+        medications: freshUser.medications || '',
+        emergencyContactName: freshUser.emergencyContactName || '',
+        emergencyContactPhone: freshUser.emergencyContactPhone || '',
+        emergencyContactRelation: freshUser.emergencyContactRelation || '',
+        certificationNumber: freshUser.certificationNumber || '',
+        certificationExpiry: freshUser.certificationExpiry || '',
+        apneaCert: freshUser.apneaCert || '',
+        bankCountry: freshUser.bankCountry || '',
+        bankName: freshUser.bankName || '',
+        accountType: freshUser.accountType || '',
+        accountNumber: freshUser.accountNumber || '',
+        routingNumber: freshUser.routingNumber || '',
         photoURL: freshUser.photoURL || '',
+        role: freshUser.role || '',
+        department: freshUser.department || '',
+        position: freshUser.position || '',
+        level: freshUser.level || 7,
+        joinDate: freshUser.joinDate || '',
       });
     }
   }, [freshUser]);
 
-  if (!user) {
+  if (!freshUser) {
     return (
       <Layout title="Perfil">
         <div className="flex items-center justify-center py-20">
-          <p className="text-[#86868B]">Inicia sesión para ver tu perfil</p>
+          <p className="text-[#86868B]">Usuario no encontrado</p>
         </div>
       </Layout>
     );
   }
 
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handlePhotoClick = () => fileInputRef.current?.click();
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('Solo se permiten imágenes');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('La imagen debe ser menor a 5MB');
+      return;
+    }
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setPhotoPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const uploadPhoto = async (uid: string): Promise<string | null> => {
+    if (!photoFile) return null;
+    const storageRef = ref(storage, `users/${uid}/profile-photo.jpg`);
+    await uploadBytes(storageRef, photoFile);
+    return getDownloadURL(storageRef);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       let photoURL = formData.photoURL;
-      if (selectedPhoto) {
-        photoURL = await uploadImage(selectedPhoto, `users/${user.id}`);
+      if (photoFile) {
+        photoURL = await uploadPhoto(targetUserId!) || photoURL;
       }
-      await updateUser(user.id, {
-        name: formData.name,
+
+      await updateUser(targetUserId!, {
+        // @ts-ignore
+        displayName: formData.displayName,
         phone: formData.phone,
-        nickname: formData.nickname,
-        cedula: formData.cedula,
+        nationality: formData.nationality,
         birthDate: formData.birthDate,
+        cedula: formData.cedula,
+        passport: formData.passport,
         address: formData.address,
-        emergencyContact: formData.emergencyContact,
-        emergencyPhone: formData.emergencyPhone,
+        bloodType: formData.bloodType,
+        allergies: formData.allergies,
+        medications: formData.medications,
+        emergencyContactName: formData.emergencyContactName,
+        emergencyContactPhone: formData.emergencyContactPhone,
+        emergencyContactRelation: formData.emergencyContactRelation,
+        certificationNumber: formData.certificationNumber,
+        certificationExpiry: formData.certificationExpiry,
+        apneaCert: formData.apneaCert,
+        bankCountry: formData.bankCountry,
+        bankName: formData.bankName,
+        accountType: formData.accountType,
+        accountNumber: formData.accountNumber,
+        routingNumber: formData.routingNumber,
         photoURL,
+        name: formData.name,
+        position: formData.position,
+        updatedAt: new Date().toISOString(),
       });
+
       setIsEditing(false);
-      setSelectedPhoto(null);
+      setPhotoFile(null);
       setPhotoPreview('');
       toast.success('Perfil actualizado correctamente');
+      if (onClose) onClose();
     } catch (err: any) {
       console.error('Error updating profile:', err);
       toast.error('Error al actualizar perfil: ' + err.message);
@@ -110,45 +221,10 @@ export default function ProfilePage() {
     }
   };
 
-  const handleChangePassword = async () => {
-    setPasswordError('');
-    setPasswordSuccess(false);
-
-    if (newPassword.length < 8) {
-      setPasswordError('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Las contraseñas no coinciden');
-      return;
-    }
-
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) {
-        setPasswordError('No hay usuario autenticado');
-        return;
-      }
-      await updatePassword(currentUser, newPassword);
-      setPasswordSuccess(true);
-      setNewPassword('');
-      setConfirmPassword('');
-      toast.success('Contraseña actualizada correctamente');
-      setTimeout(() => setShowPasswordModal(false), 2000);
-    } catch (err: any) {
-      console.error('Password error:', err);
-      if (err.code === 'auth/requires-recent-login') {
-        setPasswordError('Debes cerrar sesión y volver a iniciar para cambiar la contraseña');
-      } else {
-        setPasswordError(err.message || 'Error al cambiar contraseña');
-      }
-    }
-  };
-
-  // Calculate age and birthday
-  const getAge = (birthDate: string) => {
-    if (!birthDate) return null;
-    const birth = new Date(birthDate);
+  // Calculate age
+  const getAge = () => {
+    if (!formData.birthDate) return null;
+    const birth = new Date(formData.birthDate);
     const today = new Date();
     let age = today.getFullYear() - birth.getFullYear();
     const m = today.getMonth() - birth.getMonth();
@@ -156,307 +232,325 @@ export default function ProfilePage() {
     return age;
   };
 
-  const getNextBirthday = (birthDate: string) => {
-    if (!birthDate) return null;
-    const birth = new Date(birthDate);
-    const today = new Date();
-    const nextBirthday = new Date(today.getFullYear(), birth.getMonth(), birth.getDate());
-    if (nextBirthday < today) {
-      nextBirthday.setFullYear(today.getFullYear() + 1);
-    }
-    const daysLeft = Math.ceil((nextBirthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return daysLeft;
-  };
+  const age = getAge();
 
-  const age = getAge(formData.birthDate);
-  const daysToBirthday = getNextBirthday(formData.birthDate);
+  // Helper to display info
+  const InfoRow = ({ icon: Icon, label, value, missing = 'No registrado' }: any) => (
+    <div className="flex items-start gap-3 py-2">
+      <div className="w-8 h-8 rounded-lg bg-[#F5F5F7] flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-[#86868B]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-[#86868B]">{label}</p>
+        <p className="text-sm font-medium text-[#1D1D1F] truncate">{value || missing}</p>
+      </div>
+    </div>
+  );
+
+  // Section component
+  const Section = ({ title, icon: Icon, children, color = 'bg-corporate' }: any) => (
+    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className={`h-1 ${color}`} />
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-[#F5F5F7] flex items-center justify-center">
+            <Icon className="w-4 h-4 text-corporate" />
+          </div>
+          <h3 className="font-semibold text-[#1D1D1F]">{title}</h3>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  // Editable field
+  const EditableField = ({ label, field, type = 'text', placeholder = '', selectOptions = null }: any) => (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-[#86868B]">{label}</Label>
+      {selectOptions ? (
+        <select
+          value={formData[field as keyof typeof formData] || ''}
+          onChange={e => handleChange(field, e.target.value)}
+          className="w-full h-10 rounded-xl border border-[#E5E5E7] px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20"
+        >
+          {selectOptions.map((opt: any) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      ) : (
+        <Input
+          type={type}
+          value={formData[field as keyof typeof formData] || ''}
+          onChange={e => handleChange(field, e.target.value)}
+          placeholder={placeholder}
+          className="h-10 rounded-xl border-[#E5E5E7] focus:ring-corporate/20"
+        />
+      )}
+    </div>
+  );
+
+  const isOwnProfile = !userId || userId === currentUser?.id;
 
   return (
-    <Layout title="Perfil">
-      <div className="max-w-2xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-6">
-          <Avatar className="w-24 h-24">
-            {formData.photoURL ? (
-              <AvatarImage src={formData.photoURL} alt={user.name} />
-            ) : null}
-            <AvatarFallback className="bg-corporate text-white text-3xl">
-              {getInitials(user.name)}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-2xl font-bold text-[#1D1D1F]">
-              {user.name}
-              {formData.nickname && <span className="text-[#86868B] text-lg ml-2">"{formData.nickname}"</span>}
-            </h1>
-            <p className="text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
-            {daysToBirthday !== null && (
-              <p className="text-sm text-corporate mt-1">
-                {daysToBirthday === 0 ? '¡Hoy es su cumpleaños! 🎉' :
-                 daysToBirthday === 1 ? 'Mañana es su cumpleaños! 🎂' :
-                 `Cumpleaños en ${daysToBirthday} días`} {age ? `(${age} años)` : ''}
-              </p>
+    <div className="min-h-screen bg-[#F5F5F7] pb-20">
+      {/* Header Banner */}
+      <div className="relative h-48 md:h-56 overflow-hidden">
+        <img
+          src="/profile-header.jpg"
+          alt="Header"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#F5F5F7]" />
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 -mt-20 relative z-10">
+        {/* Profile Card */}
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6 mb-6">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            {/* Avatar */}
+            <div className="relative">
+              <div
+                onClick={isEditing ? handlePhotoClick : undefined}
+                className={`w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-lg ${isEditing ? 'cursor-pointer ring-2 ring-corporate ring-offset-2' : ''}`}
+              >
+                {photoPreview || formData.photoURL ? (
+                  <img src={photoPreview || formData.photoURL} alt={formData.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-corporate flex items-center justify-center text-white text-3xl font-bold">
+                    {getInitials(formData.name)}
+                  </div>
+                )}
+              </div>
+              {isEditing && (
+                <div className="absolute bottom-0 right-0 w-8 h-8 bg-corporate rounded-full flex items-center justify-center shadow-md">
+                  <Camera className="w-4 h-4 text-white" />
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 text-center md:text-left">
+              <h1 className="text-2xl font-bold text-[#1D1D1F]">
+                {formData.name || 'Usuario'}
+                {formData.displayName && (
+                  <span className="text-[#86868B] text-lg font-normal ml-2">"{formData.displayName}"</span>
+                )}
+              </h1>
+              <p className="text-[#86868B] mt-1">{formData.position || formData.role?.replace(/_/g, ' ') || 'Sin rol'}</p>
+              <div className="flex items-center justify-center md:justify-start gap-3 mt-3">
+                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5F5F7] text-xs text-[#86868B]">
+                  <Briefcase className="w-3 h-3" />
+                  {formData.department?.replace(/_/g, ' ') || 'Sin departamento'}
+                </span>
+                {formData.bloodType && (
+                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${BLOOD_TYPE_COLORS[formData.bloodType] || 'bg-gray-100 text-gray-700'}`}>
+                    <Droplet className="w-3 h-3" />
+                    {formData.bloodType}
+                  </span>
+                )}
+                {age !== null && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5F5F7] text-xs text-[#86868B]">
+                    <Calendar className="w-3 h-3" />
+                    {age} años
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Edit Button */}
+            {(isOwnProfile || isAdmin) && (
+              <Button
+                variant={isEditing ? 'default' : 'outline'}
+                onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)}
+                className={isEditing ? 'bg-corporate' : ''}
+              >
+                {isEditing ? (
+                  <><X className="w-4 h-4 mr-1" /> Cancelar</>
+                ) : (
+                  <><Edit3 className="w-4 h-4 mr-1" /> Editar</>
+                )}
+              </Button>
             )}
           </div>
         </div>
 
-        {/* Info Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Información Personal</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsEditing(!isEditing)}
-            >
-              {isEditing ? 'Cancelar' : 'Editar'}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isEditing ? (
-              <>
-                <div className="space-y-2">
-                  <Label>Foto de perfil</Label>
-                  <div className="flex items-center gap-4">
-                    <Avatar className="w-16 h-16">
-                      {photoPreview || formData.photoURL ? (
-                        <AvatarImage src={photoPreview || formData.photoURL} alt={user.name} />
-                      ) : null}
-                      <AvatarFallback className="bg-corporate text-white text-xl">
-                        {getInitials(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) {
-                            setSelectedPhoto(file);
-                            const reader = new FileReader();
-                            reader.onloadend = () => setPhotoPreview(reader.result as string);
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-[#86868B] mt-1">Selecciona una foto de tu galería</p>
-                    </div>
-                  </div>
+        {isEditing ? (
+          /* EDIT MODE */
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Información Personal</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField label="Nombre completo" field="name" />
+                <EditableField label="Nombre para mostrar" field="displayName" placeholder="Cómo te gusta que te llamen" />
+                <EditableField label="Nacionalidad" field="nationality" placeholder="Ej: Ecuatoriana" />
+                <EditableField label="Fecha de nacimiento" field="birthDate" type="date" />
+                <EditableField label="Cédula / ID" field="cedula" placeholder="1712345678" />
+                <EditableField label="Pasaporte" field="passport" placeholder="PA123456" />
+                <div className="md:col-span-2">
+                  <EditableField label="Dirección" field="address" placeholder="Av. Charles Darwin, Puerto Ayora" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Nombre completo</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Contacto</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField label="Teléfono" field="phone" placeholder="+593 987654321" />
+                <EditableField label="Email" field="email" type="email" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Salud</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField
+                  label="Tipo de sangre"
+                  field="bloodType"
+                  selectOptions={[
+                    { value: '', label: 'Seleccionar' },
+                    { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+                    { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+                    { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
+                    { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+                  ]}
+                />
+                <EditableField label="Alergias" field="allergies" placeholder="Ninguna" />
+                <div className="md:col-span-2">
+                  <EditableField label="Medicamentos" field="medications" placeholder="Ninguno" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Como le gusta que le llamen</Label>
-                  <div className="flex items-center gap-2">
-                    <UserCircle className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.nickname}
-                      onChange={(e) => setFormData({ ...formData, nickname: e.target.value })}
-                      placeholder="Ej: Andy, Andresito"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Cédula / Pasaporte</Label>
-                  <Input
-                    value={formData.cedula}
-                    onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
-                    placeholder="Ej: 1712345678"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Fecha de nacimiento</Label>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      type="date"
-                      value={formData.birthDate}
-                      onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Teléfono</Label>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="Ej: 0991234567"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Residencia / Dirección</Label>
-                  <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.address}
-                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      placeholder="Ej: Puerto Ayora, Santa Cruz"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Contacto de emergencia (nombre)</Label>
-                  <div className="flex items-center gap-2">
-                    <Contact className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.emergencyContact}
-                      onChange={(e) => setFormData({ ...formData, emergencyContact: e.target.value })}
-                      placeholder="Ej: María Bonilla"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Contacto de emergencia (teléfono)</Label>
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-[#86868B]" />
-                    <Input
-                      value={formData.emergencyPhone}
-                      onChange={(e) => setFormData({ ...formData, emergencyPhone: e.target.value })}
-                      placeholder="Ej: 0987654321"
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSave} disabled={saving || uploadingPhoto} className="bg-corporate hover:bg-corporate/90">
-                  {uploadingPhoto ? 'Subiendo foto...' : saving ? 'Guardando...' : 'Guardar Cambios'}
-                </Button>
-              </>
-            ) : (
-              <div className="space-y-3">
-                {formData.nickname && (
-                  <div className="flex items-center gap-3">
-                    <UserCircle className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-sm text-[#86868B] w-32">Le llaman:</span>
-                    <span className="text-[#1D1D1F] font-medium">"{formData.nickname}"</span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-[#86868B]" />
-                  <span className="text-sm text-[#86868B] w-32">Email:</span>
-                  <span className="text-[#1D1D1F]">{user.email}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Phone className="w-4 h-4 text-[#86868B]" />
-                  <span className="text-sm text-[#86868B] w-32">Teléfono:</span>
-                  <span className="text-[#1D1D1F]">{formData.phone || 'No registrado'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Building2 className="w-4 h-4 text-[#86868B]" />
-                  <span className="text-sm text-[#86868B] w-32">Departamento:</span>
-                  <span className="text-[#1D1D1F]">{user.department?.replace(/_/g, ' ') || 'No asignado'}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Briefcase className="w-4 h-4 text-[#86868B]" />
-                  <span className="text-sm text-[#86868B] w-32">Cargo:</span>
-                  <span className="text-[#1D1D1F]">{user.position || 'No registrado'}</span>
-                </div>
-                {formData.cedula && (
-                  <div className="flex items-center gap-3">
-                    <UserCircle className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-sm text-[#86868B] w-32">Cédula:</span>
-                    <span className="text-[#1D1D1F]">{formData.cedula}</span>
-                  </div>
-                )}
-                {formData.birthDate && (
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-sm text-[#86868B] w-32">Nacimiento:</span>
-                    <span className="text-[#1D1D1F]">
-                      {new Date(formData.birthDate).toLocaleDateString('es-EC')}
-                      {age !== null && ` (${age} años)`}
-                    </span>
-                  </div>
-                )}
-                {formData.address && (
-                  <div className="flex items-center gap-3">
-                    <MapPin className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-sm text-[#86868B] w-32">Residencia:</span>
-                    <span className="text-[#1D1D1F]">{formData.address}</span>
-                  </div>
-                )}
-                {(formData.emergencyContact || formData.emergencyPhone) && (
-                  <div className="flex items-center gap-3">
-                    <Contact className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-sm text-[#86868B] w-32">Emergencia:</span>
-                    <span className="text-[#1D1D1F]">
-                      {formData.emergencyContact} {formData.emergencyPhone && `- ${formData.emergencyPhone}`}
-                    </span>
-                  </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Contacto de Emergencia</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField label="Nombre" field="emergencyContactName" placeholder="Nombre completo" />
+                <EditableField label="Teléfono" field="emergencyContactPhone" placeholder="+593 987654321" />
+                <EditableField
+                  label="Relación"
+                  field="emergencyContactRelation"
+                  selectOptions={[
+                    { value: '', label: 'Seleccionar' },
+                    { value: 'Esposo/a', label: 'Esposo/a' },
+                    { value: 'Padre', label: 'Padre' },
+                    { value: 'Madre', label: 'Madre' },
+                    { value: 'Hijo/a', label: 'Hijo/a' },
+                    { value: 'Hermano/a', label: 'Hermano/a' },
+                    { value: 'Tio/a', label: 'Tio/a' },
+                    { value: 'Primo/a', label: 'Primo/a' },
+                    { value: 'Amigo/a', label: 'Amigo/a' },
+                    { value: 'Otro', label: 'Otro' },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Certificaciones</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField label="Certificación de buceo" field="certificationNumber" placeholder="PADI #123456" />
+                <EditableField label="Vencimiento" field="certificationExpiry" type="date" />
+                <EditableField label="Certificación apnea" field="apneaCert" placeholder="AIDA #123456" />
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+              <h3 className="font-semibold text-[#1D1D1F] mb-4">Datos Bancarios</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <EditableField
+                  label="País del banco"
+                  field="bankCountry"
+                  selectOptions={[
+                    { value: '', label: 'Seleccionar' },
+                    { value: 'EC', label: 'Ecuador' },
+                    { value: 'US', label: 'USA' },
+                    { value: 'PA', label: 'Panamá' },
+                    { value: 'CO', label: 'Colombia' },
+                    { value: 'PE', label: 'Perú' },
+                    { value: 'CL', label: 'Chile' },
+                    { value: 'AR', label: 'Argentina' },
+                    { value: 'BR', label: 'Brasil' },
+                    { value: 'MX', label: 'México' },
+                    { value: 'ES', label: 'España' },
+                    { value: 'GB', label: 'Reino Unido' },
+                    { value: 'DE', label: 'Alemania' },
+                  ]}
+                />
+                <EditableField label="Nombre del banco" field="bankName" placeholder="Banco Pichincha" />
+                <EditableField
+                  label="Tipo de cuenta"
+                  field="accountType"
+                  selectOptions={[
+                    { value: '', label: 'Seleccionar' },
+                    { value: 'ahorros', label: 'Ahorros / Savings' },
+                    { value: 'corriente', label: 'Corriente / Checking' },
+                  ]}
+                />
+                <EditableField label="Número de cuenta" field="accountNumber" placeholder="1234567890" />
+                {formData.bankCountry === 'US' && (
+                  <EditableField label="Routing Number" field="routingNumber" placeholder="021000021" />
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Security Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Seguridad</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Button
-              variant="outline"
-              onClick={() => setShowPasswordModal(true)}
-              className="flex items-center gap-2"
-            >
-              <Lock className="w-4 h-4" />
-              Cambiar Contraseña
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Password Change Modal */}
-      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cambiar Contraseña</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-[#86868B]">
-              Para cambiar tu contraseña, debes cerrar sesión y volver a iniciar sesión recientemente.
-            </p>
-            <div className="space-y-2">
-              <Label>Nueva Contraseña</Label>
-              <Input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
-              />
             </div>
-            <div className="space-y-2">
-              <Label>Confirmar Contraseña</Label>
-              <Input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repite la contraseña"
-              />
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setIsEditing(false)} className="flex-1 h-12">
+                <X className="w-4 h-4 mr-1" /> Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="flex-1 h-12 bg-corporate">
+                {saving ? 'Guardando...' : <><Check className="w-4 h-4 mr-1" /> Guardar cambios</>}
+              </Button>
             </div>
-            {passwordError && (
-              <p className="text-sm text-red-500">{passwordError}</p>
-            )}
-            {passwordSuccess && (
-              <p className="text-sm text-green-600">Contraseña actualizada correctamente</p>
-            )}
-            <Button
-              onClick={handleChangePassword}
-              className="w-full bg-corporate hover:bg-corporate/90"
-            >
-              Actualizar Contraseña
-            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
-    </Layout>
+        ) : (
+          /* VIEW MODE */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Section title="Información Personal" icon={User} color="bg-corporate">
+              <InfoRow icon={User} label="Nombre completo" value={formData.name} />
+              {formData.displayName && <InfoRow icon={UserCircle} label="Le llaman" value={`"${formData.displayName}"`} />}
+              <InfoRow icon={Flag} label="Nacionalidad" value={formData.nationality} />
+              <InfoRow icon={Calendar} label="Fecha de nacimiento" value={formData.birthDate ? `${formData.birthDate} (${age} años)` : ''} />
+              <InfoRow icon={IdCard} label="Cédula" value={formData.cedula} />
+              <InfoRow icon={Globe} label="Pasaporte" value={formData.passport} />
+              <InfoRow icon={MapPin} label="Dirección" value={formData.address} />
+            </Section>
+
+            <Section title="Contacto" icon={Phone} color="bg-blue-500">
+              <InfoRow icon={Phone} label="Teléfono" value={formData.phone} />
+              <InfoRow icon={Mail} label="Email" value={formData.email} />
+            </Section>
+
+            <Section title="Salud" icon={Heart} color="bg-red-500">
+              <InfoRow icon={Droplet} label="Tipo de sangre" value={formData.bloodType} missing="No registrado" />
+              <InfoRow icon={AlertTriangle} label="Alergias" value={formData.allergies} missing="Ninguna" />
+              <InfoRow icon={Pill} label="Medicamentos" value={formData.medications} missing="Ninguno" />
+            </Section>
+
+            <Section title="Contacto de Emergencia" icon={Shield} color="bg-orange-500">
+              <InfoRow icon={User} label="Nombre" value={formData.emergencyContactName} />
+              <InfoRow icon={Phone} label="Teléfono" value={formData.emergencyContactPhone} />
+              <InfoRow icon={Heart} label="Relación" value={formData.emergencyContactRelation} />
+            </Section>
+
+            <Section title="Certificaciones" icon={Award} color="bg-purple-500">
+              <InfoRow icon={BadgeCheck} label="Buceo" value={formData.certificationNumber} />
+              <InfoRow icon={Calendar} label="Vencimiento" value={formData.certificationExpiry} />
+              <InfoRow icon={BadgeCheck} label="Apnea" value={formData.apneaCert} />
+            </Section>
+
+            <Section title="Datos Bancarios" icon={CreditCard} color="bg-emerald-500">
+              <InfoRow icon={Flag} label="País" value={formData.bankCountry} />
+              <InfoRow icon={Building2} label="Banco" value={formData.bankName} />
+              <InfoRow icon={CreditCard} label="Tipo" value={formData.accountType} />
+              <InfoRow icon={IdCard} label="Cuenta" value={formData.accountNumber} />
+              {formData.bankCountry === 'US' && (
+                <InfoRow icon={IdCard} label="Routing" value={formData.routingNumber} />
+              )}
+            </Section>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

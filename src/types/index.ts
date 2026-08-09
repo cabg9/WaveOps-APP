@@ -109,10 +109,22 @@ export interface User {
   profileComplete?: boolean;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
   bloodType?: string;
+  allergies?: string;
+  medications?: string;
   certificationNumber?: string;
   certificationExpiry?: string;
+  apneaCert?: string;
   joinDate?: string;
+  displayName?: string;
+  nationality?: string;
+  passport?: string;
+  bankCountry?: string;
+  bankName?: string;
+  accountType?: string;
+  accountNumber?: string;
+  routingNumber?: string;
 }
 
 export interface Subtask {

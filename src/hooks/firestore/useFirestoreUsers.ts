@@ -46,6 +46,32 @@ export interface FirestoreUser {
   emergencyContact?: string;
   emergencyPhone?: string;
   photoURL?: string;
+  authUid?: string;
+  authCreated?: boolean;
+  authCreatedAt?: string;
+  mustChangePassword?: boolean;
+  profileComplete?: boolean;
+  invitationPending?: boolean;
+  invitedAt?: string;
+  updatedAt?: string;
+  joinDate?: string;
+  displayName?: string;
+  nationality?: string;
+  passport?: string;
+  bloodType?: string;
+  allergies?: string;
+  medications?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  emergencyContactRelation?: string;
+  certificationNumber?: string;
+  certificationExpiry?: string;
+  apneaCert?: string;
+  bankCountry?: string;
+  bankName?: string;
+  accountType?: string;
+  accountNumber?: string;
+  routingNumber?: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════
