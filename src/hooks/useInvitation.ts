@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-const SEND_INVITATION_URL = 'https://sendinvitationemail-fex6pa2byq-uc.a.run.app';
+const SEND_INVITATION_URL = 'https://us-central1-wve-b3db5.cloudfunctions.net/sendInvitationEmail';
 const ACCEPT_INVITATION_URL = 'https://acceptinvitation-fex6pa2byq-uc.a.run.app';
 
 export function useInvitation() {
