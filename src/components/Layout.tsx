@@ -212,6 +212,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                     <div className="text-right">
                       <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
                       <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
+                      <p className="text-[10px] text-corporate font-medium tracking-wide">Dive X Surf</p>
                     </div>
                     {(() => {
                       const cached = localStorage.getItem("cachedPhotoURL");

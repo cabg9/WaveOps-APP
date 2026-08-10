@@ -295,17 +295,7 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] pb-20">
-      {/* Header Banner */}
-      <div className="relative h-48 md:h-56 overflow-hidden">
-        <img
-          src="/profile-header.jpg"
-          alt="Header"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#F5F5F7]" />
-      </div>
-
-      <div className="max-w-4xl mx-auto px-4 -mt-20 relative z-10">
+      <div className="max-w-4xl mx-auto px-4 pt-6">
         {/* Profile Card */}
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-6 mb-6">
           <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
