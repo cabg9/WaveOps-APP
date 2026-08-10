@@ -414,3 +414,54 @@ export interface ShiftsContextType {
   getShiftById: (id: string) => Shift | undefined;
   getAssignmentById: (id: string) => ShiftAssignment | undefined;
 }
+
+
+// ═══════════════════════════════════════════════════════════════════
+// NOTIFICATIONS — Fase 6
+// ═══════════════════════════════════════════════════════════════════
+
+export enum NotificationType {
+  TASK_ASSIGNED = 'TASK_ASSIGNED',
+  TASK_COMPLETED = 'TASK_COMPLETED',
+  TASK_OVERDUE = 'TASK_OVERDUE',
+  TASK_UPDATED = 'TASK_UPDATED',
+  INCIDENCIA_CREATED = 'INCIDENCIA_CREATED',
+  INCIDENCIA_CONFIRMED = 'INCIDENCIA_CONFIRMED',
+  INCIDENCIA_RESOLVED = 'INCIDENCIA_RESOLVED',
+  INCIDENCIA_CLOSED = 'INCIDENCIA_CLOSED',
+  INCIDENCIA_REOPENED = 'INCIDENCIA_REOPENED',
+  INCIDENCIA_NOTE_ADDED = 'INCIDENCIA_NOTE_ADDED',
+  SHIFT_ASSIGNED = 'SHIFT_ASSIGNED',
+  SHIFT_UPDATED = 'SHIFT_UPDATED',
+  VACATION_REQUESTED = 'VACATION_REQUESTED',
+  VACATION_APPROVED = 'VACATION_APPROVED',
+  INVITATION_SENT = 'INVITATION_SENT',
+  USER_ACTIVATED = 'USER_ACTIVATED',
+  USER_DEACTIVATED = 'USER_DEACTIVATED',
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: {
+    link?: string;
+    taskId?: string;
+    incidenciaId?: string;
+    shiftId?: string;
+  };
+  read: boolean;
+  readAt?: string;
+  createdAt: string;
+  createdBy?: string;
+  priority: 'low' | 'normal' | 'high';
+}
+
+export interface FCMToken {
+  userId: string;
+  token: string;
+  platform: 'web' | 'ios' | 'android';
+  createdAt: string;
+}

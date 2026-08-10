@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
+import { useNotifications } from '@/hooks/firestore/useNotifications';
+import { NotificationsDrawer } from '@/components/NotificationsDrawer';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { getInitials } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -99,8 +101,10 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
   const navItems = useNavItems();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Formatear fecha
   const today = new Date();
@@ -128,6 +132,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
   };
 
   return (
+    <>
     <div className="min-h-screen bg-[#F5F5F7] flex">
       {/* ═══════════════════════════════════════════════════════════════════
           SIDEBAR - DESKTOP ONLY
@@ -167,11 +172,16 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         {/* Bottom Actions */}
         <div className="flex flex-col items-center gap-2">
           {/* Notifications */}
-          <button className="w-10 h-10 rounded-xl flex items-center justify-center text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F] transition-all relative">
+          <button
+            onClick={() => setShowNotifications(true)}
+            className="w-10 h-10 rounded-xl flex items-center justify-center text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F] transition-all relative"
+          >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3B30] rounded-full flex items-center justify-center">
-              <span className="text-white text-[10px] font-medium">3</span>
-            </span>
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3B30] rounded-full flex items-center justify-center">
+                <span className="text-white text-[10px] font-medium">{unreadCount}</span>
+              </span>
+            )}
           </button>
 
           {/* Logout */}
@@ -377,6 +387,18 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         <div className="p-4 lg:p-6">{children}</div>
       </main>
     </div>
+
+    {/* Notifications Drawer */}
+    <NotificationsDrawer
+      isOpen={showNotifications}
+      onClose={() => setShowNotifications(false)}
+      notifications={notifications}
+      unreadCount={unreadCount}
+      onMarkAsRead={markAsRead}
+      onMarkAllAsRead={markAllAsRead}
+      onDelete={deleteNotification}
+    />
+    </>
   );
 }
 
