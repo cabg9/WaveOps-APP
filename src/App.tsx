@@ -306,7 +306,7 @@ function AppRoutes() {
 
       {/* Perfil */}
       <Route path="/configuracion" element={<RequireProfileComplete><ProtectedRoute><SettingsPage /></ProtectedRoute></RequireProfileComplete>} />
-      <Route path="/perfil" element={<RequireProfileComplete><ProtectedRoute><ProfilePage /></ProtectedRoute></RequireProfileComplete>} />
+      <Route path="/perfil" element={<RequireProfileComplete><ProtectedRoute><Layout title="Perfil"><ProfilePage /></Layout></ProtectedRoute></RequireProfileComplete>} />
       {/* 404 */}
       <Route path="/invitation" element={<InvitationPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />

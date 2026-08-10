@@ -589,7 +589,7 @@ function UsuariosTab() {
                     <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => window.location.href = "/perfil?userId=" + u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><Eye className="w-4 h-4" /></button><button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
                         {/* @ts-ignore */}
                         {(u.invitationPending || (!u.authUid && u.isActive)) && !showInactive && (
                           <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">

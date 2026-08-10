@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { Layout } from '@/components/Layout';
@@ -47,6 +48,7 @@ interface ProfilePageProps {
   onClose?: () => void; // For modal mode
 }
 
+  const [searchParams] = useSearchParams();
 export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) {
   const { user: currentUser } = useAuth();
   const { updateUser, users } = useFirestoreUsers();
@@ -58,7 +60,7 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
 
   // Determine which user to display
   const isAdmin = !userId || (currentUser?.level || 7) <= 3;
-  const targetUserId = userId || currentUser?.id;
+  const targetUserId = userId || searchParams.get("userId") || currentUser?.id;
   const freshUser = users.find(u => u.id === targetUserId) || currentUser;
 
   const [formData, setFormData] = useState({
