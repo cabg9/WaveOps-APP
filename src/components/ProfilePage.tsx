@@ -48,8 +48,8 @@ interface ProfilePageProps {
   onClose?: () => void; // For modal mode
 }
 
-  const [searchParams] = useSearchParams();
 export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) {
+  const [searchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   const { updateUser, users } = useFirestoreUsers();
   const [isEditing, setIsEditing] = useState(false);
