@@ -269,30 +269,32 @@ export default function Dashboard() {
   return (
     <Layout title="Dashboard" showDate={true}>
       <div className="space-y-6">
-        {/* Welcome Banner */}
-        <div className="relative overflow-hidden rounded-2xl text-white p-6">
-          <img src="/whaleshark-bg.jpg" alt="Fondo" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
-          <div className="relative z-10">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-medium text-white/60 uppercase tracking-wider">
-                {user?.department?.replace(/_/g, ' ') || 'STAFF'}
-              </span>
+        {/* Welcome Banner + Logo */}
+        <div className="relative">
+          <div className="relative overflow-hidden rounded-2xl text-white p-6">
+            <img src="/whaleshark-bg.jpg" alt="Fondo" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/60 to-black/40" />
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-medium text-white/60 uppercase tracking-wider">
+                  {user?.department?.replace(/_/g, ' ') || 'STAFF'}
+                </span>
+              </div>
+              <h2 className="text-2xl font-bold mb-1">
+                ¡Hola {user?.name?.split(' ')[0] || 'Usuario'}!
+              </h2>
+              <p className="text-white/60 text-sm">
+                {new Date().toLocaleDateString('es-ES', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                })} · {user?.department?.replace(/_/g, ' ') || 'Dive Shop'}
+              </p>
             </div>
-            <h2 className="text-2xl font-bold mb-1">
-              ¡Hola {user?.name?.split(' ')[0] || 'Usuario'}!
-            </h2>
-            <p className="text-white/60 text-sm">
-              {new Date().toLocaleDateString('es-ES', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })} · {user?.department?.replace(/_/g, ' ') || 'Dive Shop'}
-            </p>
           </div>
-          {/* Logo Dive X Surf */}
-          <div className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-black/30 flex items-center justify-center">
-            <img src="/divexsurf-logo.png" alt="Dive X Surf" className="w-16 h-16 sm:w-20 sm:h-20 object-contain" />
+          {/* Logo Dive X Surf - FUERA del banner para no ser cortado */}
+          <div className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 w-20 h-20 sm:w-[72px] sm:h-[72px] rounded-full bg-black/30 flex items-center justify-center shadow-2xl border border-white/10">
+            <img src="/divexsurf-logo.png" alt="Dive X Surf" className="w-20 h-20 sm:w-24 sm:h-24 object-contain" />
           </div>
         </div>
 
