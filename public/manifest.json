@@ -3,7 +3,7 @@
   "short_name": "WaveOps",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F5F5F7",
+  "background_color": "#007AFF",
   "theme_color": "#007AFF",
   "orientation": "portrait",
   "icons": [
