@@ -15,9 +15,9 @@ async function sendPushNotification(userId, title, body, data = {}) {
       tokens,
       webpush: {
         notification: {
-          icon: "https://wve-b3db5.web.app/favicon.svg",
-          badge: "https://wve-b3db5.web.app/favicon.svg",
-          click_action: data.link ? `https://wve-b3db5.web.app${data.link}` : "https://wve-b3db5.web.app",
+          icon: "https://my.waveops.app/favicon.svg",
+          badge: "https://my.waveops.app/favicon.svg",
+          click_action: data.link ? `https://my.waveops.app${data.link}` : "https://my.waveops.app",
         },
       },
     };

@@ -40,7 +40,7 @@ const sendInvitationEmail = onRequest(
         acceptedAt: null,
       });
 
-      const invitationLink = `https://wve-b3db5.web.app/invitation?token=${token}`;
+      const invitationLink = `https://my.waveops.app/invitation?token=${token}`;
 
       try {
         const template = invitationEmailTemplate(name, invitationLink, "Dive X Surf");

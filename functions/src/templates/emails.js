@@ -1,4 +1,4 @@
-const LOGO_URL = "https://wve-b3db5.web.app/logo-waveops.png";
+const LOGO_URL = "https://my.waveops.app/logo-waveops.png";
 
 function invitationEmailTemplate(name, link, companyName) {
   return {
