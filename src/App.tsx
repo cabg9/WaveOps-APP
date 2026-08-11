@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { updateDoc, doc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { AuthProvider, useAuth } from '@/hooks/useFirestoreAuth';
+import { useFCMToken } from '@/hooks/useFCMToken';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { TasksProvider } from '@/hooks/useTasks';
 import { ShiftsProvider } from '@/hooks/useShifts';
@@ -142,6 +143,7 @@ interface ProtectedRouteProps {
 
 function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isAuthenticated, isLoading, updateUser } = useAuth();
+  useFCMToken(); // Push notifications
   const [showChangePassword, setShowChangePassword] = React.useState(false);
 
   React.useEffect(() => {

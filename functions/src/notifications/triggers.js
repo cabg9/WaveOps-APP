@@ -5,21 +5,31 @@
 const { onDocumentCreated, onDocumentUpdated, onSchedule } = require("firebase-functions/v2/firestore");
 const { onSchedule: onScheduleV2 } = require("firebase-functions/v2/scheduler");
 const { db } = require("../config/firebase");
+const { sendPushNotification } = require("./push");
 
 // ── Helper: Crear notificación ──
-async function createNotification({ userId, type, title, body, data = {}, priority = 'normal', createdBy }) {
-  return db.collection("notifications").add({
+async function createNotification({ userId, type, title, body, data = {}, priority = 'normal', createdBy, sendPush = true }) {
+  const notif = {
     userId, type, title, body, data,
     read: false,
     createdAt: new Date().toISOString(),
     createdBy: createdBy || null,
     priority,
-  });
+  };
+  const result = await db.collection("notifications").add(notif);
+  if (sendPush) {
+    sendPushNotification(userId, title, body, data || {}).catch(() => {});
+  }
+  return result;
 }
 
 async function notifyMultiple({ userIds, type, title, body, data, priority, createdBy }) {
+  // Push notifications (fire & forget)
+  userIds.forEach(uid => {
+    sendPushNotification(uid, title, body, data || {}).catch(() => {});
+  });
   return Promise.all(userIds.map(uid =>
-    createNotification({ userId: uid, type, title, body, data, priority, createdBy })
+    createNotification({ userId: uid, type, title, body, data, priority, createdBy, sendPush: false })
   ));
 }
 
