@@ -188,11 +188,7 @@ export default function LoginScreen() {
           </div>
         </div>
 
-        {/* Demo Info */}
-        <div className="mt-6 text-center text-white/80 text-sm">
-          <p>Usuario demo: andres.bonilla@galapagosdiveandsurf.com</p>
-          <p>Contraseña: cualquiera (mínimo 6 caracteres)</p>
-        </div>
+
       </div>
     </div>
   );

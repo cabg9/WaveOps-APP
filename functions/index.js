@@ -50,3 +50,7 @@ exports.notifyUserDeactivated = notifyUserDeactivated;
 exports.notifyRoleChanged = notifyRoleChanged;
 exports.checkOverdueTasks = checkOverdueTasks;
 exports.cleanupOldNotifications = cleanupOldNotifications;
+
+// Admin
+const { resetDemoData } = require("./src/admin/resetDemoData");
+exports.resetDemoData = resetDemoData;

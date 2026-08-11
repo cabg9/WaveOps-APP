@@ -174,7 +174,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         </nav>
 
         {/* Bottom Actions */}
-        <div className="flex flex-col items-center gap-2 pb-safe">
+        <div className="flex flex-col items-center gap-2 pb-16">
           {/* Notifications */}
           <button
             onClick={() => setShowNotifications(true)}
