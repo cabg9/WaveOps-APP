@@ -277,11 +277,16 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
             {/* Right: Notifications & Menu */}
             <div className="flex items-center gap-2">
               {/* Notifications */}
-              <button className="w-10 h-10 rounded-xl flex items-center justify-center text-[#86868B] hover:bg-[#F5F5F7] transition-all relative">
+              <button
+                onClick={() => setShowNotifications(true)}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-[#86868B] hover:bg-[#F5F5F7] transition-all relative"
+              >
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3B30] rounded-full flex items-center justify-center">
-                  <span className="text-white text-[10px] font-medium">3</span>
-                </span>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 w-4 h-4 bg-[#FF3B30] rounded-full flex items-center justify-center">
+                    <span className="text-white text-[10px] font-medium">{unreadCount}</span>
+                  </span>
+                )}
               </button>
 
               {/* Mobile Menu */}

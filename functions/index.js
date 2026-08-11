@@ -2,16 +2,15 @@
 // WAVEOPS CLOUD FUNCTIONS
 // ═══════════════════════════════════════════════════════════════════
 
-// Auth
 const { createAuthUser } = require("./src/auth/createUser");
 const { sendInvitationEmail, acceptInvitation } = require("./src/auth/invitation");
 const { deleteAuthUser, setAuthUserDisabled } = require("./src/auth/manageUser");
 const { cleanupUserData, cleanupExpiredInvitations } = require("./src/auth/cleanup");
 
-// Notifications
 const {
   notifyTaskAssigned,
   notifyTaskCompleted,
+  notifyTaskBlocked,
   notifyIncidenciaCreated,
   notifyIncidenciaStatus,
   notifyIncidenciaNoteAdded,
@@ -27,7 +26,6 @@ const {
   cleanupOldNotifications,
 } = require("./src/notifications/triggers");
 
-// Auth exports
 exports.createAuthUser = createAuthUser;
 exports.sendInvitationEmail = sendInvitationEmail;
 exports.acceptInvitation = acceptInvitation;
@@ -36,9 +34,9 @@ exports.setAuthUserDisabled = setAuthUserDisabled;
 exports.cleanupUserData = cleanupUserData;
 exports.cleanupExpiredInvitations = cleanupExpiredInvitations;
 
-// Notification exports
 exports.notifyTaskAssigned = notifyTaskAssigned;
 exports.notifyTaskCompleted = notifyTaskCompleted;
+exports.notifyTaskBlocked = notifyTaskBlocked;
 exports.notifyIncidenciaCreated = notifyIncidenciaCreated;
 exports.notifyIncidenciaStatus = notifyIncidenciaStatus;
 exports.notifyIncidenciaNoteAdded = notifyIncidenciaNoteAdded;

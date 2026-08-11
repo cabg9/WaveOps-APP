@@ -62,16 +62,33 @@ const notifyTaskCompleted = onDocumentUpdated("tasks/{taskId}", async (event) =>
   const before = event.data.before.data();
   const after = event.data.after.data();
   if (before.status === "completed" || after.status !== "completed") return;
-  if (!after.createdBy || after.createdBy === after.completedBy) return;
   
-  await createNotification({
-    userId: after.createdBy,
-    type: "TASK_COMPLETED",
-    title: "Tarea completada",
-    body: `"${after.title}" fue completada por ${after.completedByName || "un usuario"}`,
-    data: { link: "/tareas", taskId: event.params.taskId },
-    priority: "normal",
-  });
+  // TAREA EXTRA: notificar al creador
+  if (after.isExtra === true) {
+    if (!after.createdBy) return;
+    await createNotification({
+      userId: after.createdBy,
+      type: "TASK_COMPLETED",
+      title: "Tarea extra completada",
+      body: `"${after.title}" fue completada por ${after.completedByName || "un usuario"}`,
+      data: { link: "/tareas", taskId: event.params.taskId },
+      priority: "normal",
+    });
+    return;
+  }
+  
+  // TAREA ESPECÍFICA: notificar a supervisor y gerente del departamento
+  const leaders = await getDepartmentLeaders(after.department || "DIVE_SHOP");
+  if (leaders.length > 0) {
+    await notifyMultiple({
+      userIds: leaders,
+      type: "TASK_COMPLETED",
+      title: "Tarea específica completada",
+      body: `"${after.title}" del departamento ${after.department || "DIVE_SHOP"} fue completada`,
+      data: { link: "/tareas", taskId: event.params.taskId },
+      priority: "normal",
+    });
+  }
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -163,6 +180,39 @@ const notifyIncidenciaNoteAdded = onDocumentUpdated("incidencias/{incidenciaId}"
 // TURNOS / HORARIOS
 // ═══════════════════════════════════════════════════════════════════
 
+const notifyTaskBlocked = onDocumentUpdated("tasks/{taskId}", async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  
+  // TAREA BLOQUEADA → notificar a supervisor y gerente
+  if (!before.blocked && after.blocked) {
+    const leaders = await getDepartmentLeaders(after.department || "DIVE_SHOP");
+    if (leaders.length > 0) {
+      await notifyMultiple({
+        userIds: leaders,
+        type: "TASK_BLOCKED",
+        title: "Tarea bloqueada",
+        body: `"${after.title}" fue bloqueada. Motivo: ${after.blockReason || "Sin especificar"}`,
+        data: { link: "/tareas", taskId: event.params.taskId },
+        priority: "high",
+      });
+    }
+    return;
+  }
+  
+  // TAREA DESBLOQUEADA → notificar al asignado
+  if (before.blocked && !after.blocked && after.assigneeId) {
+    await createNotification({
+      userId: after.assigneeId,
+      type: "TASK_UNBLOCKED",
+      title: "Tarea desbloqueada",
+      body: `"${after.title}" fue desbloqueada. Puedes continuar.`,
+      data: { link: "/tareas", taskId: event.params.taskId },
+      priority: "normal",
+    });
+  }
+});
+
 const notifyShiftAssigned = onDocumentCreated("shiftAssignments/{id}", async (event) => {
   const a = event.data.data();
   await createNotification({
@@ -203,8 +253,8 @@ const notifyVacationRequested = onDocumentCreated("vacationRequests/{id}", async
   await notifyMultiple({
     userIds: all,
     type: "VACATION_REQUESTED",
-    title: "Solicitud de vacaciones",
-    body: `${req.userName || "Un usuario"} solicita ${req.days || 0} días (${req.startDate || ""} - ${req.endDate || ""})`,
+    title: "Solicitud de permiso",
+    body: `${req.userName || "Un usuario"} solicita ${req.type === "vacation" ? "vacaciones" : "libres"} (${req.startDate || ""} - ${req.endDate || ""})`,
     data: { link: "/vacaciones", requestId: event.params.id },
     priority: "normal",
   });
@@ -218,8 +268,8 @@ const notifyVacationApproved = onDocumentUpdated("vacationRequests/{id}", async 
   await createNotification({
     userId: after.userId,
     type: "VACATION_APPROVED",
-    title: "Vacaciones aprobadas",
-    body: `Tu solicitud del ${after.startDate || ""} al ${after.endDate || ""} fue aprobada`,
+    title: "Permiso aprobado",
+    body: `Tu solicitud de ${after.type === "vacation" ? "vacaciones" : "libres"} del ${after.startDate || ""} al ${after.endDate || ""} fue aprobada`,
     data: { link: "/vacaciones", requestId: event.params.id },
     priority: "normal",
   });
@@ -233,8 +283,8 @@ const notifyVacationRejected = onDocumentUpdated("vacationRequests/{id}", async 
   await createNotification({
     userId: after.userId,
     type: "VACATION_REJECTED",
-    title: "Vacaciones rechazadas",
-    body: `Tu solicitud del ${after.startDate || ""} al ${after.endDate || ""} fue rechazada. Motivo: ${after.rejectionReason || "Sin especificar"}`,
+    title: "Permiso rechazado",
+    body: `Tu solicitud de ${after.type === "vacation" ? "vacaciones" : "libres"} del ${after.startDate || ""} al ${after.endDate || ""} fue rechazada. Motivo: ${after.rejectionReason || "Sin especificar"}`,
     data: { link: "/vacaciones", requestId: event.params.id },
     priority: "normal",
   });
@@ -361,6 +411,7 @@ const cleanupOldNotifications = onScheduleV2({
 module.exports = {
   notifyTaskAssigned,
   notifyTaskCompleted,
+  notifyTaskBlocked,
   notifyIncidenciaCreated,
   notifyIncidenciaStatus,
   notifyIncidenciaNoteAdded,
