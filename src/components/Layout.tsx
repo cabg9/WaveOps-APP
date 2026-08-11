@@ -25,6 +25,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useNotifications } from '@/hooks/firestore/useNotifications';
+import { useFCMToken } from '@/hooks/useFCMToken';
 import { NotificationsDrawer } from '@/components/NotificationsDrawer';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { getInitials } from '@/lib/utils';
@@ -102,6 +103,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
+  const { permission, isSupported, requestPermission } = useFCMToken();
   const navItems = useNavItems();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -130,6 +132,8 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
     navigate(path);
     setMobileMenuOpen(false);
   };
+
+  const showNotifBanner = isSupported && permission === "default" && user?.id;
 
   return (
     <>
