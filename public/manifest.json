@@ -1,14 +1,14 @@
 {
   "name": "WaveOps — Dive Operations",
   "short_name": "WaveOps",
-  "start_url": "/",
+  "start_url": "/?v=2",
   "display": "standalone",
   "background_color": "#007AFF",
   "theme_color": "#007AFF",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/logo-icon.png",
+      "src": "/logo-icon.png?v=2",
       "sizes": "512x512",
       "type": "image/png"
     }
