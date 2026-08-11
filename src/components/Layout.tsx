@@ -141,7 +141,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
       {/* ═══════════════════════════════════════════════════════════════════
           SIDEBAR - DESKTOP ONLY
           ═══════════════════════════════════════════════════════════════════ */}
-      <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-16 bg-white border-r border-[#E5E5E7] flex-col items-center py-4 z-50">
+      <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-16 bg-white border-r border-[#E5E5E7] flex-col items-center pt-4 pb-6 z-50">
         {/* Logo */}
         <div className="mb-6">
           <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
@@ -174,7 +174,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         </nav>
 
         {/* Bottom Actions */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 pb-safe">
           {/* Notifications */}
           <button
             onClick={() => setShowNotifications(true)}
