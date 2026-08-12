@@ -54,3 +54,7 @@ exports.cleanupOldNotifications = cleanupOldNotifications;
 // Admin
 const { resetDemoData } = require("./src/admin/resetDemoData");
 exports.resetDemoData = resetDemoData;
+
+// Admin fixes
+const { fixRoles } = require('./src/admin/fixRoles');
+exports.fixRoles = fixRoles;
