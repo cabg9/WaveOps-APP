@@ -322,14 +322,36 @@ export default function TasksModule() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-full sm:w-fit overflow-x-auto sm:overflow-visible">
-          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
-          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
+        {/* Mobile: dropdown de pestaña */}
+        <div className="md:hidden">
+          <Select value={mainTab} onValueChange={(v) => {
+            const tab = v as MainTab;
+            setMainTab(tab);
+            if (tab === 'all') { setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }
+            else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
+            else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
+          }}>
+            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-11">
+              <SelectValue placeholder="Seleccionar vista" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="my-tasks">Mis Tareas</SelectItem>
+              <SelectItem value="my-department">Mi Departamento</SelectItem>
+              {hasPermission('canViewAllDepartments') && <SelectItem value="all">Todas</SelectItem>}
+              <SelectItem value="incidencias">Incidencias</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: pestañas como botones */}
+        <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
+          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
           {hasPermission('canViewAllDepartments') && (
-            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
+            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
           )}
           <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
-          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
+          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
         </div>
 
         {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
@@ -345,22 +367,57 @@ export default function TasksModule() {
           </div>
         )}
 
+        {/* Mobile: dropdown tiempo */}
+        <div className="md:hidden">
+          <Select value={timeFilter} onValueChange={(v) => {
+            const tf = v as TimeFilter;
+            setTimeFilter(tf);
+            if (isIncidenciasTab) {
+              if (tf === TimeFilter.TODAY) setStatusFilter(IncidenciaStatus.NEW); else setStatusFilter('all');
+            } else {
+              if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
+            }
+          }}>
+            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+              <SelectValue placeholder="Periodo" />
+            </SelectTrigger>
+            <SelectContent>
+              {!isIncidenciasTab ? (
+                <>
+                  <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
+                  <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
+                  <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
+                  <SelectItem value={TimeFilter.TOMORROW}>Mañana</SelectItem>
+                  <SelectItem value={TimeFilter.UPCOMING}>Próximas</SelectItem>
+                </>
+              ) : (
+                <>
+                  <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
+                  <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
+                  <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: botones tiempo */}
         {!isIncidenciasTab && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
           </div>
         )}
 
         {isIncidenciasTab && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
             {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-                <SelectTrigger className="w-[160px] sm:w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
@@ -371,31 +428,80 @@ export default function TasksModule() {
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
-          {!isIncidenciasTab ? (
-            <>
-              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.PENDING)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.PENDING ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.pending}</span><span>Pendientes</span></button>
-              <button onClick={() => setStatusFilter(TaskStatus.IN_PROGRESS)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.IN_PROGRESS ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.inProgress}</span><span>En Progreso</span></button>
-              {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (<>
-                <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
-                <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
-              </>)}
-              <button onClick={() => setStatusFilter(TaskStatus.BLOCKED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.BLOCKED ? 'border border-[#FF9500] text-[#FF9500] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.blocked}</span><span>Bloqueadas</span></button>
-              {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
-              )}
-            </>
-          ) : (
-            <>
-              <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.total}</span><span>Todas</span></button>
-              {timeFilter === TimeFilter.TODAY && <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>}
-              <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Visualizadas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.verified}</span><span>Verificadas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.RESOLVED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.RESOLVED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.resolved}</span><span>Resueltas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.CLOSED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.CLOSED ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.closed}</span><span>Cerradas</span></button>
-              <button onClick={() => setStatusFilter(IncidenciaStatus.REOPENED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.REOPENED ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.reopened}</span><span>Reabiertas</span></button>
-            </>
-          )}
+          {/* Mobile: dropdown estado */}
+          <div className="md:hidden w-full">
+            <Select value={String(statusFilter)} onValueChange={(v) => {
+              if (!isIncidenciasTab) {
+                if (v === 'all') setStatusFilter('all');
+                else setStatusFilter(v as TaskStatus);
+              } else {
+                if (v === 'all') setStatusFilter('all');
+                else setStatusFilter(v as IncidenciaStatus);
+              }
+            }}>
+              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+                <SelectValue placeholder="Estado" />
+              </SelectTrigger>
+              <SelectContent>
+                {!isIncidenciasTab ? (
+                  <>
+                    <SelectItem value="all">Todas ({filteredTaskCounts.total})</SelectItem>
+                    <SelectItem value={TaskStatus.PENDING}>Pendientes ({filteredTaskCounts.pending})</SelectItem>
+                    <SelectItem value={TaskStatus.IN_PROGRESS}>En Progreso ({filteredTaskCounts.inProgress})</SelectItem>
+                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                      <>
+                        <SelectItem value={TaskStatus.COMPLETED}>Completadas ({filteredTaskCounts.completed})</SelectItem>
+                        <SelectItem value={TaskStatus.VERIFIED}>Verificadas ({filteredTaskCounts.verified})</SelectItem>
+                      </>
+                    )}
+                    <SelectItem value={TaskStatus.BLOCKED}>Bloqueadas ({filteredTaskCounts.blocked})</SelectItem>
+                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                      <SelectItem value={TaskStatus.OVERDUE}>Atrasadas ({filteredTaskCounts.overdue})</SelectItem>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all">Todas ({incidenciaCounts.total})</SelectItem>
+                    {timeFilter === TimeFilter.TODAY && <SelectItem value={IncidenciaStatus.NEW}>Nuevas ({incidenciaCounts.new})</SelectItem>}
+                    <SelectItem value={IncidenciaStatus.OPEN}>Visualizadas ({incidenciaCounts.open})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.VERIFIED}>Verificadas ({incidenciaCounts.verified})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.RESOLVED}>Resueltas ({incidenciaCounts.resolved})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.CLOSED}>Cerradas ({incidenciaCounts.closed})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.REOPENED}>Reabiertas ({incidenciaCounts.reopened})</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop: botones estado */}
+          <div className="hidden md:flex items-center gap-2 flex-wrap">
+            {!isIncidenciasTab ? (
+              <>
+                <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.PENDING)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.PENDING ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.pending}</span><span>Pendientes</span></button>
+                <button onClick={() => setStatusFilter(TaskStatus.IN_PROGRESS)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.IN_PROGRESS ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.inProgress}</span><span>En Progreso</span></button>
+                {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (<>
+                  <button onClick={() => setStatusFilter(TaskStatus.COMPLETED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.COMPLETED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.completed}</span><span>Completadas</span></button>
+                  <button onClick={() => setStatusFilter(TaskStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.verified}</span><span>Verificadas</span></button>
+                </>)}
+                <button onClick={() => setStatusFilter(TaskStatus.BLOCKED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.BLOCKED ? 'border border-[#FF9500] text-[#FF9500] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.blocked}</span><span>Bloqueadas</span></button>
+                {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                  <button onClick={() => setStatusFilter(TaskStatus.OVERDUE)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === TaskStatus.OVERDUE ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.overdue}</span><span>Atrasadas</span></button>
+                )}
+              </>
+            ) : (
+              <>
+                <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.total}</span><span>Todas</span></button>
+                {timeFilter === TimeFilter.TODAY && <button onClick={() => setStatusFilter(IncidenciaStatus.NEW)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.NEW ? 'border border-[#FF3B30] text-[#FF3B30] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.new}</span><span>Nuevas</span></button>}
+                <button onClick={() => setStatusFilter(IncidenciaStatus.OPEN)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.OPEN ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.open}</span><span>Visualizadas</span></button>
+                <button onClick={() => setStatusFilter(IncidenciaStatus.VERIFIED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.VERIFIED ? 'border border-[#5856D6] text-[#5856D6] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.verified}</span><span>Verificadas</span></button>
+                <button onClick={() => setStatusFilter(IncidenciaStatus.RESOLVED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.RESOLVED ? 'border border-[#34C759] text-[#34C759] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.resolved}</span><span>Resueltas</span></button>
+                <button onClick={() => setStatusFilter(IncidenciaStatus.CLOSED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.CLOSED ? 'border border-[#8E8E93] text-[#8E8E93] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.closed}</span><span>Cerradas</span></button>
+                <button onClick={() => setStatusFilter(IncidenciaStatus.REOPENED)} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === IncidenciaStatus.REOPENED ? 'border border-[#007AFF] text-[#007AFF] bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{incidenciaCounts.reopened}</span><span>Reabiertas</span></button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

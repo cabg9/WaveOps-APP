@@ -59,8 +59,10 @@ import {
   Pencil,
   Trash2,
   RotateCcw,
+  ChevronDown,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useShifts } from '@/hooks/useShifts';
 import { useTasks } from '@/hooks/useTasks';
@@ -83,13 +85,6 @@ import {
 } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { UserAvatar } from '@/components/UserAvatar';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -317,8 +312,27 @@ export default function HorariosModule() {
         </div>
 
         {/* Tabs principales + sub-pestañas de incapacidades */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+        <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
+          {/* Mobile: dropdown de pestaña principal */}
+          <div className="md:hidden">
+            <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
+              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-11">
+                <SelectValue placeholder="Seleccionar sección" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mi-horario">Mi Horario</SelectItem>
+                <SelectItem value="equipo">Equipo</SelectItem>
+                {hasPermission('canAssignShifts') && <SelectItem value="asignar">Asignar</SelectItem>}
+                <SelectItem value="solicitudes">Solicitudes</SelectItem>
+                {(user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || user?.role === Role.DIRECTOR_GENERAL) && (
+                  <SelectItem value="incapacidades">Incapacidades</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop: botones de pestaña principal */}
+          <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
             <button
               onClick={() => setActiveTab('mi-horario')}
               className={cn(
@@ -369,7 +383,6 @@ export default function HorariosModule() {
               <ClipboardList className="w-4 h-4" />
               Solicitudes
             </button>
-            {/* Pestaña Incapacidades - solo para supervisores y roles superiores */}
             {(user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || user?.role === Role.DIRECTOR_GENERAL) && (
               <button
                 onClick={() => setActiveTab('incapacidades')}
@@ -386,9 +399,24 @@ export default function HorariosModule() {
             )}
           </div>
           
-          {/* Sub-pestañas de incapacidades - alineadas a la derecha cuando está activa */}
+          {/* Sub-pestañas de incapacidades - mobile dropdown */}
           {activeTab === 'incapacidades' && (
-            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit ml-auto">
+            <div className="md:hidden">
+              <Select value={incapacidadesSubTab} onValueChange={(v) => setIncapacidadesSubTab(v as 'mias' | 'equipo')}>
+                <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+                  <SelectValue placeholder="Seleccionar vista" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mias">Mis Incapacidades</SelectItem>
+                  <SelectItem value="equipo">Equipo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Sub-pestañas de incapacidades - desktop buttons */}
+          {activeTab === 'incapacidades' && (
+            <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit md:ml-auto">
               <button
                 onClick={() => setIncapacidadesSubTab('mias')}
                 className={cn(
@@ -5567,35 +5595,51 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
 
   return (
     <div className="space-y-4">
+      {/* Vista mías/equipo */}
       {canApprove && (
-        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
-          <button
-            onClick={() => setView('mias')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <User className="w-4 h-4" />
-            Mis solicitudes
-          </button>
-          <button
-            onClick={() => setView('equipo')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <Users className="w-4 h-4" />
-            Equipo
-          </button>
-        </div>
+        <>
+          {/* Mobile: dropdown */}
+          <div className="md:hidden">
+            <Select value={view} onValueChange={(v) => setView(v as 'mias' | 'equipo')}>
+              <SelectTrigger className="w-full bg-[#F5F5F7] border-[#E5E5E7] h-11">
+                <SelectValue placeholder="Seleccionar vista" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mias">Mis solicitudes</SelectItem>
+                <SelectItem value="equipo">Equipo</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Desktop: botones */}
+          <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+            <button
+              onClick={() => setView('mias')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <User className="w-4 h-4" />
+              Mis solicitudes
+            </button>
+            <button
+              onClick={() => setView('equipo')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <Users className="w-4 h-4" />
+              Equipo
+            </button>
+          </div>
+        </>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col md:flex-row gap-2">
         {showDeptFilter && (
           <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v as string | 'ALL')}>
-            <SelectTrigger className="w-full sm:w-[180px] bg-white border-[#E5E5E7]">
+            <SelectTrigger className="w-full md:w-[180px] bg-white border-[#E5E5E7]">
               <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
               <SelectValue placeholder="Departamento" />
             </SelectTrigger>
@@ -5610,7 +5654,27 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
           </Select>
         )}
 
-        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+        {/* Mobile: dropdown de estado */}
+        <div className="md:hidden flex-1">
+          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {filterButtons.map((f) => {
+                const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
+                return (
+                  <SelectItem key={f.id} value={f.id}>
+                    {f.label} ({count})
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: botones de estado */}
+        <div className="hidden md:flex gap-2 overflow-x-auto pb-1 md:pb-0">
           {filterButtons.map((f) => {
             const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
             return (
@@ -6359,7 +6423,21 @@ function SolicitudesTab() {
         </div>
 
         {/* Pestañas principales */}
-        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
+        {/* Mobile: dropdown */}
+        <div className="md:hidden">
+          <Select value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as typeof activeSubTab)}>
+            <SelectTrigger className="w-full bg-[#F5F5F7] border-[#E5E5E7] h-11">
+              <SelectValue placeholder="Seleccionar tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="mis-cambios">Mis cambios</SelectItem>
+              <SelectItem value="mis-solicitudes">Mis solicitudes</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: botones */}
+        <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
           <button
             onClick={() => setActiveSubTab('mis-cambios')}
             className={cn(
@@ -6402,7 +6480,23 @@ function SolicitudesTab() {
       ) : (
         <div className="space-y-4">
           {/* Filtros para Mis Cambios */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
+          {/* Mobile: dropdown */}
+          <div className="md:hidden">
+            <Select value={misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
+              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+                <SelectValue placeholder="Filtrar solicitudes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recibidas">Recibidas ({misCambiosCounts.recibidas})</SelectItem>
+                <SelectItem value="enviadas">Enviadas ({misCambiosCounts.enviadas})</SelectItem>
+                <SelectItem value="historial">Historial ({misCambiosCounts.historialCount})</SelectItem>
+                <SelectItem value="equipo">Equipo ({equipoCounts.todas})</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Desktop: botones */}
+          <div className="hidden md:flex gap-2 overflow-x-auto pb-1">
             {[
               { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
               { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
