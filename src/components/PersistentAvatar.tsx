@@ -4,28 +4,19 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getInitials } from '@/lib/utils';
+import { useAuth } from '@/hooks/useFirestoreAuth';
+import { UserAvatar } from '@/components/UserAvatar';
 import { ChevronDown } from 'lucide-react';
-
-// Lee TODO directamente de localStorage - NO hooks, NO useAuth, NO re-renders
-const getName = () => localStorage.getItem('wo_name') || '';
-const getPhoto = () => localStorage.getItem('wo_photo') || '';
-const getRole = () => localStorage.getItem('wo_role') || '';
-const isLoggedIn = () => localStorage.getItem('wo_auth') === '1';
 
 export function PersistentAvatar() {
   const navigate = useNavigate();
+  const { user, logout, isAuthenticated } = useAuth();
 
   // Si no esta logueado, no mostrar nada
-  if (!isLoggedIn()) return null;
-
-  const name = getName();
-  const photo = getPhoto();
-  const role = getRole();
+  if (!isAuthenticated || !user) return null;
 
   const handleLogout = () => {
-    // Limpiar TODO y recargar
-    localStorage.clear();
+    logout();
     window.location.href = '/login';
   };
 
@@ -36,18 +27,15 @@ export function PersistentAvatar() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 bg-white hover:bg-[#F5F5F7] rounded-xl px-3 py-2 transition-colors">
               <div className="text-right">
-                <p className="text-sm font-medium text-[#1D1D1F]">{name}</p>
-                <p className="text-xs text-[#86868B]">{role.replace(/_/g, ' ')}</p>
+                <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
+                <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
               </div>
-              <div className="w-9 h-9 rounded-full overflow-hidden bg-corporate flex-shrink-0">
-                {photo ? (
-                  <img src={photo} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-white text-sm font-medium">
-                    {getInitials(name)}
-                  </div>
-                )}
-              </div>
+              <UserAvatar
+                name={user.name}
+                photoUrl={user.photoURL || user.avatar}
+                size="sm"
+                fallbackClassName="bg-corporate text-sm font-medium"
+              />
               <ChevronDown className="w-4 h-4 text-[#86868B]" />
             </button>
           </DropdownMenuTrigger>

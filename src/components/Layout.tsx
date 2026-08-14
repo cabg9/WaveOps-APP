@@ -227,18 +227,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
                       <p className="text-[10px] text-corporate font-medium tracking-wide">Dive X Surf</p>
                     </div>
-                    {(() => {
-                      const cached = localStorage.getItem("cachedPhotoURL");
-                      const src = user.photoURL || user.avatar || cached;
-                      return (
-                        <UserAvatar
-                          name={user.name}
-                          photoUrl={src}
-                          size="sm"
-                          fallbackClassName="bg-corporate text-sm font-medium"
-                        />
-                      );
-                    })()}
+                    <UserAvatar
+                      name={user.name}
+                      photoUrl={user.photoURL || user.avatar}
+                      size="sm"
+                      fallbackClassName="bg-corporate text-sm font-medium"
+                    />
                     <ChevronDown className="w-4 h-4 text-[#86868B]" />
                   </button>
                 </DropdownMenuTrigger>
@@ -342,18 +336,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                       <div className="space-y-4">
                         {/* User Info */}
                         <div className="flex items-center gap-3">
-                          {(() => {
-                            const cached = localStorage.getItem("cachedPhotoURL");
-                            const src = user.photoURL || user.avatar || cached;
-                            return (
-                              <UserAvatar
-                                name={user.name}
-                                photoUrl={src}
-                                size="md"
-                                fallbackClassName="bg-corporate text-sm font-medium"
-                              />
-                            );
-                          })()}
+                          <UserAvatar
+                            name={user.name}
+                            photoUrl={user.photoURL || user.avatar}
+                            size="md"
+                            fallbackClassName="bg-corporate text-sm font-medium"
+                          />
                           <div>
                             <p className="font-medium text-[#1D1D1F]">{user.name}</p>
                             <p className="text-xs text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>

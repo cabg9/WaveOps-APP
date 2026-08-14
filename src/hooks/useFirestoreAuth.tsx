@@ -52,11 +52,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             level: userData.level || 7,
             isActive: userData.isActive !== false,
             mustChangePassword: userData.mustChangePassword || false,
-            photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
+            photoURL: userData.photoURL || '',
             profileComplete: userData.profileComplete || false,
           });
-          if (userData.photoURL) localStorage.setItem('cachedPhotoURL', userData.photoURL);
-          
+
           // Listener en tiempo real para expulsar si desactivan al usuario
           const unsubscribeDoc = onSnapshot(doc(db, 'users', userDoc.id), (snap) => {
             if (!snap.exists() || snap.data()?.isActive === false) {
@@ -116,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         position: userData.position || '',
         level: userData.level || 7,
         isActive: userData.isActive !== false,
-        photoURL: userData.photoURL || localStorage.getItem('cachedPhotoURL') || '',
+        photoURL: userData.photoURL || '',
         profileComplete: userData.profileComplete || false,
       });
       return true;

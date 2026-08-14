@@ -1,5 +1,5 @@
 // SETTINGS PAGE
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { Layout } from '@/components/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Bell, Volume2, Moon, Globe, Monitor, Smartphone, Filter, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { doc, getDoc, onSnapshot, updateDoc } from 'firebase/firestore';
+import { db } from '@/firebase-config';
 
 interface UserSettings {
   emailNotifications: boolean;
@@ -24,27 +26,48 @@ const DEFAULT_SETTINGS: UserSettings = {
   rememberFilters: true,
 };
 
-function loadSettings(): UserSettings {
-  try {
-    const saved = localStorage.getItem('waveops-settings');
-    if (saved) return { ...DEFAULT_SETTINGS, ...JSON.parse(saved) };
-  } catch {}
-  return DEFAULT_SETTINGS;
-}
-
-function saveSettings(settings: UserSettings) {
-  localStorage.setItem('waveops-settings', JSON.stringify(settings));
-}
-
 export default function SettingsPage() {
   const { user } = useAuth();
-  const [settings, setSettings] = useState<UserSettings>(loadSettings);
+  const [settings, setSettings] = useState<UserSettings>(DEFAULT_SETTINGS);
+  const pendingWritesRef = useRef(0);
 
-  useEffect(() => { saveSettings(settings); }, [settings]);
+  // Cargar settings desde Firestore y mantenerlos sincronizados en tiempo real
+  useEffect(() => {
+    if (!user?.id) return;
+    const ref = doc(db, 'users', user.id);
 
-  const updateSetting = <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
-    setSettings((prev) => ({ ...prev, [key]: value }));
-    toast.success('Configuracion guardada');
+    getDoc(ref).then((snap) => {
+      if (snap.exists() && snap.data()?.settings) {
+        setSettings((prev) => ({ ...DEFAULT_SETTINGS, ...snap.data().settings }));
+      }
+    });
+
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      // Ignorar snapshots generados por nuestros propios updateDoc para evitar loops
+      if (pendingWritesRef.current > 0) return;
+      if (snap.exists() && snap.data()?.settings) {
+        setSettings((prev) => ({ ...DEFAULT_SETTINGS, ...snap.data().settings }));
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]);
+
+  const updateSetting = async <K extends keyof UserSettings>(key: K, value: UserSettings[K]) => {
+    if (!user?.id) return;
+    const newSettings = { ...settings, [key]: value };
+    setSettings(newSettings);
+
+    pendingWritesRef.current += 1;
+    try {
+      await updateDoc(doc(db, 'users', user.id), { settings: newSettings });
+      toast.success('Configuracion guardada');
+    } catch (err) {
+      console.error('Error guardando settings:', err);
+      toast.error('Error al guardar configuracion');
+    } finally {
+      pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+    }
   };
 
   if (!user) {

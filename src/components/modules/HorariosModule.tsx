@@ -117,6 +117,7 @@ import {
   getDoc, 
   updateDoc,
   addDoc,
+  setDoc,
   serverTimestamp,
   arrayUnion 
 } from 'firebase/firestore';
@@ -202,9 +203,9 @@ export default function HorariosModule() {
   // Hook de Storage para subir imágenes
   useStorageUpload();
   
-  // Estado local de incapacityDates para compatibilidad (derivado de Firestore)
+  // Estado local de incapacityDates derivado de Firestore (sin persistencia local)
   const [incapacityDates, setIncapacityDates] = useState<{date: string, type: string, userId: string}[]>([]);
-  
+
   // Sincronizar incapacityDates desde Firestore (solo incapacidades activas, no rechazadas)
   useEffect(() => {
     const dates: {date: string, type: string, userId: string}[] = [];
@@ -222,8 +223,6 @@ export default function HorariosModule() {
         }
       });
     setIncapacityDates(dates);
-    // También guardar en localStorage como respaldo
-    localStorage.setItem('waveops_incapacity_dates', JSON.stringify(dates));
   }, [incapacidades]);
   
   const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => {
@@ -550,17 +549,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const [selectedTargetShift, setSelectedTargetShift] = useState<string | null>(null);
   const [selectedSwapUser, setSelectedSwapUser] = useState<string | null>(null);
   const [changeReason, setChangeReason] = useState('');
-  
-  // Estado para solicitudes enviadas desde Mi Horario
-  const [misSolicitudesEnviadas, setMisSolicitudesEnviadas] = useState<Solicitud[]>(() => {
-    const saved = localStorage.getItem('waveops_mis_solicitudes_enviadas');
-    return saved ? JSON.parse(saved) : [];
-  });
-  
-  // Guardar solicitudes en localStorage
-  useEffect(() => {
-    localStorage.setItem('waveops_mis_solicitudes_enviadas', JSON.stringify(misSolicitudesEnviadas));
-  }, [misSolicitudesEnviadas]);
 
   // Solicitudes de tiempo libre aprobadas para el usuario actual
   const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
@@ -1772,8 +1760,12 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       
                       const swapUserShifts = swapUser ? getUserShifts(swapUser.id, expandedDate) : [];
                       
+                      // Generar ID de Firestore desde el inicio para evitar duplicados y datos locales
+                      const docRef = doc(collection(db, 'solicitudes'));
+                      const firestoreId = docRef.id;
+
                       const nuevaSolicitud: Solicitud = {
-                        id: Date.now(),
+                        id: firestoreId,
                         tipo: requestType === 'change' ? 'cambio' : 'intercambio',
                         deId: user?.id || 'unknown',
                         de: user?.name || 'Tú',
@@ -1807,14 +1799,10 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                           { fecha: now, accion: 'Solicitud creada', usuario: user?.name || 'Tú' }
                         ]
                       };
-                      
-                      // Guardar en estado local
-                      setMisSolicitudesEnviadas(prev => [...prev, nuevaSolicitud]);
-                      
-                      // Guardar en Firestore
+
+                      // Guardar únicamente en Firestore
                       const saveToFirestore = async () => {
                         try {
-                          
                           const solicitudData = {
                             tipo: nuevaSolicitud.tipo,
                             deId: nuevaSolicitud.deId,
@@ -1846,26 +1834,16 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                             avatar: nuevaSolicitud.avatar,
                             historial: nuevaSolicitud.historial
                           };
-                          
-                          const docRef = await addDoc(collection(db, 'solicitudes'), solicitudData);
-                          console.log('Solicitud guardada en Firestore con ID:', docRef.id);
-                          
-                          // También guardar en localStorage como respaldo
-                          const todasSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-                          todasSolicitudes.push({ ...nuevaSolicitud, firestoreId: docRef.id });
-                          localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
-                          
-                          alert('Solicitud enviada correctamente');
+
+                          await setDoc(docRef, solicitudData);
+                          console.log('Solicitud guardada en Firestore con ID:', firestoreId);
+                          toast.success('Solicitud enviada correctamente');
                         } catch (error) {
                           console.error('Error al guardar en Firestore:', error);
-                          // Fallback: guardar solo en localStorage
-                          const todasSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-                          todasSolicitudes.push(nuevaSolicitud);
-                          localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
-                          alert('Solicitud guardada localmente (modo offline)');
+                          toast.error('No se pudo enviar la solicitud');
                         }
                       };
-                      
+
                       saveToFirestore();
                       
                       // Limpiar estados
@@ -5893,11 +5871,7 @@ function SolicitudesTab() {
   const [selectedSolicitud, setSelectedSolicitud] = useState<Solicitud | null>(null);
   const [undoReason, setUndoReason] = useState('');
   
-  // Estado para solicitudes (para poder modificarlas)
-  const [solicitudesEquipoState, setSolicitudesEquipoState] = useState<Solicitud[]>([]);
-  const [solicitudesRecibidasState, setSolicitudesRecibidasState] = useState<Solicitud[]>([]);
-  const [solicitudesEnviadasState, setSolicitudesEnviadasState] = useState<Solicitud[]>([]);
-  const [historialState, setHistorialState] = useState<Solicitud[]>([]);
+  // Estado de solicitudes de cambio de turno (solo en memoria, fuente de verdad: Firestore)
   const [todasSolicitudes, setTodasSolicitudes] = useState<Solicitud[]>([]);
   
   // Inicializar solicitudes desde Firestore en tiempo real
@@ -5947,42 +5921,16 @@ function SolicitudesTab() {
             });
           });
           
-          // Combinar con datos de ejemplo
-          const allSolicitudes = [...firestoreSolicitudes, ...solicitudesEquipo, ...solicitudesRecibidas, ...solicitudesEnviadas, ...historial];
-          
-          // Eliminar duplicados por ID (priorizar Firestore)
-          const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-            index === self.findIndex(s => s.id === sol.id)
-          );
-          
-          setTodasSolicitudes(uniqueSolicitudes);
-          setSolicitudesEquipoState(solicitudesEquipo);
-          setSolicitudesRecibidasState(solicitudesRecibidas);
-          setSolicitudesEnviadasState(solicitudesEnviadas);
-          setHistorialState(historial);
-          
+          setTodasSolicitudes(firestoreSolicitudes);
+
           console.log('Solicitudes cargadas desde Firestore:', firestoreSolicitudes.length);
         }, (error) => {
           console.error('Error al escuchar Firestore:', error);
-          // Fallback: usar localStorage
-          const savedSolicitudes = localStorage.getItem('waveops_todas_solicitudes');
-          const parsedSolicitudes = savedSolicitudes ? JSON.parse(savedSolicitudes) : [];
-          const allSolicitudes = [...parsedSolicitudes, ...solicitudesEquipo, ...solicitudesRecibidas, ...solicitudesEnviadas, ...historial];
-          const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-            index === self.findIndex(s => s.id === sol.id)
-          );
-          setTodasSolicitudes(uniqueSolicitudes);
+          toast.error('Error al cargar solicitudes de cambio de turno');
         });
       } catch (error) {
         console.error('Error al configurar listener de Firestore:', error);
-        // Fallback: usar localStorage
-        const savedSolicitudes = localStorage.getItem('waveops_todas_solicitudes');
-        const parsedSolicitudes = savedSolicitudes ? JSON.parse(savedSolicitudes) : [];
-        const allSolicitudes = [...parsedSolicitudes, ...solicitudesEquipo, ...solicitudesRecibidas, ...solicitudesEnviadas, ...historial];
-        const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-          index === self.findIndex(s => s.id === sol.id)
-        );
-        setTodasSolicitudes(uniqueSolicitudes);
+        toast.error('Error al configurar solicitudes de cambio de turno');
       }
     };
     
@@ -5995,13 +5943,6 @@ function SolicitudesTab() {
     };
   }, []);
   
-  // Actualizar localStorage cuando cambian las solicitudes
-  useEffect(() => {
-    if (todasSolicitudes.length > 0) {
-      localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
-    }
-  }, [todasSolicitudes]);
-
   // Escuchar timeOffRequests desde Firestore en tiempo real
   useEffect(() => {
     const q = query(collection(db, 'timeOffRequests'), orderBy('createdAt', 'desc'));
@@ -6212,33 +6153,20 @@ function SolicitudesTab() {
       historial: [...(selectedSolicitud.historial || []), newHistorialItem]
     };
 
-    // Persistir en Firestore si el ID proviene de Firestore
-    if (typeof selectedSolicitud.id === 'string') {
-      try {
-        await updateDoc(doc(db, 'solicitudes', selectedSolicitud.id), {
-          estado: 'deshecha',
-          historial: updatedSolicitud.historial
-        });
-      } catch (error) {
-        console.error('Error al deshacer cambio en Firestore:', error);
-        toast.error('No se pudo deshacer el cambio');
-        return;
-      }
+    // Persistir en Firestore
+    try {
+      await updateDoc(doc(db, 'solicitudes', selectedSolicitud.id as string), {
+        estado: 'deshecha',
+        historial: updatedSolicitud.historial
+      });
+    } catch (error) {
+      console.error('Error al deshacer cambio en Firestore:', error);
+      toast.error('No se pudo deshacer el cambio');
+      return;
     }
-
-    // Actualizar el estado de equipo
-    setSolicitudesEquipoState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-
-    // Actualizar historial de Mis Cambios
-    setHistorialState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
 
     // Actualizar estado global
     setTodasSolicitudes(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === selectedSolicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
 
     // Cerrar modal y limpiar
     setShowUndoModal(false);
@@ -6246,71 +6174,61 @@ function SolicitudesTab() {
     setUndoReason('');
   };
 
-  // Solicitudes (solo Firestore, sin datos de ejemplo)
-  const solicitudesRecibidas: Solicitud[] = [];
-  const solicitudesEnviadas: Solicitud[] = [];
-  const historial: Solicitud[] = [];
-  const solicitudesEquipo: Solicitud[] = [];
+  // Solicitudes (solo Firestore)
   const getFilteredEquipo = () => {
-    let filtered = solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo;
-    
+    const currentUser = user?.name || 'Usuario';
+    const currentUserId = user?.id || 'current-user';
+    const userDept = user?.department;
+
+    let filtered = todasSolicitudes.filter(s =>
+      s.de !== currentUser && s.a !== currentUser &&
+      s.de !== currentUserId && s.a !== currentUserId &&
+      s.de !== 'Tú' && s.a !== 'Tú'
+    );
+
     // Filtrar por departamento
     if (equipoDeptFilter !== 'ALL') {
       filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
+    } else if (userDept) {
+      filtered = filtered.filter(s => s.deDept === userDept || s.aDept === userDept);
     }
-    
+
     // Filtrar por estado
     if (equipoFilter === 'aceptadas') filtered = filtered.filter(s => s.estado === 'aceptada');
     if (equipoFilter === 'rechazadas') filtered = filtered.filter(s => s.estado === 'rechazada');
     if (equipoFilter === 'deshechas') filtered = filtered.filter(s => s.estado === 'deshecha');
-    
+
     return filtered;
   };
 
   const getFilteredMisCambios = () => {
     const currentUser = user?.name || 'Usuario';
     const currentUserId = user?.id || 'current-user';
-    
-    // Combinar todas las solicitudes disponibles
-    const allSolicitudes = [
-      ...todasSolicitudes,
-      ...solicitudesRecibidasState,
-      ...solicitudesEnviadasState,
-      ...historialState,
-      ...solicitudesRecibidas,
-      ...solicitudesEnviadas,
-      ...historial
-    ];
-    
-    // Eliminar duplicados
-    const uniqueSolicitudes = allSolicitudes.filter((sol, index, self) => 
-      index === self.findIndex(s => s.id === sol.id)
-    );
-    
+
     let result: Solicitud[] = [];
-    
+
     if (misCambiosFilter === 'recibidas') {
       // Solicitudes donde OTROS usuarios envían AL usuario actual (a === usuario actual) y están pendientes
-      result = uniqueSolicitudes.filter(s => 
-        (s.a === 'Tú' || s.a === currentUser || s.a === currentUserId) && 
+      result = todasSolicitudes.filter(s =>
+        (s.a === 'Tú' || s.a === currentUser || s.a === currentUserId) &&
         (s.de !== 'Tú' && s.de !== currentUser && s.de !== currentUserId) &&
         s.estado === 'pendiente'
       );
     } else if (misCambiosFilter === 'enviadas') {
       // Solicitudes donde el usuario actual envía A OTROS (de === usuario actual) y están pendientes
-      result = uniqueSolicitudes.filter(s => 
-        (s.de === 'Tú' || s.de === currentUser || s.de === currentUserId) && 
+      result = todasSolicitudes.filter(s =>
+        (s.de === 'Tú' || s.de === currentUser || s.de === currentUserId) &&
         (s.a !== 'Tú' && s.a !== currentUser && s.a !== currentUserId) &&
         s.estado === 'pendiente'
       );
     } else {
       // Historial - todas las solicitudes donde el usuario participó (aceptadas, rechazadas, deshechas)
-      result = uniqueSolicitudes.filter(s => 
+      result = todasSolicitudes.filter(s =>
         (s.de === 'Tú' || s.a === 'Tú' || s.de === currentUser || s.a === currentUser || s.de === currentUserId || s.a === currentUserId) &&
         (s.estado === 'aceptada' || s.estado === 'rechazada' || s.estado === 'deshecha')
       );
     }
-    
+
     // Ordenar cronológicamente de más nueva a más antigua (por fecha de solicitud)
     return result.sort((a, b) => new Date(b.fechaSolicitud).getTime() - new Date(a.fechaSolicitud).getTime());
   };
@@ -6327,32 +6245,21 @@ function SolicitudesTab() {
       historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud aceptada', usuario: userName }]
     };
 
-    // Persistir en Firestore si el ID proviene de Firestore
-    if (typeof solicitud.id === 'string') {
-      try {
-        await updateDoc(doc(db, 'solicitudes', solicitud.id), {
-          estado: 'aceptada',
-          fechaRespuesta: now,
-          historial: updatedSolicitud.historial
-        });
-      } catch (error) {
-        console.error('Error al aceptar solicitud en Firestore:', error);
-        toast.error('No se pudo aceptar la solicitud');
-        return;
-      }
+    // Persistir en Firestore
+    try {
+      await updateDoc(doc(db, 'solicitudes', solicitud.id as string), {
+        estado: 'aceptada',
+        fechaRespuesta: now,
+        historial: updatedSolicitud.historial
+      });
+    } catch (error) {
+      console.error('Error al aceptar solicitud en Firestore:', error);
+      toast.error('No se pudo aceptar la solicitud');
+      return;
     }
 
-    // Actualizar estado local
-    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
-    setHistorialState(prev => [...prev, updatedSolicitud]);
-
-    // Actualizar estado global
+    // Actualizar estado global (el listener de Firestore lo refrescará, pero esto mejora la reactividad inmediata)
     setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
   };
 
   // Función para rechazar solicitud
@@ -6367,32 +6274,21 @@ function SolicitudesTab() {
       historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud rechazada', usuario: userName }]
     };
 
-    // Persistir en Firestore si el ID proviene de Firestore
-    if (typeof solicitud.id === 'string') {
-      try {
-        await updateDoc(doc(db, 'solicitudes', solicitud.id), {
-          estado: 'rechazada',
-          fechaRespuesta: now,
-          historial: updatedSolicitud.historial
-        });
-      } catch (error) {
-        console.error('Error al rechazar solicitud en Firestore:', error);
-        toast.error('No se pudo rechazar la solicitud');
-        return;
-      }
+    // Persistir en Firestore
+    try {
+      await updateDoc(doc(db, 'solicitudes', solicitud.id as string), {
+        estado: 'rechazada',
+        fechaRespuesta: now,
+        historial: updatedSolicitud.historial
+      });
+    } catch (error) {
+      console.error('Error al rechazar solicitud en Firestore:', error);
+      toast.error('No se pudo rechazar la solicitud');
+      return;
     }
-
-    // Actualizar estado local
-    setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
-    setHistorialState(prev => [...prev, updatedSolicitud]);
 
     // Actualizar estado global
     setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-
-    // Actualizar localStorage
-    const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
-    const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
-    localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
   };
 
   const getStatusBadge = (estado: string) => {
@@ -6409,6 +6305,47 @@ function SolicitudesTab() {
         return null;
     }
   };
+
+  const currentUser = user?.name || 'Usuario';
+  const currentUserId = user?.id || 'current-user';
+  const userDept = user?.department;
+
+  const misCambiosCounts = useMemo(() => {
+    const recibidas = todasSolicitudes.filter(s =>
+      (s.a === 'Tú' || s.a === currentUser || s.a === currentUserId) &&
+      (s.de !== 'Tú' && s.de !== currentUser && s.de !== currentUserId) &&
+      s.estado === 'pendiente'
+    ).length;
+    const enviadas = todasSolicitudes.filter(s =>
+      (s.de === 'Tú' || s.de === currentUser || s.de === currentUserId) &&
+      (s.a !== 'Tú' && s.a !== currentUser && s.a !== currentUserId) &&
+      s.estado === 'pendiente'
+    ).length;
+    const historialCount = todasSolicitudes.filter(s =>
+      (s.de === 'Tú' || s.a === 'Tú' || s.de === currentUser || s.a === currentUser || s.de === currentUserId || s.a === currentUserId) &&
+      (s.estado === 'aceptada' || s.estado === 'rechazada' || s.estado === 'deshecha')
+    ).length;
+    return { recibidas, enviadas, historialCount };
+  }, [todasSolicitudes, currentUser, currentUserId]);
+
+  const equipoCounts = useMemo(() => {
+    let filtered = todasSolicitudes.filter(s =>
+      s.de !== currentUser && s.a !== currentUser &&
+      s.de !== currentUserId && s.a !== currentUserId &&
+      s.de !== 'Tú' && s.a !== 'Tú'
+    );
+    if (equipoDeptFilter !== 'ALL') {
+      filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
+    } else if (userDept) {
+      filtered = filtered.filter(s => s.deDept === userDept || s.aDept === userDept);
+    }
+    return {
+      todas: filtered.length,
+      aceptadas: filtered.filter(s => s.estado === 'aceptada').length,
+      rechazadas: filtered.filter(s => s.estado === 'rechazada').length,
+      deshechas: filtered.filter(s => s.estado === 'deshecha').length,
+    };
+  }, [todasSolicitudes, currentUser, currentUserId, equipoDeptFilter, userDept]);
 
   return (
     <div className="space-y-4">
@@ -6467,10 +6404,10 @@ function SolicitudesTab() {
           {/* Filtros para Mis Cambios */}
           <div className="flex gap-2 overflow-x-auto pb-1">
             {[
-              { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: solicitudesRecibidas.length },
-              { id: 'enviadas', label: 'Enviadas', icon: Send, count: solicitudesEnviadas.length },
-              { id: 'historial', label: 'Historial', icon: History, count: historial.length },
-              { id: 'equipo', label: 'Equipo', icon: Users, count: (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).length },
+              { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
+              { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
+              { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
+              { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
             ].map((filter) => (
               <button
                 key={filter.id}
@@ -6746,10 +6683,10 @@ function SolicitudesTab() {
             {/* Filtros de estado con iconos minimalistas */}
             <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
               {[
-                { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter).length },
-                { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'aceptada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
-                { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'rechazada' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
-                { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoDeptFilter === 'ALL' ? (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha').length : (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).filter(s => s.estado === 'deshecha' && (s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter)).length },
+                { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
+                { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
+                { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
+                { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
               ].map((filter) => (
                 <button
                   key={filter.id}
