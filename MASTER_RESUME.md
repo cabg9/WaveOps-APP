@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (renombres de pestañas, indicadores cuadrados, íconos Mi Horario y calendarios Equipo/Asignar a 3 días visibles; deployado)
+> Última actualización: 2026-08-14 (indicadores responsive, pestañas Cambios/Solicitudes, íconos Mi Horario, sub-pestañas Incapacidades y ancho fijo de calendarios Equipo/Asignar; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -150,11 +150,15 @@
     - En **Equipo** y **Asignar**, el selector de departamento se movió junto al dropdown principal de pestañas en móvil; las tablas usan columnas de usuario más angostas (`w-20` en móvil), días abreviados `L / Ma / Mi / J / V / S / D`, celdas de día de `min-w-[52px]` y scroll horizontal interno para los 7 días sin salirse del grid.
     - En **Asignar**, el sidebar de turnos disponibles es `sticky` también en móvil para que los turnos queden fijos mientras se hace scroll en el calendario.
   - **Modal Solicitar Días Libres**: en móvil usa `max-w-[calc(100%-2rem)]` para tener margen izquierdo/derecho y no quedar pegado a los bordes.
-  - **Solicitudes**: pestañas principales renombradas a **Sólo cambios** y **Sólo solicitudes** (todos los tamaños de pantalla).
-  - **Incapacidades**: indicadores celeste/verde de estadísticas ahora son tarjetas cuadradas compactas (`w-20 h-20` en móvil, `w-24 h-24` en desktop) en lugar de barras extendidas.
-  - **Mi Horario (móvil)**: los íconos de incapacidad/tiempo libre en el calendario mensual se reducen (`w-4 h-4` con icono `w-2.5 h-2.5`) para no tapar el número del día.
+  - **Solicitudes**: pestañas principales renombradas a **Cambios** y **Solicitudes** (todos los tamaños de pantalla).
+  - **Incapacidades**:
+    - Las sub-pestañas **Mis Incapacidades / Equipo** ahora se muestran junto al selector principal en móvil (dentro del mismo flex) y junto a las pestañas desktop.
+    - Indicadores celeste/verde de estadísticas: en móvil ocupan la mitad del ancho cada uno (`flex-1`); en desktop son tarjetas fijas compactas (`w-40 h-24`) para no verse vacías ni demasiado anchas.
+  - **Mi Horario (móvil)**: los íconos de incapacidad/tiempo libre en el calendario mensual se reducen aún más (`w-3 h-3` con icono `w-2 h-2`) y todos se ubican en la esquina superior derecha para no tapar el número del día.
   - **Ajustes finales en Equipo y Asignar (post-deploy)**:
     - Las tablas de Equipo y Asignar se reconstruyeron con `grid` en lugar de `<table>`, usando `grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))]` en móvil. Esto garantiza que siempre se vean **4 columnas**: la columna de usuario fija (72px) + **3 días visibles**; los otros 4 días se descubren con scroll horizontal interno, igualando el ancho al calendario de Mi Horario.
+    - Se agregó `min-w-0` al grid, celdas y contenedores flex para evitar que el contenido interno (nombres de turnos, asignaciones) fuerce el ancho y desplace toda la pantalla.
+    - Los textos de turnos/asignaciones ahora usan `flex-wrap`, `break-words` y tamaño reducido en móvil (`text-[10px] sm:text-xs`) para ajustarse a las celdas.
     - En desktop (`sm:`) las 7 columnas de días se muestran completas (`minmax(100px,1fr)`).
     - La columna de usuario permanece `sticky left-0` con sombra de separación.
     - Abreviaturas de días en móvil: `L / Ma / Mi / J / V / S / D`.
