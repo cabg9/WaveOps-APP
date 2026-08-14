@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (indicadores responsive, pestañas Cambios/Solicitudes, íconos Mi Horario, sub-pestañas Incapacidades y ancho fijo de calendarios Equipo/Asignar; deployado)
+> Última actualización: 2026-08-14 (columna usuario responsive, filtros reubicados en Solicitudes/Incapacidades, info previa en indicadores; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -150,16 +150,23 @@
     - En **Equipo** y **Asignar**, el selector de departamento se movió junto al dropdown principal de pestañas en móvil; las tablas usan columnas de usuario más angostas (`w-20` en móvil), días abreviados `L / Ma / Mi / J / V / S / D`, celdas de día de `min-w-[52px]` y scroll horizontal interno para los 7 días sin salirse del grid.
     - En **Asignar**, el sidebar de turnos disponibles es `sticky` también en móvil para que los turnos queden fijos mientras se hace scroll en el calendario.
   - **Modal Solicitar Días Libres**: en móvil usa `max-w-[calc(100%-2rem)]` para tener margen izquierdo/derecho y no quedar pegado a los bordes.
-  - **Solicitudes**: pestañas principales renombradas a **Cambios** y **Solicitudes** (todos los tamaños de pantalla).
+  - **Solicitudes**:
+    - Pestañas principales renombradas a **Cambios** y **Solicitudes**.
+    - El bloque gris de pestañas principales ahora es `w-fit`.
+    - En **Cambios**, los sub-filtros (Recibidas, Enviadas, Historial, Equipo) y el selector de departamento (solo en Equipo) se muestran junto a las pestañas principales.
+    - En **Solicitudes**, los sub-filtros (Mis solicitudes / Equipo), el selector de departamento (solo en Equipo) y el filtro de estado se muestran junto a las pestañas principales. Los filtros de estado de tiempo libre ahora se controlan desde el header.
   - **Incapacidades**:
-    - Las sub-pestañas **Mis Incapacidades / Equipo** ahora se muestran junto al selector principal en móvil (dentro del mismo flex) y junto a las pestañas desktop.
-    - Indicadores celeste/verde de estadísticas: en móvil ocupan la mitad del ancho cada uno (`flex-1`); en desktop son tarjetas fijas compactas (`w-40 h-24`) para no verse vacías ni demasiado anchas.
-  - **Mi Horario (móvil)**: los íconos de incapacidad/tiempo libre en el calendario mensual se reducen aún más (`w-3 h-3` con icono `w-2 h-2`) y todos se ubican en la esquina superior derecha para no tapar el número del día.
+    - Las sub-pestañas **Mis Incapacidades / Equipo** se muestran junto al selector principal en móvil y junto a las pestañas desktop.
+    - El filtro de estado de **Mis Incapacidades** se muestra junto a sus sub-pestañas.
+    - En **Equipo**, el filtro de estado y el selector de departamento se muestran junto al selector principal de pestañas (en móvil y desktop); la opción "Todos los departamentos" se acortó a **"Todos"**.
+    - Indicadores celeste/verde de estadísticas: en móvil ocupan la mitad del ancho cada uno (`flex-1`); en desktop son tarjetas fijas compactas (`w-40 h-24`). Ahora muestran también el dato del periodo anterior (`Ant.: X`) para dar más contexto.
+  - **Mi Horario (móvil)**: los íconos de incapacidad/tiempo libre en el calendario mensual se reducen aún más (`w-2.5 h-2.5` con icono `w-1.5 h-1.5`) y todos se ubican en la esquina superior derecha para no tapar el número del día.
   - **Ajustes finales en Equipo y Asignar (post-deploy)**:
-    - Las tablas de Equipo y Asignar se reconstruyeron con `grid` en lugar de `<table>`, usando `grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))]` en móvil. Esto garantiza que siempre se vean **4 columnas**: la columna de usuario fija (72px) + **3 días visibles**; los otros 4 días se descubren con scroll horizontal interno, igualando el ancho al calendario de Mi Horario.
-    - Se agregó `min-w-0` al grid, celdas y contenedores flex para evitar que el contenido interno (nombres de turnos, asignaciones) fuerce el ancho y desplace toda la pantalla.
-    - Los textos de turnos/asignaciones ahora usan `flex-wrap`, `break-words` y tamaño reducido en móvil (`text-[10px] sm:text-xs`) para ajustarse a las celdas.
-    - En desktop (`sm:`) las 7 columnas de días se muestran completas (`minmax(100px,1fr)`).
+    - Las tablas de Equipo y Asignar se reconstruyeron con `grid` en lugar de `<table>`.
+    - **Móvil**: columna de usuario fija de `96px` (más ancha para no cortar nombres) + **3 días visibles**; el resto con scroll horizontal interno, igualando el ancho al calendario de Mi Horario.
+    - **Desktop**: columna de usuario con tamaño normal (`12rem` / `192px`); las 7 columnas de días se muestran completas (`minmax(100px,1fr)`).
+    - Se agregó `min-w-0` al grid, celdas y contenedores flex para evitar que el contenido interno fuerce el ancho y desplace toda la pantalla.
+    - Los textos de turnos/asignaciones ahora usan `flex-wrap`, `break-words` y tamaño reducido en móvil (`text-[10px] sm:text-xs`).
     - La columna de usuario permanece `sticky left-0` con sombra de separación.
     - Abreviaturas de días en móvil: `L / Ma / Mi / J / V / S / D`.
     - Se agregó `users` a las dependencias de los `useMemo` de `deptUsers` (Equipo/Asignar) y `crossDeptUsers` (Asignar), corrigiendo que el filtro **Todos** los departamentos no mostraba usuarios reales hasta que llegaban asíncronamente de Firestore.
