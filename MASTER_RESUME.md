@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (ajustes responsive finales en Equipo/Asignar y filtro Todos departamentos; deployado)
+> Última actualización: 2026-08-14 (renombres de pestañas, indicadores cuadrados, íconos Mi Horario y calendarios Equipo/Asignar a 3 días visibles; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -150,8 +150,13 @@
     - En **Equipo** y **Asignar**, el selector de departamento se movió junto al dropdown principal de pestañas en móvil; las tablas usan columnas de usuario más angostas (`w-20` en móvil), días abreviados `L / Ma / Mi / J / V / S / D`, celdas de día de `min-w-[52px]` y scroll horizontal interno para los 7 días sin salirse del grid.
     - En **Asignar**, el sidebar de turnos disponibles es `sticky` también en móvil para que los turnos queden fijos mientras se hace scroll en el calendario.
   - **Modal Solicitar Días Libres**: en móvil usa `max-w-[calc(100%-2rem)]` para tener margen izquierdo/derecho y no quedar pegado a los bordes.
+  - **Solicitudes**: pestañas principales renombradas a **Sólo cambios** y **Sólo solicitudes** (todos los tamaños de pantalla).
+  - **Incapacidades**: indicadores celeste/verde de estadísticas ahora son tarjetas cuadradas compactas (`w-20 h-20` en móvil, `w-24 h-24` en desktop) en lugar de barras extendidas.
+  - **Mi Horario (móvil)**: los íconos de incapacidad/tiempo libre en el calendario mensual se reducen (`w-4 h-4` con icono `w-2.5 h-2.5`) para no tapar el número del día.
   - **Ajustes finales en Equipo y Asignar (post-deploy)**:
-    - Las celdas de día en móvil pasan a `min-w-[90px]` (desktop `sm:min-w-[100px]`) y la columna de usuario se reduce a `72px`, de modo que inicialmente se ven ~3 días y el resto de la semana se alcanza con scroll horizontal interno sin salirse del grid.
+    - Las tablas de Equipo y Asignar se reconstruyeron con `grid` en lugar de `<table>`, usando `grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))]` en móvil. Esto garantiza que siempre se vean **4 columnas**: la columna de usuario fija (72px) + **3 días visibles**; los otros 4 días se descubren con scroll horizontal interno, igualando el ancho al calendario de Mi Horario.
+    - En desktop (`sm:`) las 7 columnas de días se muestran completas (`minmax(100px,1fr)`).
+    - La columna de usuario permanece `sticky left-0` con sombra de separación.
     - Abreviaturas de días en móvil: `L / Ma / Mi / J / V / S / D`.
     - Se agregó `users` a las dependencias de los `useMemo` de `deptUsers` (Equipo/Asignar) y `crossDeptUsers` (Asignar), corrigiendo que el filtro **Todos** los departamentos no mostraba usuarios reales hasta que llegaban asíncronamente de Firestore.
 - **TasksModule**:
