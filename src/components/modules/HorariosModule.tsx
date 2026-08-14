@@ -2018,8 +2018,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       return users.filter(u => u.isActive);
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [getUsersByDepartment, selectedDepartment]);
-  
+  }, [users, getUsersByDepartment, selectedDepartment]);
+
   // Obtener asignaciones
   const assignments = useMemo(() => {
     if (selectedDepartment === 'ALL') {
@@ -2199,7 +2199,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
               <tr className="border-b border-[#E5E5E7]">
                 <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-[72px] sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
                 {weekDays.map((day, i) => (
-                  <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
+                  <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] min-w-[90px] sm:min-w-[100px]">
                     <button
                       onClick={() => {
                         setSelectedHeaderDay(day);
@@ -3449,8 +3449,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
       return users.filter(u => u.isActive);
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [getUsersByDepartment, selectedDepartment]);
-  
+  }, [users, getUsersByDepartment, selectedDepartment]);
+
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
   const canViewCrossDepartment = user?.role === Role.DIRECTOR_GENERAL || 
                                   user?.role === Role.GERENTE_OPERACIONES ||
@@ -3699,7 +3699,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                 <tr className="border-b border-[#E5E5E7]">
                   <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-[72px] sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
                   {weekDays.map((day, i) => (
-                    <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
+                    <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] min-w-[90px] sm:min-w-[100px]">
                       <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
                       <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
                       <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
