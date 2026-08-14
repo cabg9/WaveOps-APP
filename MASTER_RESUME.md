@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (refactor 100% online completado)
+> Última actualización: 2026-08-14 (dropdowns móviles en Horarios y Tasks deployados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -142,6 +142,7 @@
   - Modales principales usan `max-w-[95vw]` en pantallas pequeñas.
   - Tarjetas de solicitudes pasan a 1 columna en móvil.
   - Tablas de Equipo y Asignar con primera columna sticky al hacer scroll horizontal.
+  - **Dropdowns en móvil**: pestañas principales (Mi Horario, Equipo, Asignar, Solicitudes, Incapacidades), sub-pestañas de Incapacidades, filtros de Mis Cambios (Recibidas, Enviadas, Historial, Equipo) y controles de Solicitudes (Mis solicitudes / Equipo, filtro de estado) se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
@@ -149,6 +150,7 @@
   - Grid de tareas 1 columna en móvil.
   - Detalle de tarea, departamentos y apoyo en 1 columna en móvil.
   - Foto maximizada de incidencia ajustada al viewport.
+  - **Dropdowns en móvil**: pestañas principales (Mis Tareas, Mi Departamento, Todas, Incidencias), filtro de tiempo y filtro de estado se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
 - **DevelopsModule**:
   - Tarjetas de módulos, roles, papelera y usuarios con layout apilado en móvil.
   - Modal de usuario usa `max-w-[95vw] sm:max-w-lg`.
