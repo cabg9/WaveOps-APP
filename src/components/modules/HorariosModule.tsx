@@ -74,7 +74,7 @@ import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
-import { users as staticUsers } from '@/data/users';
+
 import {
   cn,
   formatWeekRange,
@@ -179,6 +179,7 @@ interface IncapacidadesTabProps {
 export default function HorariosModule() {
   const { user, hasPermission } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
 
@@ -224,7 +225,7 @@ export default function HorariosModule() {
   
   const addIncapacity = async (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => {
     // Encontrar usuario en el array local o usar la info proporcionada
-    let userInfo = staticUsers.find(u => u.id === userId);
+    let userInfo = firestoreUsers.find(u => u.id === userId);
     
     // Si no se encuentra en el array local pero se proporciona info override, usarla
     if (!userInfo && userInfoOverride) {
@@ -1939,7 +1940,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
-  const users = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
+  const users = firestoreUsers;
   const { getTasksByUser } = useTasks();
   const [weekOffset, setWeekOffset] = useState(0);
 
@@ -2196,7 +2197,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
           <table className="min-w-max">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
-                <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-20 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
+                <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-[72px] sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
                 {weekDays.map((day, i) => (
                   <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
                     <button
@@ -3375,7 +3376,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
-  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
+  const users = firestoreUsers2;
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -3696,7 +3697,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
             <table className="min-w-max">
               <thead>
                 <tr className="border-b border-[#E5E5E7]">
-                  <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-20 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
+                  <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-[72px] sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
                   {weekDays.map((day, i) => (
                     <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
                       <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
@@ -3993,7 +3994,7 @@ function IncapacidadesTab({
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const { hasPermission } = useAppConfig();
-  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
+  const users = firestoreUsers2;
 
   // Permisos de incapacidades (fallback a roles para compatibilidad con datos existentes)
   const canVerifyIncapacidad = hasPermission('canVerifyIncapacidad') ||
@@ -6028,7 +6029,7 @@ function SolicitudesTab() {
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
-  const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
+  const users = firestoreUsers2;
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'mis-solicitudes' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial' | 'equipo'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
@@ -6850,9 +6851,53 @@ function SolicitudesTab() {
                 ))}
               </SelectContent>
             </Select>
-            
-            {/* Filtros de estado con iconos minimalistas */}
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+
+            {/* Mobile: dropdown de estado con iconos */}
+            <div className="md:hidden">
+              <Select value={equipoFilter} onValueChange={(v) => setEquipoFilter(v as typeof equipoFilter)}>
+                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {(() => {
+                      const active = [
+                        { id: 'todas', label: 'Todas', icon: LayoutGrid },
+                        { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2 },
+                        { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
+                        { id: 'deshechas', label: 'Revertidas', icon: History },
+                      ].find((f) => f.id === equipoFilter);
+                      const ActiveIcon = active?.icon || LayoutGrid;
+                      return (
+                        <span className="flex items-center gap-2 text-[#86868B]">
+                          <ActiveIcon className="w-4 h-4" />
+                          <span>{active?.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
+                    { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
+                    { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
+                    { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
+                  ].map((filter) => {
+                    const FilterIcon = filter.icon;
+                    return (
+                      <SelectItem key={filter.id} value={filter.id}>
+                        <span className="flex items-center gap-2">
+                          <FilterIcon className="w-4 h-4" />
+                          <span>{filter.label}</span>
+                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop: botones de estado con iconos */}
+            <div className="hidden md:flex gap-2 overflow-x-auto pb-1 sm:pb-0">
               {[
                 { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
                 { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
