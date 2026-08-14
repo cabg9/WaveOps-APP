@@ -178,8 +178,10 @@ interface IncapacidadesTabProps {
 
 export default function HorariosModule() {
   const { user, hasPermission } = useAuth();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
-  
+  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
+
   // Estado para sub-pestañas de incapacidades
   const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
   
@@ -314,9 +316,9 @@ export default function HorariosModule() {
         {/* Tabs principales + sub-pestañas de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
           {/* Mobile: dropdown de pestaña principal (estilo botón, ancho al contenido) */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-2 flex-wrap">
             <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-              <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
+              <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                 <SelectValue placeholder="Seleccionar sección" />
               </SelectTrigger>
               <SelectContent>
@@ -329,6 +331,45 @@ export default function HorariosModule() {
                 )}
               </SelectContent>
             </Select>
+
+            {/* Mobile: filtro de departamento para Equipo/Asignar */}
+            {(activeTab === 'equipo' || activeTab === 'asignar') && (
+              <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {selectedDepartment === 'ALL' ? (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Todos</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                        <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.GERENTE_OPERACIONES) && (
+                    <SelectItem value="ALL">
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Todos los departamentos</span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  {departmentOptions.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code}>
+                      <div className="flex items-center gap-2">
+                        <DeptIcon department={dept.code} className="w-4 h-4" />
+                        <span>{dept.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           {/* Desktop: botones de pestaña principal */}
@@ -433,8 +474,8 @@ export default function HorariosModule() {
 
         {/* Content */}
         {activeTab === 'mi-horario' && <MiHorarioTab incapacityDates={incapacityDates} addIncapacity={addIncapacity} getIncapacityForDate={getIncapacityForDate} />}
-        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} />}
-        {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} />}
+        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
+        {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
         {activeTab === 'solicitudes' && <SolicitudesTab />}
         {activeTab === 'incapacidades' && (
           <IncapacidadesTab 
@@ -1265,7 +1306,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
         }
         setShowFreeDaysModal(open);
       }}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Solicitar Días Libres</DialogTitle>
           </DialogHeader>
@@ -1889,18 +1930,19 @@ interface EquipoTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
   addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => Promise<void>;
+  selectedDepartment: string | 'ALL';
+  setSelectedDepartment: (v: string | 'ALL') => void;
 }
 
-function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity }: EquipoTabProps) {
+function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity, selectedDepartment, setSelectedDepartment }: EquipoTabProps) {
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const users = firestoreUsers.length > 0 ? firestoreUsers : staticUsers;
   const { getTasksByUser } = useTasks();
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
-  
+
   // Modales
   const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
   const [selectedDayInfo, setSelectedDayInfo] = useState<{user: typeof users[0], date: Date} | null>(null);
@@ -2087,41 +2129,44 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
     <div className="space-y-4">
       {/* Header: siempre horizontal */}
       <div className="flex flex-row flex-wrap items-center justify-between gap-2">
-        <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-          <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
-            <SelectValue>
-              {selectedDepartment === 'ALL' ? (
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4" />
-                  <span>Todos</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                  <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                </div>
+        {/* Desktop: filtro de departamento */}
+        <div className="hidden sm:block">
+          <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+              <SelectValue>
+                {selectedDepartment === 'ALL' ? (
+                  <div className="flex items-center gap-2 text-[#86868B]">
+                    <LayoutGrid className="w-4 h-4" />
+                    <span>Todos</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-[#86868B]">
+                    <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                    <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {canViewAllDepartments && (
+                <SelectItem value="ALL">
+                  <div className="flex items-center gap-2">
+                    <LayoutGrid className="w-4 h-4" />
+                    <span>Todos los departamentos</span>
+                  </div>
+                </SelectItem>
               )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            {canViewAllDepartments && (
-              <SelectItem value="ALL">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="w-4 h-4" />
-                  <span>Todos los departamentos</span>
-                </div>
-              </SelectItem>
-            )}
-            {departments.map(dept => (
-              <SelectItem key={dept.code} value={dept.code}>
-                <div className="flex items-center gap-2">
-                  <DeptIcon department={dept.code} className="w-4 h-4" />
-                  <span>{dept.name}</span>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+              {departments.map(dept => (
+                <SelectItem key={dept.code} value={dept.code}>
+                  <div className="flex items-center gap-2">
+                    <DeptIcon department={dept.code} className="w-4 h-4" />
+                    <span>{dept.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="flex items-center gap-2">
           <button
@@ -2151,18 +2196,19 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
           <table className="min-w-max">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
-                <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
+                <th className="text-left p-2 sm:p-4 text-sm font-medium text-[#86868B] w-28 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
                 {weekDays.map((day, i) => (
-                  <th key={i} className="text-center p-2 text-sm font-medium text-[#86868B] min-w-[100px]">
+                  <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
                     <button
                       onClick={() => {
                         setSelectedHeaderDay(day);
                         setShowHeaderDayModal(true);
                       }}
-                      className="w-full py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
+                      className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
                     >
-                      <div>{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                      <div className="text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                      <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                      <div className="sm:hidden">{['L', 'M', 'X', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </button>
                   </th>
                 ))}
@@ -2171,15 +2217,15 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <tbody>
               {deptUsers.map((u) => (
                 <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0">
-                    <td className="p-4 sticky left-0 bg-white z-10">
-                    <button 
+                    <td className="p-2 sm:p-4 sticky left-0 bg-white z-10">
+                    <button
                       onClick={() => handleUserClick(u)}
-                      className="flex items-center gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
+                      className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
                     >
                       <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
-                      <div>
-                        <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
-                        <p className="text-xs text-[#86868B]">{u.position}</p>
+                      <div className="text-center sm:text-left">
+                        <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight">{u.name.split(' ')[0]}</p>
+                        <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
                       </div>
                     </button>
                   </td>
@@ -3308,9 +3354,11 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 interface AsignarTabProps {
   incapacityDates: {date: string, type: string, userId: string}[];
   getIncapacityForDate: (date: string, userId: string) => {date: string, type: string, userId: string} | undefined;
+  selectedDepartment: string | 'ALL';
+  setSelectedDepartment: (v: string | 'ALL') => void;
 }
 
-function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate }: AsignarTabProps) {
+function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate, selectedDepartment, setSelectedDepartment }: AsignarTabProps) {
   const { user } = useAuth();
   const { 
     assignments: allAssignments,
@@ -3328,8 +3376,6 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
-  // Permitir 'ALL' para ver todos los departamentos (según permisos)
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -3510,23 +3556,24 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
       onDragEnd={handleDragEnd}
     >
       <div className="flex flex-col lg:flex-row gap-4 items-start">
-        {/* Turnos disponibles - Sidebar sticky en desktop, apilado en móvil */}
-        <div className="lg:sticky lg:top-4 w-full lg:w-72 flex-shrink-0 bg-white rounded-2xl p-4 lg:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
+        {/* Turnos disponibles - Sidebar sticky siempre */}
+        <div className="sticky top-0 lg:top-4 z-20 w-full lg:w-72 flex-shrink-0 bg-white rounded-2xl p-4 lg:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto">
           <div className="flex items-center justify-between mb-3 lg:mb-4">
             <h3 className="font-medium text-[#1D1D1F] text-sm">Turnos disponibles</h3>
           </div>
           
-          <div className="mb-3 lg:mb-4">
+          {/* Desktop: filtro de departamento en sidebar */}
+          <div className="mb-3 lg:mb-4 hidden lg:block">
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="w-full h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
+              <SelectTrigger className="w-full h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-[#86868B]">
                       <LayoutGrid className="w-4 h-4" />
                       <span className="truncate">Todos los departamentos</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-[#86868B]">
                       <DeptIcon department={selectedDepartment} className="w-4 h-4 flex-shrink-0" />
                       <span className="truncate">{selectedDepartment.replace(/_/g, ' ')}</span>
                     </div>
@@ -3649,11 +3696,12 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
             <table className="min-w-max">
               <thead>
                 <tr className="border-b border-[#E5E5E7]">
-                  <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
+                  <th className="text-left p-2 sm:p-4 text-sm font-medium text-[#86868B] w-28 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
                   {weekDays.map((day, i) => (
-                    <th key={i} className="text-center p-4 text-sm font-medium text-[#86868B] min-w-[100px]">
-                      <div>{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                      <div className="text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                    <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
+                      <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                      <div className="sm:hidden">{['L', 'M', 'X', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </th>
                   ))}
                 </tr>
@@ -3666,8 +3714,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     "border-b border-[#E5E5E7] last:border-0",
                     isCrossDept && "bg-amber-50/50"
                   )}>
-                    <td className="p-4 sticky left-0 bg-white z-10">
-                      <div className="flex items-center gap-3">
+                    <td className="p-2 sm:p-4 sticky left-0 bg-white z-10">
+                      <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
                         <UserAvatar
                           name={u.name}
                           photoUrl={u.photoURL || u.avatar}
@@ -3675,9 +3723,9 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                           className={cn(isCrossDept && "ring-2 ring-amber-400")}
                           fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
                         />
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
+                        <div className="text-center sm:text-left">
+                          <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                            <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight">{u.name.split(' ')[0]}</p>
                             {/* Icono de departamento para usuarios de otros deptos */}
                             {isCrossDept && (
                               <div 
@@ -3688,7 +3736,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-[#86868B]">{u.position}</p>
+                          <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
                           {isCrossDept && (
                             <p className="text-[10px] text-amber-600 font-medium">
                               {DEPT_SHORT_NAMES[u.department]}
@@ -4381,7 +4429,54 @@ function IncapacidadesTab({
       <div className="flex items-center gap-2">
         {activeSubTab === 'equipo' ? (
           <>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {/* Mobile: dropdown de estado con iconos */}
+            <div className="md:hidden">
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {(() => {
+                      const active = [
+                        { id: 'todas', label: 'Todas', icon: LayoutGrid },
+                        { id: 'pendiente', label: 'Pendientes', icon: Clock },
+                        { id: 'verificada', label: 'Verificadas', icon: Check },
+                        { id: 'registrada', label: 'Registradas', icon: CheckCircle2 },
+                        { id: 'rechazada', label: 'Rechazadas', icon: XCircle },
+                      ].find((f) => f.id === statusFilter);
+                      const ActiveIcon = active?.icon || LayoutGrid;
+                      return (
+                        <span className="flex items-center gap-2 text-[#86868B]">
+                          <ActiveIcon className="w-4 h-4" />
+                          <span>{active?.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
+                    { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
+                    { id: 'verificada', label: 'Verificadas', count: counts.verificada, icon: Check },
+                    { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
+                    { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
+                  ].map((filter) => {
+                    const FilterIcon = filter.icon;
+                    return (
+                      <SelectItem key={filter.id} value={filter.id}>
+                        <span className="flex items-center gap-2">
+                          <FilterIcon className="w-4 h-4" />
+                          <span>{filter.label}</span>
+                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop: botones de estado con iconos */}
+            <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
               {[
                 { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
                 { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
@@ -4416,15 +4511,15 @@ function IncapacidadesTab({
               })}
             </div>
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-[#86868B]">
                       <LayoutGrid className="w-4 h-4" />
                       <span>Todos</span>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-[#86868B]">
                       <DeptIcon department={selectedDepartment} className="w-4 h-4" />
                       <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
                     </div>
@@ -4452,39 +4547,86 @@ function IncapacidadesTab({
             </Select>
           </>
         ) : (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {[
-              { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
-              { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
-              { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
-              { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
-            ].map((filter) => {
-              const FilterIcon = filter.icon;
-              return (
-                <button
-                  key={filter.id}
-                  onClick={() => setMyFilter(filter.id as typeof myFilter)}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                    myFilter === filter.id
-                      ? 'bg-corporate text-white'
-                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                  )}
-                >
-                  <FilterIcon className="w-4 h-4" />
-                  {filter.label}
-                  {filter.count > 0 && (
-                    <span className={cn(
-                      'px-1.5 py-0.5 text-xs rounded-full',
-                      myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                    )}>
-                      {filter.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          <>
+            {/* Mobile: dropdown de estado con iconos */}
+            <div className="md:hidden">
+              <Select value={myFilter} onValueChange={(v) => setMyFilter(v as typeof myFilter)}>
+                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {(() => {
+                      const active = [
+                        { id: 'enviadas', label: 'Enviadas', icon: Send },
+                        { id: 'registradas', label: 'Registradas', icon: CheckCircle2 },
+                        { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
+                        { id: 'historial', label: 'Historial', icon: History },
+                      ].find((f) => f.id === myFilter);
+                      const ActiveIcon = active?.icon || Send;
+                      return (
+                        <span className="flex items-center gap-2 text-[#86868B]">
+                          <ActiveIcon className="w-4 h-4" />
+                          <span>{active?.label}</span>
+                        </span>
+                      );
+                    })()}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
+                    { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
+                    { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
+                    { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
+                  ].map((filter) => {
+                    const FilterIcon = filter.icon;
+                    return (
+                      <SelectItem key={filter.id} value={filter.id}>
+                        <span className="flex items-center gap-2">
+                          <FilterIcon className="w-4 h-4" />
+                          <span>{filter.label}</span>
+                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Desktop: botones de estado con iconos */}
+            <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
+              {[
+                { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
+                { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
+                { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
+                { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
+              ].map((filter) => {
+                const FilterIcon = filter.icon;
+                return (
+                  <button
+                    key={filter.id}
+                    onClick={() => setMyFilter(filter.id as typeof myFilter)}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                      myFilter === filter.id
+                        ? 'bg-corporate text-white'
+                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                    )}
+                  >
+                    <FilterIcon className="w-4 h-4" />
+                    {filter.label}
+                    {filter.count > 0 && (
+                      <span className={cn(
+                        'px-1.5 py-0.5 text-xs rounded-full',
+                        myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                      )}>
+                        {filter.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
 
@@ -5586,11 +5728,11 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
         </div>
       )}
 
-      {/* Filtros en fila horizontal */}
+      {/* Filtros: departamento (equipo) + estado */}
       <div className="flex items-center gap-2">
         {showDeptFilter && (
           <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v as string | 'ALL')}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
               <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
               <SelectValue placeholder="Departamento" />
             </SelectTrigger>
@@ -5605,7 +5747,41 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
           </Select>
         )}
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {/* Mobile: dropdown de estado */}
+        <div className="md:hidden">
+          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+              <SelectValue>
+                {(() => {
+                  const active = filterButtons.find((f) => f.id === filter);
+                  const count = deptFiltered.filter((r) => filter === 'todas' || r.status === filter).length;
+                  return (
+                    <span className="flex items-center gap-2 text-[#86868B]">
+                      <span>{active?.label || 'Estado'}</span>
+                      {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
+                    </span>
+                  );
+                })()}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {filterButtons.map((f) => {
+                const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
+                return (
+                  <SelectItem key={f.id} value={f.id}>
+                    <span className="flex items-center gap-2">
+                      <span>{f.label}</span>
+                      {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Desktop: botones de estado */}
+        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
           {filterButtons.map((f) => {
             const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
             return (
@@ -6408,17 +6584,17 @@ function SolicitudesTab() {
                 key={filter.id}
                 onClick={() => setMisCambiosFilter(filter.id as typeof misCambiosFilter)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                  'flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
                   misCambiosFilter === filter.id
                     ? 'bg-corporate text-white'
                     : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
                 )}
               >
-                <filter.icon className="w-4 h-4" />
-                {filter.label}
+                <filter.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>{filter.label}</span>
                 {filter.count > 0 && (
                   <span className={cn(
-                    'px-1.5 py-0.5 text-xs rounded-full',
+                    'px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full',
                     misCambiosFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
                   )}>
                     {filter.count}
@@ -6661,7 +6837,7 @@ function SolicitudesTab() {
           <div className="flex flex-row items-center gap-2">
             {/* Selector de departamento */}
             <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
                 <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
