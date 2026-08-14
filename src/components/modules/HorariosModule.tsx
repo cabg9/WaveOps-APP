@@ -2191,12 +2191,12 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] max-w-full">
-        <div className="overflow-x-auto max-w-full">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full">
+        <div className="overflow-x-auto">
           <table className="min-w-max">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
-                <th className="text-left p-2 sm:p-4 text-sm font-medium text-[#86868B] w-28 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
+                <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-20 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
                 {weekDays.map((day, i) => (
                   <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
                     <button
@@ -2207,7 +2207,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
                     >
                       <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                      <div className="sm:hidden">{['L', 'M', 'X', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
                       <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </button>
                   </th>
@@ -2217,10 +2217,10 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <tbody>
               {deptUsers.map((u) => (
                 <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0">
-                    <td className="p-2 sm:p-4 sticky left-0 bg-white z-10">
+                    <td className="p-1 sm:p-4 sticky left-0 bg-white z-10">
                     <button
                       onClick={() => handleUserClick(u)}
-                      className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
+                      className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
                     >
                       <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
                       <div className="text-center sm:text-left">
@@ -3692,15 +3692,15 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
           </div>
 
           {/* Tabla */}
-          <div className="overflow-x-auto max-w-full">
+          <div className="overflow-x-auto w-full">
             <table className="min-w-max">
               <thead>
                 <tr className="border-b border-[#E5E5E7]">
-                  <th className="text-left p-2 sm:p-4 text-sm font-medium text-[#86868B] w-28 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
+                  <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] w-20 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
                   {weekDays.map((day, i) => (
                     <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] min-w-[52px] sm:min-w-[100px]">
                       <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                      <div className="sm:hidden">{['L', 'M', 'X', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
                       <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </th>
                   ))}
@@ -3714,8 +3714,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     "border-b border-[#E5E5E7] last:border-0",
                     isCrossDept && "bg-amber-50/50"
                   )}>
-                    <td className="p-2 sm:p-4 sticky left-0 bg-white z-10">
-                      <div className="flex flex-col sm:flex-row items-center sm:items-center gap-1 sm:gap-3">
+                    <td className="p-1 sm:p-4 sticky left-0 bg-white z-10">
+                      <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
                         <UserAvatar
                           name={u.name}
                           photoUrl={u.photoURL || u.avatar}
