@@ -162,6 +162,10 @@ interface IncapacidadesTabProps {
   activeSubTab: 'mias' | 'equipo';
   myFilter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial';
   setMyFilter: (filter: 'enviadas' | 'registradas' | 'rechazadas' | 'historial') => void;
+  selectedDepartment: string | 'ALL';
+  onSelectedDepartmentChange: (dept: string | 'ALL') => void;
+  statusFilter: 'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada';
+  onStatusFilterChange: (filter: 'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada') => void;
   // Funciones de Firestore
   firestoreIncapacidades: Incapacidad[];
   verifyIncapacidad: (id: string, userId: string, userName: string) => Promise<void>;
@@ -185,6 +189,10 @@ export default function HorariosModule() {
 
   // Estado para sub-pestañas de incapacidades
   const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
+
+  // Estado para filtros de incapacidades (controlados desde el header)
+  const [incapacidadesStatusFilter, setIncapacidadesStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
+  const [incapacidadesDeptFilter, setIncapacidadesDeptFilter] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
   
   // Hook de Firestore para incapacidades
   const { 
@@ -314,7 +322,7 @@ export default function HorariosModule() {
           <p className="text-sm text-[#86868B]">Gestiona turnos y horarios del equipo</p>
         </div>
 
-        {/* Tabs principales + sub-pestañas de incapacidades */}
+        {/* Tabs principales + sub-pestañas y filtros de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
           {/* Mobile: dropdown de pestaña principal + filtros */}
           <div className="md:hidden flex items-center gap-2 flex-wrap">
@@ -356,7 +364,7 @@ export default function HorariosModule() {
                     <SelectItem value="ALL">
                       <div className="flex items-center gap-2">
                         <LayoutGrid className="w-4 h-4" />
-                        <span>Todos los departamentos</span>
+                        <span>Todos</span>
                       </div>
                     </SelectItem>
                   )}
@@ -372,34 +380,115 @@ export default function HorariosModule() {
               </Select>
             )}
 
-            {/* Mobile: sub-pestañas de incapacidades */}
+            {/* Mobile: sub-pestañas y filtros de incapacidades */}
             {activeTab === 'incapacidades' && (
-              <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-                <button
-                  onClick={() => setIncapacidadesSubTab('mias')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                    incapacidadesSubTab === 'mias'
-                      ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                      : 'text-[#86868B] hover:text-[#1D1D1F]'
-                  )}
-                >
-                  <User className="w-4 h-4" />
-                  Mis Incapacidades
-                </button>
-                <button
-                  onClick={() => setIncapacidadesSubTab('equipo')}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                    incapacidadesSubTab === 'equipo'
-                      ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                      : 'text-[#86868B] hover:text-[#1D1D1F]'
-                  )}
-                >
-                  <Users className="w-4 h-4" />
-                  Equipo
-                </button>
-              </div>
+              <>
+                <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                  <button
+                    onClick={() => setIncapacidadesSubTab('mias')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                      incapacidadesSubTab === 'mias'
+                        ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    <User className="w-4 h-4" />
+                    Mis Incapacidades
+                  </button>
+                  <button
+                    onClick={() => setIncapacidadesSubTab('equipo')}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                      incapacidadesSubTab === 'equipo'
+                        ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    <Users className="w-4 h-4" />
+                    Equipo
+                  </button>
+                </div>
+
+                {incapacidadesSubTab === 'mias' && (
+                  <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                      <SelectValue>
+                        {{
+                          enviadas: 'Enviadas',
+                          registradas: 'Registradas',
+                          rechazadas: 'Rechazadas',
+                          historial: 'Historial',
+                        }[myIncapacidadesFilter]}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="enviadas">Enviadas</SelectItem>
+                      <SelectItem value="registradas">Registradas</SelectItem>
+                      <SelectItem value="rechazadas">Rechazadas</SelectItem>
+                      <SelectItem value="historial">Historial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {incapacidadesSubTab === 'equipo' && (
+                  <>
+                    <Select value={incapacidadesStatusFilter} onValueChange={(v) => setIncapacidadesStatusFilter(v as typeof incapacidadesStatusFilter)}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <SelectValue>
+                          {{
+                            todas: 'Todas',
+                            pendiente: 'Pendientes',
+                            verificada: 'Verificadas',
+                            registrada: 'Registradas',
+                            rechazada: 'Rechazadas',
+                          }[incapacidadesStatusFilter]}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todas">Todas</SelectItem>
+                        <SelectItem value="pendiente">Pendientes</SelectItem>
+                        <SelectItem value="verificada">Verificadas</SelectItem>
+                        <SelectItem value="registrada">Registradas</SelectItem>
+                        <SelectItem value="rechazada">Rechazadas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <SelectValue>
+                          {incapacidadesDeptFilter === 'ALL' ? (
+                            <div className="flex items-center gap-2 text-[#86868B]">
+                              <LayoutGrid className="w-4 h-4" />
+                              <span>Todos</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-[#86868B]">
+                              <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4" />
+                              <span className="truncate max-w-[100px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                            </div>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">
+                          <div className="flex items-center gap-2">
+                            <LayoutGrid className="w-4 h-4" />
+                            <span>Todos</span>
+                          </div>
+                        </SelectItem>
+                        {departmentOptions.map((dept) => (
+                          <SelectItem key={dept.code} value={dept.code}>
+                            <div className="flex items-center gap-2">
+                              <DeptIcon department={dept.code} className="w-4 h-4" />
+                              <span>{dept.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
+              </>
             )}
           </div>
 
@@ -471,7 +560,66 @@ export default function HorariosModule() {
             )}
           </div>
 
-          {/* Desktop: sub-pestañas de incapacidades */}
+          {/* Desktop: filtros de Incapacidades Equipo junto al selector principal */}
+          {activeTab === 'incapacidades' && incapacidadesSubTab === 'equipo' && (
+            <>
+              <Select value={incapacidadesStatusFilter} onValueChange={(v) => setIncapacidadesStatusFilter(v as typeof incapacidadesStatusFilter)}>
+                <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {{
+                      todas: 'Todas',
+                      pendiente: 'Pendientes',
+                      verificada: 'Verificadas',
+                      registrada: 'Registradas',
+                      rechazada: 'Rechazadas',
+                    }[incapacidadesStatusFilter]}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas</SelectItem>
+                  <SelectItem value="pendiente">Pendientes</SelectItem>
+                  <SelectItem value="verificada">Verificadas</SelectItem>
+                  <SelectItem value="registrada">Registradas</SelectItem>
+                  <SelectItem value="rechazada">Rechazadas</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectValue>
+                    {incapacidadesDeptFilter === 'ALL' ? (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Todos</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4" />
+                        <span className="truncate max-w-[120px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">
+                    <div className="flex items-center gap-2">
+                      <LayoutGrid className="w-4 h-4" />
+                      <span>Todos</span>
+                    </div>
+                  </SelectItem>
+                  {departmentOptions.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code}>
+                      <div className="flex items-center gap-2">
+                        <DeptIcon department={dept.code} className="w-4 h-4" />
+                        <span>{dept.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </>
+          )}
+
+          {/* Desktop: sub-pestañas de incapacidades + filtro Mis Incapacidades */}
           {activeTab === 'incapacidades' && (
             <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
               <button
@@ -498,11 +646,32 @@ export default function HorariosModule() {
                 <Users className="w-4 h-4" />
                 Equipo
               </button>
+              {incapacidadesSubTab === 'mias' && (
+                <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
+                  <SelectTrigger className="h-9 px-3 bg-white border-[#E5E5E7] rounded-lg hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                    <SelectValue>
+                      {{
+                        enviadas: 'Enviadas',
+                        registradas: 'Registradas',
+                        rechazadas: 'Rechazadas',
+                        historial: 'Historial',
+                      }[myIncapacidadesFilter]}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="enviadas">Enviadas</SelectItem>
+                    <SelectItem value="registradas">Registradas</SelectItem>
+                    <SelectItem value="rechazadas">Rechazadas</SelectItem>
+                    <SelectItem value="historial">Historial</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           )}
         </div>
 
         {/* Content */}
+
         {activeTab === 'mi-horario' && <MiHorarioTab incapacityDates={incapacityDates} addIncapacity={addIncapacity} getIncapacityForDate={getIncapacityForDate} />}
         {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
         {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
@@ -515,6 +684,10 @@ export default function HorariosModule() {
             activeSubTab={incapacidadesSubTab} 
             myFilter={myIncapacidadesFilter} 
             setMyFilter={setMyIncapacidadesFilter}
+            selectedDepartment={incapacidadesDeptFilter}
+            onSelectedDepartmentChange={setIncapacidadesDeptFilter}
+            statusFilter={incapacidadesStatusFilter}
+            onStatusFilterChange={setIncapacidadesStatusFilter}
             firestoreIncapacidades={incapacidades}
             verifyIncapacidad={verifyIncapacidad}
             rejectIncapacidad={rejectIncapacidad}
@@ -972,13 +1145,13 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   >
                     {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
                     {hasIncapacity && IncapacityIcon && (
-                      <div className={cn("absolute top-0.5 right-0.5 w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
-                        <IncapacityIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
+                      <div className={cn("absolute top-0.5 right-0.5 w-2.5 h-2.5 sm:w-4 sm:h-4 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
+                        <IncapacityIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
                       </div>
                     )}
                     {!hasIncapacity && hasTimeOff && TimeOffIcon && (
-                      <div className={cn("absolute top-0.5 right-0.5 w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
-                        <TimeOffIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
+                      <div className={cn("absolute top-0.5 right-0.5 w-2.5 h-2.5 sm:w-4 sm:h-4 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
+                        <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
                       </div>
                     )}
                     <span className={cn(
@@ -2222,7 +2395,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       {/* Calendario */}
       <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
         <div className="overflow-x-auto w-full">
-          <div className="grid w-full min-w-0 grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
+          <div className="grid w-full min-w-0 grid-cols-[96px_repeat(7,minmax(calc((100%_-_96px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
             {/* Header */}
             <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
               Usuario
@@ -2255,7 +2428,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                     >
                       <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
                       <div className="text-center sm:text-left">
-                        <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight">{u.name.split(' ')[0]}</p>
+                        <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
                         <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
                       </div>
                     </button>
@@ -3724,7 +3897,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
           {/* Calendario */}
           <div className="overflow-x-auto w-full">
-            <div className="grid w-full min-w-0 grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
+            <div className="grid w-full min-w-0 grid-cols-[96px_repeat(7,minmax(calc((100%_-_96px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
               {/* Header */}
               <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
                 Colaborador
@@ -3755,7 +3928,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                         />
                         <div className="text-center sm:text-left">
                           <div className="flex items-center justify-center sm:justify-start gap-1.5">
-                            <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight">{u.name.split(' ')[0]}</p>
+                            <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
                             {isCrossDept && (
                               <div 
                                 className="p-0.5 rounded bg-amber-100" 
@@ -4011,7 +4184,11 @@ function IncapacidadesTab({
   registerIncapacidad,
   undoIncapacidad: _undoIncapacidad,
   addNoteToIncapacidad,
-  addDocumentToIncapacidad
+  addDocumentToIncapacidad,
+  selectedDepartment,
+  onSelectedDepartmentChange,
+  statusFilter,
+  onStatusFilterChange,
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
@@ -4031,9 +4208,7 @@ function IncapacidadesTab({
   // Hook de Storage para subir imágenes
   const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
   
-  // Filtros para pestaña "Equipo"
-  const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
-  const [statusFilter, setStatusFilter] = useState<'todas' | 'pendiente' | 'verificada' | 'registrada' | 'rechazada'>('todas');
+  // Filtros controlados desde el header de HorariosModule
   
   const [expandedIncapacityId, setExpandedIncapacityId] = useState<string | null>(null);
   const [selectedIncapacity, setSelectedIncapacity] = useState<Incapacidad | null>(null);
@@ -4156,7 +4331,7 @@ function IncapacidadesTab({
       await verifyIncapacidad(incapacity.id!, user.id, user.name || 'Supervisor');
       
       // Cambiar filtro a 'todas' para que la incapacidad siga visible
-      setStatusFilter('todas');
+      onStatusFilterChange('todas');
     } catch (error) {
       console.error('Error al verificar incapacidad:', error);
       alert('Error al verificar la incapacidad');
@@ -4190,7 +4365,7 @@ function IncapacidadesTab({
       setIsExternalSupport(false);
       
       // Cambiar filtro a 'todas' para que la incapacidad siga visible
-      setStatusFilter('todas');
+      onStatusFilterChange('todas');
     } catch (error) {
       console.error('Error al registrar incapacidad:', error);
       alert('Error al registrar la incapacidad');
@@ -4209,7 +4384,7 @@ function IncapacidadesTab({
       setRejectionReason('');
       
       // Cambiar filtro a 'todas' para que la incapacidad siga visible
-      setStatusFilter('todas');
+      onStatusFilterChange('todas');
     } catch (error) {
       console.error('Error al rechazar incapacidad:', error);
       alert('Error al rechazar la incapacidad');
@@ -4379,34 +4554,41 @@ function IncapacidadesTab({
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const prevYear = currentYear - 1;
+
+    const daysFor = (items: typeof myIncapacidades) => items.reduce((total, inc) => {
+      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }, 0);
+
     const incapacidadesMes = myIncapacidades.filter(inc => {
       const [year, month] = inc.startDate.split('-').map(Number);
       return month - 1 === currentMonth && year === currentYear;
     });
-    
+    const incapacidadesMesAnterior = myIncapacidades.filter(inc => {
+      const [year, month] = inc.startDate.split('-').map(Number);
+      return month - 1 === prevMonth && year === prevMonthYear;
+    });
     const incapacidadesAnio = myIncapacidades.filter(inc => {
       const year = parseInt(inc.startDate.split('-')[0]);
       return year === currentYear;
     });
-    
-    const diasMes = incapacidadesMes.reduce((total, inc) => {
-      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-      const start = new Date(startYear, startMonth - 1, startDay);
-      const end = new Date(endYear, endMonth - 1, endDay);
-      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    }, 0);
-    
-    const diasAnio = incapacidadesAnio.reduce((total, inc) => {
-      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-      const start = new Date(startYear, startMonth - 1, startDay);
-      const end = new Date(endYear, endMonth - 1, endDay);
-      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    }, 0);
-    
-    return { diasMes, diasAnio };
+    const incapacidadesAnioAnterior = myIncapacidades.filter(inc => {
+      const year = parseInt(inc.startDate.split('-')[0]);
+      return year === prevYear;
+    });
+
+    return {
+      diasMes: daysFor(incapacidadesMes),
+      diasMesAnterior: daysFor(incapacidadesMesAnterior),
+      diasAnio: daysFor(incapacidadesAnio),
+      diasAnioAnterior: daysFor(incapacidadesAnioAnterior),
+    };
   }, [myIncapacidades]);
 
   // Estadísticas del departamento para "Equipo" (todas las incapacidades)
@@ -4414,246 +4596,45 @@ function IncapacidadesTab({
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const prevYear = currentYear - 1;
+
+    const daysFor = (items: typeof deptIncapacidades) => items.reduce((total, inc) => {
+      const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
+      const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
+      const start = new Date(startYear, startMonth - 1, startDay);
+      const end = new Date(endYear, endMonth - 1, endDay);
+      return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }, 0);
+
     const deptIncapacidades = incapacidades.filter(inc => {
       if (selectedDepartment !== 'ALL' && inc.userDepartment !== selectedDepartment) return false;
       return true; // Todas las incapacidades, no solo registradas
     });
-    
+
+    const inMonth = (inc: typeof deptIncapacidades[0]) => {
+      const [year, month] = inc.startDate.split('-').map(Number);
+      return month - 1 === currentMonth && year === currentYear;
+    };
+    const inPrevMonth = (inc: typeof deptIncapacidades[0]) => {
+      const [year, month] = inc.startDate.split('-').map(Number);
+      return month - 1 === prevMonth && year === prevMonthYear;
+    };
+    const inYear = (inc: typeof deptIncapacidades[0]) => parseInt(inc.startDate.split('-')[0]) === currentYear;
+    const inPrevYear = (inc: typeof deptIncapacidades[0]) => parseInt(inc.startDate.split('-')[0]) === prevYear;
+
     // Personas incapacitadas en el mes (únicas)
-    const personasMes = new Set(
-      deptIncapacidades
-        .filter(inc => {
-          const [year, month] = inc.startDate.split('-').map(Number);
-          return month - 1 === currentMonth && year === currentYear;
-        })
-        .map(inc => inc.userId)
-    ).size;
-    
-    // Días incapacitados en el año
-    const diasAnio = deptIncapacidades
-      .filter(inc => {
-        const year = parseInt(inc.startDate.split('-')[0]);
-        return year === currentYear;
-      })
-      .reduce((total, inc) => {
-        const [startYear, startMonth, startDay] = inc.startDate.split('-').map(Number);
-        const [endYear, endMonth, endDay] = inc.endDate.split('-').map(Number);
-        const start = new Date(startYear, startMonth - 1, startDay);
-        const end = new Date(endYear, endMonth - 1, endDay);
-        return total + Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      }, 0);
-    
-    return { personasMes, diasAnio };
+    const personasMes = new Set(deptIncapacidades.filter(inMonth).map(inc => inc.userId)).size;
+    const personasMesAnterior = new Set(deptIncapacidades.filter(inPrevMonth).map(inc => inc.userId)).size;
+    const diasAnio = daysFor(deptIncapacidades.filter(inYear));
+    const diasAnioAnterior = daysFor(deptIncapacidades.filter(inPrevYear));
+
+    return { personasMes, personasMesAnterior, diasAnio, diasAnioAnterior };
   }, [incapacidades, selectedDepartment]);
 
   return (
     <div className="space-y-4">
-      {/* Filtros + departamento en fila horizontal */}
-      <div className="flex items-center gap-2">
-        {activeSubTab === 'equipo' ? (
-          <>
-            {/* Mobile: dropdown de estado con iconos */}
-            <div className="md:hidden">
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {(() => {
-                      const active = [
-                        { id: 'todas', label: 'Todas', icon: LayoutGrid },
-                        { id: 'pendiente', label: 'Pendientes', icon: Clock },
-                        { id: 'verificada', label: 'Verificadas', icon: Check },
-                        { id: 'registrada', label: 'Registradas', icon: CheckCircle2 },
-                        { id: 'rechazada', label: 'Rechazadas', icon: XCircle },
-                      ].find((f) => f.id === statusFilter);
-                      const ActiveIcon = active?.icon || LayoutGrid;
-                      return (
-                        <span className="flex items-center gap-2 text-[#86868B]">
-                          <ActiveIcon className="w-4 h-4" />
-                          <span>{active?.label}</span>
-                        </span>
-                      );
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
-                    { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
-                    { id: 'verificada', label: 'Verificadas', count: counts.verificada, icon: Check },
-                    { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
-                    { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
-                  ].map((filter) => {
-                    const FilterIcon = filter.icon;
-                    return (
-                      <SelectItem key={filter.id} value={filter.id}>
-                        <span className="flex items-center gap-2">
-                          <FilterIcon className="w-4 h-4" />
-                          <span>{filter.label}</span>
-                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Desktop: botones de estado con iconos */}
-            <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
-              {[
-                { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
-                { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
-                { id: 'verificada', label: 'Verificadas', count: counts.verificada, icon: Check },
-                { id: 'registrada', label: 'Registradas', count: counts.registrada, icon: CheckCircle2 },
-                { id: 'rechazada', label: 'Rechazadas', count: counts.rechazada, icon: XCircle },
-              ].map((filter) => {
-                const FilterIcon = filter.icon;
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setStatusFilter(filter.id as typeof statusFilter)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                      statusFilter === filter.id
-                        ? 'bg-corporate text-white'
-                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                    )}
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 text-xs rounded-full',
-                        statusFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                      )}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
-                <SelectValue>
-                  {selectedDepartment === 'ALL' ? (
-                    <div className="flex items-center gap-2 text-[#86868B]">
-                      <LayoutGrid className="w-4 h-4" />
-                      <span>Todos</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[#86868B]">
-                      <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                      <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                    </div>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {canViewAllDepartments && (
-                  <SelectItem value="ALL">
-                    <div className="flex items-center gap-2">
-                      <LayoutGrid className="w-4 h-4" />
-                      <span>Todos los departamentos</span>
-                    </div>
-                  </SelectItem>
-                )}
-                {departments.map(dept => (
-                  <SelectItem key={dept.code} value={dept.code}>
-                    <div className="flex items-center gap-2">
-                      <DeptIcon department={dept.code} className="w-4 h-4" />
-                      <span>{dept.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        ) : (
-          <>
-            {/* Mobile: dropdown de estado con iconos */}
-            <div className="md:hidden">
-              <Select value={myFilter} onValueChange={(v) => setMyFilter(v as typeof myFilter)}>
-                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {(() => {
-                      const active = [
-                        { id: 'enviadas', label: 'Enviadas', icon: Send },
-                        { id: 'registradas', label: 'Registradas', icon: CheckCircle2 },
-                        { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
-                        { id: 'historial', label: 'Historial', icon: History },
-                      ].find((f) => f.id === myFilter);
-                      const ActiveIcon = active?.icon || Send;
-                      return (
-                        <span className="flex items-center gap-2 text-[#86868B]">
-                          <ActiveIcon className="w-4 h-4" />
-                          <span>{active?.label}</span>
-                        </span>
-                      );
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
-                    { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
-                    { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
-                    { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
-                  ].map((filter) => {
-                    const FilterIcon = filter.icon;
-                    return (
-                      <SelectItem key={filter.id} value={filter.id}>
-                        <span className="flex items-center gap-2">
-                          <FilterIcon className="w-4 h-4" />
-                          <span>{filter.label}</span>
-                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Desktop: botones de estado con iconos */}
-            <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
-              {[
-                { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
-                { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
-                { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
-                { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
-              ].map((filter) => {
-                const FilterIcon = filter.icon;
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setMyFilter(filter.id as typeof myFilter)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                      myFilter === filter.id
-                        ? 'bg-corporate text-white'
-                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                    )}
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 text-xs rounded-full',
-                        myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                      )}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </>
-        )}
-      </div>
-
       {/* Estadísticas */}
       <div className="flex gap-2">
         {activeSubTab === 'mias' ? (
@@ -4662,11 +4643,13 @@ function IncapacidadesTab({
               <Calendar className="w-3.5 h-3.5 text-corporate mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasMesAnterior}</span>
             </div>
             <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasAnioAnterior}</span>
             </div>
           </>
         ) : (
@@ -4675,11 +4658,13 @@ function IncapacidadesTab({
               <Users className="w-3.5 h-3.5 text-corporate mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.personasMesAnterior}</span>
             </div>
             <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.diasAnioAnterior}</span>
             </div>
           </>
         )}
@@ -5674,14 +5659,42 @@ interface TimeOffRequestsPanelProps {
   onReject: (req: TimeOffRequest) => void;
   onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string }) => void;
   onCancel: (req: TimeOffRequest) => void;
+  view?: 'mias' | 'equipo';
+  onViewChange?: (view: 'mias' | 'equipo') => void;
+  filter?: 'todas' | TimeOffRequest['status'];
+  onFilterChange?: (filter: 'todas' | TimeOffRequest['status']) => void;
+  deptFilter?: string | 'ALL';
+  onDeptFilterChange?: (dept: string | 'ALL') => void;
 }
 
-function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onApprove, onReject, onEdit, onCancel }: TimeOffRequestsPanelProps) {
+function TimeOffRequestsPanel({
+  myRequests,
+  teamRequests,
+  canApprove,
+  users,
+  onApprove,
+  onReject,
+  onEdit,
+  onCancel,
+  view: controlledView,
+  onViewChange,
+  filter: controlledFilter,
+  onFilterChange,
+  deptFilter: controlledDeptFilter,
+  onDeptFilterChange,
+}: TimeOffRequestsPanelProps) {
   const { user } = useAuth();
   const { departmentOptions } = useDynamicDepartments();
-  const [view, setView] = useState<'mias' | 'equipo'>('mias');
-  const [filter, setFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
-  const [deptFilter, setDeptFilter] = useState<string | 'ALL'>('ALL');
+  const [internalView, setInternalView] = useState<'mias' | 'equipo'>('mias');
+  const [internalFilter, setInternalFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
+  const [internalDeptFilter, setInternalDeptFilter] = useState<string | 'ALL'>('ALL');
+
+  const view = controlledView ?? internalView;
+  const setView = onViewChange ?? setInternalView;
+  const filter = controlledFilter ?? internalFilter;
+  const setFilter = onFilterChange ?? setInternalFilter;
+  const deptFilter = controlledDeptFilter ?? internalDeptFilter;
+  const setDeptFilter = onDeptFilterChange ?? setInternalDeptFilter;
 
   // Modal de edición
   const [editingRequest, setEditingRequest] = useState<TimeOffRequest | null>(null);
@@ -5706,115 +5719,8 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
 
   return (
     <div className="space-y-4">
-      {/* Vista mías/equipo: botones unitarios */}
-      {canApprove && (
-        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
-          <button
-            onClick={() => setView('mias')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <User className="w-4 h-4" />
-            Mis solicitudes
-          </button>
-          <button
-            onClick={() => setView('equipo')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-              view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <Users className="w-4 h-4" />
-            Equipo
-          </button>
-        </div>
-      )}
-
-      {/* Filtros: departamento (equipo) + estado */}
-      <div className="flex items-center gap-2">
-        {showDeptFilter && (
-          <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v as string | 'ALL')}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
-              <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
-              <SelectValue placeholder="Departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">Todos los departamentos</SelectItem>
-              {departmentOptions.map((opt) => (
-                <SelectItem key={opt.code} value={opt.code}>
-                  {opt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-
-        {/* Mobile: dropdown de estado */}
-        <div className="md:hidden">
-          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-              <SelectValue>
-                {(() => {
-                  const active = filterButtons.find((f) => f.id === filter);
-                  const count = deptFiltered.filter((r) => filter === 'todas' || r.status === filter).length;
-                  return (
-                    <span className="flex items-center gap-2 text-[#86868B]">
-                      <span>{active?.label || 'Estado'}</span>
-                      {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
-                    </span>
-                  );
-                })()}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {filterButtons.map((f) => {
-                const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
-                return (
-                  <SelectItem key={f.id} value={f.id}>
-                    <span className="flex items-center gap-2">
-                      <span>{f.label}</span>
-                      {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Desktop: botones de estado */}
-        <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
-          {filterButtons.map((f) => {
-            const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                  filter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                )}
-              >
-                {f.label}
-                {count > 0 && (
-                  <span
-                    className={cn(
-                      'px-1.5 py-0.5 text-xs rounded-full',
-                      filter === f.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                    )}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <div className="space-y-3">
+
         {filtered.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -6037,6 +5943,11 @@ function SolicitudesTab() {
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial' | 'equipo'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
   const [equipoDeptFilter, setEquipoDeptFilter] = useState<string | 'ALL'>('ALL');
+
+  // Estado para filtros de solicitudes de tiempo libre (controlados desde el header)
+  const [timeOffView, setTimeOffView] = useState<'mias' | 'equipo'>('mias');
+  const [timeOffFilter, setTimeOffFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
+  const [timeOffDeptFilter, setTimeOffDeptFilter] = useState<string | 'ALL'>('ALL');
   
   // Estado para solicitudes de tiempo libre (timeOffRequests)
   const [timeOffRequests, setTimeOffRequests] = useState<TimeOffRequest[]>([]);
@@ -6524,45 +6435,222 @@ function SolicitudesTab() {
 
   return (
     <div className="space-y-4">
-      {/* Header con pestañas */}
+      {/* Header con pestañas y filtros */}
       <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-[#1D1D1F]">Solicitudes</h3>
-            <p className="text-sm text-[#86868B]">Gestiona cambios de turno y solicitudes de tiempo libre</p>
-          </div>
+        <div className="mb-4">
+          <h3 className="text-lg font-semibold text-[#1D1D1F]">Solicitudes</h3>
+          <p className="text-sm text-[#86868B]">Gestiona cambios de turno y solicitudes de tiempo libre</p>
         </div>
 
-        {/* Pestañas principales: botones unitarios */}
-        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
-          <button
-            onClick={() => setActiveSubTab('mis-cambios')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-              activeSubTab === 'mis-cambios'
-                ? 'bg-white text-corporate shadow-sm'
-                : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <User className="w-4 h-4" />
-            Cambios
-          </button>
-          <button
-            onClick={() => setActiveSubTab('mis-solicitudes')}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
-              activeSubTab === 'mis-solicitudes'
-                ? 'bg-white text-corporate shadow-sm'
-                : 'text-[#86868B] hover:text-[#1D1D1F]'
-            )}
-          >
-            <Sun className="w-4 h-4" />
-            Solicitudes
-          </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Pestañas principales: Cambios | Solicitudes */}
+          <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+            <button
+              onClick={() => setActiveSubTab('mis-cambios')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
+                activeSubTab === 'mis-cambios'
+                  ? 'bg-white text-corporate shadow-sm'
+                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <User className="w-4 h-4" />
+              Cambios
+            </button>
+            <button
+              onClick={() => setActiveSubTab('mis-solicitudes')}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
+                activeSubTab === 'mis-solicitudes'
+                  ? 'bg-white text-corporate shadow-sm'
+                  : 'text-[#86868B] hover:text-[#1D1D1F]'
+              )}
+            >
+              <Sun className="w-4 h-4" />
+              Solicitudes
+            </button>
+          </div>
+
+          {activeSubTab === 'mis-cambios' && (
+            <>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[
+                  { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
+                  { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
+                  { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
+                  { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setMisCambiosFilter(filter.id as typeof misCambiosFilter)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
+                      misCambiosFilter === filter.id
+                        ? 'bg-corporate text-white'
+                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                    )}
+                  >
+                    <filter.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{filter.label}</span>
+                    {filter.count > 0 && (
+                      <span className={cn(
+                        'px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full',
+                        misCambiosFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                      )}>
+                        {filter.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {misCambiosFilter === 'equipo' && (
+                <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
+                    <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
+                    <SelectValue placeholder="Departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
+                    {departmentOptions.map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>
+                        {opt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </>
+          )}
+
+          {activeSubTab === 'mis-solicitudes' && (
+            <>
+              {canApproveTimeOff && (
+                <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+                  <button
+                    onClick={() => setTimeOffView('mias')}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                      timeOffView === 'mias'
+                        ? 'bg-white text-corporate shadow-sm'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    <User className="w-4 h-4" />
+                    Mis solicitudes
+                  </button>
+                  <button
+                    onClick={() => setTimeOffView('equipo')}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                      timeOffView === 'equipo'
+                        ? 'bg-white text-corporate shadow-sm'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    <Users className="w-4 h-4" />
+                    Equipo
+                  </button>
+                </div>
+              )}
+
+              {timeOffView === 'equipo' && canApproveTimeOff && (
+                <Select value={timeOffDeptFilter} onValueChange={(v) => setTimeOffDeptFilter(v as string | 'ALL')}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
+                    <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
+                    <SelectValue placeholder="Departamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">Todos</SelectItem>
+                    {departmentOptions.map((opt) => (
+                      <SelectItem key={opt.code} value={opt.code}>
+                        {opt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Filtro de estado: dropdown en móvil, botones en desktop */}
+              {(() => {
+                const effectiveView = canApproveTimeOff ? timeOffView : 'mias';
+                const requests = effectiveView === 'mias' ? myTimeOffRequests : teamTimeOffRequests;
+                const deptFilteredRequests = timeOffDeptFilter === 'ALL' ? requests : requests.filter((r) => r.department === timeOffDeptFilter);
+                const filterButtons = [
+                  { id: 'todas' as const, label: 'Todas' },
+                  { id: 'pendiente' as const, label: 'Pendientes' },
+                  { id: 'aprobada' as const, label: 'Aprobadas' },
+                  { id: 'rechazada' as const, label: 'Rechazadas' },
+                  { id: 'cancelada' as const, label: 'Canceladas' },
+                ];
+                return (
+                  <>
+                    <div className="md:hidden">
+                      <Select value={timeOffFilter} onValueChange={(v) => setTimeOffFilter(v as typeof timeOffFilter)}>
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                          <SelectValue>
+                            {(() => {
+                              const active = filterButtons.find((f) => f.id === timeOffFilter);
+                              const count = deptFilteredRequests.filter((r) => timeOffFilter === 'todas' || r.status === timeOffFilter).length;
+                              return (
+                                <span className="flex items-center gap-2 text-[#86868B]">
+                                  <span>{active?.label || 'Estado'}</span>
+                                  {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
+                                </span>
+                              );
+                            })()}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filterButtons.map((f) => {
+                            const count = deptFilteredRequests.filter((r) => f.id === 'todas' || r.status === f.id).length;
+                            return (
+                              <SelectItem key={f.id} value={f.id}>
+                                <span className="flex items-center gap-2">
+                                  <span>{f.label}</span>
+                                  {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
+                                </span>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
+                      {filterButtons.map((f) => {
+                        const count = deptFilteredRequests.filter((r) => f.id === 'todas' || r.status === f.id).length;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => setTimeOffFilter(f.id)}
+                            className={cn(
+                              'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                              timeOffFilter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                            )}
+                          >
+                            {f.label}
+                            {count > 0 && (
+                              <span className={cn(
+                                'px-1.5 py-0.5 text-xs rounded-full',
+                                timeOffFilter === f.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                              )}>
+                                {count}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </>
+          )}
         </div>
       </div>
 
       {/* Contenido según pestaña activa */}
+
       {activeSubTab === 'mis-solicitudes' ? (
         <TimeOffRequestsPanel
           myRequests={myTimeOffRequests}
@@ -6573,41 +6661,15 @@ function SolicitudesTab() {
           onReject={handleRejectTimeOff}
           onEdit={handleEditTimeOff}
           onCancel={handleCancelTimeOff}
+          view={timeOffView}
+          onViewChange={setTimeOffView}
+          filter={timeOffFilter}
+          onFilterChange={setTimeOffFilter}
+          deptFilter={timeOffDeptFilter}
+          onDeptFilterChange={setTimeOffDeptFilter}
         />
       ) : (
         <div className="space-y-4">
-          {/* Filtros para Mis Cambios: botones horizontales */}
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {[
-              { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
-              { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
-              { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
-              { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
-            ].map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => setMisCambiosFilter(filter.id as typeof misCambiosFilter)}
-                className={cn(
-                  'flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium transition-all whitespace-nowrap',
-                  misCambiosFilter === filter.id
-                    ? 'bg-corporate text-white'
-                    : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                )}
-              >
-                <filter.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <span>{filter.label}</span>
-                {filter.count > 0 && (
-                  <span className={cn(
-                    'px-1.5 py-0.5 text-[10px] sm:text-xs rounded-full',
-                    misCambiosFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                  )}>
-                    {filter.count}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-
           {misCambiosFilter !== 'equipo' ? (
             <div className="space-y-3">
               {getFilteredMisCambios().length === 0 ? (
