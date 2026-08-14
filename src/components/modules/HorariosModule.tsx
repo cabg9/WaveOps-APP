@@ -316,7 +316,7 @@ export default function HorariosModule() {
 
         {/* Tabs principales + sub-pestañas de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
-          {/* Mobile: dropdown de pestaña principal (estilo botón, ancho al contenido) */}
+          {/* Mobile: dropdown de pestaña principal + filtros */}
           <div className="md:hidden flex items-center gap-2 flex-wrap">
             <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
               <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
@@ -370,6 +370,36 @@ export default function HorariosModule() {
                   ))}
                 </SelectContent>
               </Select>
+            )}
+
+            {/* Mobile: sub-pestañas de incapacidades */}
+            {activeTab === 'incapacidades' && (
+              <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                <button
+                  onClick={() => setIncapacidadesSubTab('mias')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    incapacidadesSubTab === 'mias'
+                      ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                      : 'text-[#86868B] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  <User className="w-4 h-4" />
+                  Mis Incapacidades
+                </button>
+                <button
+                  onClick={() => setIncapacidadesSubTab('equipo')}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                    incapacidadesSubTab === 'equipo'
+                      ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                      : 'text-[#86868B] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  <Users className="w-4 h-4" />
+                  Equipo
+                </button>
+              </div>
             )}
           </div>
 
@@ -440,11 +470,10 @@ export default function HorariosModule() {
               </button>
             )}
           </div>
-          
-          {/* Sub-pestañas de incapacidades - mobile + desktop buttons */}
-          {activeTab === 'incapacidades' && (
-            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
 
+          {/* Desktop: sub-pestañas de incapacidades */}
+          {activeTab === 'incapacidades' && (
+            <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
               <button
                 onClick={() => setIncapacidadesSubTab('mias')}
                 className={cn(
@@ -941,16 +970,15 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
                     )}
                   >
-                    {/* Icono según tipo de incapacidad */}
+                    {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
                     {hasIncapacity && IncapacityIcon && (
-                      <div className={cn("absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-md", incapacityStyle?.bgColor)}>
-                        <IncapacityIcon className={cn("w-2.5 h-2.5 sm:w-3 sm:h-3", incapacityStyle?.color)} />
+                      <div className={cn("absolute top-0.5 right-0.5 w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
+                        <IncapacityIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
                       </div>
                     )}
-                    {/* Icono según tiempo libre aprobado */}
                     {!hasIncapacity && hasTimeOff && TimeOffIcon && (
-                      <div className={cn("absolute top-1 left-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-md", timeOffStyle?.bgColor)}>
-                        <TimeOffIcon className={cn("w-2.5 h-2.5 sm:w-3 sm:h-3", timeOffStyle?.color)} />
+                      <div className={cn("absolute top-0.5 right-0.5 w-3 h-3 sm:w-4 sm:h-4 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
+                        <TimeOffIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
                       </div>
                     )}
                     <span className={cn(
@@ -2192,15 +2220,15 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       </div>
 
       {/* Calendario */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
         <div className="overflow-x-auto w-full">
-          <div className="grid w-full grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
+          <div className="grid w-full min-w-0 grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
             {/* Header */}
-            <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center">
+            <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
               Usuario
             </div>
             {weekDays.map((day, i) => (
-              <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7]">
+              <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
                 <button
                   onClick={() => {
                     setSelectedHeaderDay(day);
@@ -2220,7 +2248,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
               const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
               return (
                 <div key={u.id} className="contents">
-                  <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center", rowBorder)}>
+                  <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder)}>
                     <button
                       onClick={() => handleUserClick(u)}
                       className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
@@ -2251,15 +2279,15 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                     const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
                     return (
-                      <div key={i} className={cn("p-1 sm:p-2 text-center flex items-center justify-center", rowBorder)}>
+                      <div key={i} className={cn("p-1 sm:p-2 text-center flex items-center justify-center min-w-0", rowBorder)}>
                         <button
                           onClick={() => handleDayClick(u, day)}
-                          className="w-full"
+                          className="w-full min-w-0"
                         >
-                          <div className="space-y-1">
+                          <div className="space-y-1 min-w-0">
                             {hasIncapacity && incapacityStyle ? (
                               <div className={cn(
-                                'px-2 py-1 rounded-lg text-xs font-medium border',
+                                'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
                                 incapacityStyle.bgColor,
                                 incapacityStyle.color,
                                 incapacityStyle.borderColor
@@ -2271,7 +2299,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               </div>
                             ) : hasTimeOff && timeOffStyle ? (
                               <div className={cn(
-                                'px-2 py-1 rounded-lg text-xs font-medium border',
+                                'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
                                 timeOffStyle.bgColor,
                                 timeOffStyle.color,
                                 timeOffStyle.borderColor
@@ -2287,7 +2315,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                                     <div
                                       key={idx}
                                       className={cn(
-                                        'px-2 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105',
+                                        'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-all hover:scale-105 min-w-0 break-words',
                                         isCrossDept && 'ring-1 ring-amber-400'
                                       )}
                                       style={{
@@ -2296,10 +2324,10 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                                       }}
                                       title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
                                     >
-                                      <div className="flex items-center justify-center gap-1">
-                                        {shift.name}
+                                      <div className="flex flex-wrap items-center justify-center gap-1">
+                                        <span className="break-words leading-tight">{shift.name}</span>
                                         {isCrossDept && (
-                                          <DeptIcon department={shift.department} className="w-3 h-3" />
+                                          <DeptIcon department={shift.department} className="w-3 h-3 flex-shrink-0" />
                                         )}
                                       </div>
                                       <div className="text-[9px] opacity-70">
@@ -3616,7 +3644,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
         </div>
 
         {/* Asignación de turnos - Contenedor scrollable */}
-        <div className="flex-1 w-full bg-white rounded-2xl p-4 lg:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex-1 w-full min-w-0 max-w-full bg-white rounded-2xl p-4 lg:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           {/* Header: siempre horizontal */}
           <div className="flex flex-row flex-wrap items-center justify-between gap-2 mb-4">
             <div>
@@ -3696,13 +3724,13 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
           {/* Calendario */}
           <div className="overflow-x-auto w-full">
-            <div className="grid w-full grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
+            <div className="grid w-full min-w-0 grid-cols-[72px_repeat(7,minmax(calc((100%_-_72px)/3),1fr))] sm:grid-cols-[72px_repeat(7,minmax(100px,1fr))]">
               {/* Header */}
-              <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center">
+              <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
                 Colaborador
               </div>
               {weekDays.map((day, i) => (
-                <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7]">
+                <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
                   <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
                   <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
                   <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
@@ -3716,7 +3744,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                 const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                 return (
                   <div key={u.id} className="contents">
-                    <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center", rowBorder, rowBg)}>
+                    <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder, rowBg)}>
                       <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
                         <UserAvatar
                           name={u.name}
@@ -3768,12 +3796,12 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                       const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
                       return (
-                        <div key={i} className={cn("p-1 sm:p-2 flex items-center justify-center", rowBorder, rowBg)}>
+                        <div key={i} className={cn("p-1 sm:p-2 flex items-center justify-center min-w-0", rowBorder, rowBg)}>
                           <DroppableCell id={dropId} disabled={isBlocked}>
-                            <div className="space-y-1 w-full">
+                            <div className="space-y-1 w-full min-w-0">
                               {hasTimeOff && timeOffStyle && (
                                 <div className={cn(
-                                  'px-2 py-1 rounded-lg text-xs font-medium border text-center',
+                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
                                   timeOffStyle.bgColor,
                                   timeOffStyle.color,
                                   timeOffStyle.borderColor
@@ -3783,7 +3811,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                               )}
                               {hasIncapacity && incapacityStyle && (
                                 <div className={cn(
-                                  'px-2 py-1 rounded-lg text-xs font-medium border text-center',
+                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
                                   incapacityStyle.bgColor,
                                   incapacityStyle.color,
                                   incapacityStyle.borderColor
@@ -3806,7 +3834,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                       }
                                     }}
                                     className={cn(
-                                      'px-2 py-1 rounded-lg text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105',
+                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105 min-w-0 break-words',
                                       assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
                                     )}
                                     style={{
@@ -3827,14 +3855,14 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                       ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
                                       : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
                                   >
-                                    <div className="flex items-center justify-center gap-1">
+                                    <div className="flex flex-wrap items-center justify-center gap-1">
                                       {assignment.status === AssignmentStatus.ELIMINADO && (
-                                        <Trash2 className="w-3 h-3 mr-0.5" />
+                                        <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
                                       )}
-                                      {shift.name}
+                                      <span className="break-words leading-tight">{shift.name}</span>
                                       {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
                                         <div 
-                                          className="p-0.5 rounded bg-white/70"
+                                          className="p-0.5 rounded bg-white/70 flex-shrink-0"
                                           title={shift.department.replace(/_/g, ' ')}
                                         >
                                           <DeptIcon department={shift.department} className="w-3 h-3" />
@@ -4630,12 +4658,12 @@ function IncapacidadesTab({
       <div className="flex gap-2">
         {activeSubTab === 'mias' ? (
           <>
-            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center text-center shrink-0">
+            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <Calendar className="w-3.5 h-3.5 text-corporate mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
             </div>
-            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center text-center shrink-0">
+            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
@@ -4643,12 +4671,12 @@ function IncapacidadesTab({
           </>
         ) : (
           <>
-            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center text-center shrink-0">
+            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <Users className="w-3.5 h-3.5 text-corporate mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
             </div>
-            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] w-20 h-20 sm:w-24 sm:h-24 flex flex-col items-center justify-center text-center shrink-0">
+            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
@@ -6517,7 +6545,7 @@ function SolicitudesTab() {
             )}
           >
             <User className="w-4 h-4" />
-            Sólo cambios
+            Cambios
           </button>
           <button
             onClick={() => setActiveSubTab('mis-solicitudes')}
@@ -6529,7 +6557,7 @@ function SolicitudesTab() {
             )}
           >
             <Sun className="w-4 h-4" />
-            Sólo solicitudes
+            Solicitudes
           </button>
         </div>
       </div>
