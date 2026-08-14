@@ -23,7 +23,7 @@ import {
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
   getIncidenciaStatusColor, getIncidenciaStatusLabel,
-  formatDateShort, formatDateWithYear, formatRelativeTime, formatHistoryDateTime, getInitials, generateId,
+  formatDateShort, formatDateWithYear, formatRelativeTime, formatHistoryDateTime, generateId,
 } from '@/lib/utils';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
@@ -38,7 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { users as staticUsers } from '@/data/users';
 
@@ -887,11 +887,11 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             <div className="flex -space-x-2">
               {(task.assignedTo || []).slice(0, 10).map((userId, i) => {
                 const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
-                return (<Avatar key={i} className="w-6 h-6 border-2 border-white" title={assignedUser?.name || userId}><AvatarFallback className="bg-corporate text-white text-[10px]">{assignedUser ? getInitials(assignedUser.name) : '?'}</AvatarFallback></Avatar>);
+                return (<UserAvatar key={i} name={assignedUser?.name || userId} photoUrl={assignedUser?.avatar} size="xs" className="border-2 border-white" title={assignedUser?.name || userId} />);
               })}
               {(task.supportUserIds || []).slice(0, 5).map((userId, i) => {
                 const supportUser = allUsers.find((u) => u.id === userId || u.email === userId);
-                return (<Avatar key={`s-${i}`} className="w-6 h-6 border-2 border-dashed border-blue-400" title={`Apoyo: ${supportUser?.name || userId}`}><AvatarFallback className="bg-blue-500 text-white text-[10px]">{supportUser ? getInitials(supportUser.name) : '?'}</AvatarFallback></Avatar>);
+                return (<UserAvatar key={`s-${i}`} name={supportUser?.name || userId} photoUrl={supportUser?.avatar} size="xs" className="border-2 border-dashed border-blue-400" fallbackClassName="bg-blue-500 text-[10px]" title={`Apoyo: ${supportUser?.name || userId}`} />);
               })}
               {task.assignedTo && task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
             </div>

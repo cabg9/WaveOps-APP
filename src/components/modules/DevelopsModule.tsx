@@ -9,7 +9,7 @@ import {
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save, Clock,
+  LayoutGrid, CalendarClock, Save, Clock, HeartPulse,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot,
@@ -716,6 +716,12 @@ const PERMISSION_CATEGORIES: PermCat[] = [
     {key:"canModifyShifts",label:"Modificar turnos"},{key:"canApproveChanges",label:"Aprobar cambios"},
     {key:"canRejectChanges",label:"Rechazar cambios"},{key:"canRequestChange",label:"Solicitar cambios"},
   ]},
+  { key: "incapacidades", label: "Incapacidades", icon: <HeartPulse size={16} />, perms: [
+    {key:"canViewOwnIncapacidades",label:"Ver propias"},{key:"canViewTeamIncapacidades",label:"Ver del equipo"},
+    {key:"canVerifyIncapacidad",label:"Verificar incapacidad"},{key:"canRegisterIncapacidad",label:"Registrar incapacidad"},
+    {key:"canRejectIncapacidad",label:"Rechazar incapacidad"},{key:"canRequestIncapacidadDocs",label:"Solicitar documentos"},
+    {key:"canUploadIncapacidadDocs",label:"Subir documentos"},
+  ]},
   { key: "incidents", label: "Incidencias", icon: <AlertTriangle size={16} />, perms: [
     {key:"canCreateIncidencia",label:"Crear incidencia"},{key:"canViewAllIncidencias",label:"Ver todas"},
     {key:"canViewOperationalIncidencias",label:"Ver operativas"},{key:"canViewOwnDepartmentIncidencias",label:"Ver mi departamento"},
@@ -739,6 +745,10 @@ const PERM_DESCRIPTIONS: Record<string, string> = {
   "canUnblockTask":"desbloquear tareas","canReopenTask":"reabrir tareas",
   "canViewTeam":"ver el equipo","canAssignShifts":"asignar turnos","canModifyShifts":"modificar turnos",
   "canApproveChanges":"aprobar cambios","canRejectChanges":"rechazar cambios","canRequestChange":"solicitar cambios",
+  "canViewOwnIncapacidades":"ver incapacidades propias","canViewTeamIncapacidades":"ver incapacidades del equipo",
+  "canVerifyIncapacidad":"verificar incapacidades","canRegisterIncapacidad":"registrar incapacidades",
+  "canRejectIncapacidad":"rechazar incapacidades","canRequestIncapacidadDocs":"solicitar documentos de incapacidad",
+  "canUploadIncapacidadDocs":"subir documentos de incapacidad",
   "canCreateIncidencia":"crear incidencias","canViewAllIncidencias":"ver todas las incidencias",
   "canViewOperationalIncidencias":"ver incidencias operativas","canViewOwnDepartmentIncidencias":"ver incidencias de mi departamento",
   "canConfirmIncidenciaAsManager":"confirmar incidencias como gerente","canConfirmIncidenciaAsSupervisor":"confirmar incidencias como supervisor",

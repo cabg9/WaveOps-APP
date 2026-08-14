@@ -28,7 +28,6 @@ import { useNotifications } from '@/hooks/firestore/useNotifications';
 import { useFCMToken } from '@/hooks/useFCMToken';
 import { NotificationsDrawer } from '@/components/NotificationsDrawer';
 import { useAppConfig } from '@/hooks/useAppConfig';
-import { getInitials } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
@@ -37,7 +36,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   Sheet,
   SheetContent,
@@ -230,14 +229,14 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                     </div>
                     {(() => {
                       const cached = localStorage.getItem("cachedPhotoURL");
-                      const src = user.photoURL || cached;
+                      const src = user.photoURL || user.avatar || cached;
                       return (
-                        <Avatar className="w-9 h-9 bg-corporate">
-                          {src ? <AvatarImage src={src} /> : null}
-                          <AvatarFallback className="bg-corporate text-white text-sm font-medium">
-                            {getInitials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          name={user.name}
+                          photoUrl={src}
+                          size="sm"
+                          fallbackClassName="bg-corporate text-sm font-medium"
+                        />
                       );
                     })()}
                     <ChevronDown className="w-4 h-4 text-[#86868B]" />
@@ -345,14 +344,14 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                         <div className="flex items-center gap-3">
                           {(() => {
                             const cached = localStorage.getItem("cachedPhotoURL");
-                            const src = user.photoURL || cached;
+                            const src = user.photoURL || user.avatar || cached;
                             return (
-                              <Avatar className="w-10 h-10 bg-corporate">
-                                {src ? <AvatarImage src={src} /> : null}
-                                <AvatarFallback className="bg-corporate text-white text-sm font-medium">
-                                  {getInitials(user.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar
+                                name={user.name}
+                                photoUrl={src}
+                                size="md"
+                                fallbackClassName="bg-corporate text-sm font-medium"
+                              />
                             );
                           })()}
                           <div>

@@ -42,9 +42,25 @@
   - Doble click sobre una asignación marcada como `ELIMINADO` la restaura a su estado previo.
   - El botón **Publicar** muestra contadores de borradores y eliminaciones pendientes.
   - Al publicar: las asignaciones en `BORRADOR` pasan a `PUBLICADO` y las marcadas como `ELIMINADO` se eliminan definitivamente de Firestore.
+- **Prioridad de incapacidad sobre tiempo libre**:
+  - En `Mi Horario`, `Horarios → Equipo` (calendario, tabla semanal, popup de día y vista expandida), cuando un día tiene una incapacidad registrada, ya no se muestra el badge ni la información de tiempo libre aprobado.
+- **Flujo de incapacidades y permisos**:
+  - Las tarjetas de **Incapacidades → Equipo** muestran los botones **Verificar**, **Registrar** (con reemplazo) y **Rechazar** para usuarios con permiso.
+  - El Director General tiene acceso total a estas acciones.
+  - Se agregó la categoría **Incapacidades** en **Develops → Roles y Permisos** con toggles para ver propias/equipo, verificar, registrar, rechazar y gestionar documentos.
+  - Se agregó helper `hasPermission` en `useAppConfig` que consulta los permisos del `roleTemplate` del usuario actual (con fallback a roles tradicionales).
+- **Avatares con foto de usuario**:
+  - Nuevo componente reutilizable `UserAvatar` que muestra la foto del usuario (`avatar` / `photoURL`) y usa iniciales como fallback.
+  - Reemplazo de avatares basados solo en iniciales en `HorariosModule`, `Layout`, `TasksModule` y limpieza de imports en `ProfilePage`.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/TasksModule.tsx`
+- `src/components/Layout.tsx`
+- `src/components/ProfilePage.tsx`
+- `src/components/UserAvatar.tsx` (nuevo)
+- `src/hooks/useAppConfig.ts`
 - `src/hooks/useShifts.tsx`
 - `src/hooks/firestore/useFirestoreShifts.ts`
 - `src/hooks/firestore/ShiftsProvider.tsx`

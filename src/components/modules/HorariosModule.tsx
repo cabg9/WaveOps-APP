@@ -69,6 +69,7 @@ import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users as staticUsers } from '@/data/users';
@@ -81,7 +82,7 @@ import {
   getInitials,
 } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   Select,
   SelectContent,
@@ -601,7 +602,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 
   const today = toLocalISODate(new Date());
   const todayShifts = user ? getUserShifts(userIdForShifts, today, user.email) : [];
-  const todayTimeOff = findTimeOffForDate(approvedTimeOff, today, user?.id);
+  const todayIncapacity = incapacityDates.find(i => i.date === today && i.userId === user?.id);
+  const todayTimeOff = todayIncapacity ? undefined : findTimeOffForDate(approvedTimeOff, today, user?.id);
   
   // Tasks pendientes ordenados cronológicamente
   const pendingTasks = user ? getTasksByUser(user.id)
@@ -892,7 +894,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       'w-full h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
                       isToday ? 'ring-2 ring-corporate bg-corporate/5' : 'hover:bg-[#F5F5F7]',
                       hasIncapacity && incapacityStyle?.bgColor.replace('100', '50'),
-                      hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
+                      !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
                     )}
                   >
                     {/* Icono según tipo de incapacidad */}
@@ -902,7 +904,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </div>
                     )}
                     {/* Icono según tiempo libre aprobado */}
-                    {hasTimeOff && TimeOffIcon && (
+                    {!hasIncapacity && hasTimeOff && TimeOffIcon && (
                       <div className={cn("absolute top-1.5 left-1.5 w-5 h-5 flex items-center justify-center rounded-md", timeOffStyle?.bgColor)}>
                         <TimeOffIcon className={cn("w-3 h-3", timeOffStyle?.color)} />
                       </div>
@@ -911,7 +913,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       'text-base font-semibold mb-1',
                       isToday ? 'text-corporate' : 'text-[#1D1D1F]',
                       hasIncapacity && incapacityStyle?.color,
-                      hasTimeOff && timeOffStyle?.color
+                      !hasIncapacity && hasTimeOff && timeOffStyle?.color
                     )}>
                       {date.getDate()}
                     </span>
@@ -938,7 +940,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         {incapacityStyle.label}
                       </div>
                     )}
-                    {hasTimeOff && timeOffInfo && timeOffStyle && (
+                    {!hasIncapacity && hasTimeOff && timeOffInfo && timeOffStyle && (
                       <div className={cn("mt-1 text-[10px] font-semibold", timeOffStyle.color)}>
                         {TIME_OFF_LABELS[timeOffInfo.type]}
                       </div>
@@ -968,7 +970,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </button>
                     </div>
 
-                    {timeOffInfo && (
+                    {!hasIncapacity && timeOffInfo && (
                       <div className="mb-4">
                         {(() => {
                           const style = TIME_OFF_VISUAL[timeOffInfo.type];
@@ -1598,11 +1600,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                     : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                                 )}
                               >
-                                <Avatar className="w-10 h-10">
-                                  <AvatarFallback className="bg-corporate text-white text-sm">
-                                    {getInitials(u.name)}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                                   <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -1667,11 +1665,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                     : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                                 )}
                               >
-                                <Avatar className="w-10 h-10">
-                                  <AvatarFallback className="bg-corporate text-white text-sm">
-                                    {getInitials(u.name)}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                                   <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -2200,11 +2194,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       onClick={() => handleUserClick(u)}
                       className="flex items-center gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
                     >
-                      <Avatar className="w-8 h-8">
-                        <AvatarFallback className="bg-corporate text-white text-xs">
-                          {getInitials(u.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={u.name} photoUrl={u.avatar} size="sm" />
                       <div>
                         <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                         <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -2316,11 +2306,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <div className="space-y-6">
               {/* Info principal */}
               <div className="flex items-center gap-4">
-                <Avatar className="w-16 h-16">
-                  <AvatarFallback className="bg-corporate text-white text-xl">
-                    {getInitials(selectedUser.name)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar name={selectedUser.name} photoUrl={selectedUser.avatar} size="xl" />
                 <div>
                   <h3 className="text-lg font-semibold text-[#1D1D1F]">{selectedUser.name}</h3>
                   <p className="text-sm text-[#86868B]">{selectedUser.position}</p>
@@ -2511,15 +2497,15 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               isToday ? 'ring-2 ring-corporate bg-corporate/10' : 'hover:bg-white',
                               hasShifts && 'font-medium',
                               hasIncapacity && incapacityStyle?.bgColor,
-                              hasTimeOff && timeOffStyle?.bgColor
+                              !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor
                             )}
                             style={hasShifts && !hasIncapacity && !hasTimeOff ? { color: dayShifts[0]?.color } : {}}
                           >
-                            <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color, hasTimeOff && timeOffStyle?.color)}>{date.getDate()}</span>
+                            <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color, !hasIncapacity && hasTimeOff && timeOffStyle?.color)}>{date.getDate()}</span>
                             {(hasShifts || hasTasks || hasIncapacity || hasTimeOff) && (
                               <div className="flex gap-0.5 mt-0.5">
                                 {hasIncapacity && <span className={cn("w-1.5 h-1.5 rounded-full", incapacityStyle?.bgColor.replace('100', '500'))} />}
-                                {hasTimeOff && <span className={cn("w-1.5 h-1.5 rounded-full", timeOffStyle?.bgColor.replace('100', '500'))} />}
+                                {!hasIncapacity && hasTimeOff && <span className={cn("w-1.5 h-1.5 rounded-full", timeOffStyle?.bgColor.replace('100', '500'))} />}
                                 {hasShifts && !hasIncapacity && !hasTimeOff && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
                                 {hasTasks && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                               </div>
@@ -2583,8 +2569,9 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                           {/* Tiempo libre aprobado */}
                           {(() => {
                             const dateStr = expandedDayInCalendar.toISOString().split('T')[0];
+                            const hasIncapacity = !!getIncapacityForDate(dateStr, selectedUser.id);
                             const timeOffInfo = getTimeOffForUserAndDay(selectedUser.id, expandedDayInCalendar);
-                            if (!timeOffInfo) return null;
+                            if (hasIncapacity || !timeOffInfo) return null;
                             const style = TIME_OFF_VISUAL[timeOffInfo.type];
                             const Icon = style.icon;
                             return (
@@ -2687,11 +2674,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <DialogTitle>
               {selectedDayInfo && (
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-10 h-10">
-                    <AvatarFallback className="bg-corporate text-white text-sm">
-                      {getInitials(selectedDayInfo.user.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={selectedDayInfo.user.name} photoUrl={selectedDayInfo.user.avatar} size="md" />
                   <div>
                     <p className="text-lg">{selectedDayInfo.user.name}</p>
                     <p className="text-sm font-normal text-[#86868B]">
@@ -2745,10 +2728,12 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                 );
               })()}
 
-              {/* Tiempo libre aprobado - si existe */}
+              {/* Tiempo libre aprobado - si existe y no hay incapacidad */}
               {(() => {
+                const dateStr = toLocalISODate(selectedDayInfo.date);
+                const hasIncapacity = !!getIncapacityForDate(dateStr, selectedDayInfo.user.id);
                 const timeOffInfo = getTimeOffForUserAndDay(selectedDayInfo.user.id, selectedDayInfo.date);
-                if (!timeOffInfo) return null;
+                if (hasIncapacity || !timeOffInfo) return null;
                 const style = TIME_OFF_VISUAL[timeOffInfo.type];
                 const Icon = style.icon;
                 return (
@@ -2894,11 +2879,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
               {/* Info del usuario seleccionado */}
               <div className="bg-[#F5F5F7] rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-corporate text-white">
-                      {getInitials(selectedUserForIncapacity.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar name={selectedUserForIncapacity.name} photoUrl={selectedUserForIncapacity.avatar} size="lg" />
                   <div>
                     <p className="font-medium text-[#1D1D1F]">{selectedUserForIncapacity.name}</p>
                     <p className="text-sm text-[#86868B]">{selectedUserForIncapacity.position}</p>
@@ -3189,11 +3170,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {managersOnDuty.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-corporate/5 rounded-lg px-3 py-2">
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback className="bg-corporate text-white text-[10px]">
-                                  {getInitials(user.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-corporate text-[10px]" />
                               <div>
                                 <p className="text-xs font-medium text-[#1D1D1F]">{user.name}</p>
                                 <p className="text-[10px] text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
@@ -3224,11 +3201,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                           {usersWithDifferentShifts.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center justify-between bg-purple-50 rounded-lg p-3">
                               <div className="flex items-center gap-2">
-                                <Avatar className="w-8 h-8">
-                                  <AvatarFallback className="bg-purple-500 text-white text-xs">
-                                    {getInitials(user.name)}
-                                  </AvatarFallback>
-                                </Avatar>
+                                <UserAvatar name={user.name} photoUrl={user.avatar} size="sm" fallbackClassName="bg-purple-500 text-xs" />
                                 <div>
                                   <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
                                   <p className="text-xs text-[#86868B]">{user.position}</p>
@@ -3261,11 +3234,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {groupUsers.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback className="bg-blue-500 text-white text-[10px]">
-                                  {getInitials(user.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-blue-500 text-[10px]" />
                               <span className="text-xs font-medium text-[#1D1D1F]">{user.name}</span>
                               {shifts[0]?.department !== user.department && (
                                 <DeptIcon department={shifts[0]!.department} className="w-3 h-3 text-amber-500" />
@@ -3288,11 +3257,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {freeUsers.map(({ user }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-lg px-3 py-2">
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback className="bg-[#C7C7CC] text-white text-[10px]">
-                                  {getInitials(user.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-[#C7C7CC] text-[10px]" />
                               <span className="text-xs text-[#86868B]">{user.name}</span>
                             </div>
                           ))}
@@ -3327,11 +3292,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               
                               return (
                                 <div key={u.id} className={cn("flex items-center gap-2 rounded-lg px-3 py-2", style?.bgColor)}>
-                                  <Avatar className="w-6 h-6">
-                                    <AvatarFallback className="bg-red-500 text-white text-[10px]">
-                                      {getInitials(u.name)}
-                                    </AvatarFallback>
-                                  </Avatar>
+                                  <UserAvatar name={u.name} photoUrl={u.avatar} size="xs" fallbackClassName="bg-red-500 text-[10px]" />
                                   <div>
                                     <span className={cn("text-xs font-medium", style?.color)}>{u.name}</span>
                                     <span className={cn("text-[10px] ml-1", style?.color)}>({style?.label})</span>
@@ -3721,14 +3682,13 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   )}>
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <Avatar className={cn("w-8 h-8", isCrossDept && "ring-2 ring-amber-400")}>
-                          <AvatarFallback className={cn(
-                            "text-white text-xs",
-                            isCrossDept ? "bg-amber-500" : "bg-corporate"
-                          )}>
-                            {getInitials(u.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          name={u.name}
+                          photoUrl={u.avatar}
+                          size="sm"
+                          className={cn(isCrossDept && "ring-2 ring-amber-400")}
+                          fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
+                        />
                         <div>
                           <div className="flex items-center gap-1.5">
                             <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
@@ -3998,8 +3958,18 @@ function IncapacidadesTab({
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
+  const { hasPermission } = useAppConfig();
   const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
-  
+
+  // Permisos de incapacidades (fallback a roles para compatibilidad con datos existentes)
+  const canVerifyIncapacidad = hasPermission('canVerifyIncapacidad') ||
+    user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO ||
+    user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR ||
+    user?.role === Role.DIRECTOR_GENERAL;
+  const canRegisterIncapacidad = hasPermission('canRegisterIncapacidad') || canVerifyIncapacidad;
+  const canRejectIncapacidad = hasPermission('canRejectIncapacidad') || canVerifyIncapacidad;
+  const canRequestIncapacidadDocs = hasPermission('canRequestIncapacidadDocs') || canVerifyIncapacidad;
+
   // Hook de Storage para subir imágenes
   const { uploadMultipleImages, uploading: uploadingImages } = useStorageUpload();
   
@@ -4637,10 +4607,18 @@ function IncapacidadesTab({
                 >
                   <div className="flex items-start gap-4">
                     {/* Avatar */}
-                    <div className="w-12 h-12 bg-corporate/10 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-lg font-semibold text-corporate">{incapacidad.userAvatar}</span>
-                    </div>
-                    
+                    {(() => {
+                      const incUser = users.find(u => u.id === incapacidad.userId);
+                      return (
+                        <UserAvatar
+                          name={incapacidad.userName}
+                          photoUrl={incUser?.avatar}
+                          size="lg"
+                          fallbackClassName="bg-corporate/10 text-corporate text-lg"
+                        />
+                      );
+                    })()}
+
                     {/* Info principal */}
                     <div className="flex-1 min-w-0">
                       {/* Fila superior: Nombre y Estado (MÁS VISIBLE) */}
@@ -4719,11 +4697,8 @@ function IncapacidadesTab({
                     {/* Botones de acción - SOLO en Equipo */}
                     {activeSubTab === 'equipo' && (
                       <div className="flex gap-2 mb-4 flex-wrap">
-                        {/* Botón Verificar - para Supervisor, Gerente, Director o Director General */}
-                        {incapacidad.status === 'pendiente' && 
-                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
-                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) && (
+                        {/* Botón Verificar */}
+                        {incapacidad.status === 'pendiente' && canVerifyIncapacidad && (
                           <button
                             onClick={() => handleVerify(incapacidad)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
@@ -4732,12 +4707,9 @@ function IncapacidadesTab({
                             Verificar
                           </button>
                         )}
-                        
-                        {/* Botón Registrar - para Supervisor, Gerente, Director o Director General cuando está pendiente o verificada */}
-                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && 
-                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
-                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) && (
+
+                        {/* Botón Registrar */}
+                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && canRegisterIncapacidad && (
                           <button
                             onClick={() => handleRegister(incapacidad)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
@@ -4746,12 +4718,9 @@ function IncapacidadesTab({
                             Registrar
                           </button>
                         )}
-                        
-                        {/* Botón Rechazar - para roles autorizados (siempre a la derecha) */}
-                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') &&
-                         (user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || 
-                          user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || 
-                          user?.role === Role.DIRECTOR_GENERAL) && (
+
+                        {/* Botón Rechazar */}
+                        {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && canRejectIncapacidad && (
                           <button
                             onClick={() => handleReject(incapacidad)}
                             className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors ml-auto"
@@ -4782,14 +4751,22 @@ function IncapacidadesTab({
                               ? "bg-amber-50 border-amber-200" 
                               : "bg-green-50 border-green-200"
                           )}>
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback className={cn(
-                                "text-white text-sm",
-                                incapacidad.isExternalSupport ? "bg-amber-500" : "bg-green-500"
-                              )}>
-                                {getInitials(incapacidad.replacementUserName)}
-                              </AvatarFallback>
-                            </Avatar>
+                            {(() => {
+                              const replacementUser = incapacidad.replacementUserId
+                                ? users.find(u => u.id === incapacidad.replacementUserId)
+                                : undefined;
+                              return (
+                                <UserAvatar
+                                  name={incapacidad.replacementUserName || ''}
+                                  photoUrl={replacementUser?.avatar}
+                                  size="md"
+                                  fallbackClassName={cn(
+                                    "text-sm",
+                                    incapacidad.isExternalSupport ? "bg-amber-500" : "bg-green-500"
+                                  )}
+                                />
+                              );
+                            })()}
                             <div>
                               <p className={cn(
                                 "text-sm font-medium",
@@ -4904,8 +4881,8 @@ function IncapacidadesTab({
                         <p className="text-sm text-[#86868B]">No hay documentos solicitados</p>
                       )}
                       
-                      {/* Solicitar nuevo documento - SOLO en Equipo */}
-                      {activeSubTab === 'equipo' && (
+                      {/* Solicitar nuevo documento - SOLO en Equipo con permiso */}
+                      {activeSubTab === 'equipo' && canRequestIncapacidadDocs && (
                         <div className="flex gap-2 mt-2">
                           <input
                             type="text"
@@ -5074,11 +5051,7 @@ function IncapacidadesTab({
                           : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                       )}
                     >
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-corporate text-white text-sm">
-                          {getInitials(u.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                         <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -5223,11 +5196,7 @@ function IncapacidadesTab({
                         : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                     )}
                   >
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="bg-corporate text-white text-sm">
-                        {getInitials(u.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                       <p className="text-xs text-[#86868B]">{u.position}</p>

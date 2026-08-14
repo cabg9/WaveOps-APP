@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { useAuth } from './useFirestoreAuth';
+import { Role } from '@/types';
 import type { AppModule, AppSettings, RoleTemplate } from '@/types/develops';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -187,6 +188,23 @@ export function useAppConfig() {
     [roleTemplates]
   );
 
+  // Plantilla de rol del usuario actual
+  const userRoleTemplate = useMemo(() => {
+    if (!user) return undefined;
+    return roleTemplates.find((r) => r.baseRole === user.role || r.id === user.role);
+  }, [roleTemplates, user]);
+
+  // Verificar si el usuario actual tiene un permiso específico
+  const hasPermission = useCallback(
+    (perm: string): boolean => {
+      if (!user) return false;
+      // Director General tiene acceso total
+      if (user.role === Role.DIRECTOR_GENERAL) return true;
+      return userRoleTemplate?.permissions?.includes(perm) ?? false;
+    },
+    [user, userRoleTemplate]
+  );
+
   // ═══════════════════════════════════════════════════════════════════
   // RETURN
   // ═══════════════════════════════════════════════════════════════════
@@ -201,6 +219,8 @@ export function useAppConfig() {
     // Roles
     roleTemplates,
     getRoleTemplate,
+    userRoleTemplate,
+    hasPermission,
     // Acceso
     hasDevelopAccess,
     // Funciones
