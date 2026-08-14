@@ -4612,7 +4612,12 @@ function IncapacidadesTab({
                   <div className="flex items-start gap-4">
                     {/* Avatar */}
                     {(() => {
-                      const incUser = users.find(u => u.id === incapacidad.userId);
+                      const incUser = users.find(
+                        (u) =>
+                          u.id === incapacidad.userId ||
+                          u.email === incapacidad.userId ||
+                          u.name === incapacidad.userName
+                      );
                       return (
                         <UserAvatar
                           name={incapacidad.userName}
@@ -4757,7 +4762,12 @@ function IncapacidadesTab({
                           )}>
                             {(() => {
                               const replacementUser = incapacidad.replacementUserId
-                                ? users.find(u => u.id === incapacidad.replacementUserId)
+                                ? users.find(
+                                    (u) =>
+                                      u.id === incapacidad.replacementUserId ||
+                                      u.email === incapacidad.replacementUserId ||
+                                      u.name === incapacidad.replacementUserName
+                                  )
                                 : undefined;
                               return (
                                 <UserAvatar

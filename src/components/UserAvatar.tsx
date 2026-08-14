@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { useEffect, useState } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn, getInitials } from '@/lib/utils';
 
 interface UserAvatarProps {
@@ -27,9 +27,13 @@ export function UserAvatar({
   size = 'md',
   title,
 }: UserAvatarProps) {
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>(
+  const [status, setStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>(
     photoUrl ? 'loading' : 'error'
   );
+
+  useEffect(() => {
+    setStatus(photoUrl ? 'loading' : 'error');
+  }, [photoUrl]);
 
   const showImage = photoUrl && status !== 'error';
   const showFallback = !photoUrl || status === 'error';
@@ -37,20 +41,17 @@ export function UserAvatar({
   return (
     <Avatar className={cn(sizeClasses[size], className)} title={title}>
       {showImage && (
-        <img
+        <AvatarImage
           src={photoUrl}
           alt={name}
-          className={cn(
-            'aspect-square size-full object-cover rounded-full transition-opacity duration-200',
-            status === 'loaded' ? 'opacity-100' : 'opacity-0'
-          )}
-          onLoad={() => setStatus('loaded')}
-          onError={() => setStatus('error')}
+          className="object-cover"
+          onLoadingStatusChange={(s) => setStatus(s)}
         />
       )}
       {showFallback && (
         <AvatarFallback
           className={cn('bg-corporate text-white font-semibold', fallbackClassName)}
+          delayMs={0}
         >
           {getInitials(name)}
         </AvatarFallback>

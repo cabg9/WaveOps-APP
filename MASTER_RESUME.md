@@ -56,12 +56,21 @@
   - Todos los `<UserAvatar>` dentro de `HorariosModule.tsx` ahora prefieren `photoURL` sobre `avatar`, incluyendo el modal de día del header, responsables, turnos, reemplazos, incapacidades y tarjetas de solicitudes.
   - Tarjetas de solicitudes de tiempo libre y cambios de turno en `HorariosModule.tsx` ahora muestran la foto real del usuario en lugar de un círculo con iniciales.
   - `TasksModule.tsx` y `DevelopsModule.tsx` actualizados para preferir `photoURL` sobre `avatar` en los avatares de usuarios asignados y en la tabla de usuarios.
-  - `UserAvatar` ahora carga la foto sin mostrar inicialmente las iniciales: la imagen se renderiza con transición suave y el fallback de iniciales solo aparece si la foto no existe o falla al cargar, eliminando el flash visual de iniciales.
+  - `UserAvatar` usa `AvatarImage` de Radix UI con `onLoadingStatusChange` para mostrar la foto tan pronto como esté lista; las iniciales solo aparecen como fallback cuando no hay foto o ésta falla al cargar, eliminando el flash visual de iniciales.
+  - Búsqueda de usuario robusta en tarjetas de incapacidades y reemplazos: se busca por `id`, `email` o `name` para encontrar la foto correcta aunque el `userId` guardado venga de distintas fuentes.
+- **Dashboard: tarjeta del módulo Horarios**:
+  - Muestra el turno asignado para hoy (nombre del turno en `stat1`).
+  - Si no tiene turno asignado, muestra **Stand By** en amarillo.
+  - Si tiene turno asignado y está dentro del horario, muestra el horario + ubicación/departamento y el indicador en verde.
+  - Si tiene turno asignado pero fuera del horario, muestra el horario + ubicación y el indicador en gris.
+  - Contador de solicitudes de cambio de turno recibidas (`solicitudes` colección, estado `pendiente`) en `stat2`.
+  - Los datos se leen en tiempo real desde Firestore y `useShifts`.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
 - `src/components/modules/DevelopsModule.tsx`
 - `src/components/modules/TasksModule.tsx`
+- `src/components/Dashboard.tsx`
 - `src/components/Layout.tsx`
 - `src/components/ProfilePage.tsx`
 - `src/components/UserAvatar.tsx`

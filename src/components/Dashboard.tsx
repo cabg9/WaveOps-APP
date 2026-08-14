@@ -27,6 +27,9 @@ import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
+import { useShifts } from '@/hooks/useShifts';
+import { db } from '@/firebase-config';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -129,6 +132,7 @@ export default function Dashboard() {
   const { visibleModules, hasDevelopAccess } = useAppConfig();
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
+  const { getUserShifts } = useShifts();
 
   const taskCounts = getTaskCounts();
 
@@ -138,8 +142,49 @@ export default function Dashboard() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const todayStr = getLocalDate();
-
   const userId = user?.id;
+
+  // ─── TURNO DE HOY ───
+  const todayShifts = userId ? getUserShifts(userId, todayStr) : [];
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const parseMinutes = (time: string) => {
+    const [h, m] = time.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const activeShift = todayShifts.find((s) => {
+    const start = parseMinutes(s.startTime);
+    const end = parseMinutes(s.endTime);
+    return currentMinutes >= start && currentMinutes <= end;
+  });
+  const nextShift = todayShifts.find((s) => parseMinutes(s.startTime) > currentMinutes);
+  const relevantShift = activeShift || nextShift || todayShifts[0];
+
+  // ─── SOLICITUDES DE CAMBIO RECIBIDAS ───
+  const [receivedChangeRequests, setReceivedChangeRequests] = React.useState(0);
+  React.useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'solicitudes'),
+      where('estado', '==', 'pendiente')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const count = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+        const aId = data.aId;
+        const a = data.a;
+        return (
+          aId === user.id ||
+          aId === user.email ||
+          a === user.name ||
+          a === user.email
+        );
+      }).length;
+      setReceivedChangeRequests(count);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const myTasks = userId ? tasks.filter((t) =>
     (t.assignedTo?.includes(userId)) ||
     (t.supportUserIds?.includes(userId)) ||
@@ -205,10 +250,17 @@ export default function Dashboard() {
         progress: progressPercent,
       },
       horarios: {
-        stat1: { label: 'Hoy', value: 'Despacho' },
-        stat2: { label: 'Solicitudes', value: 0 },
-        bottomText: 'Activo',
-        bottomStatus: 'active',
+        stat1: {
+          label: 'Hoy',
+          value: relevantShift ? relevantShift.name : 'Stand By',
+        },
+        stat2: { label: 'Solicitudes', value: receivedChangeRequests },
+        bottomText: relevantShift
+          ? activeShift
+            ? `Activo · ${relevantShift.startTime}-${relevantShift.endTime} · ${relevantShift.department?.replace(/_/g, ' ') || 'Dive Shop'}`
+            : `${relevantShift.startTime}-${relevantShift.endTime} · ${relevantShift.department?.replace(/_/g, ' ') || 'Dive Shop'}`
+          : 'Stand By',
+        bottomStatus: relevantShift ? (activeShift ? 'active' : 'inactive') : 'progress',
       },
       reportes: {
         stat1: { label: 'Pendientes', value: 3 },
