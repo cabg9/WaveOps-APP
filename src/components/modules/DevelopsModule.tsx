@@ -24,6 +24,7 @@ import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useInvitation } from '@/hooks/useInvitation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { UserAvatar } from '@/components/UserAvatar';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
 import { DepartamentosTab } from './DepartamentosTab';
 import { TurnosTab } from './TurnosTab';
@@ -578,9 +579,7 @@ function UsuariosTab() {
                   <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0 hover:bg-[#F5F5F7]/50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-corporate/10 flex items-center justify-center text-xs font-semibold text-corporate">
-                          {u.name?.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
-                        </div>
+                        <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" fallbackClassName="bg-corporate/10 text-corporate text-xs" />
                         <span className="text-sm font-medium text-[#1D1D1F]">{u.name}</span>
                       </div>
                     </td>

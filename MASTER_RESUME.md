@@ -44,6 +44,7 @@
   - Al publicar: las asignaciones en `BORRADOR` pasan a `PUBLICADO` y las marcadas como `ELIMINADO` se eliminan definitivamente de Firestore.
 - **Prioridad de incapacidad sobre tiempo libre**:
   - En `Mi Horario`, `Horarios → Equipo` (calendario, tabla semanal, popup de día y vista expandida), cuando un día tiene una incapacidad registrada, ya no se muestra el badge ni la información de tiempo libre aprobado.
+  - En el **modal de día del header de Horarios → Equipo**, un usuario con incapacidad ahora aparece **únicamente** en la sección de **Incapacidades**; se elimina de **Usuarios libres**, **Múltiples turnos** y **Responsables en turno**.
 - **Flujo de incapacidades y permisos**:
   - Las tarjetas de **Incapacidades → Equipo** muestran los botones **Verificar**, **Registrar** (con reemplazo) y **Rechazar** para usuarios con permiso.
   - El Director General tiene acceso total a estas acciones.
@@ -51,10 +52,11 @@
   - Se agregó helper `hasPermission` en `useAppConfig` que consulta los permisos del `roleTemplate` del usuario actual (con fallback a roles tradicionales).
 - **Avatares con foto de usuario**:
   - Nuevo componente reutilizable `UserAvatar` que muestra la foto del usuario (`avatar` / `photoURL`) y usa iniciales como fallback.
-  - Reemplazo de avatares basados solo en iniciales en `HorariosModule`, `Layout`, `TasksModule` y limpieza de imports en `ProfilePage`.
-  - Todos los `<UserAvatar>` dentro de `HorariosModule.tsx` ahora prefieren `photoURL` sobre `avatar`, incluyendo el modal de día del header, responsables, turnos, reemplazos e incapacidades.
-- **Corrección en modal de día del header de Horarios → Equipo**:
-  - Los usuarios que tienen una incapacidad registrada para ese día ya no se listan simultáneamente en **Usuarios libres**; solo aparecen en la sección de **Incapacidades**.
+  - Reemplazo de avatares basados solo en iniciales en `HorariosModule`, `Layout`, `TasksModule`, `DevelopsModule` y limpieza de imports en `ProfilePage`.
+  - Todos los `<UserAvatar>` dentro de `HorariosModule.tsx` ahora prefieren `photoURL` sobre `avatar`, incluyendo el modal de día del header, responsables, turnos, reemplazos, incapacidades y tarjetas de solicitudes.
+  - Tarjetas de solicitudes de tiempo libre y cambios de turno en `HorariosModule.tsx` ahora muestran la foto real del usuario en lugar de un círculo con iniciales.
+  - `TasksModule.tsx` y `DevelopsModule.tsx` actualizados para preferir `photoURL` sobre `avatar` en los avatares de usuarios asignados y en la tabla de usuarios.
+  - `UserAvatar` ahora carga la foto sin mostrar inicialmente las iniciales: la imagen se renderiza con transición suave y el fallback de iniciales solo aparece si la foto no existe o falla al cargar, eliminando el flash visual de iniciales.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
@@ -62,7 +64,7 @@
 - `src/components/modules/TasksModule.tsx`
 - `src/components/Layout.tsx`
 - `src/components/ProfilePage.tsx`
-- `src/components/UserAvatar.tsx` (nuevo)
+- `src/components/UserAvatar.tsx`
 - `src/hooks/useAppConfig.ts`
 - `src/hooks/useShifts.tsx`
 - `src/hooks/firestore/useFirestoreShifts.ts`

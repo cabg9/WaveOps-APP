@@ -3090,7 +3090,10 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                 const freeUsers: typeof usersWithShifts = [];
                 
                 usersWithShifts.forEach(uws => {
-                  if (uws.shifts.length === 0 && !getIncapacityForDate(dateStr, uws.user.id)) {
+                  // Si tiene incapacidad, solo se muestra en la sección de incapacidades
+                  if (getIncapacityForDate(dateStr, uws.user.id)) return;
+
+                  if (uws.shifts.length === 0) {
                     freeUsers.push(uws);
                   } else if (uws.shifts.length === 1) {
                     const shiftName = uws.shifts[0].name;
@@ -3101,10 +3104,11 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                   }
                 });
                 
-                // Encontrar responsables (gerente/supervisor) con turno ese día
+                // Encontrar responsables (gerente/supervisor) con turno ese día, excluyendo incapacitados
                 const managersOnDuty = usersWithShifts.filter(uws => 
                   (uws.user.role === Role.GERENTE_DEPARTAMENTO || uws.user.role === Role.SUPERVISOR) &&
-                  uws.shifts.length > 0
+                  uws.shifts.length > 0 &&
+                  !getIncapacityForDate(dateStr, uws.user.id)
                 );
                 
                 // Tasks del departamento
@@ -5538,13 +5542,14 @@ interface TimeOffRequestsPanelProps {
   myRequests: TimeOffRequest[];
   teamRequests: TimeOffRequest[];
   canApprove: boolean;
+  users: { id: string; name: string; avatar?: string; photoURL?: string }[];
   onApprove: (req: TimeOffRequest) => void;
   onReject: (req: TimeOffRequest) => void;
   onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string }) => void;
   onCancel: (req: TimeOffRequest) => void;
 }
 
-function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove, onReject, onEdit, onCancel }: TimeOffRequestsPanelProps) {
+function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onApprove, onReject, onEdit, onCancel }: TimeOffRequestsPanelProps) {
   const { user } = useAuth();
   const { departmentOptions } = useDynamicDepartments();
   const [view, setView] = useState<'mias' | 'equipo'>('mias');
@@ -5664,16 +5669,17 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-white">
-                      {req.userName
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')
-                        .substring(0, 2)
-                        .toUpperCase()}
-                    </span>
-                  </div>
+                  {(() => {
+                    const reqUser = users.find((u) => u.id === req.userId);
+                    return (
+                      <UserAvatar
+                        name={req.userName}
+                        photoUrl={reqUser?.photoURL || reqUser?.avatar}
+                        size="md"
+                        fallbackClassName="bg-corporate text-sm"
+                      />
+                    );
+                  })()}
                   <div>
                     <p className="text-sm font-medium text-[#1D1D1F]">{req.userName}</p>
                     <p className="text-xs text-[#86868B]">{req.department.replace(/_/g, ' ')}</p>
@@ -6396,6 +6402,7 @@ function SolicitudesTab() {
           myRequests={myTimeOffRequests}
           teamRequests={teamTimeOffRequests}
           canApprove={canApproveTimeOff}
+          users={users}
           onApprove={handleApproveTimeOff}
           onReject={handleRejectTimeOff}
           onEdit={handleEditTimeOff}
@@ -6462,9 +6469,18 @@ function SolicitudesTab() {
                     {/* Header: Avatar + Nombre + Cargo + Estado */}
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
-                          <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
-                        </div>
+                        {(() => {
+                          const displayUserId = misCambiosFilter === 'enviadas' ? solicitud.aId : solicitud.deId;
+                          const displayUser = users.find((u) => u.id === displayUserId);
+                          return (
+                            <UserAvatar
+                              name={displayName}
+                              photoUrl={displayUser?.photoURL || displayUser?.avatar}
+                              size="md"
+                              fallbackClassName="bg-corporate text-sm"
+                            />
+                          );
+                        })()}
                         <div>
                           <p className="text-sm font-medium text-[#1D1D1F]">{displayName}</p>
                           <p className="text-xs text-[#86868B]">{displayCargo || 'Voluntario'} • {displayDept || 'Dive Shop'}</p>
@@ -6724,9 +6740,17 @@ function SolicitudesTab() {
                   {/* Header: Avatar + Nombre + Cargo + Estado */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-semibold text-white">{solicitud.avatar}</span>
-                      </div>
+                      {(() => {
+                        const displayUser = users.find((u) => u.id === solicitud.deId);
+                        return (
+                          <UserAvatar
+                            name={solicitud.de}
+                            photoUrl={displayUser?.photoURL || displayUser?.avatar}
+                            size="md"
+                            fallbackClassName="bg-corporate text-sm"
+                          />
+                        );
+                      })()}
                       <div>
                         <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.de}</p>
                         <p className="text-xs text-[#86868B]">{solicitud.deCargo || 'Voluntario'} • {solicitud.deDept || 'Dive Shop'}</p>

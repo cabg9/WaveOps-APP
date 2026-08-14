@@ -1,4 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useState } from 'react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn, getInitials } from '@/lib/utils';
 
 interface UserAvatarProps {
@@ -26,22 +27,34 @@ export function UserAvatar({
   size = 'md',
   title,
 }: UserAvatarProps) {
+  const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>(
+    photoUrl ? 'loading' : 'error'
+  );
+
+  const showImage = photoUrl && status !== 'error';
+  const showFallback = !photoUrl || status === 'error';
+
   return (
     <Avatar className={cn(sizeClasses[size], className)} title={title}>
-      {photoUrl && (
-        <AvatarImage
+      {showImage && (
+        <img
           src={photoUrl}
           alt={name}
-          className="object-cover"
-          onError={(e) => {
-            // Si la imagen falla, ocultarla para que se muestren las iniciales
-            (e.target as HTMLImageElement).style.display = 'none';
-          }}
+          className={cn(
+            'aspect-square size-full object-cover rounded-full transition-opacity duration-200',
+            status === 'loaded' ? 'opacity-100' : 'opacity-0'
+          )}
+          onLoad={() => setStatus('loaded')}
+          onError={() => setStatus('error')}
         />
       )}
-      <AvatarFallback className={cn('bg-corporate text-white font-semibold', fallbackClassName)}>
-        {getInitials(name)}
-      </AvatarFallback>
+      {showFallback && (
+        <AvatarFallback
+          className={cn('bg-corporate text-white font-semibold', fallbackClassName)}
+        >
+          {getInitials(name)}
+        </AvatarFallback>
+      )}
     </Avatar>
   );
 }

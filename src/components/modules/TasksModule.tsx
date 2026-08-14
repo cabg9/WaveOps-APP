@@ -887,11 +887,11 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             <div className="flex -space-x-2">
               {(task.assignedTo || []).slice(0, 10).map((userId, i) => {
                 const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
-                return (<UserAvatar key={i} name={assignedUser?.name || userId} photoUrl={assignedUser?.avatar} size="xs" className="border-2 border-white" title={assignedUser?.name || userId} />);
+                return (<UserAvatar key={i} name={assignedUser?.name || userId} photoUrl={assignedUser?.photoURL || assignedUser?.avatar} size="xs" className="border-2 border-white" title={assignedUser?.name || userId} />);
               })}
               {(task.supportUserIds || []).slice(0, 5).map((userId, i) => {
                 const supportUser = allUsers.find((u) => u.id === userId || u.email === userId);
-                return (<UserAvatar key={`s-${i}`} name={supportUser?.name || userId} photoUrl={supportUser?.avatar} size="xs" className="border-2 border-dashed border-blue-400" fallbackClassName="bg-blue-500 text-[10px]" title={`Apoyo: ${supportUser?.name || userId}`} />);
+                return (<UserAvatar key={`s-${i}`} name={supportUser?.name || userId} photoUrl={supportUser?.photoURL || supportUser?.avatar} size="xs" className="border-2 border-dashed border-blue-400" fallbackClassName="bg-blue-500 text-[10px]" title={`Apoyo: ${supportUser?.name || userId}`} />);
               })}
               {task.assignedTo && task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
             </div>
