@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14
+> Última actualización: 2026-08-14 (refactor 100% online completado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -69,15 +69,51 @@
   - Las acciones **Aceptar**, **Rechazar** y **Deshacer** de solicitudes de cambio de turno ahora actualizan el documento correspondiente en la colección `solicitudes` de Firestore, no solo el estado local ni `localStorage`.
   - El listener en tiempo real de `solicitudes` refleja los cambios en todos los clientes conectados.
 
+## FASE 7.1: Refactor a 100% online (sin datos de negocio en localStorage)
+
+**Estado:** COMPLETADA
+
+### Funcionalidades entregadas
+- **Configuración/Settings en Firestore**:
+  - `src/components/SettingsPage.tsx` ahora lee y escribe las preferencias del usuario en el campo `settings` del documento del usuario en Firestore (`users/{uid}`).
+  - Sincronización en tiempo real con `onSnapshot`; los cambios se reflejan en todos los dispositivos conectados.
+  - Se eliminó por completo el uso de `localStorage` para guardar settings (`waveops-settings`).
+  - Escrituras protegidas contra loops: el listener ignora los snapshots generados por sus propias actualizaciones.
+- **Autenticación y avatar 100% online**:
+  - Eliminado `cachedPhotoURL` de `useFirestoreAuth.tsx`.
+  - `Layout.tsx` ya no lee foto de `localStorage`; muestra el avatar desde el usuario autenticado/Firestore.
+  - `PersistentAvatar.tsx` reescrito para usar `useAuth()` de `useFirestoreAuth` en lugar de claves `wo_*` de `localStorage`.
+- **HorariosModule sin estado local de negocio**:
+  - Eliminado `localStorage` de incapacidades (`waveops_incapacity_dates`), solicitudes enviadas (`waveops_mis_solicitudes_enviadas`) y respaldo de solicitudes (`waveops_todas_solicitudes`).
+  - La creación de solicitudes de cambio de turno genera el ID con `doc()` de Firestore desde el inicio y guarda con `setDoc()`, evitando duplicados.
+- **Decisión de arquitectura**: la app es 100% online. Datos de negocio, preferencias, autenticación y avatares se leen/escriben siempre en Firebase. `localStorage` solo se reserva para tokens técnicos del navegador si fueran estrictamente necesarios (no para datos de usuario).
+
 ### Archivos modificados
+- `src/components/SettingsPage.tsx`
+- `src/hooks/useFirestoreAuth.tsx`
+- `src/components/Layout.tsx`
+- `src/components/PersistentAvatar.tsx`
+- `src/components/modules/HorariosModule.tsx`
+
+### Restricciones respetadas
+- No se borraron datos de Firebase.
+- No se tocó el modal de "Solicitar Días Libres".
+- Sin emojis; solo íconos de `lucide-react`.
+
+---
+
+### Archivos modificados (FASE 7 completa)
 - `src/components/modules/HorariosModule.tsx`
 - `src/components/modules/DevelopsModule.tsx`
 - `src/components/modules/TasksModule.tsx`
 - `src/components/Dashboard.tsx`
 - `src/components/Layout.tsx`
 - `src/components/ProfilePage.tsx`
+- `src/components/PersistentAvatar.tsx`
+- `src/components/SettingsPage.tsx`
 - `src/components/UserAvatar.tsx`
 - `src/hooks/useAppConfig.ts`
+- `src/hooks/useFirestoreAuth.tsx`
 - `src/hooks/useShifts.tsx`
 - `src/hooks/firestore/useFirestoreShifts.ts`
 - `src/hooks/firestore/ShiftsProvider.tsx`
