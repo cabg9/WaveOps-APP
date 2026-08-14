@@ -41,6 +41,7 @@ import {
   CheckSquare,
   HeartPulse,
   Sun,
+  FileText,
   Activity,
   AlertTriangle,
   Stethoscope,
@@ -300,6 +301,7 @@ export default function HorariosModule() {
   // Estado para filtros de Mis Incapacidades
   const [myIncapacidadesFilter, setMyIncapacidadesFilter] = useState<'enviadas' | 'registradas' | 'rechazadas' | 'historial'>('enviadas');
 
+
   return (
     <Layout title="Horarios" showDate={true}>
       <div className="space-y-4">
@@ -461,6 +463,74 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const [expandedDate, setExpandedDate] = useState<string | null>(null);
   const [showIncapacityModal, setShowIncapacityModal] = useState(false);
   const [showFreeDaysModal, setShowFreeDaysModal] = useState(false);
+  const [timeOffType, setTimeOffType] = useState<'vacaciones' | 'cita_medica' | 'dia_libre' | 'otro'>('dia_libre');
+  const [timeOffStart, setTimeOffStart] = useState<string>('');
+  const [timeOffEnd, setTimeOffEnd] = useState<string>('');
+  const [timeOffMotivo, setTimeOffMotivo] = useState('');
+  const [timeOffCalendarMonth, setTimeOffCalendarMonth] = useState(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(1);
+    return d;
+  });
+
+  const handleSubmitTimeOff = async () => {
+    if (!timeOffStart) {
+      toast.error('Selecciona al menos una fecha');
+      return;
+    }
+    const endDate = timeOffEnd || timeOffStart;
+    try {
+      await addDoc(collection(db, 'timeOffRequests'), {
+        userId: user?.id || user?.id || '',
+        userName: user?.name || '',
+        department: user?.department || '',
+        type: timeOffType,
+        startDate: timeOffStart,
+        endDate: endDate,
+        reason: timeOffMotivo,
+        status: 'pendiente',
+        createdAt: serverTimestamp(),
+        reviewedBy: null,
+        reviewedAt: null,
+        response: null
+      });
+      toast.success('Solicitud enviada correctamente');
+      setTimeOffStart('');
+      setTimeOffEnd('');
+      setTimeOffMotivo('');
+      setTimeOffType('dia_libre');
+      setShowFreeDaysModal(false);
+    } catch (err) {
+      console.error('Error al enviar solicitud:', err);
+      toast.error('Error al enviar la solicitud');
+    }
+  };
+
+  const getCalendarDays = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+    const days = [];
+    for (let i = 0; i < startDayOfWeek; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  const handleDateClick = (day: number) => {
+    const year = timeOffCalendarMonth.getFullYear();
+    const month = timeOffCalendarMonth.getMonth();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (!timeOffStart || (timeOffStart && timeOffEnd) || dateStr < timeOffStart) {
+      setTimeOffStart(dateStr);
+      setTimeOffEnd('');
+    } else {
+      setTimeOffEnd(dateStr);
+    }
+  };
+
+
   const [incapacityStartDate, setIncapacityStartDate] = useState('');
   const [incapacityEndDate, setIncapacityEndDate] = useState('');
   const [incapacityType, setIncapacityType] = useState('');
@@ -1085,49 +1155,174 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
       </Dialog>
 
       {/* Modal de Solicitar Días Libres */}
-      <Dialog open={showFreeDaysModal} onOpenChange={setShowFreeDaysModal}>
-        <DialogContent className="max-w-md">
+      <Dialog open={showFreeDaysModal} onOpenChange={(open) => {
+        if (!open) {
+          setTimeOffStart('');
+          setTimeOffEnd('');
+          setTimeOffMotivo('');
+          setTimeOffType('dia_libre');
+        }
+        setShowFreeDaysModal(open);
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Solicitar Días Libres</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="bg-amber-50 rounded-lg p-3">
-              <p className="text-xs text-amber-700">
-                Estás solicitando días libres para el mes siguiente. 
-                Las solicitudes se procesarán según disponibilidad.
-              </p>
-            </div>
             <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Mes solicitado</label>
-              <div className="px-3 py-2 bg-[#F5F5F7] rounded-lg text-sm text-[#86868B]">
-                {new Date(new Date().getFullYear(), new Date().getMonth() + 1).toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Tipo de solicitud</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { key: 'vacaciones', label: 'Vacaciones', icon: Sun },
+                  { key: 'cita_medica', label: 'Cita Médica', icon: HeartPulse },
+                  { key: 'dia_libre', label: 'Día Libre', icon: CalendarDays },
+                  { key: 'otro', label: 'Otro', icon: FileText },
+                ].map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => {
+                      setTimeOffType(opt.key as any);
+                      setTimeOffStart('');
+                      setTimeOffEnd('');
+                      const d = new Date();
+                      if (opt.key !== 'vacaciones') {
+                        d.setMonth(d.getMonth() + 1);
+                      } else {
+                        d.setMonth(d.getMonth());
+                      }
+                      d.setDate(1);
+                      setTimeOffCalendarMonth(d);
+                    }}
+                    className={`p-3 rounded-xl border-2 text-sm flex flex-col items-center gap-1 transition-all ${
+                      timeOffType === opt.key
+                        ? 'border-corporate bg-corporate/5 text-corporate'
+                        : 'border-[#E5E5E7] hover:border-gray-300'
+                    }`}
+                  >
+                    <opt.icon className="w-5 h-5" />
+                    <span>{opt.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
+
             <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Fecha de inicio</label>
-              <input type="date" className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm" />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-[#1D1D1F]">
+                  {timeOffType === 'vacaciones' ? 'Selecciona fechas' : 'Selecciona fechas (próximo mes)'}
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(timeOffCalendarMonth);
+                      d.setMonth(d.getMonth() - 1);
+                      setTimeOffCalendarMonth(d);
+                    }}
+                    className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+                    disabled={timeOffType !== 'vacaciones' && timeOffCalendarMonth.getMonth() <= new Date().getMonth()}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-medium min-w-[120px] text-center">
+                    {timeOffCalendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = new Date(timeOffCalendarMonth);
+                      d.setMonth(d.getMonth() + 1);
+                      setTimeOffCalendarMonth(d);
+                    }}
+                    className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+                    disabled={timeOffType !== 'vacaciones' ? 
+                      timeOffCalendarMonth.getMonth() >= new Date().getMonth() + 1 :
+                      timeOffCalendarMonth.getFullYear() >= 2027 && timeOffCalendarMonth.getMonth() >= 11
+                    }
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {(timeOffStart || timeOffEnd) && (
+                <div className="bg-corporate/5 rounded-lg p-2 mb-2 text-center">
+                  <p className="text-sm text-corporate font-medium">
+                    {timeOffStart === timeOffEnd || !timeOffEnd
+                      ? `Día seleccionado: ${new Date(timeOffStart + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`
+                      : `Del ${new Date(timeOffStart + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} al ${new Date(timeOffEnd + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    }
+                  </p>
+                </div>
+              )}
+
+              <div className="border border-[#E5E5E7] rounded-xl p-3">
+                <div className="grid grid-cols-7 gap-1 text-center mb-1">
+                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d) => (
+                    <div key={d} className="text-xs text-[#86868B] py-1 font-medium">{d}</div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {(() => {
+                    const year = timeOffCalendarMonth.getFullYear();
+                    const month = timeOffCalendarMonth.getMonth();
+                    const days = getCalendarDays(year, month);
+                    return days.map((day, idx) => {
+                      if (!day) return <div key={idx} />;
+                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const isStart = timeOffStart === dateStr;
+                      const isEnd = timeOffEnd === dateStr;
+                      const isInRange = timeOffStart && timeOffEnd && dateStr > timeOffStart && dateStr < timeOffEnd;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => handleDateClick(day)}
+                          className={`h-8 rounded-lg text-sm transition-all ${
+                            isStart || isEnd
+                              ? 'bg-corporate text-white font-semibold'
+                              : isInRange
+                                ? 'bg-corporate/20 text-corporate'
+                                : 'hover:bg-gray-100 text-[#1D1D1F]'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+              <p className="text-xs text-[#86868B] mt-1 text-center">
+                Primer clic: fecha inicio · Segundo clic: fecha fin · Clic en fecha anterior: reinicia inicio
+              </p>
             </div>
+
             <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Fecha de fin</label>
-              <input type="date" className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm" />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Motivo (opcional)</label>
-              <textarea 
+              <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Motivo adicional (opcional)</label>
+              <textarea
+                value={timeOffMotivo}
+                onChange={(e) => setTimeOffMotivo(e.target.value)}
                 className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm min-h-[60px] resize-none"
                 placeholder="Indica el motivo de tu solicitud..."
               />
             </div>
+
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setShowFreeDaysModal(false)}>
+              <Button variant="outline" className="flex-1" onClick={() => {
+                setTimeOffStart('');
+                setTimeOffEnd('');
+                setTimeOffMotivo('');
+                setTimeOffType('dia_libre');
+                setShowFreeDaysModal(false);
+              }}>
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-corporate hover:bg-corporate/90"
-                onClick={() => {
-                  setShowFreeDaysModal(false);
-                  alert('Solicitud enviada correctamente');
-                }}
+                onClick={handleSubmitTimeOff}
+                disabled={!timeOffStart}
               >
                 Enviar solicitud
               </Button>

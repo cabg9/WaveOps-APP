@@ -58,3 +58,10 @@ exports.resetDemoData = resetDemoData;
 // Admin fixes
 const { fixRoles } = require('./src/admin/fixRoles');
 exports.fixRoles = fixRoles;
+
+// Admin utilities
+const { listCollections } = require('./src/admin/listCollections');
+exports.listCollections = listCollections;
+
+const { resetDemoDataV2 } = require('./src/admin/resetDemoDataV2');
+exports.resetDemoDataV2 = resetDemoDataV2;
