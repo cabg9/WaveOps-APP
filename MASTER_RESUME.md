@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (columna usuario angosta y scroll horizontal de días deployado)
+> Última actualización: 2026-08-14 (eliminado staticUsers de HorariosModule y ajustes responsive deployados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -186,23 +186,22 @@
 
 ## FASE 7.3: Eliminar datos hardcodeados y fallback a datos estáticos
 
-**Estado:** REGISTRADA (pendiente, no iniciada)
+**Estado:** EN PROGRESO (HorariosModule limpio; TasksModule pendiente)
 
 ### Objetivo
 Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos de `src/data/` como fuente de verdad o fallback, y migrar todo a lectura/escritura desde Firestore en tiempo real.
 
-### Problemas identificados
-- `src/data/users.ts` se usa como fallback (`firestoreUsers.length > 0 ? firestoreUsers : staticUsers`) en `HorariosModule` y `TasksModule`.
-- `TasksModule` consulta `staticUsers.find(...)` directamente en varios lugares (creación de tareas, asignación de apoyo, historial, notas, incidencias), lo que puede ocultar usuarios creados recientemente en Firestore.
-- `src/data/tasks.ts` e `src/data/incidencias.ts` contienen datos de demo que podrían importarse accidentalmente.
+### Progreso
+- **HorariosModule**: se eliminó completamente la importación de `staticUsers` y todos los fallback (`firestoreUsers.length > 0 ? firestoreUsers : staticUsers`). Ahora Equipo, Asignar, Incapacidades y Solicitudes usan exclusivamente los usuarios reales de Firestore.
+- **MiHorarioTab**: se agregó lectura de `useFirestoreUsers` para resolver el usuario actual sin depender de `staticUsers`.
+- **addIncapacity**: ahora busca el usuario en `firestoreUsers` en lugar de `staticUsers`.
 
-### Tareas futuras
-- Reemplazar todos los `staticUsers` directos en `TasksModule` por `firestoreUsers`.
-- Eliminar fallback `firestoreUsers.length > 0 ? firestoreUsers : staticUsers`; si Firestore no responde, mostrar estado de carga/error, no datos estáticos.
+### Pendiente
+- **TasksModule**: aún usa `staticUsers` en múltiples lugares (creación de tareas, asignación de apoyo, historial, notas, incidencias). Debe migrarse a `firestoreUsers`.
 - Auditar `src/data/tasks.ts` e `src/data/incidencias.ts`; eliminar si no se usan o si solo son datos de demo.
 - Mantener `src/data/shifts.ts` solo si contiene puras constantes/mapeos (iconos, nombres cortos) y no datos de negocio.
 - Verificar que no quede ningún `localStorage`/`sessionStorage` de datos de negocio.
-- Hacer build, deploy, commit y push.
+- Hacer build, deploy, commit y push cuando TasksModule también esté limpio.
 
 ### Archivos a revisar
 - `src/data/users.ts`
