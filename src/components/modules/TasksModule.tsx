@@ -331,7 +331,7 @@ export default function TasksModule() {
             else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
             else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
           }}>
-            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-11">
+            <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
               <SelectValue placeholder="Seleccionar vista" />
             </SelectTrigger>
             <SelectContent>
@@ -378,7 +378,7 @@ export default function TasksModule() {
               if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
             }
           }}>
-            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+            <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent>
@@ -429,7 +429,7 @@ export default function TasksModule() {
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* Mobile: dropdown estado */}
-          <div className="md:hidden w-full">
+          <div className="md:hidden">
             <Select value={String(statusFilter)} onValueChange={(v) => {
               if (!isIncidenciasTab) {
                 if (v === 'all') setStatusFilter('all');
@@ -439,7 +439,7 @@ export default function TasksModule() {
                 else setStatusFilter(v as IncidenciaStatus);
               }
             }}>
-              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
+              <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
                 <SelectValue placeholder="Estado" />
               </SelectTrigger>
               <SelectContent>

@@ -313,10 +313,10 @@ export default function HorariosModule() {
 
         {/* Tabs principales + sub-pestañas de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
-          {/* Mobile: dropdown de pestaña principal */}
+          {/* Mobile: dropdown de pestaña principal (estilo botón, ancho al contenido) */}
           <div className="md:hidden">
             <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-11">
+              <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
                 <SelectValue placeholder="Seleccionar sección" />
               </SelectTrigger>
               <SelectContent>
@@ -399,24 +399,10 @@ export default function HorariosModule() {
             )}
           </div>
           
-          {/* Sub-pestañas de incapacidades - mobile dropdown */}
+          {/* Sub-pestañas de incapacidades - mobile + desktop buttons */}
           {activeTab === 'incapacidades' && (
-            <div className="md:hidden">
-              <Select value={incapacidadesSubTab} onValueChange={(v) => setIncapacidadesSubTab(v as 'mias' | 'equipo')}>
-                <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
-                  <SelectValue placeholder="Seleccionar vista" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mias">Mis Incapacidades</SelectItem>
-                  <SelectItem value="equipo">Equipo</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
 
-          {/* Sub-pestañas de incapacidades - desktop buttons */}
-          {activeTab === 'incapacidades' && (
-            <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit md:ml-auto">
               <button
                 onClick={() => setIncapacidadesSubTab('mias')}
                 className={cn(
@@ -2099,20 +2085,20 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* Header: siempre horizontal */}
+      <div className="flex flex-row flex-wrap items-center justify-between gap-2">
         <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-          <SelectTrigger className="w-full sm:w-56">
+          <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
             <SelectValue>
               {selectedDepartment === 'ALL' ? (
                 <div className="flex items-center gap-2">
                   <LayoutGrid className="w-4 h-4" />
-                  <span>Todos los departamentos</span>
+                  <span>Todos</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
                   <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                  <span>{selectedDepartment.replace(/_/g, ' ')}</span>
+                  <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
                 </div>
               )}
             </SelectValue>
@@ -2137,42 +2123,32 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
           </SelectContent>
         </Select>
 
-        <div className="flex items-center justify-between sm:justify-end gap-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setWeekOffset(prev => prev - 1)}
-              className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setWeekOffset(0)}
-              className="px-3 py-1.5 text-sm font-medium text-corporate hover:bg-corporate/5 rounded-lg"
-            >
-              Hoy
-            </button>
-            <button
-              onClick={() => setWeekOffset(prev => prev + 1)}
-              className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="text-right hidden sm:block">
-            <div className="flex items-center gap-2 text-[#1D1D1F]">
-              <Users className="w-4 h-4" />
-              <span className="font-medium">Turnos de equipo</span>
-            </div>
-            <p className="text-xs text-[#86868B]">{formatWeekRange(weekStart, addDays(weekStart, 6))}</p>
-          </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setWeekOffset(prev => prev - 1)}
+            className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setWeekOffset(0)}
+            className="px-3 py-1.5 text-sm font-medium text-corporate hover:bg-corporate/5 rounded-lg"
+          >
+            Hoy
+          </button>
+          <button
+            onClick={() => setWeekOffset(prev => prev + 1)}
+            className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
       {/* Tabla */}
-      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] max-w-full">
+        <div className="overflow-x-auto max-w-full">
+          <table className="min-w-max">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
                 <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
@@ -3542,7 +3518,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
           
           <div className="mb-3 lg:mb-4">
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
                     <div className="flex items-center gap-2">
@@ -3591,25 +3567,25 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
         {/* Asignación de turnos - Contenedor scrollable */}
         <div className="flex-1 w-full bg-white rounded-2xl p-4 lg:p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          {/* Header */}
-          <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-4">
+          {/* Header: siempre horizontal */}
+          <div className="flex flex-row flex-wrap items-center justify-between gap-2 mb-4">
             <div>
-              <h3 className="font-medium text-[#1D1D1F]">Asignación de turnos</h3>
+              <h3 className="font-medium text-[#1D1D1F] text-sm">Asignación de turnos</h3>
               <p className="text-xs text-[#86868B]">{formatWeekRange(weekStart, addDays(weekStart, 6))}</p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 text-sm text-[#86868B]">
-                <Users className="w-4 h-4" />
-                <span>{allVisibleUsers.length} colaboradores</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 text-xs text-[#86868B] mr-1">
+                <Users className="w-3.5 h-3.5" />
+                <span>{allVisibleUsers.length}</span>
                 {crossDeptUsers.length > 0 && (
-                  <span className="text-xs text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                    +{crossDeptUsers.length} de otros deptos
+                  <span className="text-[10px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded">
+                    +{crossDeptUsers.length}
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => setWeekOffset(prev => prev - 1)}
                   className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
@@ -3669,8 +3645,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
           </div>
 
           {/* Tabla */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto max-w-full">
+            <table className="min-w-max">
               <thead>
                 <tr className="border-b border-[#E5E5E7]">
                   <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
@@ -4401,12 +4377,11 @@ function IncapacidadesTab({
 
   return (
     <div className="space-y-4">
-      {/* CONTENEDOR: responsive - en movil apilado, en desktop grid de 4 */}
-      <div className="space-y-3 lg:grid lg:grid-cols-4 lg:gap-3 lg:space-y-0">
-        {/* Celdas 1-2: Filtros (unidas en desktop) */}
-        <div className="lg:col-span-2 min-w-0">
-          {activeSubTab === 'equipo' ? (
-            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
+      {/* Filtros + departamento en fila horizontal */}
+      <div className="flex items-center gap-2">
+        {activeSubTab === 'equipo' ? (
+          <>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
               {[
                 { id: 'todas', label: 'Todas', count: counts.todas, icon: LayoutGrid },
                 { id: 'pendiente', label: 'Pendientes', count: counts.pendiente, icon: Clock },
@@ -4440,49 +4415,8 @@ function IncapacidadesTab({
                 );
               })}
             </div>
-          ) : (
-            /* Filtros para Mis Incapacidades */
-            <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
-              {[
-                { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
-                { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
-                { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
-                { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
-              ].map((filter) => {
-                const FilterIcon = filter.icon;
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setMyFilter(filter.id as typeof myFilter)}
-                    className={cn(
-                      'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                      myFilter === filter.id
-                        ? 'bg-corporate text-white'
-                        : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                    )}
-                  >
-                    <FilterIcon className="w-4 h-4" />
-                    {filter.label}
-                    {filter.count > 0 && (
-                      <span className={cn(
-                        'px-1.5 py-0.5 text-xs rounded-full',
-                        myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                      )}>
-                        {filter.count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        
-        {/* Selector de departamento */}
-        <div className="min-w-0">
-          {activeSubTab === 'equipo' ? (
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="w-full h-10">
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
                 <SelectValue>
                   {selectedDepartment === 'ALL' ? (
                     <div className="flex items-center gap-2">
@@ -4492,7 +4426,7 @@ function IncapacidadesTab({
                   ) : (
                     <div className="flex items-center gap-2">
                       <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                      <span className="truncate">{selectedDepartment.replace(/_/g, ' ')}</span>
+                      <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
                     </div>
                   )}
                 </SelectValue>
@@ -4516,62 +4450,93 @@ function IncapacidadesTab({
                 ))}
               </SelectContent>
             </Select>
-          ) : (
-            /* Espacio reservado para Mis Incapacidades */
-            <div className="h-10" />
-          )}
-        </div>
-        
-        {/* Estadísticas */}
-        <div className="flex gap-2 h-auto lg:h-10 items-stretch lg:items-center lg:justify-end">
-          {activeSubTab === 'mias' ? (
-            <>
-              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-full lg:w-[160px]">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="w-3 h-3 text-corporate" />
-                  <span className="text-[10px] text-[#86868B]">Este mes</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
-                  <span className="text-[10px] text-[#86868B]">días</span>
-                </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
+            {[
+              { id: 'enviadas', label: 'Enviadas', count: myIncapacidades.filter(i => i.status === 'pendiente').length, icon: Send },
+              { id: 'registradas', label: 'Registradas', count: myIncapacidades.filter(i => i.status === 'registrada').length, icon: CheckCircle2 },
+              { id: 'rechazadas', label: 'Rechazadas', count: myIncapacidades.filter(i => i.status === 'rechazada').length, icon: XCircle },
+              { id: 'historial', label: 'Historial', count: myIncapacidades.length, icon: History },
+            ].map((filter) => {
+              const FilterIcon = filter.icon;
+              return (
+                <button
+                  key={filter.id}
+                  onClick={() => setMyFilter(filter.id as typeof myFilter)}
+                  className={cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                    myFilter === filter.id
+                      ? 'bg-corporate text-white'
+                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                  )}
+                >
+                  <FilterIcon className="w-4 h-4" />
+                  {filter.label}
+                  {filter.count > 0 && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 text-xs rounded-full',
+                      myFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                    )}>
+                      {filter.count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Estadísticas */}
+      <div className="flex gap-2">
+        {activeSubTab === 'mias' ? (
+          <>
+            <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] flex-1">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3 h-3 text-corporate" />
+                <span className="text-[10px] text-[#86868B]">Este mes</span>
               </div>
-              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-full lg:w-[160px]">
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="w-3 h-3 text-green-600" />
-                  <span className="text-[10px] text-[#86868B]">Este año</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
-                  <span className="text-[10px] text-[#86868B]">días</span>
-                </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
+                <span className="text-[10px] text-[#86868B]">días</span>
               </div>
-            </>
-          ) : (
-            <>
-              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-full lg:w-[160px]">
-                <div className="flex items-center gap-1.5">
-                  <Users className="w-3 h-3 text-corporate" />
-                  <span className="text-[10px] text-[#86868B]">Este mes</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
-                  <span className="text-[10px] text-[#86868B]">personas</span>
-                </div>
+            </div>
+            <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] flex-1">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-3 h-3 text-green-600" />
+                <span className="text-[10px] text-[#86868B]">Este año</span>
               </div>
-              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-full lg:w-[160px]">
-                <div className="flex items-center gap-1.5">
-                  <CalendarDays className="w-3 h-3 text-green-600" />
-                  <span className="text-[10px] text-[#86868B]">Este año</span>
-                </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
-                  <span className="text-[10px] text-[#86868B]">días</span>
-                </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
+                <span className="text-[10px] text-[#86868B]">días</span>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] flex-1">
+              <div className="flex items-center gap-1.5">
+                <Users className="w-3 h-3 text-corporate" />
+                <span className="text-[10px] text-[#86868B]">Este mes</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
+                <span className="text-[10px] text-[#86868B]">personas</span>
+              </div>
+            </div>
+            <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] flex-1">
+              <div className="flex items-center gap-1.5">
+                <CalendarDays className="w-3 h-3 text-green-600" />
+                <span className="text-[10px] text-[#86868B]">Este año</span>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
+                <span className="text-[10px] text-[#86868B]">días</span>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Lista de incapacidades */}
@@ -5595,52 +5560,38 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
 
   return (
     <div className="space-y-4">
-      {/* Vista mías/equipo */}
+      {/* Vista mías/equipo: botones unitarios */}
       {canApprove && (
-        <>
-          {/* Mobile: dropdown */}
-          <div className="md:hidden">
-            <Select value={view} onValueChange={(v) => setView(v as 'mias' | 'equipo')}>
-              <SelectTrigger className="w-full bg-[#F5F5F7] border-[#E5E5E7] h-11">
-                <SelectValue placeholder="Seleccionar vista" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mias">Mis solicitudes</SelectItem>
-                <SelectItem value="equipo">Equipo</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Desktop: botones */}
-          <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
-            <button
-              onClick={() => setView('mias')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-              )}
-            >
-              <User className="w-4 h-4" />
-              Mis solicitudes
-            </button>
-            <button
-              onClick={() => setView('equipo')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
-              )}
-            >
-              <Users className="w-4 h-4" />
-              Equipo
-            </button>
-          </div>
-        </>
+        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+          <button
+            onClick={() => setView('mias')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <User className="w-4 h-4" />
+            Mis solicitudes
+          </button>
+          <button
+            onClick={() => setView('equipo')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <Users className="w-4 h-4" />
+            Equipo
+          </button>
+        </div>
       )}
 
-      <div className="flex flex-col md:flex-row gap-2">
+      {/* Filtros en fila horizontal */}
+      <div className="flex items-center gap-2">
         {showDeptFilter && (
           <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v as string | 'ALL')}>
-            <SelectTrigger className="w-full md:w-[180px] bg-white border-[#E5E5E7]">
-              <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
+              <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
               <SelectValue placeholder="Departamento" />
             </SelectTrigger>
             <SelectContent>
@@ -5654,27 +5605,7 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
           </Select>
         )}
 
-        {/* Mobile: dropdown de estado */}
-        <div className="md:hidden flex-1">
-          <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {filterButtons.map((f) => {
-                const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
-                return (
-                  <SelectItem key={f.id} value={f.id}>
-                    {f.label} ({count})
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Desktop: botones de estado */}
-        <div className="hidden md:flex gap-2 overflow-x-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
           {filterButtons.map((f) => {
             const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
             return (
@@ -5682,7 +5613,7 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                  'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
                   filter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
                 )}
               >
@@ -6422,26 +6353,12 @@ function SolicitudesTab() {
           </div>
         </div>
 
-        {/* Pestañas principales */}
-        {/* Mobile: dropdown */}
-        <div className="md:hidden">
-          <Select value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as typeof activeSubTab)}>
-            <SelectTrigger className="w-full bg-[#F5F5F7] border-[#E5E5E7] h-11">
-              <SelectValue placeholder="Seleccionar tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mis-cambios">Mis cambios</SelectItem>
-              <SelectItem value="mis-solicitudes">Mis solicitudes</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Desktop: botones */}
-        <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
+        {/* Pestañas principales: botones unitarios */}
+        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl">
           <button
             onClick={() => setActiveSubTab('mis-cambios')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
               activeSubTab === 'mis-cambios'
                 ? 'bg-white text-corporate shadow-sm'
                 : 'text-[#86868B] hover:text-[#1D1D1F]'
@@ -6453,7 +6370,7 @@ function SolicitudesTab() {
           <button
             onClick={() => setActiveSubTab('mis-solicitudes')}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
               activeSubTab === 'mis-solicitudes'
                 ? 'bg-white text-corporate shadow-sm'
                 : 'text-[#86868B] hover:text-[#1D1D1F]'
@@ -6479,24 +6396,8 @@ function SolicitudesTab() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Filtros para Mis Cambios */}
-          {/* Mobile: dropdown */}
-          <div className="md:hidden">
-            <Select value={misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
-              <SelectTrigger className="w-full bg-white border-[#E5E5E7] h-10">
-                <SelectValue placeholder="Filtrar solicitudes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recibidas">Recibidas ({misCambiosCounts.recibidas})</SelectItem>
-                <SelectItem value="enviadas">Enviadas ({misCambiosCounts.enviadas})</SelectItem>
-                <SelectItem value="historial">Historial ({misCambiosCounts.historialCount})</SelectItem>
-                <SelectItem value="equipo">Equipo ({equipoCounts.todas})</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Desktop: botones */}
-          <div className="hidden md:flex gap-2 overflow-x-auto pb-1">
+          {/* Filtros para Mis Cambios: botones horizontales */}
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {[
               { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
               { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
@@ -6757,11 +6658,11 @@ function SolicitudesTab() {
       ) : (
         <div className="space-y-4">
           {/* Filtros para Equipo */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="flex flex-row items-center gap-2">
             {/* Selector de departamento */}
             <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-white border-[#E5E5E7]">
-                <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0">
+                <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
               <SelectContent>
