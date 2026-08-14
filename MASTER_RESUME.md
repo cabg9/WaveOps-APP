@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (dropdowns móviles en Horarios y Tasks deployados)
+> Última actualización: 2026-08-14 (filtros horizontales y selects tipo botón deployados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -143,6 +143,11 @@
   - Tarjetas de solicitudes pasan a 1 columna en móvil.
   - Tablas de Equipo y Asignar con primera columna sticky al hacer scroll horizontal.
   - **Dropdowns en móvil**: pestañas principales (Mi Horario, Equipo, Asignar, Solicitudes, Incapacidades), sub-pestañas de Incapacidades, filtros de Mis Cambios (Recibidas, Enviadas, Historial, Equipo) y controles de Solicitudes (Mis solicitudes / Equipo, filtro de estado) se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
+  - **Ajustes finales de filtros**:
+    - Todos los selects ahora se ajustan al contenido (`w-fit`) y usan estilo de botón con `rounded-xl`, borde suave y hover, en lugar de ocupar todo el ancho.
+    - En **Solicitudes**, las pestañas Mis Cambios / Mis solicitudes y los filtros Recibidas / Enviadas / Historial / Equipo se muestran como botones horizontales en móvil.
+    - En **Incapacidades**, las pestañas Mis Incapacidades / Equipo y los filtros de estado son botones horizontales; el selector de departamento comparte fila con los filtros.
+    - En **Equipo** y **Asignar**, el selector de departamento y los controles de semana están en una fila horizontal; las tablas usan `max-w-full overflow-x-auto` y `min-w-max` para evitar que el scroll horizontal desborde toda la página.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
@@ -151,6 +156,7 @@
   - Detalle de tarea, departamentos y apoyo en 1 columna en móvil.
   - Foto maximizada de incidencia ajustada al viewport.
   - **Dropdowns en móvil**: pestañas principales (Mis Tareas, Mi Departamento, Todas, Incidencias), filtro de tiempo y filtro de estado se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
+  - **Ajustes finales de selects**: los dropdowns de pestaña, periodo y estado ahora se ajustan al contenido y usan el mismo estilo de botón redondeado que Horarios.
 - **DevelopsModule**:
   - Tarjetas de módulos, roles, papelera y usuarios con layout apilado en móvil.
   - Modal de usuario usa `max-w-[95vw] sm:max-w-lg`.
