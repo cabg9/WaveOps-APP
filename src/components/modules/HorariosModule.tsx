@@ -1600,7 +1600,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                     : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                                 )}
                               >
-                                <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
+                                <UserAvatar name={u.name} photoUrl={(u as any).photoURL || u.avatar} size="md" />
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                                   <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -1665,7 +1665,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                     : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                                 )}
                               >
-                                <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
+                                <UserAvatar name={u.name} photoUrl={(u as any).photoURL || u.avatar} size="md" />
                                 <div className="flex-1">
                                   <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                                   <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -2194,7 +2194,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       onClick={() => handleUserClick(u)}
                       className="flex items-center gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
                     >
-                      <UserAvatar name={u.name} photoUrl={u.avatar} size="sm" />
+                      <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
                       <div>
                         <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                         <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -2306,7 +2306,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <div className="space-y-6">
               {/* Info principal */}
               <div className="flex items-center gap-4">
-                <UserAvatar name={selectedUser.name} photoUrl={selectedUser.avatar} size="xl" />
+                <UserAvatar name={selectedUser.name} photoUrl={selectedUser.photoURL || selectedUser.avatar} size="xl" />
                 <div>
                   <h3 className="text-lg font-semibold text-[#1D1D1F]">{selectedUser.name}</h3>
                   <p className="text-sm text-[#86868B]">{selectedUser.position}</p>
@@ -2674,7 +2674,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <DialogTitle>
               {selectedDayInfo && (
                 <div className="flex items-center gap-3">
-                  <UserAvatar name={selectedDayInfo.user.name} photoUrl={selectedDayInfo.user.avatar} size="md" />
+                  <UserAvatar name={selectedDayInfo.user.name} photoUrl={selectedDayInfo.user.photoURL || selectedDayInfo.user.avatar} size="md" />
                   <div>
                     <p className="text-lg">{selectedDayInfo.user.name}</p>
                     <p className="text-sm font-normal text-[#86868B]">
@@ -2879,7 +2879,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
               {/* Info del usuario seleccionado */}
               <div className="bg-[#F5F5F7] rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <UserAvatar name={selectedUserForIncapacity.name} photoUrl={selectedUserForIncapacity.avatar} size="lg" />
+                  <UserAvatar name={selectedUserForIncapacity.name} photoUrl={selectedUserForIncapacity.photoURL || selectedUserForIncapacity.avatar} size="lg" />
                   <div>
                     <p className="font-medium text-[#1D1D1F]">{selectedUserForIncapacity.name}</p>
                     <p className="text-sm text-[#86868B]">{selectedUserForIncapacity.position}</p>
@@ -3090,7 +3090,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                 const freeUsers: typeof usersWithShifts = [];
                 
                 usersWithShifts.forEach(uws => {
-                  if (uws.shifts.length === 0) {
+                  if (uws.shifts.length === 0 && !getIncapacityForDate(dateStr, uws.user.id)) {
                     freeUsers.push(uws);
                   } else if (uws.shifts.length === 1) {
                     const shiftName = uws.shifts[0].name;
@@ -3170,7 +3170,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {managersOnDuty.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-corporate/5 rounded-lg px-3 py-2">
-                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-corporate text-[10px]" />
+                              <UserAvatar name={user.name} photoUrl={user.photoURL || user.avatar} size="xs" fallbackClassName="bg-corporate text-[10px]" />
                               <div>
                                 <p className="text-xs font-medium text-[#1D1D1F]">{user.name}</p>
                                 <p className="text-[10px] text-[#86868B]">{user.role.replace(/_/g, ' ')}</p>
@@ -3201,7 +3201,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                           {usersWithDifferentShifts.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center justify-between bg-purple-50 rounded-lg p-3">
                               <div className="flex items-center gap-2">
-                                <UserAvatar name={user.name} photoUrl={user.avatar} size="sm" fallbackClassName="bg-purple-500 text-xs" />
+                                <UserAvatar name={user.name} photoUrl={user.photoURL || user.avatar} size="sm" fallbackClassName="bg-purple-500 text-xs" />
                                 <div>
                                   <p className="text-sm font-medium text-[#1D1D1F]">{user.name}</p>
                                   <p className="text-xs text-[#86868B]">{user.position}</p>
@@ -3234,7 +3234,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {groupUsers.map(({ user, shifts }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
-                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-blue-500 text-[10px]" />
+                              <UserAvatar name={user.name} photoUrl={user.photoURL || user.avatar} size="xs" fallbackClassName="bg-blue-500 text-[10px]" />
                               <span className="text-xs font-medium text-[#1D1D1F]">{user.name}</span>
                               {shifts[0]?.department !== user.department && (
                                 <DeptIcon department={shifts[0]!.department} className="w-3 h-3 text-amber-500" />
@@ -3257,7 +3257,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         <div className="flex flex-wrap gap-2">
                           {freeUsers.map(({ user }) => (
                             <div key={user.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-lg px-3 py-2">
-                              <UserAvatar name={user.name} photoUrl={user.avatar} size="xs" fallbackClassName="bg-[#C7C7CC] text-[10px]" />
+                              <UserAvatar name={user.name} photoUrl={user.photoURL || user.avatar} size="xs" fallbackClassName="bg-[#C7C7CC] text-[10px]" />
                               <span className="text-xs text-[#86868B]">{user.name}</span>
                             </div>
                           ))}
@@ -3292,7 +3292,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               
                               return (
                                 <div key={u.id} className={cn("flex items-center gap-2 rounded-lg px-3 py-2", style?.bgColor)}>
-                                  <UserAvatar name={u.name} photoUrl={u.avatar} size="xs" fallbackClassName="bg-red-500 text-[10px]" />
+                                  <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="xs" fallbackClassName="bg-red-500 text-[10px]" />
                                   <div>
                                     <span className={cn("text-xs font-medium", style?.color)}>{u.name}</span>
                                     <span className={cn("text-[10px] ml-1", style?.color)}>({style?.label})</span>
@@ -3684,7 +3684,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                       <div className="flex items-center gap-3">
                         <UserAvatar
                           name={u.name}
-                          photoUrl={u.avatar}
+                          photoUrl={u.photoURL || u.avatar}
                           size="sm"
                           className={cn(isCrossDept && "ring-2 ring-amber-400")}
                           fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
@@ -4612,7 +4612,7 @@ function IncapacidadesTab({
                       return (
                         <UserAvatar
                           name={incapacidad.userName}
-                          photoUrl={incUser?.avatar}
+                          photoUrl={incUser?.photoURL || incUser?.avatar}
                           size="lg"
                           fallbackClassName="bg-corporate/10 text-corporate text-lg"
                         />
@@ -4758,7 +4758,7 @@ function IncapacidadesTab({
                               return (
                                 <UserAvatar
                                   name={incapacidad.replacementUserName || ''}
-                                  photoUrl={replacementUser?.avatar}
+                                  photoUrl={replacementUser?.photoURL || replacementUser?.avatar}
                                   size="md"
                                   fallbackClassName={cn(
                                     "text-sm",
@@ -5051,7 +5051,7 @@ function IncapacidadesTab({
                           : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                       )}
                     >
-                      <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
+                      <UserAvatar name={u.name} photoUrl={(u as any).photoURL || u.avatar} size="md" />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                         <p className="text-xs text-[#86868B]">{u.position}</p>
@@ -5196,7 +5196,7 @@ function IncapacidadesTab({
                         : 'border-[#E5E5E7] bg-white hover:border-[#C7C7CC]'
                     )}
                   >
-                    <UserAvatar name={u.name} photoUrl={u.avatar} size="md" />
+                    <UserAvatar name={u.name} photoUrl={(u as any).photoURL || u.avatar} size="md" />
                     <div className="flex-1">
                       <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
                       <p className="text-xs text-[#86868B]">{u.position}</p>

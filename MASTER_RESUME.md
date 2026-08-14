@@ -52,6 +52,9 @@
 - **Avatares con foto de usuario**:
   - Nuevo componente reutilizable `UserAvatar` que muestra la foto del usuario (`avatar` / `photoURL`) y usa iniciales como fallback.
   - Reemplazo de avatares basados solo en iniciales en `HorariosModule`, `Layout`, `TasksModule` y limpieza de imports en `ProfilePage`.
+  - Todos los `<UserAvatar>` dentro de `HorariosModule.tsx` ahora prefieren `photoURL` sobre `avatar`, incluyendo el modal de día del header, responsables, turnos, reemplazos e incapacidades.
+- **Corrección en modal de día del header de Horarios → Equipo**:
+  - Los usuarios que tienen una incapacidad registrada para ese día ya no se listan simultáneamente en **Usuarios libres**; solo aparecen en la sección de **Incapacidades**.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
