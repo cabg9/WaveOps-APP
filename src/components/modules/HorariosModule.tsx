@@ -56,6 +56,7 @@ import {
   FileImage,
   XCircle,
   Download,
+  Pencil,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -66,7 +67,7 @@ import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
-import { Shift, ShiftAssignment, AssignmentStatus, Role } from '@/types';
+import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType } from '@/types';
 import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
 import { users as staticUsers } from '@/data/users';
 import {
@@ -106,6 +107,7 @@ import {
 import { 
   collection, 
   query, 
+  where,
   orderBy, 
   onSnapshot, 
   doc, 
@@ -556,8 +558,47 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
     localStorage.setItem('waveops_mis_solicitudes_enviadas', JSON.stringify(misSolicitudesEnviadas));
   }, [misSolicitudesEnviadas]);
 
+  // Solicitudes de tiempo libre aprobadas para el usuario actual
+  const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
+  useEffect(() => {
+    if (!user?.id) return;
+    const q = query(collection(db, 'timeOffRequests'), where('userId', '==', user.id));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const reqs: TimeOffRequest[] = snapshot.docs
+          .map((docSnap) => {
+            const data = docSnap.data();
+            return {
+              id: docSnap.id,
+              userId: data.userId || '',
+              userName: data.userName || '',
+              department: data.department || '',
+              type: data.type || 'otro',
+              startDate: data.startDate || '',
+              endDate: data.endDate || '',
+              reason: data.reason || '',
+              status: data.status || 'pendiente',
+              createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+              reviewedBy: data.reviewedBy || null,
+              reviewedAt: data.reviewedAt?.toDate?.()?.toISOString?.() || null,
+              response: data.response || null,
+            } as TimeOffRequest;
+          })
+          .filter((r) => r.status === 'aprobada')
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setApprovedTimeOff(reqs);
+      },
+      (error) => {
+        console.error('Error al cargar timeOff aprobadas:', error);
+      }
+    );
+    return () => unsubscribe();
+  }, [user?.id]);
+
   const today = toLocalISODate(new Date());
   const todayShifts = user ? getUserShifts(userIdForShifts, today, user.email) : [];
+  const todayTimeOff = findTimeOffForDate(approvedTimeOff, today, user?.id);
   
   // Tasks pendientes ordenados cronológicamente
   const pendingTasks = user ? getTasksByUser(user.id)
@@ -665,6 +706,23 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   <span className="text-sm text-[#86868B]">Sin turnos asignados</span>
                 )}
               </div>
+
+              {/* Día libre / vacaciones aprobado para hoy */}
+              {todayTimeOff && (
+                <div className="flex items-center gap-2">
+                  {(() => {
+                    const style = TIME_OFF_VISUAL[todayTimeOff.type];
+                    const Icon = style.icon;
+                    return (
+                      <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg border', style.bgColor, style.borderColor)}>
+                        <Icon className={cn('w-4 h-4', style.color)} />
+                        <span className={cn('text-sm font-medium', style.color)}>{TIME_OFF_LABELS[todayTimeOff.type]}</span>
+                        <span className="text-xs text-[#86868B]">({formatTimeOffRange(todayTimeOff.startDate, todayTimeOff.endDate)})</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
 
               {/* Lugar/Departamento */}
               <div className="flex items-center gap-2">
@@ -805,6 +863,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
             const isExpanded = expandedDate === dateStr;
             const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
             const hasIncapacity = !!incapacityInfo;
+            const timeOffInfo = findTimeOffForDate(approvedTimeOff, dateStr, user?.id);
+            const hasTimeOff = !!timeOffInfo;
             const dayTasks = user ? getTasksByUser(user.id).filter(t => t.dueDate === dateStr) : [];
             
             // Configuración de iconos y colores por tipo de incapacidad
@@ -816,6 +876,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
             };
             const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
             const IncapacityIcon = incapacityStyle?.icon;
+            const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+            const TimeOffIcon = timeOffStyle?.icon;
 
             return (
               <div key={index} className={cn("contents", isExpanded && "col-span-7")}>
@@ -826,7 +888,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     className={cn(
                       'w-full h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
                       isToday ? 'ring-2 ring-corporate bg-corporate/5' : 'hover:bg-[#F5F5F7]',
-                      hasIncapacity && incapacityStyle?.bgColor.replace('100', '50')
+                      hasIncapacity && incapacityStyle?.bgColor.replace('100', '50'),
+                      hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
                     )}
                   >
                     {/* Icono según tipo de incapacidad */}
@@ -835,14 +898,21 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         <IncapacityIcon className={cn("w-3 h-3", incapacityStyle?.color)} />
                       </div>
                     )}
+                    {/* Icono según tiempo libre aprobado */}
+                    {hasTimeOff && TimeOffIcon && (
+                      <div className={cn("absolute top-1.5 left-1.5 w-5 h-5 flex items-center justify-center rounded-md", timeOffStyle?.bgColor)}>
+                        <TimeOffIcon className={cn("w-3 h-3", timeOffStyle?.color)} />
+                      </div>
+                    )}
                     <span className={cn(
                       'text-base font-semibold mb-1',
                       isToday ? 'text-corporate' : 'text-[#1D1D1F]',
-                      hasIncapacity && incapacityStyle?.color
+                      hasIncapacity && incapacityStyle?.color,
+                      hasTimeOff && timeOffStyle?.color
                     )}>
                       {date.getDate()}
                     </span>
-                    {hasShifts && !hasIncapacity && (
+                    {hasShifts && !hasIncapacity && !hasTimeOff && (
                       <div className="flex flex-col gap-1 w-full">
                         {dayShifts.slice(0, 3).map((shift, i) => (
                           <div
@@ -863,6 +933,11 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                     {hasIncapacity && incapacityInfo && incapacityStyle && (
                       <div className={cn("mt-1 text-[10px] font-semibold", incapacityStyle.color)}>
                         {incapacityStyle.label}
+                      </div>
+                    )}
+                    {hasTimeOff && timeOffInfo && timeOffStyle && (
+                      <div className={cn("mt-1 text-[10px] font-semibold", timeOffStyle.color)}>
+                        {TIME_OFF_LABELS[timeOffInfo.type]}
                       </div>
                     )}
                   </button>
@@ -889,6 +964,25 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         Solicitar cambio
                       </button>
                     </div>
+
+                    {timeOffInfo && (
+                      <div className="mb-4">
+                        {(() => {
+                          const style = TIME_OFF_VISUAL[timeOffInfo.type];
+                          const Icon = style.icon;
+                          return (
+                            <div className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg border', style.bgColor, style.borderColor)}>
+                              <Icon className={cn('w-4 h-4', style.color)} />
+                              <span className={cn('text-sm font-medium', style.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
+                              <span className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</span>
+                              {timeOffInfo.reason && (
+                                <span className="text-xs text-[#86868B]">· {timeOffInfo.reason}</span>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* Turnos - Izquierda */}
@@ -1838,6 +1932,43 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
   const [incapacityEndDate, setIncapacityEndDate] = useState('');
   const [incapacityCalendarMonth, setIncapacityCalendarMonth] = useState(new Date());
 
+  // Solicitudes de tiempo libre aprobadas para mostrar en el calendario de equipo
+  const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
+  useEffect(() => {
+    const q = query(collection(db, 'timeOffRequests'), where('status', '==', 'aprobada'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const reqs: TimeOffRequest[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            userId: data.userId || '',
+            userName: data.userName || '',
+            department: data.department || '',
+            type: data.type || 'otro',
+            startDate: data.startDate || '',
+            endDate: data.endDate || '',
+            reason: data.reason || '',
+            status: data.status || 'pendiente',
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            reviewedBy: data.reviewedBy || null,
+            reviewedAt: data.reviewedAt?.toDate?.()?.toISOString?.() || null,
+            response: data.response || null,
+          } as TimeOffRequest;
+        });
+        setApprovedTimeOff(reqs);
+      },
+      (error) => console.error('Error al cargar timeOff aprobadas en Equipo:', error)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const getTimeOffForUserAndDay = (userId: string, date: Date): TimeOffRequest | undefined => {
+    const dateStr = toLocalISODate(date);
+    return approvedTimeOff.find((r) => r.userId === userId && isDateInRange(dateStr, r.startDate, r.endDate));
+  };
+
   const weekStart = useMemo(() => {
     const today = new Date();
     const start = new Date(today);
@@ -2082,6 +2213,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                     const dateStr = toLocalISODate(day);
                     const incapacityInfo = getIncapacityForDate(dateStr, u.id);
                     const hasIncapacity = !!incapacityInfo;
+                    const timeOffInfo = getTimeOffForUserAndDay(u.id, day);
+                    const hasTimeOff = !!timeOffInfo;
                     
                     // Configuración de colores por tipo de incapacidad
                     const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string }> = {
@@ -2091,6 +2224,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
                     };
                     const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                    const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
                     
                     return (
                       <td key={i} className="p-2 text-center">
@@ -2098,51 +2232,64 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                           onClick={() => handleDayClick(u, day)}
                           className="w-full"
                         >
-                          {hasIncapacity && incapacityStyle ? (
-                            <div className={cn(
-                              'px-2 py-1 rounded-lg text-xs font-medium border',
-                              incapacityStyle.bgColor,
-                              incapacityStyle.color,
-                              incapacityStyle.borderColor
-                            )}>
-                              {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
-                              {incapacityInfo.type === 'accidente' && 'Accidente'}
-                              {incapacityInfo.type === 'cita_medica' && 'Cita méd.'}
-                              {incapacityInfo.type === 'inasistencia' && 'Inasist.'}
-                            </div>
-                          ) : dayShifts.length > 0 ? (
-                            <div className="space-y-1">
-                              {dayShifts.map((shift, idx) => {
-                                const isCrossDept = shift.department !== u.department;
-                                return (
-                                  <div
-                                    key={idx}
-                                    className={cn(
-                                      'px-2 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105',
-                                      isCrossDept && 'ring-1 ring-amber-400'
-                                    )}
-                                    style={{
-                                      backgroundColor: `${shift.color}20`,
-                                      color: shift.color,
-                                    }}
-                                    title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
-                                  >
-                                    <div className="flex items-center justify-center gap-1">
-                                      {shift.name}
-                                      {isCrossDept && (
-                                        <DeptIcon department={shift.department} className="w-3 h-3" />
+                          <div className="space-y-1">
+                            {hasIncapacity && incapacityStyle ? (
+                              <div className={cn(
+                                'px-2 py-1 rounded-lg text-xs font-medium border',
+                                incapacityStyle.bgColor,
+                                incapacityStyle.color,
+                                incapacityStyle.borderColor
+                              )}>
+                                {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
+                                {incapacityInfo.type === 'accidente' && 'Accidente'}
+                                {incapacityInfo.type === 'cita_medica' && 'Cita méd.'}
+                                {incapacityInfo.type === 'inasistencia' && 'Inasist.'}
+                              </div>
+                            ) : hasTimeOff && timeOffStyle ? (
+                              <div className={cn(
+                                'px-2 py-1 rounded-lg text-xs font-medium border',
+                                timeOffStyle.bgColor,
+                                timeOffStyle.color,
+                                timeOffStyle.borderColor
+                              )}>
+                                {TIME_OFF_LABELS[timeOffInfo.type]}
+                              </div>
+                            ) : null}
+                            {dayShifts.length > 0 && (
+                              <div className="space-y-1">
+                                {dayShifts.map((shift, idx) => {
+                                  const isCrossDept = shift.department !== u.department;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={cn(
+                                        'px-2 py-1 rounded-lg text-xs font-medium transition-all hover:scale-105',
+                                        isCrossDept && 'ring-1 ring-amber-400'
                                       )}
+                                      style={{
+                                        backgroundColor: `${shift.color}20`,
+                                        color: shift.color,
+                                      }}
+                                      title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
+                                    >
+                                      <div className="flex items-center justify-center gap-1">
+                                        {shift.name}
+                                        {isCrossDept && (
+                                          <DeptIcon department={shift.department} className="w-3 h-3" />
+                                        )}
+                                      </div>
+                                      <div className="text-[9px] opacity-70">
+                                        {shift.startTime}-{shift.endTime}
+                                      </div>
                                     </div>
-                                    <div className="text-[9px] opacity-70">
-                                      {shift.startTime}-{shift.endTime}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <span className="text-[#C7C7CC] hover:bg-[#F5F5F7] rounded-lg px-3 py-2 block transition-colors">-</span>
-                          )}
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {!hasIncapacity && !hasTimeOff && dayShifts.length === 0 && (
+                              <span className="text-[#C7C7CC] hover:bg-[#F5F5F7] rounded-lg px-3 py-2 block transition-colors">-</span>
+                            )}
+                          </div>
                         </button>
                       </td>
                     );
@@ -2339,6 +2486,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       const isToday = dateStr === toLocalISODate(new Date());
                       const incapacityInfo = getIncapacityForDate(dateStr, selectedUser.id);
                       const hasIncapacity = !!incapacityInfo;
+                      const timeOffInfo = getTimeOffForUserAndDay(selectedUser.id, date);
+                      const hasTimeOff = !!timeOffInfo;
                       
                       // Configuración de iconos y colores por tipo de incapacidad
                       const incapacityConfig: Record<string, { color: string, bgColor: string }> = {
@@ -2348,6 +2497,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                         inasistencia: { color: 'text-purple-500', bgColor: 'bg-purple-100' },
                       };
                       const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
                       
                       return (
                         <div key={index} className="relative">
@@ -2357,15 +2507,17 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               'w-full aspect-square rounded-lg flex flex-col items-center justify-center text-xs transition-all',
                               isToday ? 'ring-2 ring-corporate bg-corporate/10' : 'hover:bg-white',
                               hasShifts && 'font-medium',
-                              hasIncapacity && incapacityStyle?.bgColor
+                              hasIncapacity && incapacityStyle?.bgColor,
+                              hasTimeOff && timeOffStyle?.bgColor
                             )}
-                            style={hasShifts && !hasIncapacity ? { color: dayShifts[0]?.color } : {}}
+                            style={hasShifts && !hasIncapacity && !hasTimeOff ? { color: dayShifts[0]?.color } : {}}
                           >
-                            <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color)}>{date.getDate()}</span>
-                            {(hasShifts || hasTasks || hasIncapacity) && (
+                            <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color, hasTimeOff && timeOffStyle?.color)}>{date.getDate()}</span>
+                            {(hasShifts || hasTasks || hasIncapacity || hasTimeOff) && (
                               <div className="flex gap-0.5 mt-0.5">
                                 {hasIncapacity && <span className={cn("w-1.5 h-1.5 rounded-full", incapacityStyle?.bgColor.replace('100', '500'))} />}
-                                {hasShifts && !hasIncapacity && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
+                                {hasTimeOff && <span className={cn("w-1.5 h-1.5 rounded-full", timeOffStyle?.bgColor.replace('100', '500'))} />}
+                                {hasShifts && !hasIncapacity && !hasTimeOff && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
                                 {hasTasks && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                               </div>
                             )}
@@ -2424,6 +2576,31 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                               </div>
                             </div>
                           )}
+
+                          {/* Tiempo libre aprobado */}
+                          {(() => {
+                            const dateStr = expandedDayInCalendar.toISOString().split('T')[0];
+                            const timeOffInfo = getTimeOffForUserAndDay(selectedUser.id, expandedDayInCalendar);
+                            if (!timeOffInfo) return null;
+                            const style = TIME_OFF_VISUAL[timeOffInfo.type];
+                            const Icon = style.icon;
+                            return (
+                              <div>
+                                <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1">
+                                  <Sun className="w-3 h-3" /> Tiempo libre:
+                                </p>
+                                <div className={cn("flex items-center gap-2 px-3 py-2 rounded-lg border", style.bgColor, style.borderColor)}>
+                                  <Icon className={cn("w-4 h-4", style.color)} />
+                                  <span className={cn("text-sm font-medium", style.color)}>
+                                    {TIME_OFF_LABELS[timeOffInfo.type]}
+                                  </span>
+                                  <span className="text-xs text-[#86868B]">
+                                    {formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
                           
                           {/* Turnos */}
                           <div>
@@ -2560,6 +2737,29 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                     <div className={cn("flex items-center gap-3 p-3 rounded-lg", config?.bgColor)}>
                       {Icon && <Icon className={cn("w-5 h-5", config?.color)} />}
                       <span className={cn("font-medium", config?.color)}>{config?.label}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tiempo libre aprobado - si existe */}
+              {(() => {
+                const timeOffInfo = getTimeOffForUserAndDay(selectedDayInfo.user.id, selectedDayInfo.date);
+                if (!timeOffInfo) return null;
+                const style = TIME_OFF_VISUAL[timeOffInfo.type];
+                const Icon = style.icon;
+                return (
+                  <div>
+                    <h4 className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
+                      <Sun className="w-4 h-4" />
+                      Tiempo libre aprobado
+                    </h4>
+                    <div className={cn("flex items-center gap-3 p-3 rounded-lg border", style.bgColor, style.borderColor)}>
+                      <Icon className={cn("w-5 h-5", style.color)} />
+                      <div>
+                        <span className={cn("font-medium", style.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
+                        <p className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -3181,6 +3381,43 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
+  // Solicitudes de tiempo libre aprobadas para bloquear asignaciones
+  const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
+  useEffect(() => {
+    const q = query(collection(db, 'timeOffRequests'), where('status', '==', 'aprobada'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const reqs: TimeOffRequest[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            userId: data.userId || '',
+            userName: data.userName || '',
+            department: data.department || '',
+            type: data.type || 'otro',
+            startDate: data.startDate || '',
+            endDate: data.endDate || '',
+            reason: data.reason || '',
+            status: data.status || 'pendiente',
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            reviewedBy: data.reviewedBy || null,
+            reviewedAt: data.reviewedAt?.toDate?.()?.toISOString?.() || null,
+            response: data.response || null,
+          } as TimeOffRequest;
+        });
+        setApprovedTimeOff(reqs);
+      },
+      (error) => console.error('Error al cargar timeOff aprobadas en Asignar:', error)
+    );
+    return () => unsubscribe();
+  }, []);
+
+  const isDayBlockedForUser = (userId: string, date: Date): boolean => {
+    const dateStr = toLocalISODate(date);
+    return approvedTimeOff.some((r) => r.userId === userId && isDateInRange(dateStr, r.startDate, r.endDate));
+  };
+
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
@@ -3324,6 +3561,11 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     const [userId, dateStr] = dropData.split('|');
 
     if (userId && dateStr && user) {
+      const date = new Date(dateStr + 'T00:00:00');
+      if (isDayBlockedForUser(userId, date)) {
+        toast.error('No se puede asignar un turno en un día con tiempo libre aprobado');
+        return;
+      }
       assignShift(userId, shiftId, dateStr, user.id);
     }
   };
@@ -3516,6 +3758,11 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                       const dateStr = toLocalISODate(day);
                       const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
                       const hasIncapacity = !!incapacityInfo;
+                      const timeOffInfo = approvedTimeOff.find(
+                        (r) => r.userId === u.id && isDateInRange(dateStr, r.startDate, r.endDate)
+                      );
+                      const hasTimeOff = !!timeOffInfo;
+                      const isBlocked = hasTimeOff;
                       
                       // Configuración de colores por tipo de incapacidad
                       const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
@@ -3525,11 +3772,23 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                         inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
                       };
                       const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
                       
                       return (
                         <td key={i} className="p-2">
-                          <DroppableCell id={dropId}>
+                          <DroppableCell id={dropId} disabled={isBlocked}>
                             <div className="space-y-1">
+                              {/* Mostrar tiempo libre aprobado si existe */}
+                              {hasTimeOff && timeOffStyle && (
+                                <div className={cn(
+                                  'px-2 py-1 rounded-lg text-xs font-medium border text-center',
+                                  timeOffStyle.bgColor,
+                                  timeOffStyle.color,
+                                  timeOffStyle.borderColor
+                                )}>
+                                  {TIME_OFF_LABELS[timeOffInfo.type]}
+                                </div>
+                              )}
                               {/* Mostrar incapacidad si existe */}
                               {hasIncapacity && incapacityStyle && (
                                 <div className={cn(
@@ -3678,8 +3937,16 @@ function DraggableShift({ shift }: { shift: Shift }) {
   );
 }
 
-function DroppableCell({ id, children }: { id: string; children: React.ReactNode }) {
-  const { isOver, setNodeRef } = useDroppable({ id });
+function DroppableCell({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
+  const { isOver, setNodeRef } = useDroppable({ id, disabled });
+
+  if (disabled) {
+    return (
+      <div className="min-h-[40px] rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] p-1">
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -5211,6 +5478,349 @@ interface Solicitud {
   firestoreId?: string;
 }
 
+interface TimeOffRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  department: string;
+  type: 'vacaciones' | 'cita_medica' | 'dia_libre' | 'otro';
+  startDate: string;
+  endDate: string;
+  reason?: string;
+  status: 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada';
+  createdAt: string;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  response?: string | null;
+}
+
+const TIME_OFF_LABELS: Record<TimeOffRequest['type'], string> = {
+  vacaciones: 'Vacaciones',
+  cita_medica: 'Cita médica',
+  dia_libre: 'Día libre',
+  otro: 'Otro',
+};
+
+function formatTimeOffRange(startDate: string, endDate: string) {
+  if (startDate === endDate) return formatDateFromString(startDate);
+  return `${formatDateFromString(startDate)} - ${formatDateFromString(endDate)}`;
+}
+
+function isDateInRange(dateStr: string, startDate: string, endDate: string) {
+  return dateStr >= startDate && dateStr <= endDate;
+}
+
+function findTimeOffForDate(
+  requests: TimeOffRequest[],
+  dateStr: string,
+  userId?: string
+): TimeOffRequest | undefined {
+  return requests.find(
+    (r) =>
+      r.status === 'aprobada' &&
+      (!userId || r.userId === userId) &&
+      isDateInRange(dateStr, r.startDate, r.endDate)
+  );
+}
+
+const TIME_OFF_VISUAL: Record<
+  TimeOffRequest['type'],
+  { icon: React.ElementType; color: string; bgColor: string; borderColor: string }
+> = {
+  vacaciones: { icon: Sun, color: 'text-green-600', bgColor: 'bg-green-100', borderColor: 'border-green-200' },
+  dia_libre: { icon: Sun, color: 'text-amber-600', bgColor: 'bg-amber-100', borderColor: 'border-amber-200' },
+  cita_medica: { icon: Stethoscope, color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200' },
+  otro: { icon: FileText, color: 'text-[#86868B]', bgColor: 'bg-[#F5F5F7]', borderColor: 'border-[#E5E5E7]' },
+};
+
+function TimeOffStatusBadge({ status }: { status: TimeOffRequest['status'] }) {
+  const config = {
+    pendiente: { class: 'bg-amber-100 text-amber-700', label: 'Pendiente' },
+    aprobada: { class: 'bg-green-100 text-green-700', label: 'Aprobada' },
+    rechazada: { class: 'bg-red-100 text-red-700', label: 'Rechazada' },
+    cancelada: { class: 'bg-gray-100 text-gray-700', label: 'Cancelada' },
+  };
+  const { class: className, label } = config[status];
+  return <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', className)}>{label}</span>;
+}
+
+interface TimeOffRequestsPanelProps {
+  myRequests: TimeOffRequest[];
+  teamRequests: TimeOffRequest[];
+  canApprove: boolean;
+  onApprove: (req: TimeOffRequest) => void;
+  onReject: (req: TimeOffRequest) => void;
+  onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string }) => void;
+  onCancel: (req: TimeOffRequest) => void;
+}
+
+function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove, onReject, onEdit, onCancel }: TimeOffRequestsPanelProps) {
+  const { user } = useAuth();
+  const [view, setView] = useState<'mias' | 'equipo'>('mias');
+  const [filter, setFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
+
+  // Modal de edición
+  const [editingRequest, setEditingRequest] = useState<TimeOffRequest | null>(null);
+  const [editType, setEditType] = useState<TimeOffRequest['type']>('dia_libre');
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
+
+  const activeView = canApprove ? view : 'mias';
+  const requests = activeView === 'mias' ? myRequests : teamRequests;
+  const filtered = requests.filter((r) => filter === 'todas' || r.status === filter);
+
+  const filterButtons: { id: typeof filter; label: string }[] = [
+    { id: 'todas', label: 'Todas' },
+    { id: 'pendiente', label: 'Pendientes' },
+    { id: 'aprobada', label: 'Aprobadas' },
+    { id: 'rechazada', label: 'Rechazadas' },
+    { id: 'cancelada', label: 'Canceladas' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      {canApprove && (
+        <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+          <button
+            onClick={() => setView('mias')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              view === 'mias' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <User className="w-4 h-4" />
+            Mis solicitudes
+          </button>
+          <button
+            onClick={() => setView('equipo')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              view === 'equipo' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <Users className="w-4 h-4" />
+            Equipo
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {filterButtons.map((f) => {
+          const count = requests.filter((r) => f.id === 'todas' || r.status === f.id).length;
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                filter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+              )}
+            >
+              {f.label}
+              {count > 0 && (
+                <span
+                  className={cn(
+                    'px-1.5 py-0.5 text-xs rounded-full',
+                    filter === f.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                  )}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="space-y-3">
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <Sun className="w-8 h-8 text-[#C7C7CC]" />
+            </div>
+            <p className="text-[#86868B]">
+              {activeView === 'mias' ? 'No tienes solicitudes de tiempo libre' : 'No hay solicitudes del equipo'}
+            </p>
+          </div>
+        ) : (
+          filtered.map((req) => (
+            <div
+              key={req.id}
+              className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 bg-corporate rounded-full flex items-center justify-center flex-shrink-0">
+                    <span className="text-sm font-semibold text-white">
+                      {req.userName
+                        .split(' ')
+                        .map((n) => n[0])
+                        .join('')
+                        .substring(0, 2)
+                        .toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#1D1D1F]">{req.userName}</p>
+                    <p className="text-xs text-[#86868B]">{req.department.replace(/_/g, ' ')}</p>
+                  </div>
+                </div>
+                <TimeOffStatusBadge status={req.status} />
+              </div>
+
+              <div className="mt-3">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
+                  <Sun className="w-3 h-3 mr-1.5" />
+                  {TIME_OFF_LABELS[req.type]}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
+                <Calendar className="w-4 h-4 text-[#86868B]" />
+                <span className="text-[#86868B]">Fechas:</span>
+                <span className="font-medium">{formatTimeOffRange(req.startDate, req.endDate)}</span>
+              </div>
+
+              {req.reason && (
+                <div className="mt-2 flex items-start gap-2 text-sm text-[#1D1D1F]">
+                  <FileText className="w-4 h-4 text-[#86868B] mt-0.5" />
+                  <span className="text-[#86868B]">Motivo:</span>
+                  <span className="font-medium">{req.reason}</span>
+                </div>
+              )}
+
+              <div className="mt-3 pt-2 border-t border-[#E5E5E7] flex items-center justify-between text-xs text-[#86868B]">
+                <span>
+                  Solicitado: {new Date(req.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                  {new Date(req.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+                {req.reviewedAt && (
+                  <span>
+                    Revisado: {new Date(req.reviewedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                    {new Date(req.reviewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+              </div>
+
+              {canApprove && req.status === 'pendiente' && (
+                <div className="mt-3 flex gap-2 justify-end">
+                  <button
+                    onClick={() => onApprove(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                  >
+                    <Check className="w-4 h-4" />
+                    Aprobar
+                  </button>
+                  <button
+                    onClick={() => onReject(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                    Rechazar
+                  </button>
+                </div>
+              )}
+
+              <div className="mt-2 flex gap-2 justify-end">
+                {canApprove && req.status === 'pendiente' && (
+                  <button
+                    onClick={() => {
+                      setEditingRequest(req);
+                      setEditType(req.type);
+                      setEditStartDate(req.startDate);
+                      setEditEndDate(req.endDate);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7] rounded-lg text-sm font-medium hover:bg-white transition-colors"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Editar
+                  </button>
+                )}
+                {req.userId === user?.id && req.status === 'pendiente' && (
+                  <button
+                    onClick={() => onCancel(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Modal de edición de solicitud */}
+      <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar solicitud</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Tipo</label>
+              <select
+                value={editType}
+                onChange={(e) => setEditType(e.target.value as TimeOffRequest['type'])}
+                className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white"
+              >
+                <option value="vacaciones">Vacaciones</option>
+                <option value="cita_medica">Cita médica</option>
+                <option value="dia_libre">Día libre</option>
+                <option value="otro">Otro</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Desde</label>
+                <input
+                  type="date"
+                  value={editStartDate}
+                  onChange={(e) => setEditStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Hasta</label>
+                <input
+                  type="date"
+                  value={editEndDate}
+                  onChange={(e) => setEditEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setEditingRequest(null)}
+              className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                if (!editingRequest) return;
+                onEdit(editingRequest, {
+                  type: editType,
+                  startDate: editStartDate,
+                  endDate: editEndDate,
+                });
+                setEditingRequest(null);
+              }}
+              disabled={!editStartDate || !editEndDate || editEndDate < editStartDate}
+              className="flex-1 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Guardar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // SOLICITUDES TAB
 // ═══════════════════════════════════════════════════════════════════
@@ -5220,10 +5830,13 @@ function SolicitudesTab() {
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
-  const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'equipo'>('mis-cambios');
+  const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'mis-solicitudes' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
   const [equipoDeptFilter, setEquipoDeptFilter] = useState<string | 'ALL'>('ALL');
+  
+  // Estado para solicitudes de tiempo libre (timeOffRequests)
+  const [timeOffRequests, setTimeOffRequests] = useState<TimeOffRequest[]>([]);
   
   // Estado para modal de deshacer cambio
   const [showUndoModal, setShowUndoModal] = useState(false);
@@ -5338,6 +5951,157 @@ function SolicitudesTab() {
       localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(todasSolicitudes));
     }
   }, [todasSolicitudes]);
+
+  // Escuchar timeOffRequests desde Firestore en tiempo real
+  useEffect(() => {
+    const q = query(collection(db, 'timeOffRequests'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const reqs: TimeOffRequest[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            userId: data.userId || '',
+            userName: data.userName || '',
+            department: data.department || '',
+            type: data.type || 'otro',
+            startDate: data.startDate || '',
+            endDate: data.endDate || '',
+            reason: data.reason || '',
+            status: data.status || 'pendiente',
+            createdAt: data.createdAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            reviewedBy: data.reviewedBy || null,
+            reviewedAt: data.reviewedAt?.toDate?.()?.toISOString?.() || null,
+            response: data.response || null,
+          } as TimeOffRequest;
+        });
+        setTimeOffRequests(reqs);
+      },
+      (error) => {
+        console.error('Error al escuchar timeOffRequests:', error);
+        toast.error('No se pudieron cargar las solicitudes de tiempo libre');
+      }
+    );
+    return () => unsubscribe();
+  }, []);
+
+  // Permisos para aprobar/rechazar solicitudes de tiempo libre
+  const canApproveTimeOff =
+    user?.role === Role.SUPERVISOR ||
+    user?.role === Role.GERENTE_DEPARTAMENTO ||
+    user?.role === Role.GERENTE_OPERACIONES ||
+    user?.role === Role.RRHH ||
+    user?.role === Role.DIRECTOR ||
+    user?.role === Role.DIRECTOR_GENERAL;
+
+  const canViewAllTimeOff =
+    user?.role === Role.RRHH ||
+    user?.role === Role.DIRECTOR ||
+    user?.role === Role.DIRECTOR_GENERAL ||
+    user?.role === Role.GERENTE_OPERACIONES ||
+    user?.level === 1 ||
+    user?.level === 2 ||
+    user?.level === 3 ||
+    user?.level === 4;
+
+  const myTimeOffRequests = useMemo(
+    () => timeOffRequests.filter((r) => r.userId === user?.id),
+    [timeOffRequests, user?.id]
+  );
+
+  const teamTimeOffRequests = useMemo(() => {
+    if (!canApproveTimeOff) return [];
+    if (canViewAllTimeOff) return timeOffRequests;
+    return timeOffRequests.filter((r) => r.department === user?.department);
+  }, [timeOffRequests, canApproveTimeOff, canViewAllTimeOff, user?.department]);
+
+  const handleApproveTimeOff = async (req: TimeOffRequest) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'timeOffRequests', req.id), {
+        status: 'aprobada',
+        reviewedBy: user.name || user.id,
+        reviewedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: req.userId,
+        type: NotificationType.VACATION_APPROVED,
+        title: 'Solicitud aprobada',
+        body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue aprobada.`,
+        data: { link: '/horarios' },
+        read: false,
+        createdAt: serverTimestamp(),
+        createdBy: user.id,
+        priority: 'normal',
+      });
+      toast.success('Solicitud aprobada');
+    } catch (error) {
+      console.error('Error al aprobar solicitud:', error);
+      toast.error('No se pudo aprobar la solicitud');
+    }
+  };
+
+  const handleRejectTimeOff = async (req: TimeOffRequest) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'timeOffRequests', req.id), {
+        status: 'rechazada',
+        reviewedBy: user.name || user.id,
+        reviewedAt: serverTimestamp(),
+      });
+      await addDoc(collection(db, 'notifications'), {
+        userId: req.userId,
+        type: NotificationType.VACATION_REJECTED,
+        title: 'Solicitud rechazada',
+        body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue rechazada.`,
+        data: { link: '/horarios' },
+        read: false,
+        createdAt: serverTimestamp(),
+        createdBy: user.id,
+        priority: 'normal',
+      });
+      toast.success('Solicitud rechazada');
+    } catch (error) {
+      console.error('Error al rechazar solicitud:', error);
+      toast.error('No se pudo rechazar la solicitud');
+    }
+  };
+
+  const handleEditTimeOff = async (
+    req: TimeOffRequest,
+    data: { type: TimeOffRequest['type']; startDate: string; endDate: string }
+  ) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'timeOffRequests', req.id), {
+        type: data.type,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        updatedBy: user.name || user.id,
+        updatedAt: serverTimestamp(),
+      });
+      toast.success('Solicitud actualizada');
+    } catch (error) {
+      console.error('Error al editar solicitud:', error);
+      toast.error('No se pudo editar la solicitud');
+    }
+  };
+
+  const handleCancelTimeOff = async (req: TimeOffRequest) => {
+    if (!user) return;
+    try {
+      await updateDoc(doc(db, 'timeOffRequests', req.id), {
+        status: 'cancelada',
+        cancelledBy: user.name || user.id,
+        cancelledAt: serverTimestamp(),
+      });
+      toast.success('Solicitud cancelada');
+    } catch (error) {
+      console.error('Error al cancelar solicitud:', error);
+      toast.error('No se pudo cancelar la solicitud');
+    }
+  };
 
   // Verificar si el usuario puede ver solicitudes de equipo (Supervisores y roles superiores)
   const canViewEquipo = true; // Temporalmente habilitado para todos, ajustar según permisos reales
@@ -5528,8 +6292,8 @@ function SolicitudesTab() {
       <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold text-[#1D1D1F]">Solicitudes de cambio</h3>
-            <p className="text-sm text-[#86868B]">Gestiona tus solicitudes y las del equipo</p>
+            <h3 className="text-lg font-semibold text-[#1D1D1F]">Solicitudes</h3>
+            <p className="text-sm text-[#86868B]">Gestiona cambios de turno y solicitudes de tiempo libre</p>
           </div>
         </div>
 
@@ -5546,6 +6310,18 @@ function SolicitudesTab() {
           >
             <User className="w-4 h-4" />
             Mis cambios
+          </button>
+          <button
+            onClick={() => setActiveSubTab('mis-solicitudes')}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
+              activeSubTab === 'mis-solicitudes'
+                ? 'bg-white text-corporate shadow-sm'
+                : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <Sun className="w-4 h-4" />
+            Mis solicitudes
           </button>
           {canViewEquipo && (
             <button
@@ -5565,7 +6341,17 @@ function SolicitudesTab() {
       </div>
 
       {/* Contenido según pestaña activa */}
-      {activeSubTab === 'mis-cambios' ? (
+      {activeSubTab === 'mis-solicitudes' ? (
+        <TimeOffRequestsPanel
+          myRequests={myTimeOffRequests}
+          teamRequests={teamTimeOffRequests}
+          canApprove={canApproveTimeOff}
+          onApprove={handleApproveTimeOff}
+          onReject={handleRejectTimeOff}
+          onEdit={handleEditTimeOff}
+          onCancel={handleCancelTimeOff}
+        />
+      ) : activeSubTab === 'mis-cambios' ? (
         <div className="space-y-4">
           {/* Filtros para Mis Cambios */}
           <div className="flex gap-2 overflow-x-auto pb-1">

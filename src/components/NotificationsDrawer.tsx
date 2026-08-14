@@ -23,6 +23,7 @@ const typeConfig: Record<string, { icon: any; color: string; label: string }> = 
   [NotificationType.INCIDENCIA_RESOLVED]: { icon: CheckCircle2, color: "text-[#34C759]", label: "Resuelto" },
   [NotificationType.SHIFT_ASSIGNED]: { icon: Clock, color: "text-corporate", label: "Horario" },
   [NotificationType.VACATION_APPROVED]: { icon: CheckCircle2, color: "text-[#34C759]", label: "Vacaciones" },
+  [NotificationType.VACATION_REJECTED]: { icon: AlertTriangle, color: "text-[#FF3B30]", label: "Vacaciones" },
   default: { icon: Info, color: "text-[#86868B]", label: "Notificación" },
 };
 
