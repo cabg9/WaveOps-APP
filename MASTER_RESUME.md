@@ -129,6 +129,51 @@
 
 ---
 
+## FASE 7.2: Responsive para iPhone y iPad
+
+**Estado:** COMPLETADA
+
+### Funcionalidades entregadas
+- **Layout global**: header trunca título/fecha, menú móvil usa `max-w-[85vw]`, contenedor principal evita scroll horizontal no deseado.
+- **HorariosModule**:
+  - Grid de incapacidades apilado en móvil, stats cards a ancho completo.
+  - Calendario mensual con alturas responsive.
+  - Stats del modal colaborador en 2 columnas en móvil.
+  - Modales principales usan `max-w-[95vw]` en pantallas pequeñas.
+  - Tarjetas de solicitudes pasan a 1 columna en móvil.
+  - Tablas de Equipo y Asignar con primera columna sticky al hacer scroll horizontal.
+- **TasksModule**:
+  - Inputs de fecha/hora a ancho completo con texto legible.
+  - Header de crear tareas con wrap.
+  - Pestañas y filtros de tiempo con scroll horizontal controlado.
+  - Grid de tareas 1 columna en móvil.
+  - Detalle de tarea, departamentos y apoyo en 1 columna en móvil.
+  - Foto maximizada de incidencia ajustada al viewport.
+- **DevelopsModule**:
+  - Tarjetas de módulos, roles, papelera y usuarios con layout apilado en móvil.
+  - Modal de usuario usa `max-w-[95vw] sm:max-w-lg`.
+  - Stats con tipografía reducida en móvil.
+- **TurnosTab**: header y modal responsive; botones del modal apilados en móvil.
+- **DepartamentosTab**: formulario y modal de equipo con `max-w-[95vw]`; grids de 2 columnas pasan a 1 en móvil.
+- **ProfilePage**: título con `break-words`, badges con `flex-wrap`, tipografía responsive.
+- **OnboardingPage**: padding reducido en móvil, select de país más angosto, grids y botones apilados en móvil.
+
+### Archivos modificados
+- `src/components/Layout.tsx`
+- `src/components/modules/HorariosModule.tsx`
+- `src/components/modules/TasksModule.tsx`
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/TurnosTab.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `src/components/ProfilePage.tsx`
+- `src/components/OnboardingPage.tsx`
+
+### Restricciones respetadas
+- No se tocó lógica de negocio, solo clases de Tailwind y estructura de layout.
+- No se hizo push a GitHub; solo deploy en Firebase Hosting y commit local.
+
+---
+
 ## Roadmap de fases pendientes
 
 ### FASE 8: Clean login + forgot password
