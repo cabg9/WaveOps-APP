@@ -242,7 +242,8 @@ export interface ShiftAssignment {
   userId: string;
   role: string; // Rol del usuario en este turno (ej: SUPERVISOR, STAFF)
   date: string; // YYYY-MM-DD
-  status: AssignmentStatus; // BORRADOR o PUBLICADO
+  status: AssignmentStatus; // BORRADOR, PUBLICADO o ELIMINADO
+  previousStatus?: AssignmentStatus; // Estado previo antes de marcar como ELIMINADO
   publishedAt?: string; // ISO date - cuando se publicó
   publishedBy?: string; // userId - quién publicó
 }

@@ -35,6 +35,7 @@ export interface FirestoreAssignment {
   userName?: string;
   date: string;
   status: AssignmentStatus;
+  previousStatus?: AssignmentStatus; // Estado previo antes de marcar como ELIMINADO
   publishedAt?: string;
   publishedBy?: string;
   createdAt: string;
@@ -190,21 +191,42 @@ export function useFirestoreShifts() {
     }
   }, []);
 
-  // Remover turno
+  // Remover turno (soft-delete: marca como ELIMINADO para que el asignador vea el cambio antes de publicar)
   const removeShift = useCallback(async (assignmentId: string): Promise<void> => {
     try {
-      await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignmentId));
+      const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId);
+      const assignment = assignments.find(a => a.id === assignmentId);
+      await updateDoc(docRef, {
+        status: AssignmentStatus.ELIMINADO,
+        previousStatus: assignment?.status || AssignmentStatus.BORRADOR,
+      });
     } catch (err: any) {
       console.error('Error al remover turno:', err);
       throw err;
     }
-  }, []);
+  }, [assignments]);
 
-  // Publicar asignaciones
+  // Restaurar turno marcado como ELIMINADO (deshacer la eliminación antes de publicar)
+  const restoreShift = useCallback(async (assignmentId: string): Promise<void> => {
+    try {
+      const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignmentId);
+      const assignment = assignments.find(a => a.id === assignmentId);
+      await updateDoc(docRef, {
+        status: assignment?.previousStatus || AssignmentStatus.BORRADOR,
+        previousStatus: null,
+      });
+    } catch (err: any) {
+      console.error('Error al restaurar turno:', err);
+      throw err;
+    }
+  }, [assignments]);
+
+  // Publicar asignaciones: publica borradores y elimina definitivamente los marcados como ELIMINADO
   const publishAssignments = useCallback(async (department: string | 'ALL', weekStart: Date, publishedBy: string): Promise<void> => {
     try {
       const weekAssignments = getWeekAssignments(department, weekStart);
       const borradorAssignments = weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR);
+      const eliminadoAssignments = weekAssignments.filter(a => a.status === AssignmentStatus.ELIMINADO);
 
       for (const assignment of borradorAssignments) {
         const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignment.id);
@@ -213,6 +235,10 @@ export function useFirestoreShifts() {
           publishedAt: new Date().toISOString(),
           publishedBy,
         });
+      }
+
+      for (const assignment of eliminadoAssignments) {
+        await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
       }
     } catch (err: any) {
       console.error('Error al publicar asignaciones:', err);
@@ -224,6 +250,12 @@ export function useFirestoreShifts() {
   const getBorradorCount = useCallback((department: string | 'ALL', weekStart: Date): number => {
     const weekAssignments = getWeekAssignments(department, weekStart);
     return weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR).length;
+  }, [getWeekAssignments]);
+
+  // Contar cambios pendientes (borradores + eliminaciones no publicadas)
+  const getPendingChangesCount = useCallback((department: string | 'ALL', weekStart: Date): number => {
+    const weekAssignments = getWeekAssignments(department, weekStart);
+    return weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR || a.status === AssignmentStatus.ELIMINADO).length;
   }, [getWeekAssignments]);
 
   // Crear turno
@@ -273,8 +305,10 @@ export function useFirestoreShifts() {
     getWeekAssignments,
     assignShift,
     removeShift,
+    restoreShift,
     publishAssignments,
     getBorradorCount,
+    getPendingChangesCount,
     createShift,
     updateShift,
     deleteShift,

@@ -57,6 +57,8 @@ import {
   XCircle,
   Download,
   Pencil,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -3371,7 +3373,9 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     getWeekAssignments,
     publishAssignments,
     getBorradorCount,
+    getPendingChangesCount,
     removeShift,
+    restoreShift,
     shifts,
   } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
@@ -3509,10 +3513,13 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const getUserAssignmentsForDay = (userId: string, date: Date): ShiftAssignment[] => {
     const dateStr = toLocalISODate(date);
     const userEmail = users.find(u => u.id === userId)?.email;
-    // No mostrar las asignaciones marcadas como ELIMINADO
-    const userAssignments = assignments.filter(a => (a.userId === userId || a.userId === userEmail) && a.date === dateStr && a.status !== AssignmentStatus.ELIMINADO);
-    // Ordenar cronológicamente por hora de inicio del turno
+    // Incluir ELIMINADO para mostrarlo como borrador de eliminación
+    const userAssignments = assignments.filter(a => (a.userId === userId || a.userId === userEmail) && a.date === dateStr);
+    // Ordenar: primero activos (BORRADOR/PUBLICADO) y luego ELIMINADO; dentro de cada grupo cronológicamente
     return userAssignments.sort((a, b) => {
+      const isDeletedA = a.status === AssignmentStatus.ELIMINADO ? 1 : 0;
+      const isDeletedB = b.status === AssignmentStatus.ELIMINADO ? 1 : 0;
+      if (isDeletedA !== isDeletedB) return isDeletedA - isDeletedB;
       const shiftA = shifts.find(s => s.id === a.shiftId);
       const shiftB = shifts.find(s => s.id === b.shiftId);
       if (!shiftA || !shiftB) return 0;
@@ -3522,34 +3529,10 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   
 
   
-  // Contar eliminaciones pendientes
-  const getPendingDeletionsCount = (dept: string | 'ALL', weekStart: Date): number => {
-    const weekDates: string[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = addDaysToDate(weekStart, i);
-      weekDates.push(format(date, 'yyyy-MM-dd'));
-    }
-    
-    if (dept === 'ALL') {
-      // En modo ALL, contar todas las eliminaciones de la semana
-      return assignments.filter(
-        a => weekDates.includes(a.date) && 
-             a.status === AssignmentStatus.ELIMINADO
-      ).length;
-    }
-    
-    const deptUserIds = users
-      .filter(u => u.department === dept && u.isActive)
-      .map(u => u.id);
-    
-    return assignments.filter(
-      a => weekDates.includes(a.date) && 
-           deptUserIds.includes(a.userId) && 
-           a.status === AssignmentStatus.ELIMINADO
-    ).length;
-  };
-  
-  const pendingDeletions = getPendingDeletionsCount(selectedDepartment, weekStart);
+  // Contar cambios pendientes (borradores + eliminaciones)
+  const pendingChanges = getPendingChangesCount(selectedDepartment, weekStart);
+  const pendingBorradores = getBorradorCount(selectedDepartment, weekStart);
+  const pendingDeletions = pendingChanges - pendingBorradores;
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -3677,9 +3660,24 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
               </div>
 
               <div className="flex items-center gap-2 pointer-events-auto">
+                {pendingChanges > 0 && (
+                  <div className="flex items-center gap-1.5 text-xs">
+                    {pendingBorradores > 0 && (
+                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">
+                        {pendingBorradores} borrador{pendingBorradores > 1 ? 'es' : ''}
+                      </span>
+                    )}
+                    {pendingDeletions > 0 && (
+                      <span className="px-1.5 py-0.5 bg-red-100 text-red-700 rounded-full font-medium">
+                        {pendingDeletions} eliminaci{pendingDeletions > 1 ? 'ones' : 'ón'}
+                      </span>
+                    )}
+                  </div>
+                )}
                 <button
                   type="button"
-                  className="px-3 py-1.5 text-sm bg-corporate text-white rounded-lg hover:bg-corporate/90 flex items-center gap-2"
+                  disabled={pendingChanges === 0}
+                  className="px-3 py-1.5 text-sm bg-corporate text-white rounded-lg hover:bg-corporate/90 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={async () => {
                     if (user) {
                       try {
@@ -3809,26 +3807,42 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                 return shift ? (
                                   <div
                                     key={idx}
-                                    onDoubleClick={() => removeShift(assignment.id)}
+                                    onDoubleClick={() => {
+                                      if (assignment.status === AssignmentStatus.ELIMINADO) {
+                                        restoreShift(assignment.id);
+                                      } else {
+                                        removeShift(assignment.id);
+                                      }
+                                    }}
                                     className={cn(
-                                      'px-2 py-1 rounded-lg text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105'
+                                      'px-2 py-1 rounded-lg text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105',
+                                      assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
                                     )}
                                     style={{
-                                      backgroundColor: assignment.status === AssignmentStatus.BORRADOR 
-                                        ? `${shift.color}20` // 20 = 12% opacidad en hex
-                                        : `${shift.color}30`, // 30 = 18% opacidad
-                                      color: shift.color,
-                                      border: assignment.status === AssignmentStatus.BORRADOR 
-                                        ? `2px dashed ${shift.color}` 
-                                        : 'none',
-                                      opacity: assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
+                                      backgroundColor: assignment.status === AssignmentStatus.ELIMINADO
+                                        ? '#F5F5F7'
+                                        : assignment.status === AssignmentStatus.BORRADOR
+                                          ? `${shift.color}20` // 20 = 12% opacidad en hex
+                                          : `${shift.color}30`, // 30 = 18% opacidad
+                                      color: assignment.status === AssignmentStatus.ELIMINADO ? '#86868B' : shift.color,
+                                      border: assignment.status === AssignmentStatus.BORRADOR
+                                        ? `2px dashed ${shift.color}`
+                                        : assignment.status === AssignmentStatus.ELIMINADO
+                                          ? '2px dashed #C7C7CC'
+                                          : 'none',
+                                      opacity: assignment.status === AssignmentStatus.ELIMINADO || assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
                                     }}
-                                    title={`${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
+                                    title={assignment.status === AssignmentStatus.ELIMINADO
+                                      ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
+                                      : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
                                   >
                                     <div className="flex items-center justify-center gap-1">
+                                      {assignment.status === AssignmentStatus.ELIMINADO && (
+                                        <Trash2 className="w-3 h-3 mr-0.5" />
+                                      )}
                                       {shift.name}
                                       {/* Mostrar icono de departamento si es de otro departamento o modo ALL */}
-                                      {(isCrossDepartment || selectedDepartment === 'ALL') && (
+                                      {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
                                         <div 
                                           className="p-0.5 rounded bg-white/70"
                                           title={shift.department.replace(/_/g, ' ')}
@@ -3841,6 +3855,11 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                     {assignment.status === AssignmentStatus.BORRADOR && (
                                       <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
                                         <span className="text-[7px] text-white font-bold">B</span>
+                                      </span>
+                                    )}
+                                    {assignment.status === AssignmentStatus.ELIMINADO && (
+                                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                                        <span className="text-[7px] text-white font-bold">-</span>
                                       </span>
                                     )}
                                   </div>

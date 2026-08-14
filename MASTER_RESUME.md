@@ -36,9 +36,18 @@
   - Calendario del modal de colaborador.
   - Modal de día.
 - Bloqueo de asignación en **Horarios → Asignar** cuando un usuario tiene tiempo libre aprobado; se muestra badge informativo y se rechaza el drop con mensaje.
+- **Eliminación de asignaciones en borrador en Horarios → Asignar**:
+  - Doble click sobre una asignación ya publicada o en borrador la marca como `ELIMINADO` (soft-delete).
+  - La asignación eliminada sigue visible en la celda con fondo gris, texto tachado, icono de basura y badge rojo, actuando como borrador de eliminación.
+  - Doble click sobre una asignación marcada como `ELIMINADO` la restaura a su estado previo.
+  - El botón **Publicar** muestra contadores de borradores y eliminaciones pendientes.
+  - Al publicar: las asignaciones en `BORRADOR` pasan a `PUBLICADO` y las marcadas como `ELIMINADO` se eliminan definitivamente de Firestore.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
+- `src/hooks/useShifts.tsx`
+- `src/hooks/firestore/useFirestoreShifts.ts`
+- `src/hooks/firestore/ShiftsProvider.tsx`
 - `src/components/NotificationsDrawer.tsx`
 - `src/types/index.ts`
 

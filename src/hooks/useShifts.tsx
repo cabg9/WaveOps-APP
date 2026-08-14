@@ -38,6 +38,7 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       role: 'STAFF',
       date: a.date,
       status: a.status,
+      previousStatus: a.previousStatus,
       publishedAt: a.publishedAt,
       publishedBy: a.publishedBy,
     })),
@@ -94,6 +95,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       shiftsHook.removeShift(assignmentId);
     },
 
+    restoreShift: (assignmentId: string) => {
+      shiftsHook.restoreShift(assignmentId);
+    },
+
     getShiftById: (id: string) => {
       return shifts.find((s: any) => s.id === id);
     },
@@ -129,6 +134,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
     getBorradorCount: (department: string | 'ALL', weekStart: Date) => {
       return shiftsHook.getBorradorCount(department, weekStart);
+    },
+
+    getPendingChangesCount: (department: string | 'ALL', weekStart: Date) => {
+      return shiftsHook.getPendingChangesCount(department, weekStart);
     },
 
     validateDayRequirements: (department: string, date: string) => {
