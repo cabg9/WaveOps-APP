@@ -187,6 +187,18 @@ export default function HorariosModule() {
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
 
+  // Estado compartido para navegación de semana en Equipo (controlado desde header principal)
+  const [equipoWeekOffset, setEquipoWeekOffset] = useState(0);
+  const equipoWeekStart = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay() + 1 + equipoWeekOffset * 7);
+    return start;
+  }, [equipoWeekOffset]);
+  const equipoWeekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(equipoWeekStart, i));
+  }, [equipoWeekStart]);
+
   // Estado para sub-pestañas de incapacidades
   const [incapacidadesSubTab, setIncapacidadesSubTab] = useState<'mias' | 'equipo'>('mias');
 
@@ -325,7 +337,7 @@ export default function HorariosModule() {
         {/* Tabs principales + sub-pestañas y filtros de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
           {/* Mobile: dropdown de pestaña principal + filtros */}
-          <div className="md:hidden flex items-center gap-2 flex-wrap">
+          <div className={cn("md:hidden flex items-center gap-2", activeTab === 'incapacidades' ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap")}>
             <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
               <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                 <SelectValue placeholder="Seleccionar sección" />
@@ -560,29 +572,96 @@ export default function HorariosModule() {
             )}
           </div>
 
-          {/* Desktop: filtros de Incapacidades Equipo junto al selector principal */}
-          {activeTab === 'incapacidades' && incapacidadesSubTab === 'equipo' && (
-            <>
-              <Select value={incapacidadesStatusFilter} onValueChange={(v) => setIncapacidadesStatusFilter(v as typeof incapacidadesStatusFilter)}>
-                <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+          {/* Desktop: controles de Equipo en header principal */}
+          {activeTab === 'equipo' && (
+            <div className="hidden md:flex items-center gap-2">
+              <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                   <SelectValue>
-                    {{
-                      todas: 'Todas',
-                      pendiente: 'Pendientes',
-                      verificada: 'Verificadas',
-                      registrada: 'Registradas',
-                      rechazada: 'Rechazadas',
-                    }[incapacidadesStatusFilter]}
+                    {selectedDepartment === 'ALL' ? (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Todos</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-[#86868B]">
+                        <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                        <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  <SelectItem value="pendiente">Pendientes</SelectItem>
-                  <SelectItem value="verificada">Verificadas</SelectItem>
-                  <SelectItem value="registrada">Registradas</SelectItem>
-                  <SelectItem value="rechazada">Rechazadas</SelectItem>
+                  {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.GERENTE_OPERACIONES) && (
+                    <SelectItem value="ALL">
+                      <div className="flex items-center gap-2">
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Todos</span>
+                      </div>
+                    </SelectItem>
+                  )}
+                  {departmentOptions.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code}>
+                      <div className="flex items-center gap-2">
+                        <DeptIcon department={dept.code} className="w-4 h-4" />
+                        <span>{dept.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setEquipoWeekOffset(prev => prev - 1)}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setEquipoWeekOffset(0)}
+                  className="px-3 py-1.5 text-sm font-medium text-corporate hover:bg-corporate/5 rounded-lg"
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={() => setEquipoWeekOffset(prev => prev + 1)}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              <span className="text-sm text-[#86868B] whitespace-nowrap">
+                {formatWeekRange(equipoWeekStart, addDays(equipoWeekStart, 6))}
+              </span>
+            </div>
+          )}
+
+          {/* Desktop: filtros de Incapacidades Equipo junto al selector principal */}
+          {activeTab === 'incapacidades' && incapacidadesSubTab === 'equipo' && (
+            <>
+              <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                {[
+                  { id: 'todas', label: 'Todas' },
+                  { id: 'pendiente', label: 'Pendientes' },
+                  { id: 'verificada', label: 'Verificadas' },
+                  { id: 'registrada', label: 'Registradas' },
+                  { id: 'rechazada', label: 'Rechazadas' },
+                ].map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setIncapacidadesStatusFilter(filter.id as typeof incapacidadesStatusFilter)}
+                    className={cn(
+                      'px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                      incapacidadesStatusFilter === filter.id
+                        ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
               <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
                 <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                   <SelectValue>
@@ -673,7 +752,7 @@ export default function HorariosModule() {
         {/* Content */}
 
         {activeTab === 'mi-horario' && <MiHorarioTab incapacityDates={incapacityDates} addIncapacity={addIncapacity} getIncapacityForDate={getIncapacityForDate} />}
-        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
+        {activeTab === 'equipo' && <EquipoTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} addIncapacity={addIncapacity} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} weekOffset={equipoWeekOffset} setWeekOffset={setEquipoWeekOffset} weekStart={equipoWeekStart} weekDays={equipoWeekDays} />}
         {activeTab === 'asignar' && <AsignarTab incapacityDates={incapacityDates} getIncapacityForDate={getIncapacityForDate} selectedDepartment={selectedDepartment} setSelectedDepartment={setSelectedDepartment} />}
         {activeTab === 'solicitudes' && <SolicitudesTab />}
         {activeTab === 'incapacidades' && (
@@ -1145,13 +1224,13 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   >
                     {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
                     {hasIncapacity && IncapacityIcon && (
-                      <div className={cn("absolute top-0.5 right-0.5 w-2.5 h-2.5 sm:w-4 sm:h-4 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
-                        <IncapacityIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
+                      <div className={cn("absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
+                        <IncapacityIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
                       </div>
                     )}
                     {!hasIncapacity && hasTimeOff && TimeOffIcon && (
-                      <div className={cn("absolute top-0.5 right-0.5 w-2.5 h-2.5 sm:w-4 sm:h-4 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
-                        <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
+                      <div className={cn("absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
+                        <TimeOffIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
                       </div>
                     )}
                     <span className={cn(
@@ -2134,16 +2213,47 @@ interface EquipoTabProps {
   addIncapacity: (dates: string[], type: string, userId: string, description?: string, userInfoOverride?: { name: string; department: string }) => Promise<void>;
   selectedDepartment: string | 'ALL';
   setSelectedDepartment: (v: string | 'ALL') => void;
+  weekOffset?: number;
+  setWeekOffset?: (v: number | ((prev: number) => number)) => void;
+  weekStart?: Date;
+  weekDays?: Date[];
 }
 
-function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, addIncapacity, selectedDepartment, setSelectedDepartment }: EquipoTabProps) {
+function EquipoTab({
+  incapacityDates: _incapacityDates,
+  getIncapacityForDate,
+  addIncapacity,
+  selectedDepartment,
+  setSelectedDepartment,
+  weekOffset: propWeekOffset,
+  setWeekOffset: propSetWeekOffset,
+  weekStart: propWeekStart,
+  weekDays: propWeekDays,
+}: EquipoTabProps) {
   const { user } = useAuth();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const users = firestoreUsers;
   const { getTasksByUser } = useTasks();
-  const [weekOffset, setWeekOffset] = useState(0);
+
+  // Navegación de semana: controlada desde HorariosModule o interna
+  const [internalWeekOffset, setInternalWeekOffset] = useState(0);
+  const isWeekControlled = propWeekOffset !== undefined && propSetWeekOffset !== undefined;
+  const weekOffset = isWeekControlled ? propWeekOffset : internalWeekOffset;
+  const setWeekOffset = isWeekControlled ? propSetWeekOffset : setInternalWeekOffset;
+
+  const internalWeekStart = useMemo(() => {
+    const today = new Date();
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7);
+    return start;
+  }, [weekOffset]);
+  const internalWeekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => addDays(internalWeekStart, i));
+  }, [internalWeekStart]);
+  const weekStart = propWeekStart ?? internalWeekStart;
+  const weekDays = propWeekDays ?? internalWeekDays;
 
   // Modales
   const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
@@ -2201,17 +2311,6 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
     const dateStr = toLocalISODate(date);
     return approvedTimeOff.find((r) => r.userId === userId && isDateInRange(dateStr, r.startDate, r.endDate));
   };
-
-  const weekStart = useMemo(() => {
-    const today = new Date();
-    const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay() + 1 + weekOffset * 7); // Lunes
-    return start;
-  }, [weekOffset]);
-
-  const weekDays = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [weekStart]);
 
   // Obtener usuarios según selección
   const deptUsers = useMemo(() => {
@@ -2329,8 +2428,8 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
   return (
     <div className="space-y-4">
-      {/* Header: siempre horizontal */}
-      <div className="flex flex-row flex-wrap items-center justify-between gap-2">
+      {/* Header: visible solo en móvil, en desktop se mueve a HorariosModule */}
+      <div className="flex flex-row flex-wrap items-center justify-between gap-2 md:hidden">
         {/* Desktop: filtro de departamento */}
         <div className="hidden sm:block">
           <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
@@ -2395,32 +2494,34 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
       {/* Calendario */}
       <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
         <div className="overflow-x-auto w-full">
-          <div className="grid w-full min-w-0 grid-cols-[96px_repeat(7,minmax(calc((100%_-_96px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
+          <div className="min-w-full">
             {/* Header */}
-            <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
-              Usuario
-            </div>
-            {weekDays.map((day, i) => (
-              <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
-                <button
-                  onClick={() => {
-                    setSelectedHeaderDay(day);
-                    setShowHeaderDayModal(true);
-                  }}
-                  className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
-                >
-                  <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                  <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
-                  <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
-                </button>
+            <div className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
+              <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
+                Usuario
               </div>
-            ))}
+              {weekDays.map((day, i) => (
+                <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
+                  <button
+                    onClick={() => {
+                      setSelectedHeaderDay(day);
+                      setShowHeaderDayModal(true);
+                    }}
+                    className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
+                  >
+                    <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                    <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
+                    <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                  </button>
+                </div>
+              ))}
+            </div>
 
             {deptUsers.map((u, rowIdx) => {
               const isLastRow = rowIdx === deptUsers.length - 1;
               const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
               return (
-                <div key={u.id} className="contents">
+                <div key={u.id} className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
                   <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder)}>
                     <button
                       onClick={() => handleUserClick(u)}
@@ -3897,18 +3998,20 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
           {/* Calendario */}
           <div className="overflow-x-auto w-full">
-            <div className="grid w-full min-w-0 grid-cols-[96px_repeat(7,minmax(calc((100%_-_96px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
+            <div className="min-w-full">
               {/* Header */}
-              <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
-                Colaborador
-              </div>
-              {weekDays.map((day, i) => (
-                <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
-                  <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                  <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
-                  <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
+              <div className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
+                <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
+                  Colaborador
                 </div>
-              ))}
+                {weekDays.map((day, i) => (
+                  <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
+                    <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                    <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
+                    <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                  </div>
+                ))}
+              </div>
 
               {allVisibleUsers.map((u, rowIdx) => {
                 const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
@@ -3916,7 +4019,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                 const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
                 const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                 return (
-                  <div key={u.id} className="contents">
+                  <div key={u.id} className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
                     <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder, rowBg)}>
                       <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
                         <UserAvatar
@@ -4624,13 +4727,16 @@ function IncapacidadesTab({
     const inYear = (inc: typeof deptIncapacidades[0]) => parseInt(inc.startDate.split('-')[0]) === currentYear;
     const inPrevYear = (inc: typeof deptIncapacidades[0]) => parseInt(inc.startDate.split('-')[0]) === prevYear;
 
-    // Personas incapacitadas en el mes (únicas)
+    // Personas incapacitadas en el mes y año (únicas)
     const personasMes = new Set(deptIncapacidades.filter(inMonth).map(inc => inc.userId)).size;
     const personasMesAnterior = new Set(deptIncapacidades.filter(inPrevMonth).map(inc => inc.userId)).size;
+    const personasAnio = new Set(deptIncapacidades.filter(inYear).map(inc => inc.userId)).size;
+    const diasMes = daysFor(deptIncapacidades.filter(inMonth));
+    const diasMesAnterior = daysFor(deptIncapacidades.filter(inPrevMonth));
     const diasAnio = daysFor(deptIncapacidades.filter(inYear));
     const diasAnioAnterior = daysFor(deptIncapacidades.filter(inPrevYear));
 
-    return { personasMes, personasMesAnterior, diasAnio, diasAnioAnterior };
+    return { personasMes, personasMesAnterior, personasAnio, diasMes, diasMesAnterior, diasAnio, diasAnioAnterior };
   }, [incapacidades, selectedDepartment]);
 
   return (
@@ -4644,12 +4750,22 @@ function IncapacidadesTab({
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
               <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasMesAnterior}</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
+                {myStats.diasMesAnterior === 0
+                  ? '% vs ant.: N/A'
+                  : `% vs ant.: ${((myStats.diasMes - myStats.diasMesAnterior) / myStats.diasMesAnterior * 100).toFixed(0)}%`}
+              </span>
             </div>
             <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
               <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasAnioAnterior}</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
+                {myStats.diasAnioAnterior === 0
+                  ? '% vs ant.: N/A'
+                  : `% vs ant.: ${((myStats.diasAnio - myStats.diasAnioAnterior) / myStats.diasAnioAnterior * 100).toFixed(0)}%`}
+              </span>
             </div>
           </>
         ) : (
@@ -4659,12 +4775,22 @@ function IncapacidadesTab({
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
               <span className="text-[9px] text-[#86868B]">Este mes</span>
               <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.personasMesAnterior}</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
+                {deptStats.personasMes === 0
+                  ? 'Prom.: 0 días/pers.'
+                  : `Prom.: ${(deptStats.diasMes / deptStats.personasMes).toFixed(1)} días/pers.`}
+              </span>
             </div>
             <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
               <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
               <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
               <span className="text-[9px] text-[#86868B]">Este año</span>
               <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.diasAnioAnterior}</span>
+              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
+                {deptStats.personasAnio === 0
+                  ? 'Prom.: 0 días/pers.'
+                  : `Prom.: ${(deptStats.diasAnio / deptStats.personasAnio).toFixed(1)} días/pers.`}
+              </span>
             </div>
           </>
         )}
@@ -6442,7 +6568,7 @@ function SolicitudesTab() {
           <p className="text-sm text-[#86868B]">Gestiona cambios de turno y solicitudes de tiempo libre</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
           {/* Pestañas principales: Cambios | Solicitudes */}
           <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
             <button
@@ -6473,7 +6599,7 @@ function SolicitudesTab() {
 
           {activeSubTab === 'mis-cambios' && (
             <>
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex gap-2">
                 {[
                   { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
                   { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
@@ -6505,20 +6631,98 @@ function SolicitudesTab() {
               </div>
 
               {misCambiosFilter === 'equipo' && (
-                <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
-                    <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
-                    <SelectValue placeholder="Departamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ALL">Todos</SelectItem>
-                    {departmentOptions.map((opt) => (
-                      <SelectItem key={opt.code} value={opt.code}>
-                        {opt.name}
-                      </SelectItem>
+                <>
+                  <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
+                      <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
+                      <SelectValue placeholder="Departamento" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Todos</SelectItem>
+                      {departmentOptions.map((opt) => (
+                        <SelectItem key={opt.code} value={opt.code}>
+                          {opt.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Mobile: dropdown de estado del equipo */}
+                  <div className="md:hidden">
+                    <Select value={equipoFilter} onValueChange={(v) => setEquipoFilter(v as typeof equipoFilter)}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <SelectValue>
+                          {(() => {
+                            const active = [
+                              { id: 'todas', label: 'Todas', icon: LayoutGrid },
+                              { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2 },
+                              { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
+                              { id: 'deshechas', label: 'Revertidas', icon: History },
+                            ].find((f) => f.id === equipoFilter);
+                            const ActiveIcon = active?.icon || LayoutGrid;
+                            return (
+                              <span className="flex items-center gap-2 text-[#86868B]">
+                                <ActiveIcon className="w-4 h-4" />
+                                <span>{active?.label}</span>
+                              </span>
+                            );
+                          })()}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[
+                          { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
+                          { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
+                          { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
+                          { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
+                        ].map((filter) => {
+                          const FilterIcon = filter.icon;
+                          return (
+                            <SelectItem key={filter.id} value={filter.id}>
+                              <span className="flex items-center gap-2">
+                                <FilterIcon className="w-4 h-4" />
+                                <span>{filter.label}</span>
+                                {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
+                              </span>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Desktop: botones de estado del equipo */}
+                  <div className="hidden md:flex gap-2">
+                    {[
+                      { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
+                      { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
+                      { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
+                      { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
+                    ].map((filter) => (
+                      <button
+                        key={filter.id}
+                        onClick={() => setEquipoFilter(filter.id as typeof equipoFilter)}
+                        className={cn(
+                          'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                          equipoFilter === filter.id
+                            ? 'bg-corporate text-white'
+                            : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                        )}
+                      >
+                        <filter.icon className="w-4 h-4" />
+                        {filter.label}
+                        {filter.count > 0 && (
+                          <span className={cn(
+                            'px-1.5 py-0.5 text-xs rounded-full',
+                            equipoFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                          )}>
+                            {filter.count}
+                          </span>
+                        )}
+                      </button>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </>
               )}
             </>
           )}
@@ -6616,7 +6820,7 @@ function SolicitudesTab() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
+                    <div className="hidden md:flex items-center gap-2">
                       {filterButtons.map((f) => {
                         const count = deptFilteredRequests.filter((r) => f.id === 'todas' || r.status === f.id).length;
                         return (
@@ -6899,101 +7103,6 @@ function SolicitudesTab() {
           </div>
       ) : (
         <div className="space-y-4">
-          {/* Filtros para Equipo */}
-          <div className="flex flex-row items-center gap-2">
-            {/* Selector de departamento */}
-            <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
-                <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Todos</SelectItem>
-                {departmentOptions.map((opt) => (
-                  <SelectItem key={opt.code} value={opt.code}>
-                    {opt.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Mobile: dropdown de estado con iconos */}
-            <div className="md:hidden">
-              <Select value={equipoFilter} onValueChange={(v) => setEquipoFilter(v as typeof equipoFilter)}>
-                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {(() => {
-                      const active = [
-                        { id: 'todas', label: 'Todas', icon: LayoutGrid },
-                        { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2 },
-                        { id: 'rechazadas', label: 'Rechazadas', icon: XCircle },
-                        { id: 'deshechas', label: 'Revertidas', icon: History },
-                      ].find((f) => f.id === equipoFilter);
-                      const ActiveIcon = active?.icon || LayoutGrid;
-                      return (
-                        <span className="flex items-center gap-2 text-[#86868B]">
-                          <ActiveIcon className="w-4 h-4" />
-                          <span>{active?.label}</span>
-                        </span>
-                      );
-                    })()}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {[
-                    { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
-                    { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
-                    { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
-                    { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
-                  ].map((filter) => {
-                    const FilterIcon = filter.icon;
-                    return (
-                      <SelectItem key={filter.id} value={filter.id}>
-                        <span className="flex items-center gap-2">
-                          <FilterIcon className="w-4 h-4" />
-                          <span>{filter.label}</span>
-                          {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Desktop: botones de estado con iconos */}
-            <div className="hidden md:flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-              {[
-                { id: 'todas', label: 'Todas', icon: LayoutGrid, count: equipoCounts.todas },
-                { id: 'aceptadas', label: 'Aceptadas', icon: CheckCircle2, count: equipoCounts.aceptadas },
-                { id: 'rechazadas', label: 'Rechazadas', icon: XCircle, count: equipoCounts.rechazadas },
-                { id: 'deshechas', label: 'Revertidas', icon: History, count: equipoCounts.deshechas },
-              ].map((filter) => (
-                <button
-                  key={filter.id}
-                  onClick={() => setEquipoFilter(filter.id as typeof equipoFilter)}
-                  className={cn(
-                    'flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                    equipoFilter === filter.id
-                      ? 'bg-corporate text-white'
-                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-                  )}
-                >
-                  <filter.icon className="w-4 h-4" />
-                  {filter.label}
-                  {filter.count > 0 && (
-                    <span className={cn(
-                      'px-1.5 py-0.5 text-xs rounded-full',
-                      equipoFilter === filter.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                    )}>
-                      {filter.count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
           {/* Lista de solicitudes del equipo */}
           <div className="space-y-3">
             {getFilteredEquipo().length === 0 ? (
