@@ -6194,9 +6194,9 @@ function SolicitudesTab() {
                          user?.role === Role.DIRECTOR_GENERAL;
   
   // Función para deshacer cambio
-  const handleUndoChange = () => {
+  const handleUndoChange = async () => {
     if (!selectedSolicitud || !undoReason.trim()) return;
-    
+
     const now = new Date().toISOString();
     const userName = user?.name || 'Supervisor';
     const newHistorialItem = {
@@ -6205,27 +6205,41 @@ function SolicitudesTab() {
       usuario: userName,
       motivo: undoReason.trim()
     };
-    
+
     const updatedSolicitud: Solicitud = {
       ...selectedSolicitud,
       estado: 'deshecha',
       historial: [...(selectedSolicitud.historial || []), newHistorialItem]
     };
-    
+
+    // Persistir en Firestore si el ID proviene de Firestore
+    if (typeof selectedSolicitud.id === 'string') {
+      try {
+        await updateDoc(doc(db, 'solicitudes', selectedSolicitud.id), {
+          estado: 'deshecha',
+          historial: updatedSolicitud.historial
+        });
+      } catch (error) {
+        console.error('Error al deshacer cambio en Firestore:', error);
+        toast.error('No se pudo deshacer el cambio');
+        return;
+      }
+    }
+
     // Actualizar el estado de equipo
     setSolicitudesEquipoState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
+
     // Actualizar historial de Mis Cambios
     setHistorialState(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
+
     // Actualizar estado global
     setTodasSolicitudes(prev => prev.map(sol => sol.id === selectedSolicitud.id ? updatedSolicitud : sol));
-    
+
     // Actualizar localStorage
     const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
     const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === selectedSolicitud.id ? updatedSolicitud : s);
     localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
-    
+
     // Cerrar modal y limpiar
     setShowUndoModal(false);
     setSelectedSolicitud(null);
@@ -6302,49 +6316,79 @@ function SolicitudesTab() {
   };
   
   // Función para aceptar solicitud
-  const handleAcceptSolicitud = (solicitud: Solicitud) => {
+  const handleAcceptSolicitud = async (solicitud: Solicitud) => {
     const now = new Date().toISOString();
     const userName = user?.name || 'Usuario';
-    
-    const updatedSolicitud: Solicitud = { 
-      ...solicitud, 
-      estado: 'aceptada', 
+
+    const updatedSolicitud: Solicitud = {
+      ...solicitud,
+      estado: 'aceptada',
       fechaRespuesta: now,
       historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud aceptada', usuario: userName }]
     };
-    
+
+    // Persistir en Firestore si el ID proviene de Firestore
+    if (typeof solicitud.id === 'string') {
+      try {
+        await updateDoc(doc(db, 'solicitudes', solicitud.id), {
+          estado: 'aceptada',
+          fechaRespuesta: now,
+          historial: updatedSolicitud.historial
+        });
+      } catch (error) {
+        console.error('Error al aceptar solicitud en Firestore:', error);
+        toast.error('No se pudo aceptar la solicitud');
+        return;
+      }
+    }
+
     // Actualizar estado local
     setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
     setHistorialState(prev => [...prev, updatedSolicitud]);
-    
+
     // Actualizar estado global
     setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-    
+
     // Actualizar localStorage
     const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
     const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
     localStorage.setItem('waveops_todas_solicitudes', JSON.stringify(updatedSaved));
   };
-  
+
   // Función para rechazar solicitud
-  const handleRejectSolicitud = (solicitud: Solicitud) => {
+  const handleRejectSolicitud = async (solicitud: Solicitud) => {
     const now = new Date().toISOString();
     const userName = user?.name || 'Usuario';
-    
-    const updatedSolicitud: Solicitud = { 
-      ...solicitud, 
-      estado: 'rechazada', 
+
+    const updatedSolicitud: Solicitud = {
+      ...solicitud,
+      estado: 'rechazada',
       fechaRespuesta: now,
       historial: [...(solicitud.historial || []), { fecha: now, accion: 'Solicitud rechazada', usuario: userName }]
     };
-    
+
+    // Persistir en Firestore si el ID proviene de Firestore
+    if (typeof solicitud.id === 'string') {
+      try {
+        await updateDoc(doc(db, 'solicitudes', solicitud.id), {
+          estado: 'rechazada',
+          fechaRespuesta: now,
+          historial: updatedSolicitud.historial
+        });
+      } catch (error) {
+        console.error('Error al rechazar solicitud en Firestore:', error);
+        toast.error('No se pudo rechazar la solicitud');
+        return;
+      }
+    }
+
     // Actualizar estado local
     setSolicitudesRecibidasState(prev => prev.filter(s => s.id !== solicitud.id));
     setHistorialState(prev => [...prev, updatedSolicitud]);
-    
+
     // Actualizar estado global
     setTodasSolicitudes(prev => prev.map(s => s.id === solicitud.id ? updatedSolicitud : s));
-    
+
     // Actualizar localStorage
     const savedSolicitudes = JSON.parse(localStorage.getItem('waveops_todas_solicitudes') || '[]');
     const updatedSaved = savedSolicitudes.map((s: Solicitud) => s.id === solicitud.id ? updatedSolicitud : s);
@@ -6658,15 +6702,15 @@ function SolicitudesTab() {
                     {/* Botones de acción para recibidas pendientes - MÁS CORTOS */}
                     {solicitud.estado === 'pendiente' && misCambiosFilter === 'recibidas' && (
                       <div className="mt-3 flex gap-2 justify-end">
-                        <button 
-                          onClick={() => handleAcceptSolicitud(solicitud)}
+                        <button
+                          onClick={async () => { await handleAcceptSolicitud(solicitud); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
                         >
                           <Check className="w-4 h-4" />
                           Aceptar
                         </button>
-                        <button 
-                          onClick={() => handleRejectSolicitud(solicitud)}
+                        <button
+                          onClick={async () => { await handleRejectSolicitud(solicitud); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
                         >
                           <X className="w-4 h-4" />
@@ -6982,7 +7026,7 @@ function SolicitudesTab() {
               Cancelar
             </button>
             <button
-              onClick={handleUndoChange}
+              onClick={async () => { await handleUndoChange(); }}
               disabled={!undoReason.trim()}
               className="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

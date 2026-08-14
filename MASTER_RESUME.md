@@ -65,6 +65,9 @@
   - Si tiene turno asignado pero fuera del horario, muestra el horario + ubicación y el indicador en gris.
   - Contador de solicitudes de cambio de turno recibidas (`solicitudes` colección, estado `pendiente`) en `stat2`.
   - Los datos se leen en tiempo real desde Firestore y `useShifts`.
+- **Persistencia en Firebase de solicitudes de cambio de turno**:
+  - Las acciones **Aceptar**, **Rechazar** y **Deshacer** de solicitudes de cambio de turno ahora actualizan el documento correspondiente en la colección `solicitudes` de Firestore, no solo el estado local ni `localStorage`.
+  - El listener en tiempo real de `solicitudes` refleja los cambios en todos los clientes conectados.
 
 ### Archivos modificados
 - `src/components/modules/HorariosModule.tsx`
