@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (filtros horizontales y selects tipo botón deployados)
+> Última actualización: 2026-08-14 (responsive Horarios/Tasks según feedback detallado deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -144,10 +144,12 @@
   - Tablas de Equipo y Asignar con primera columna sticky al hacer scroll horizontal.
   - **Dropdowns en móvil**: pestañas principales (Mi Horario, Equipo, Asignar, Solicitudes, Incapacidades), sub-pestañas de Incapacidades, filtros de Mis Cambios (Recibidas, Enviadas, Historial, Equipo) y controles de Solicitudes (Mis solicitudes / Equipo, filtro de estado) se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
   - **Ajustes finales de filtros**:
-    - Todos los selects ahora se ajustan al contenido (`w-fit`) y usan estilo de botón con `rounded-xl`, borde suave y hover, en lugar de ocupar todo el ancho.
-    - En **Solicitudes**, las pestañas Mis Cambios / Mis solicitudes y los filtros Recibidas / Enviadas / Historial / Equipo se muestran como botones horizontales en móvil.
-    - En **Incapacidades**, las pestañas Mis Incapacidades / Equipo y los filtros de estado son botones horizontales; el selector de departamento comparte fila con los filtros.
-    - En **Equipo** y **Asignar**, el selector de departamento y los controles de semana están en una fila horizontal; las tablas usan `max-w-full overflow-x-auto` y `min-w-max` para evitar que el scroll horizontal desborde toda la página.
+    - Todos los selects ahora se ajustan al contenido (`w-fit`), usan estilo de botón con `rounded-xl`, borde suave y hover, y su texto/iconos son grises (`#86868B`) para mantener la línea gráfica.
+    - En **Solicitudes**, las pestañas Mis Cambios / Mis solicitudes son botones unitarios; los filtros Recibidas / Enviadas / Historial / Equipo son botones más compactos; en Mis solicitudes el filtro de estado (Todas, Pendientes, Aprobadas, Rechazadas, Canceladas) es un dropdown en móvil y botones en desktop.
+    - En **Incapacidades**, las pestañas Mis Incapacidades / Equipo son botones unitarios; los filtros de estado pasan a ser un dropdown con iconos en móvil y botones en desktop.
+    - En **Equipo** y **Asignar**, el selector de departamento se movió junto al dropdown principal de pestañas en móvil; las tablas usan columnas de usuario más angostas (`w-28` en móvil), días abreviados, celdas de día de `min-w-[52px]` y `max-w-full overflow-x-auto` para evitar scroll de página.
+    - En **Asignar**, el sidebar de turnos disponibles es `sticky` también en móvil para que los turnos queden fijos mientras se hace scroll en el calendario.
+  - **Modal Solicitar Días Libres**: en móvil usa `max-w-[calc(100%-2rem)]` para tener margen izquierdo/derecho y no quedar pegado a los bordes.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
