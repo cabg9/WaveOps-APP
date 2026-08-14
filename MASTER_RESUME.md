@@ -13,14 +13,19 @@
 
 ### Funcionalidades entregadas
 - Lectura en tiempo real de la colección `timeOffRequests` desde Firestore usando `onSnapshot`.
-- Nueva sub-pestaña **Solicitudes → Mis solicitudes**:
+- Pestaña **Solicitudes** con dos pestañas principales:
+  - **Mis cambios**: solicitudes de cambio de turno entre usuarios, con sub-filtros Recibidas, Enviadas, Historial y Equipo.
+  - **Mis solicitudes**: solicitudes de tiempo libre (`timeOffRequests`).
+- **Mis solicitudes → Mis solicitudes / Equipo**:
   - Vista "Mis solicitudes" para el usuario logueado.
-  - Vista "Equipo" para supervisores, RRHH, gerentes y directores.
+  - Vista "Equipo" para supervisores, RRHH, gerentes y directores; incluye las solicitudes propias del usuario.
   - Filtros por estado: Todas, Pendientes, Aprobadas, Rechazadas, Canceladas.
+  - Filtro por departamento en vista Equipo.
 - Acciones disponibles:
   - **Aprobar / Rechazar**: visibles para usuarios con permisos de aprobador, incluyendo auto-aprobar para pruebas (Director General).
-  - **Editar**: solo aprobadores; permite modificar tipo, fecha de inicio y fecha de fin.
-  - **Cancelar**: visible para el solicitante en sus propias solicitudes pendientes; marca el estado como `cancelada`.
+  - **Editar**: solo aprobadores; visible en solicitudes pendientes, aprobadas y rechazadas (no en canceladas); permite modificar tipo, fecha de inicio y fecha de fin.
+  - **Cancelar**: visible para el solicitante en sus propias solicitudes no canceladas; activo solo en estado pendiente; marca el estado como `cancelada` y conserva el historial.
+- **Historial de auditoría** visible solo para aprobadores dentro de cada tarjeta: registra aprobaciones, rechazos, ediciones (con cambios realizados) y cancelaciones, incluyendo quién y cuándo.
 - Notificaciones al usuario solicitante cuando su solicitud es aprobada o rechazada.
 - Visualización de días aprobados en **Mi Horario**:
   - Tarjeta de HOY.

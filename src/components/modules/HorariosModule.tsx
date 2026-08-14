@@ -114,7 +114,8 @@ import {
   getDoc, 
   updateDoc,
   addDoc,
-  serverTimestamp 
+  serverTimestamp,
+  arrayUnion 
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 
@@ -5492,6 +5493,7 @@ interface TimeOffRequest {
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   response?: string | null;
+  history?: { action: string; by: string; at: string; note?: string }[];
 }
 
 const TIME_OFF_LABELS: Record<TimeOffRequest['type'], string> = {
@@ -5556,8 +5558,10 @@ interface TimeOffRequestsPanelProps {
 
 function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove, onReject, onEdit, onCancel }: TimeOffRequestsPanelProps) {
   const { user } = useAuth();
+  const { departmentOptions } = useDynamicDepartments();
   const [view, setView] = useState<'mias' | 'equipo'>('mias');
   const [filter, setFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
+  const [deptFilter, setDeptFilter] = useState<string | 'ALL'>('ALL');
 
   // Modal de edición
   const [editingRequest, setEditingRequest] = useState<TimeOffRequest | null>(null);
@@ -5567,7 +5571,10 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
 
   const activeView = canApprove ? view : 'mias';
   const requests = activeView === 'mias' ? myRequests : teamRequests;
-  const filtered = requests.filter((r) => filter === 'todas' || r.status === filter);
+  const deptFiltered = deptFilter === 'ALL' ? requests : requests.filter((r) => r.department === deptFilter);
+  const filtered = deptFiltered.filter((r) => filter === 'todas' || r.status === filter);
+
+  const showDeptFilter = activeView === 'equipo' && departmentOptions.length > 1;
 
   const filterButtons: { id: typeof filter; label: string }[] = [
     { id: 'todas', label: 'Todas' },
@@ -5604,32 +5611,51 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
         </div>
       )}
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {filterButtons.map((f) => {
-          const count = requests.filter((r) => f.id === 'todas' || r.status === f.id).length;
-          return (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
-                filter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
-              )}
-            >
-              {f.label}
-              {count > 0 && (
-                <span
-                  className={cn(
-                    'px-1.5 py-0.5 text-xs rounded-full',
-                    filter === f.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
-                  )}
-                >
-                  {count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <div className="flex flex-col sm:flex-row gap-2">
+        {showDeptFilter && (
+          <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v as string | 'ALL')}>
+            <SelectTrigger className="w-full sm:w-[180px] bg-white border-[#E5E5E7]">
+              <Building2 className="w-4 h-4 text-[#86868B] mr-2" />
+              <SelectValue placeholder="Departamento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">Todos los departamentos</SelectItem>
+              {departmentOptions.map((opt) => (
+                <SelectItem key={opt.code} value={opt.code}>
+                  {opt.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          {filterButtons.map((f) => {
+            const count = deptFiltered.filter((r) => f.id === 'todas' || r.status === f.id).length;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap',
+                  filter === f.id ? 'bg-corporate text-white' : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                )}
+              >
+                {f.label}
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      'px-1.5 py-0.5 text-xs rounded-full',
+                      filter === f.id ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -5702,6 +5728,25 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
                 )}
               </div>
 
+              {/* Historial: solo visible para aprobadores */}
+              {canApprove && (req.history || []).length > 0 && (
+                <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
+                  <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
+                  <div className="space-y-1">
+                    {req.history!.map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs">
+                        <span className="text-[#86868B] whitespace-nowrap">
+                          {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                          {new Date(item.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                        <span className="text-[#1D1D1F]">- {item.action}</span>
+                        {item.note && <span className="text-[#86868B] italic">({item.note})</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {canApprove && req.status === 'pendiente' && (
                 <div className="mt-3 flex gap-2 justify-end">
                   <button
@@ -5722,7 +5767,7 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
               )}
 
               <div className="mt-2 flex gap-2 justify-end">
-                {canApprove && req.status === 'pendiente' && (
+                {canApprove && req.status !== 'cancelada' && (
                   <button
                     onClick={() => {
                       setEditingRequest(req);
@@ -5736,10 +5781,11 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, onApprove,
                     Editar
                   </button>
                 )}
-                {req.userId === user?.id && req.status === 'pendiente' && (
+                {req.userId === user?.id && req.status !== 'cancelada' && (
                   <button
-                    onClick={() => onCancel(req)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    onClick={() => req.status === 'pendiente' && onCancel(req)}
+                    disabled={req.status !== 'pendiente'}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <X className="w-3.5 h-3.5" />
                     Cancelar
@@ -5831,7 +5877,7 @@ function SolicitudesTab() {
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2.length > 0 ? firestoreUsers2 : staticUsers;
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'mis-solicitudes' | 'equipo'>('mis-cambios');
-  const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial'>('recibidas');
+  const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial' | 'equipo'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
   const [equipoDeptFilter, setEquipoDeptFilter] = useState<string | 'ALL'>('ALL');
   
@@ -5974,6 +6020,12 @@ function SolicitudesTab() {
             reviewedBy: data.reviewedBy || null,
             reviewedAt: data.reviewedAt?.toDate?.()?.toISOString?.() || null,
             response: data.response || null,
+            history: (data.history || []).map((h: any) => ({
+              action: h.action || '',
+              by: h.by || '',
+              at: h.at?.toDate?.()?.toISOString?.() || h.at || new Date().toISOString(),
+              note: h.note || '',
+            })),
           } as TimeOffRequest;
         });
         setTimeOffRequests(reqs);
@@ -6023,6 +6075,11 @@ function SolicitudesTab() {
         status: 'aprobada',
         reviewedBy: user.name || user.id,
         reviewedAt: serverTimestamp(),
+        history: arrayUnion({
+          action: 'Solicitud aprobada',
+          by: user.name || user.id,
+          at: new Date().toISOString(),
+        }),
       });
       await addDoc(collection(db, 'notifications'), {
         userId: req.userId,
@@ -6049,6 +6106,11 @@ function SolicitudesTab() {
         status: 'rechazada',
         reviewedBy: user.name || user.id,
         reviewedAt: serverTimestamp(),
+        history: arrayUnion({
+          action: 'Solicitud rechazada',
+          by: user.name || user.id,
+          at: new Date().toISOString(),
+        }),
       });
       await addDoc(collection(db, 'notifications'), {
         userId: req.userId,
@@ -6074,12 +6136,21 @@ function SolicitudesTab() {
   ) => {
     if (!user) return;
     try {
+      const changes: string[] = [];
+      if (data.type !== req.type) changes.push(`tipo: ${TIME_OFF_LABELS[req.type]} → ${TIME_OFF_LABELS[data.type]}`);
+      if (data.startDate !== req.startDate) changes.push(`inicio: ${formatTimeOffRange(req.startDate, req.startDate)} → ${formatTimeOffRange(data.startDate, data.startDate)}`);
+      if (data.endDate !== req.endDate) changes.push(`fin: ${formatTimeOffRange(req.endDate, req.endDate)} → ${formatTimeOffRange(data.endDate, data.endDate)}`);
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
         type: data.type,
         startDate: data.startDate,
         endDate: data.endDate,
         updatedBy: user.name || user.id,
         updatedAt: serverTimestamp(),
+        history: arrayUnion({
+          action: changes.length > 0 ? `Solicitud editada (${changes.join(', ')})` : 'Solicitud editada',
+          by: user.name || user.id,
+          at: new Date().toISOString(),
+        }),
       });
       toast.success('Solicitud actualizada');
     } catch (error) {
@@ -6095,6 +6166,11 @@ function SolicitudesTab() {
         status: 'cancelada',
         cancelledBy: user.name || user.id,
         cancelledAt: serverTimestamp(),
+        history: arrayUnion({
+          action: 'Solicitud cancelada por el solicitante',
+          by: user.name || user.id,
+          at: new Date().toISOString(),
+        }),
       });
       toast.success('Solicitud cancelada');
     } catch (error) {
@@ -6323,20 +6399,6 @@ function SolicitudesTab() {
             <Sun className="w-4 h-4" />
             Mis solicitudes
           </button>
-          {canViewEquipo && (
-            <button
-              onClick={() => setActiveSubTab('equipo')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 justify-center',
-                activeSubTab === 'equipo'
-                  ? 'bg-white text-corporate shadow-sm'
-                  : 'text-[#86868B] hover:text-[#1D1D1F]'
-              )}
-            >
-              <Users className="w-4 h-4" />
-              Equipo
-            </button>
-          )}
         </div>
       </div>
 
@@ -6351,7 +6413,7 @@ function SolicitudesTab() {
           onEdit={handleEditTimeOff}
           onCancel={handleCancelTimeOff}
         />
-      ) : activeSubTab === 'mis-cambios' ? (
+      ) : (
         <div className="space-y-4">
           {/* Filtros para Mis Cambios */}
           <div className="flex gap-2 overflow-x-auto pb-1">
@@ -6359,6 +6421,7 @@ function SolicitudesTab() {
               { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: solicitudesRecibidas.length },
               { id: 'enviadas', label: 'Enviadas', icon: Send, count: solicitudesEnviadas.length },
               { id: 'historial', label: 'Historial', icon: History, count: historial.length },
+              { id: 'equipo', label: 'Equipo', icon: Users, count: (solicitudesEquipoState.length > 0 ? solicitudesEquipoState : solicitudesEquipo).length },
             ].map((filter) => (
               <button
                 key={filter.id}
@@ -6384,9 +6447,9 @@ function SolicitudesTab() {
             ))}
           </div>
 
-          {/* Lista de solicitudes */}
-          <div className="space-y-3">
-            {getFilteredMisCambios().length === 0 ? (
+          {misCambiosFilter !== 'equipo' ? (
+            <div className="space-y-3">
+              {getFilteredMisCambios().length === 0 ? (
               <div className="bg-white rounded-2xl p-8 text-center shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                 <div className="w-16 h-16 bg-[#F5F5F7] rounded-2xl flex items-center justify-center mx-auto mb-4">
                   <ClipboardList className="w-8 h-8 text-[#C7C7CC]" />
@@ -6602,7 +6665,6 @@ function SolicitudesTab() {
               })
             )}
           </div>
-        </div>
       ) : (
         <div className="space-y-4">
           {/* Filtros para Equipo */}
@@ -6862,6 +6924,8 @@ function SolicitudesTab() {
           </div>
         </div>
       )}
+    </div>
+  )}
       
       {/* Modal para deshacer cambio */}
       <Dialog open={showUndoModal} onOpenChange={setShowUndoModal}>
