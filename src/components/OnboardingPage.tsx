@@ -334,7 +334,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] max-w-2xl w-full">
+      <div className="bg-white rounded-2xl p-5 sm:p-8 shadow-[0_2px_8px_rgba(0,0,0,0.04)] max-w-2xl w-full">
         <div className="text-center mb-6">
           <img src="/logo-waveops.png" alt="WaveOps" className="w-48 mx-auto mb-4" />
           <h1 className="text-xl font-semibold text-[#1D1D1F]">Completa tu perfil</h1>
@@ -369,7 +369,7 @@ export default function OnboardingPage() {
             <div className="space-y-2">
               <label className="flex items-center gap-2 text-sm font-medium text-[#1D1D1F]"><Phone className="w-4 h-4 text-corporate" /> Telefono *</label>
               <div className="flex gap-2">
-                <select value={form.phoneCountry} onChange={e => handleChange('phoneCountry', e.target.value)} className="w-36 h-10 rounded-xl border border-[#E5E5E7] px-2 text-sm">
+                <select value={form.phoneCountry} onChange={e => handleChange('phoneCountry', e.target.value)} className="w-28 sm:w-36 h-10 rounded-xl border border-[#E5E5E7] px-2 text-sm shrink-0">
                   {COUNTRY_CODES.map(c => (
                     <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
                   ))}
@@ -379,7 +379,7 @@ export default function OnboardingPage() {
               {errors.phone && <p className="text-sm text-red-500">{errors.phone}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-[#1D1D1F]"><Globe className="w-4 h-4 text-corporate" /> Nacionalidad *</label>
                 <Input value={form.nationality} onChange={e => handleChange('nationality', e.target.value)} placeholder="Ecuatoriana" className={errors.nationality ? 'border-red-500' : ''} />
@@ -392,7 +392,7 @@ export default function OnboardingPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-[#1D1D1F]">Cedula / ID</label>
                 <Input value={form.cedula} onChange={e => handleChange('cedula', e.target.value)} placeholder="1712345678" />
@@ -439,7 +439,7 @@ export default function OnboardingPage() {
               <Input value={form.emergencyContactName} onChange={e => handleChange('emergencyContactName', e.target.value)} placeholder="Nombre completo" className={errors.emergencyContactName ? 'border-red-500' : ''} />
               {errors.emergencyContactName && <p className="text-sm text-red-500">{errors.emergencyContactName}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-[#1D1D1F]"><Phone className="w-4 h-4 text-corporate" /> Tel. emergencia *</label>
                 <Input value={form.emergencyContactPhone} onChange={e => handleChange('emergencyContactPhone', e.target.value)} placeholder="+593 98 765 4321" className={errors.emergencyContactPhone ? 'border-red-500' : ''} />
@@ -462,7 +462,7 @@ export default function OnboardingPage() {
                 {errors.emergencyContactRelation && <p className="text-sm text-red-500">{errors.emergencyContactRelation}</p>}
               </div>
             </div>
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button variant="outline" onClick={() => setStep(1)} className="flex-1 h-12"><ChevronLeft className="w-4 h-4 mr-1" /> Atras</Button>
               <Button onClick={() => goToStep(3)} className="flex-1 bg-corporate h-12">Continuar <ChevronRight className="w-4 h-4 ml-1" /></Button>
             </div>
@@ -485,7 +485,7 @@ export default function OnboardingPage() {
             </div>
             <div className="border-t pt-4 mt-4">
               <p className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2"><CreditCard className="w-4 h-4 text-corporate" /> Datos bancarios</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs text-[#86868B]">Pais del banco</label>
                   <select value={form.bankCountry} onChange={e => handleChange('bankCountry', e.target.value)} className="w-full h-10 rounded-xl border border-[#E5E5E7] px-3 text-sm">
@@ -530,7 +530,7 @@ export default function OnboardingPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button variant="outline" onClick={() => setStep(2)} className="flex-1 h-12"><ChevronLeft className="w-4 h-4 mr-1" /> Atras</Button>
               <Button onClick={handleSubmit} disabled={loading} className="flex-1 bg-corporate h-12">
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Completar perfil'}

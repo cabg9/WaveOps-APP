@@ -74,7 +74,7 @@ function StatCard({ title, value, icon: Icon, color }: { title: string; value: s
           <Icon className={cn("w-5 h-5", color)} />
         </div>
       </div>
-      <p className="text-2xl font-semibold text-[#1D1D1F] mb-1">{value}</p>
+      <p className="text-xl sm:text-2xl font-semibold text-[#1D1D1F] mb-1">{value}</p>
       <p className="text-sm text-[#86868B]">{title}</p>
     </div>
   );
@@ -455,7 +455,7 @@ function UsuariosTab() {
       {/* Form Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto mx-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto mx-4" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-[#1D1D1F]">{editingUser ? 'Editar usuario' : 'Nuevo usuario'}</h3>
             <button onClick={() => setShowForm(false)} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
@@ -647,17 +647,17 @@ function ModulosTab() {
     <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <div className="space-y-3">
         {modules.map((mod) => (
-          <div key={mod.id} className="flex items-center justify-between p-4 rounded-xl border border-[#E5E5E7]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: mod.color + '20' }}>
+          <div key={mod.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#E5E5E7] gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: mod.color + '20' }}>
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: mod.color }} />
               </div>
-              <div>
-                <p className="text-sm font-medium text-[#1D1D1F]">{mod.name}</p>
-                <p className="text-xs text-[#86868B]">{mod.description}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
+                <p className="text-xs text-[#86868B] truncate">{mod.description}</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#86868B]">Visible</span>
                 <button onClick={() => toggleVisibility(mod.id, mod.isVisible)} disabled={saving === mod.id + '_vis'}
@@ -814,7 +814,7 @@ function RolesTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-[#1D1D1F]">Roles y Permisos</h3>
         <span className="text-sm text-[#86868B]">{roleTemplates.length} roles configurados</span>
       </div>
@@ -825,15 +825,15 @@ function RolesTab() {
           const currentPerms = drafts[role.id] || new Set(role.permissions || []);
           return (
             <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-gray-300 shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
-              <button onClick={() => toggleRole(role.id, role.permissions || [])} className="flex w-full items-center justify-between p-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl">
-                <div className="flex items-center gap-3">
+              <button onClick={() => toggleRole(role.id, role.permissions || [])} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <RoleIcon name={role.name} />
-                  <div>
-                    <div className="font-semibold text-[#1D1D1F] text-[15px]">{role.name}</div>
+                  <div className="min-w-0 text-left">
+                    <div className="font-semibold text-[#1D1D1F] text-[15px] truncate">{role.name}</div>
                     <div className="text-xs text-[#86868B] mt-0.5">{role.permissions?.length || 0} permisos asignados</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap justify-end">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${levelColor(role.level || 1)}`}>Nivel {role.level || 1}</span>
                   {isDirty && <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Modificado</span>}
                   {isOpen ? <ChevronUp size={18} className="text-[#86868B]" /> : <ChevronDown size={18} className="text-[#86868B]" />}
@@ -1090,9 +1090,9 @@ function SeguridadTab() {
           <Shield className="w-5 h-5 text-corporate" />
           <h3 className="font-semibold text-[#1D1D1F]">Usuarios con acceso a Develops</h3>
         </div>
-        <div className="flex gap-2 mb-4">
+        <div className="flex flex-col sm:flex-row gap-2 mb-4">
           <select value={email} onChange={(e) => setEmail(e.target.value)}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white">
+            className="flex-1 px-4 py-2.5 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white min-w-0">
             <option value="">Seleccionar usuario...</option>
             {users
               .filter((u) => u.isActive !== false && !access.allowedUserIds.includes(u.email) && u.email)
@@ -1101,7 +1101,7 @@ function SeguridadTab() {
                 <option key={u.id} value={u.email}>{u.name} ({u.email})</option>
               ))}
           </select>
-          <Button onClick={handleAddByEmail} disabled={adding || !email} className="gap-2">
+          <Button onClick={handleAddByEmail} disabled={adding || !email} className="gap-2 w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Agregar
           </Button>
         </div>
@@ -1110,17 +1110,17 @@ function SeguridadTab() {
             <p className="text-sm text-[#86868B] text-center py-4">No hay usuarios con acceso</p>
           ) : (
             dgUsers.map((u) => (
-              <div key={u.id} className="flex items-center justify-between p-3 rounded-xl border border-[#E5E5E7]">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-corporate/10 flex items-center justify-center text-xs font-semibold text-corporate">
+              <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-[#E5E5E7] gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-corporate/10 flex items-center justify-center text-xs font-semibold text-corporate shrink-0">
                     {u.name?.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#1D1D1F]">{u.name}</p>
-                    <p className="text-xs text-[#86868B]">{u.email} &middot; {u.role}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#1D1D1F] truncate">{u.name}</p>
+                    <p className="text-xs text-[#86868B] truncate">{u.email} &middot; {u.role}</p>
                   </div>
                 </div>
-                <button onClick={() => handleRemove(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title="Remover">
+                <button onClick={() => handleRemove(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red self-end sm:self-auto" title="Remover">
                   <X className="w-4 h-4" />
                 </button>
               </div>
@@ -1228,7 +1228,7 @@ function PapeleraTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h3 className="text-lg font-semibold text-[#1D1D1F]">Papelera</h3>
         <span className="text-sm text-[#86868B]">{totalItems} elementos</span>
       </div>
@@ -1238,7 +1238,7 @@ function PapeleraTab() {
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Turnos eliminados</h4>
           {trashedShifts.map((shift: any) => (
-            <div key={shift.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
+            <div key={shift.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: shift.color || '#8E8E93' }}>{(shift.name || "?").charAt(0).toUpperCase()}</div>
                 <div>
@@ -1246,7 +1246,7 @@ function PapeleraTab() {
                   <div className="text-xs text-[#86868B]">{getDeptName(shift.department)} &middot; {shift.startTime} - {shift.endTime}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <button onClick={() => handleRestoreShift(shift)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><RefreshCw size={14} /> Restaurar</button>
                 <button onClick={() => handlePermanentDeleteShift(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
               </div>
@@ -1260,7 +1260,7 @@ function PapeleraTab() {
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Departamentos eliminados</h4>
           {trashedDepartments.map((dept: any) => (
-            <div key={dept.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
+            <div key={dept.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold" style={{ backgroundColor: dept.color || '#8E8E93' }}>{(dept.name || "?").charAt(0).toUpperCase()}</div>
                 <div>
@@ -1268,7 +1268,7 @@ function PapeleraTab() {
                   <div className="text-xs text-[#86868B]">{dept.email || dept.manager || 'Sin email'} &middot; Eliminado {dept.deletedAt ? new Date(dept.deletedAt).toLocaleDateString() : "recientemente"}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <button onClick={() => handleRestoreDepartment(dept)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-colors"><RefreshCw size={14} /> Restaurar</button>
                 <button onClick={() => handlePermanentDeleteDepartment(dept)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
               </div>
@@ -1282,7 +1282,7 @@ function PapeleraTab() {
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-[#86868B] uppercase tracking-wide">Usuarios eliminados</h4>
           {trashedUsers.map((u: any) => (
-            <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex items-center justify-between">
+            <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-semibold">{(u.name || "?").charAt(0).toUpperCase()}</div>
                 <div>
@@ -1290,7 +1290,7 @@ function PapeleraTab() {
                   <div className="text-xs text-[#86868B]">{u.email} &middot; Eliminado {u.deletedAt ? new Date(u.deletedAt).toLocaleDateString() : "recientemente"}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <button onClick={() => handleRestoreUser(u)} disabled={restoringId === u.id} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 transition-colors">{restoringId === u.id ? "Restaurando..." : <><RefreshCw size={14} /> Restaurar</>}</button>
                 <button onClick={() => handlePermanentDelete(u)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500" title="Eliminar permanentemente"><Trash2 size={14} /></button>
               </div>

@@ -304,7 +304,7 @@ export default function TasksModule() {
             <h2 className="text-xl font-semibold text-[#1D1D1F]">Tasks</h2>
             <p className="text-sm text-[#86868B]">Gestiona tareas e incidencias</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {hasPermission('canCreateExtraTask') && (
               <Button onClick={() => handleOpenModal('extra')} variant="outline" className="border-amber-500 text-amber-500 hover:bg-amber-50 rounded-lg gap-2">
                 <Plus className="w-4 h-4" />Tarea Extra
@@ -322,14 +322,14 @@ export default function TasksModule() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
-          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Departamento</button>
+        <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-full sm:w-fit overflow-x-auto sm:overflow-visible">
+          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
+          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
           {hasPermission('canViewAllDepartments') && (
-            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
+            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
           )}
-          <div className="w-px h-6 bg-[#C7C7CC] mx-1" />
-          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
+          <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
+          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
         </div>
 
         {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
@@ -346,21 +346,21 @@ export default function TasksModule() {
         )}
 
         {!isIncidenciasTab && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
           </div>
         )}
 
         {isIncidenciasTab && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1">
             {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
             ))}
             {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-                <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                <SelectTrigger className="w-[160px] sm:w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0"><SelectValue placeholder="Departamento" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
@@ -418,7 +418,7 @@ export default function TasksModule() {
               <p className="text-[#86868B]">{isIncidenciasTab ? 'No hay incidencias' : 'No hay tareas'}</p>
             </div>
           ) : (
-            <div className={cn('space-y-3', viewType === 'grid' ? 'grid grid-cols-2 gap-3' : '')}>
+            <div className={cn('space-y-3', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
@@ -605,7 +605,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       {/* Departamento - botones */}
       <div className="space-y-2">
         <Label>Departamento</Label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {(() => {
             const currentUser = staticUsers.find((u) => u.id === currentUserId);
             let depts = allDepartments.map(d => d.code);
@@ -659,14 +659,14 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
       <hr className="border-[#C7C7CC] my-6" />
 
       {/* Fecha y hora de inicio */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-        <div className="space-y-1.5 min-w-0 overflow-hidden">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+        <div className="space-y-1.5 min-w-0 w-full">
           <Label className="text-xs">Fecha inicio</Label>
-          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-64 text-[6px] min-w-0 max-w-full py-0 px-0 h-10 text-center" />
+          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm min-w-0 max-w-full py-2 px-3 h-10 text-center" />
         </div>
-        <div className="space-y-1.5 min-w-0 overflow-hidden">
+        <div className="space-y-1.5 min-w-0 w-full">
           <Label className="text-xs">Hora inicio</Label>
-          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-64 text-[6px] min-w-0 max-w-full py-0 px-0 h-10 text-center" />
+          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm min-w-0 max-w-full py-2 px-3 h-10 text-center" />
         </div>
       </div>
 
@@ -723,7 +723,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
           {showApoyo && (
             <div className="space-y-2">
               <Label>Departamento</Label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {allDepartments.filter((d) => d.name !== taskForm.department).map((dept) => (
                   <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
                     {dept.name.toLowerCase()}
@@ -912,7 +912,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
       {expanded && (
         <div className="px-4 pb-4 border-t border-[#E5E5E7]">
           <div className="py-4 space-y-3">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><span className="text-[#86868B]">Creada por:</span> <span className="text-[#1D1D1F] font-medium">{creatorName}</span></div>
               <div><span className="text-[#86868B]">Departamento:</span> <span className="text-[#1D1D1F]">{task.department.replace(/_/g, ' ')}</span></div>
               {task.startTime && (<div><span className="text-[#86868B]">Hora inicio:</span> <span className="text-[#1D1D1F]">{task.startTime}</span></div>)}
@@ -1276,7 +1276,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
       {showReopenModal && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">Reabrir Incidencia</h3><p className="text-sm text-slate-600 mb-4">Escribe el motivo de la reapertura:</p><textarea value={reopenReason} onChange={(e) => setReopenReason(e.target.value)} placeholder="Escribe el motivo..." className="w-full p-3 border border-slate-300 rounded-lg mb-4 text-sm" rows={4} /><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowReopenModal(false)}>Cancelar</Button><Button className="bg-[#007AFF] hover:bg-[#007AFF]/90 text-white" onClick={() => { if (currentUserId) { onReopenIncidencia?.(incidencia.id, currentUserId, reopenReason); setShowReopenModal(false); setReopenReason(''); } }} disabled={!reopenReason.trim()}>Reabrir</Button></div></div></div>)}
       {maximizedPhoto && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setMaximizedPhoto(null)}>
-          <div className="relative max-w-4xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-[95vw] sm:max-w-4xl w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
             <img src={maximizedPhoto} className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl" alt="Foto maximizada" />
             <div className="flex items-center gap-4 mt-4">
               {incidencia.photos.map((photo, idx) => (

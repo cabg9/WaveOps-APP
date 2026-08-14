@@ -142,13 +142,13 @@ export function TurnosTab() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold text-[#1D1D1F]">Turnos</h2>
           <p className="text-sm text-[#86868B]">{allShifts.length} turnos configurados</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2">
+          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 w-full sm:w-auto justify-center">
             <Plus className="w-4 h-4" /> Nuevo Turno
           </Button>
         </div>
@@ -194,7 +194,7 @@ export function TurnosTab() {
 
       {/* Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingShift ? 'Editar Turno' : 'Nuevo Turno'}</DialogTitle>
           </DialogHeader>
@@ -227,9 +227,9 @@ export function TurnosTab() {
                 ))}
               </div>
             </div>
-            <div className="flex gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 bg-corporate hover:bg-corporate/90">{editingShift ? 'Actualizar' : 'Crear'}</Button>
-              <Button variant="outline" onClick={() => setShowModal(false)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">Cancelar</Button>
             </div>
           </div>
         </DialogContent>

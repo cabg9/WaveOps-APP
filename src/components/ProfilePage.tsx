@@ -323,14 +323,14 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
 
             {/* Info */}
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-2xl font-bold text-[#1D1D1F]">
+              <h1 className="text-xl sm:text-2xl font-bold text-[#1D1D1F] break-words">
                 {formData.name || 'Usuario'}
                 {formData.displayName && (
-                  <span className="text-[#86868B] text-lg font-normal ml-2">"{formData.displayName}"</span>
+                  <span className="text-[#86868B] text-base sm:text-lg font-normal ml-2">"{formData.displayName}"</span>
                 )}
               </h1>
               <p className="text-[#86868B] mt-1">{formData.position || formData.role?.replace(/_/g, ' ') || 'Sin rol'}</p>
-              <div className="flex items-center justify-center md:justify-start gap-3 mt-3">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-3">
                 <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#F5F5F7] text-xs text-[#86868B]">
                   <Briefcase className="w-3 h-3" />
                   {formData.department?.replace(/_/g, ' ') || 'Sin departamento'}

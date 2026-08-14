@@ -206,12 +206,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         <header className="hidden lg:flex sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-[#E5E5E7]">
           <div className="flex items-center justify-between px-6 py-4 w-full">
             {/* Left: Title & Date */}
-            <div>
+            <div className="min-w-0 flex-1">
               {title && (
-                <h1 className="text-2xl font-semibold text-[#1D1D1F]">{title}</h1>
+                <h1 className="text-2xl font-semibold text-[#1D1D1F] truncate">{title}</h1>
               )}
               {showDate && (
-                <p className="text-sm text-[#86868B] capitalize mt-0.5">
+                <p className="text-sm text-[#86868B] capitalize mt-0.5 truncate">
                   {formattedDate}
                 </p>
               )}
@@ -257,14 +257,14 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         <header className="lg:hidden sticky top-0 z-40 bg-white border-b border-[#E5E5E7]">
           <div className="flex items-center justify-between px-4 py-3">
             {/* Left: Logo & Title */}
-            <div className="flex items-center gap-3">
-              <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
-              <div>
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl shrink-0" />
+              <div className="min-w-0 flex-1">
                 {title && (
-                  <h1 className="text-lg font-semibold text-[#1D1D1F]">{title}</h1>
+                  <h1 className="text-lg font-semibold text-[#1D1D1F] truncate">{title}</h1>
                 )}
                 {showDate && (
-                  <p className="text-xs text-[#86868B] capitalize">
+                  <p className="text-xs text-[#86868B] capitalize truncate">
                     {formattedDate}
                   </p>
                 )}
@@ -293,7 +293,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                     <Menu className="w-5 h-5" />
                   </button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[280px] bg-white p-0">
+                <SheetContent side="right" className="w-[280px] max-w-[85vw] bg-white p-0">
                   {/* Sheet Header */}
                   <SheetHeader className="p-4 border-b border-[#E5E5E7]">
                     <div className="flex items-center justify-between">
@@ -380,7 +380,7 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
         </header>
 
         {/* Page Content */}
-        <div className="p-4 lg:p-6">{children}</div>
+        <div className="p-4 lg:p-6 overflow-x-hidden">{children}</div>
       </main>
     </div>
 

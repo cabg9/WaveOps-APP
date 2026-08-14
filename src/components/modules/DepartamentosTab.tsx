@@ -154,7 +154,7 @@ export function DepartamentosTab() {
     if (!showFormModal) return null;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeFormModal(); }}>
-        <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
+        <div className="w-full max-w-[95vw] sm:max-w-lg rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-slate-100">{editingId ? "Editar departamento" : "Nuevo departamento"}</h3>
             <button onClick={closeFormModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
@@ -171,7 +171,7 @@ export function DepartamentosTab() {
               <Label className="text-slate-300">Descripcion</Label>
               <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-slate-600 bg-slate-700 text-slate-100" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Tipo</Label>
                 <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value as any }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
@@ -216,7 +216,7 @@ export function DepartamentosTab() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeTeamModal(); }}>
-        <div className="w-full max-w-3xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="w-full max-w-[95vw] sm:max-w-3xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-100">{selectedDept.name}</h3>

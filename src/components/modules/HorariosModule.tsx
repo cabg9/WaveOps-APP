@@ -879,7 +879,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   <button
                     onClick={() => setExpandedDate(isExpanded ? null : dateStr)}
                     className={cn(
-                      'w-full h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
+                      'w-full h-[90px] sm:h-[110px] lg:h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
                       isToday ? 'ring-2 ring-corporate bg-corporate/5' : 'hover:bg-[#F5F5F7]',
                       hasIncapacity && incapacityStyle?.bgColor.replace('100', '50'),
                       !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
@@ -2147,7 +2147,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#E5E5E7]">
-                <th className="text-left p-4 text-sm font-medium text-[#86868B] w-48">Usuario</th>
+                <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Usuario</th>
                 {weekDays.map((day, i) => (
                   <th key={i} className="text-center p-2 text-sm font-medium text-[#86868B] min-w-[100px]">
                     <button
@@ -2167,7 +2167,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
             <tbody>
               {deptUsers.map((u) => (
                 <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0">
-                  <td className="p-4">
+                    <td className="p-4 sticky left-0 bg-white z-10">
                     <button 
                       onClick={() => handleUserClick(u)}
                       className="flex items-center gap-3 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors"
@@ -2274,7 +2274,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
       {/* Modal de información del usuario */}
       <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>Información del colaborador</span>
@@ -2361,21 +2361,21 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                       <CalendarDays className="w-4 h-4" />
                       Estadísticas de {userCalendarMonth.toLocaleDateString('es-ES', { month: 'long' })}
                     </h4>
-                    <div className="grid grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="bg-green-50 rounded-xl p-3 text-center">
-                        <p className="text-2xl font-bold text-green-600">{workingDays}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-green-600">{workingDays}</p>
                         <p className="text-xs text-green-700">Días trabajados</p>
                       </div>
                       <div className="bg-blue-50 rounded-xl p-3 text-center">
-                        <p className="text-2xl font-bold text-blue-600">{freeDays}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-blue-600">{freeDays}</p>
                         <p className="text-xs text-blue-700">Días libres</p>
                       </div>
                       <div className="bg-purple-50 rounded-xl p-3 text-center">
-                        <p className="text-2xl font-bold text-purple-600">{totalShifts}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-purple-600">{totalShifts}</p>
                         <p className="text-xs text-purple-700">Total turnos</p>
                       </div>
                       <div className="bg-red-50 rounded-xl p-3 text-center">
-                        <p className="text-2xl font-bold text-red-600">{incapacityDays}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-red-600">{incapacityDays}</p>
                         <p className="text-xs text-red-700">Incapacidades</p>
                       </div>
                     </div>
@@ -3026,7 +3026,7 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
 
       {/* Modal de día del header - Información del departamento */}
       <Dialog open={showHeaderDayModal} onOpenChange={setShowHeaderDayModal}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {selectedHeaderDay && (
@@ -3121,21 +3121,21 @@ function EquipoTab({ incapacityDates: _incapacityDates, getIncapacityForDate, ad
                           <span className="text-sm font-medium text-[#1D1D1F] w-12 text-right">{completionRate}%</span>
                         </div>
                         {/* Contadores */}
-                        <div className="grid grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                           <div className="bg-white rounded-lg p-3 text-center">
-                            <p className="text-xl font-bold text-[#1D1D1F]">{totalTasks}</p>
+                            <p className="text-lg sm:text-xl font-bold text-[#1D1D1F]">{totalTasks}</p>
                             <p className="text-[10px] text-[#86868B]">Total</p>
                           </div>
                           <div className="bg-green-50 rounded-lg p-3 text-center">
-                            <p className="text-xl font-bold text-green-600">{tasksCompleted}</p>
+                            <p className="text-lg sm:text-xl font-bold text-green-600">{tasksCompleted}</p>
                             <p className="text-[10px] text-green-700">Realizados</p>
                           </div>
                           <div className="bg-amber-50 rounded-lg p-3 text-center">
-                            <p className="text-xl font-bold text-amber-600">{tasksPending}</p>
+                            <p className="text-lg sm:text-xl font-bold text-amber-600">{tasksPending}</p>
                             <p className="text-[10px] text-amber-700">Pendientes</p>
                           </div>
                           <div className="bg-red-50 rounded-lg p-3 text-center">
-                            <p className="text-xl font-bold text-red-600">{tasksOverdue}</p>
+                            <p className="text-lg sm:text-xl font-bold text-red-600">{tasksOverdue}</p>
                             <p className="text-[10px] text-red-700">Atrasados</p>
                           </div>
                         </div>
@@ -3645,7 +3645,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#E5E5E7]">
-                  <th className="text-left p-4 text-sm font-medium text-[#86868B] w-48">Colaborador</th>
+                  <th className="text-left p-4 text-sm font-medium text-[#86868B] w-40 sm:w-48 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Colaborador</th>
                   {weekDays.map((day, i) => (
                     <th key={i} className="text-center p-4 text-sm font-medium text-[#86868B] min-w-[100px]">
                       <div>{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
@@ -3662,7 +3662,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     "border-b border-[#E5E5E7] last:border-0",
                     isCrossDept && "bg-amber-50/50"
                   )}>
-                    <td className="p-4">
+                    <td className="p-4 sticky left-0 bg-white z-10">
                       <div className="flex items-center gap-3">
                         <UserAvatar
                           name={u.name}
@@ -4373,10 +4373,10 @@ function IncapacidadesTab({
 
   return (
     <div className="space-y-4">
-      {/* CONTENEDOR: Grid de 4 celdas del mismo tamaño */}
-      <div className="grid grid-cols-4 gap-3">
-        {/* Celdas 1-2: Filtros (unidas) */}
-        <div className="col-span-2 min-w-0">
+      {/* CONTENEDOR: responsive - en movil apilado, en desktop grid de 4 */}
+      <div className="space-y-3 lg:grid lg:grid-cols-4 lg:gap-3 lg:space-y-0">
+        {/* Celdas 1-2: Filtros (unidas en desktop) */}
+        <div className="lg:col-span-2 min-w-0">
           {activeSubTab === 'equipo' ? (
             <div className="flex gap-2 overflow-x-auto pb-1 h-10 items-center">
               {[
@@ -4450,7 +4450,7 @@ function IncapacidadesTab({
           )}
         </div>
         
-        {/* Celda 3: Selector de departamento */}
+        {/* Selector de departamento */}
         <div className="min-w-0">
           {activeSubTab === 'equipo' ? (
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
@@ -4494,11 +4494,11 @@ function IncapacidadesTab({
           )}
         </div>
         
-        {/* Celda 4: Estadísticas */}
-        <div className="flex gap-2 justify-end h-10 items-center">
+        {/* Estadísticas */}
+        <div className="flex gap-2 h-auto lg:h-10 items-stretch lg:items-center lg:justify-end">
           {activeSubTab === 'mias' ? (
             <>
-              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-[160px]">
+              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-full lg:w-[160px]">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3 h-3 text-corporate" />
                   <span className="text-[10px] text-[#86868B]">Este mes</span>
@@ -4508,7 +4508,7 @@ function IncapacidadesTab({
                   <span className="text-[10px] text-[#86868B]">días</span>
                 </div>
               </div>
-              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-[160px]">
+              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-full lg:w-[160px]">
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-3 h-3 text-green-600" />
                   <span className="text-[10px] text-[#86868B]">Este año</span>
@@ -4521,7 +4521,7 @@ function IncapacidadesTab({
             </>
           ) : (
             <>
-              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-[160px]">
+              <div className="bg-[#F0F7FF] rounded-lg px-4 py-2 border border-[#D1E3F6] w-full lg:w-[160px]">
                 <div className="flex items-center gap-1.5">
                   <Users className="w-3 h-3 text-corporate" />
                   <span className="text-[10px] text-[#86868B]">Este mes</span>
@@ -4531,7 +4531,7 @@ function IncapacidadesTab({
                   <span className="text-[10px] text-[#86868B]">personas</span>
                 </div>
               </div>
-              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-[160px]">
+              <div className="bg-[#F0FFF4] rounded-lg px-4 py-2 border border-[#C6F6D5] w-full lg:w-[160px]">
                 <div className="flex items-center gap-1.5">
                   <CalendarDays className="w-3 h-3 text-green-600" />
                   <span className="text-[10px] text-[#86868B]">Este año</span>
@@ -4961,7 +4961,7 @@ function IncapacidadesTab({
 
       {/* Modal de Registrar Incapacidad - CON SELECCIÓN DE REEMPLAZO */}
       <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -5126,7 +5126,7 @@ function IncapacidadesTab({
 
       {/* Modal de Cambiar Reemplazo */}
       <Dialog open={showChangeReplaceModal} onOpenChange={setShowChangeReplaceModal}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -5799,7 +5799,7 @@ function TimeOffRequestsPanel({ myRequests, teamRequests, canApprove, users, onA
                 <option value="otro">Otro</option>
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Desde</label>
                 <input
@@ -6498,7 +6498,7 @@ function SolicitudesTab() {
                     
                     {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
                     {solicitud.tipo === 'cambio' ? (
-                      <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Columna ANTES */}
                         <div className="bg-[#F5F5F7] rounded-lg p-3">
                           <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
@@ -6553,7 +6553,7 @@ function SolicitudesTab() {
                         </div>
                       </div>
                     ) : solicitud.tipo === 'intercambio' ? (
-                      <div className="mt-3 grid grid-cols-2 gap-3">
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {/* Columna ANTES */}
                         <div className="bg-[#F5F5F7] rounded-lg p-3">
                           <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
@@ -6768,7 +6768,7 @@ function SolicitudesTab() {
                   
                   {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
                   {solicitud.tipo === 'cambio' ? (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Columna ANTES */}
                       <div className="bg-[#F5F5F7] rounded-lg p-3">
                         <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
@@ -6823,7 +6823,7 @@ function SolicitudesTab() {
                       </div>
                     </div>
                   ) : solicitud.tipo === 'intercambio' ? (
-                    <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {/* Columna ANTES */}
                       <div className="bg-[#F5F5F7] rounded-lg p-3">
                         <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
