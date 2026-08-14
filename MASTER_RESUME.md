@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (eliminado staticUsers de HorariosModule y ajustes responsive deployados)
+> Última actualización: 2026-08-14 (ajustes responsive finales en Equipo/Asignar y filtro Todos departamentos; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -150,6 +150,10 @@
     - En **Equipo** y **Asignar**, el selector de departamento se movió junto al dropdown principal de pestañas en móvil; las tablas usan columnas de usuario más angostas (`w-20` en móvil), días abreviados `L / Ma / Mi / J / V / S / D`, celdas de día de `min-w-[52px]` y scroll horizontal interno para los 7 días sin salirse del grid.
     - En **Asignar**, el sidebar de turnos disponibles es `sticky` también en móvil para que los turnos queden fijos mientras se hace scroll en el calendario.
   - **Modal Solicitar Días Libres**: en móvil usa `max-w-[calc(100%-2rem)]` para tener margen izquierdo/derecho y no quedar pegado a los bordes.
+  - **Ajustes finales en Equipo y Asignar (post-deploy)**:
+    - Las celdas de día en móvil pasan a `min-w-[90px]` (desktop `sm:min-w-[100px]`) y la columna de usuario se reduce a `72px`, de modo que inicialmente se ven ~3 días y el resto de la semana se alcanza con scroll horizontal interno sin salirse del grid.
+    - Abreviaturas de días en móvil: `L / Ma / Mi / J / V / S / D`.
+    - Se agregó `users` a las dependencias de los `useMemo` de `deptUsers` (Equipo/Asignar) y `crossDeptUsers` (Asignar), corrigiendo que el filtro **Todos** los departamentos no mostraba usuarios reales hasta que llegaban asíncronamente de Firestore.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
@@ -195,6 +199,7 @@ Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos d
 - **HorariosModule**: se eliminó completamente la importación de `staticUsers` y todos los fallback (`firestoreUsers.length > 0 ? firestoreUsers : staticUsers`). Ahora Equipo, Asignar, Incapacidades y Solicitudes usan exclusivamente los usuarios reales de Firestore.
 - **MiHorarioTab**: se agregó lectura de `useFirestoreUsers` para resolver el usuario actual sin depender de `staticUsers`.
 - **addIncapacity**: ahora busca el usuario en `firestoreUsers` en lugar de `staticUsers`.
+- **Filtro "Todos" los departamentos**: se corrigió la recalculación de listas de usuarios en Equipo/Asignar agregando `users` a las dependencias de `useMemo`, evitando que se mostraran usuarios hardcodeados/fantasma cuando `useFirestoreUsers` aún no había devuelto datos.
 
 ### Pendiente
 - **TasksModule**: aún usa `staticUsers` en múltiples lugares (creación de tareas, asignación de apoyo, historial, notas, incidencias). Debe migrarse a `firestoreUsers`.
