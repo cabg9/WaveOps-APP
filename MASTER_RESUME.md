@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-15 (Popup Equipo con margen en móvil + rediseño tarjetas stats Incapacidades; deployado)
+> Última actualización: 2026-08-15 (Mi Horario: expansión de día no mueve números de la semana; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -205,6 +205,7 @@
       - Se corrigió la duplicación de sub-pestañas **Mis Incapacidades | Equipo** en móvil; la fila unificada ahora es exclusivamente desktop y el móvil conserva solo su bloque de sub-pestañas y filtros.
       - En móvil, los dropdowns de filtros de **Incapacidades** ocupan el ancho completo (`w-full`) y se muestran en fila (`flex-row`): dropdown de estado a la izquierda y dropdown de departamento a la derecha, ambos debajo de las sub-pestañas.
     - **Popup de día en Equipo (móvil)**: el `DialogContent` ahora usa `w-[calc(100%-2rem)] max-w-md mx-auto` para dejar margen izquierdo/derecho y no tocar los bordes de la pantalla.
+    - **Expansión de día en Mi Horario**: el calendario ahora agrupa los días por semanas. Al presionar un día, la fila de números de la semana permanece fija y el panel de detalle se muestra debajo de toda la fila, sin recorrer ningún número.
     - **Tarjetas de estadísticas en Incapacidades**: rediseño completo de las tarjetas celeste/verde para aprovechar el espacio, evitar texto aplastado y mostrar la información de forma clara:
       - Icono más grande en la esquina superior, título legible, valor destacado en tamaño grande y unidad explicitada.
       - Datos secundarios (periodo anterior y variación/promedio) en una sección inferior separada por borde.
