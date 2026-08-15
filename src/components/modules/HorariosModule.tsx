@@ -337,7 +337,7 @@ export default function HorariosModule() {
         {/* Tabs principales + sub-pestañas y filtros de incapacidades */}
         <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2">
           {/* Mobile: dropdown de pestaña principal + filtros */}
-          <div className={cn("md:hidden flex items-center gap-2", activeTab === 'incapacidades' ? "flex-nowrap overflow-x-auto pb-1" : "flex-wrap")}>
+          <div className={cn("md:hidden flex items-start gap-2", activeTab === 'incapacidades' ? "flex-col" : "flex-wrap")}>
             <Select value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
               <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                 <SelectValue placeholder="Seleccionar sección" />
@@ -394,7 +394,90 @@ export default function HorariosModule() {
 
             {/* Mobile: sub-pestañas y filtros de incapacidades */}
             {activeTab === 'incapacidades' && (
-              <>
+              <div className="md:hidden flex flex-col gap-2">
+                {/* Fila 1: dropdown principal + estado/departamento */}
+                <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1">
+                  {incapacidadesSubTab === 'mias' && (
+                    <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <SelectValue>
+                          {{
+                            enviadas: 'Enviadas',
+                            registradas: 'Registradas',
+                            rechazadas: 'Rechazadas',
+                            historial: 'Historial',
+                          }[myIncapacidadesFilter]}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="enviadas">Enviadas</SelectItem>
+                        <SelectItem value="registradas">Registradas</SelectItem>
+                        <SelectItem value="rechazadas">Rechazadas</SelectItem>
+                        <SelectItem value="historial">Historial</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {incapacidadesSubTab === 'equipo' && (
+                    <>
+                      <Select value={incapacidadesStatusFilter} onValueChange={(v) => setIncapacidadesStatusFilter(v as typeof incapacidadesStatusFilter)}>
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                          <SelectValue>
+                            {{
+                              todas: 'Todas',
+                              pendiente: 'Pendientes',
+                              verificada: 'Verificadas',
+                              registrada: 'Registradas',
+                              rechazada: 'Rechazadas',
+                            }[incapacidadesStatusFilter]}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="pendiente">Pendientes</SelectItem>
+                          <SelectItem value="verificada">Verificadas</SelectItem>
+                          <SelectItem value="registrada">Registradas</SelectItem>
+                          <SelectItem value="rechazada">Rechazadas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                          <SelectValue>
+                            {incapacidadesDeptFilter === 'ALL' ? (
+                              <div className="flex items-center gap-2 text-[#86868B]">
+                                <LayoutGrid className="w-4 h-4" />
+                                <span>Todos</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-[#86868B]">
+                                <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4" />
+                                <span className="truncate max-w-[100px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                              </div>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">
+                            <div className="flex items-center gap-2">
+                              <LayoutGrid className="w-4 h-4" />
+                              <span>Todos</span>
+                            </div>
+                          </SelectItem>
+                          {departmentOptions.map((dept) => (
+                            <SelectItem key={dept.code} value={dept.code}>
+                              <div className="flex items-center gap-2">
+                                <DeptIcon department={dept.code} className="w-4 h-4" />
+                                <span>{dept.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
+                </div>
+
+                {/* Fila 2: sub-pestañas */}
                 <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
                   <button
                     onClick={() => setIncapacidadesSubTab('mias')}
@@ -421,86 +504,7 @@ export default function HorariosModule() {
                     Equipo
                   </button>
                 </div>
-
-                {incapacidadesSubTab === 'mias' && (
-                  <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
-                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                      <SelectValue>
-                        {{
-                          enviadas: 'Enviadas',
-                          registradas: 'Registradas',
-                          rechazadas: 'Rechazadas',
-                          historial: 'Historial',
-                        }[myIncapacidadesFilter]}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="enviadas">Enviadas</SelectItem>
-                      <SelectItem value="registradas">Registradas</SelectItem>
-                      <SelectItem value="rechazadas">Rechazadas</SelectItem>
-                      <SelectItem value="historial">Historial</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {incapacidadesSubTab === 'equipo' && (
-                  <>
-                    <Select value={incapacidadesStatusFilter} onValueChange={(v) => setIncapacidadesStatusFilter(v as typeof incapacidadesStatusFilter)}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                        <SelectValue>
-                          {{
-                            todas: 'Todas',
-                            pendiente: 'Pendientes',
-                            verificada: 'Verificadas',
-                            registrada: 'Registradas',
-                            rechazada: 'Rechazadas',
-                          }[incapacidadesStatusFilter]}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="todas">Todas</SelectItem>
-                        <SelectItem value="pendiente">Pendientes</SelectItem>
-                        <SelectItem value="verificada">Verificadas</SelectItem>
-                        <SelectItem value="registrada">Registradas</SelectItem>
-                        <SelectItem value="rechazada">Rechazadas</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                        <SelectValue>
-                          {incapacidadesDeptFilter === 'ALL' ? (
-                            <div className="flex items-center gap-2 text-[#86868B]">
-                              <LayoutGrid className="w-4 h-4" />
-                              <span>Todos</span>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-[#86868B]">
-                              <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4" />
-                              <span className="truncate max-w-[100px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">
-                          <div className="flex items-center gap-2">
-                            <LayoutGrid className="w-4 h-4" />
-                            <span>Todos</span>
-                          </div>
-                        </SelectItem>
-                        {departmentOptions.map((dept) => (
-                          <SelectItem key={dept.code} value={dept.code}>
-                            <div className="flex items-center gap-2">
-                              <DeptIcon department={dept.code} className="w-4 h-4" />
-                              <span>{dept.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </>
-                )}
-              </>
+              </div>
             )}
           </div>
 
@@ -2494,136 +2498,138 @@ function EquipoTab({
       {/* Calendario */}
       <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
         <div className="overflow-x-auto w-full">
-          <div className="min-w-full">
-            {/* Header */}
-            <div className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
-              <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
-                Usuario
-              </div>
-              {weekDays.map((day, i) => (
-                <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
-                  <button
-                    onClick={() => {
-                      setSelectedHeaderDay(day);
-                      setShowHeaderDayModal(true);
-                    }}
-                    className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
-                  >
-                    <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                    <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
-                    <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {deptUsers.map((u, rowIdx) => {
-              const isLastRow = rowIdx === deptUsers.length - 1;
-              const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
-              return (
-                <div key={u.id} className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
-                  <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder)}>
+          <table className="w-full min-w-[600px] sm:min-w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem]">
+                  Usuario
+                </th>
+                {weekDays.map((day, i) => (
+                  <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
                     <button
-                      onClick={() => handleUserClick(u)}
-                      className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
+                      onClick={() => {
+                        setSelectedHeaderDay(day);
+                        setShowHeaderDayModal(true);
+                      }}
+                      className="w-full py-1 sm:py-2 rounded-lg hover:bg-[#F5F5F7] transition-colors"
                     >
-                      <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
-                      <div className="text-center sm:text-left">
-                        <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
-                        <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
-                      </div>
+                      <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                      <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </button>
-                  </div>
-                  {weekDays.map((day, i) => {
-                    const dayShifts = getUserShiftsForDay(u.id, day);
-                    const dateStr = toLocalISODate(day);
-                    const incapacityInfo = getIncapacityForDate(dateStr, u.id);
-                    const hasIncapacity = !!incapacityInfo;
-                    const timeOffInfo = getTimeOffForUserAndDay(u.id, day);
-                    const hasTimeOff = !!timeOffInfo;
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {deptUsers.map((u, rowIdx) => {
+                const isLastRow = rowIdx === deptUsers.length - 1;
+                const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
+                return (
+                  <tr key={u.id} className={rowBorder}>
+                    <td className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem] align-middle", rowBorder)}>
+                      <button
+                        onClick={() => handleUserClick(u)}
+                        className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
+                      >
+                        <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
+                        <div className="text-center sm:text-left">
+                          <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
+                          <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
+                        </div>
+                      </button>
+                    </td>
+                    {weekDays.map((day, i) => {
+                      const dayShifts = getUserShiftsForDay(u.id, day);
+                      const dateStr = toLocalISODate(day);
+                      const incapacityInfo = getIncapacityForDate(dateStr, u.id);
+                      const hasIncapacity = !!incapacityInfo;
+                      const timeOffInfo = getTimeOffForUserAndDay(u.id, day);
+                      const hasTimeOff = !!timeOffInfo;
 
-                    // Configuración de colores por tipo de incapacidad
-                    const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string }> = {
-                      enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
-                      accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
-                      cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-                      inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-                    };
-                    const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
-                    const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+                      // Configuración de colores por tipo de incapacidad
+                      const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string }> = {
+                        enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
+                        accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
+                        cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
+                        inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
+                      };
+                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
-                    return (
-                      <div key={i} className={cn("p-1 sm:p-2 text-center flex items-center justify-center min-w-0", rowBorder)}>
-                        <button
-                          onClick={() => handleDayClick(u, day)}
-                          className="w-full min-w-0"
-                        >
-                          <div className="space-y-1 min-w-0">
-                            {hasIncapacity && incapacityStyle ? (
-                              <div className={cn(
-                                'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
-                                incapacityStyle.bgColor,
-                                incapacityStyle.color,
-                                incapacityStyle.borderColor
-                              )}>
-                                {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
-                                {incapacityInfo.type === 'accidente' && 'Accidente'}
-                                {incapacityInfo.type === 'cita_medica' && 'Cita méd.'}
-                                {incapacityInfo.type === 'inasistencia' && 'Inasist.'}
-                              </div>
-                            ) : hasTimeOff && timeOffStyle ? (
-                              <div className={cn(
-                                'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
-                                timeOffStyle.bgColor,
-                                timeOffStyle.color,
-                                timeOffStyle.borderColor
-                              )}>
-                                {TIME_OFF_LABELS[timeOffInfo.type]}
-                              </div>
-                            ) : null}
-                            {dayShifts.length > 0 && (
-                              <div className="space-y-1">
-                                {dayShifts.map((shift, idx) => {
-                                  const isCrossDept = shift.department !== u.department;
-                                  return (
-                                    <div
-                                      key={idx}
-                                      className={cn(
-                                        'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-all hover:scale-105 min-w-0 break-words',
-                                        isCrossDept && 'ring-1 ring-amber-400'
-                                      )}
-                                      style={{
-                                        backgroundColor: `${shift.color}20`,
-                                        color: shift.color,
-                                      }}
-                                      title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
-                                    >
-                                      <div className="flex flex-wrap items-center justify-center gap-1">
-                                        <span className="break-words leading-tight">{shift.name}</span>
-                                        {isCrossDept && (
-                                          <DeptIcon department={shift.department} className="w-3 h-3 flex-shrink-0" />
+                      return (
+                        <td key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", rowBorder)}>
+                          <button
+                            onClick={() => handleDayClick(u, day)}
+                            className="w-full min-w-0"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              {hasIncapacity && incapacityStyle ? (
+                                <div className={cn(
+                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
+                                  incapacityStyle.bgColor,
+                                  incapacityStyle.color,
+                                  incapacityStyle.borderColor
+                                )}>
+                                  {incapacityInfo.type === 'enfermedad' && 'Enfermedad'}
+                                  {incapacityInfo.type === 'accidente' && 'Accidente'}
+                                  {incapacityInfo.type === 'cita_medica' && 'Cita méd.'}
+                                  {incapacityInfo.type === 'inasistencia' && 'Inasist.'}
+                                </div>
+                              ) : hasTimeOff && timeOffStyle ? (
+                                <div className={cn(
+                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
+                                  timeOffStyle.bgColor,
+                                  timeOffStyle.color,
+                                  timeOffStyle.borderColor
+                                )}>
+                                  {TIME_OFF_LABELS[timeOffInfo.type]}
+                                </div>
+                              ) : null}
+                              {dayShifts.length > 0 && (
+                                <div className="space-y-1">
+                                  {dayShifts.map((shift, idx) => {
+                                    const isCrossDept = shift.department !== u.department;
+                                    return (
+                                      <div
+                                        key={idx}
+                                        className={cn(
+                                          'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium transition-all hover:scale-105 min-w-0 break-words',
+                                          isCrossDept && 'ring-1 ring-amber-400'
                                         )}
+                                        style={{
+                                          backgroundColor: `${shift.color}20`,
+                                          color: shift.color,
+                                        }}
+                                        title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
+                                      >
+                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                          <span className="break-words leading-tight">{shift.name}</span>
+                                          {isCrossDept && (
+                                            <DeptIcon department={shift.department} className="w-3 h-3 flex-shrink-0" />
+                                          )}
+                                        </div>
+                                        <div className="text-[9px] opacity-70">
+                                          {shift.startTime}-{shift.endTime}
+                                        </div>
                                       </div>
-                                      <div className="text-[9px] opacity-70">
-                                        {shift.startTime}-{shift.endTime}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            {!hasIncapacity && !hasTimeOff && dayShifts.length === 0 && (
-                              <span className="text-[#C7C7CC] hover:bg-[#F5F5F7] rounded-lg px-3 py-2 block transition-colors">-</span>
-                            )}
-                          </div>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              {!hasIncapacity && !hasTimeOff && dayShifts.length === 0 && (
+                                <span className="text-[#C7C7CC] hover:bg-[#F5F5F7] rounded-lg px-3 py-2 block transition-colors">-</span>
+                              )}
+                            </div>
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -3998,176 +4004,178 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
           {/* Calendario */}
           <div className="overflow-x-auto w-full">
-            <div className="min-w-full">
-              {/* Header */}
-              <div className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
-                <div className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0">
-                  Colaborador
-                </div>
-                {weekDays.map((day, i) => (
-                  <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
-                    <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                    <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
-                    <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
-                  </div>
-                ))}
-              </div>
-
-              {allVisibleUsers.map((u, rowIdx) => {
-                const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
-                const isLastRow = rowIdx === allVisibleUsers.length - 1;
-                const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
-                const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
-                return (
-                  <div key={u.id} className="grid grid-cols-[110px_repeat(7,minmax(calc((100%_-_110px)/3),1fr))] sm:grid-cols-[12rem_repeat(7,minmax(100px,1fr))]">
-                    <div className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] flex items-center min-w-0", rowBorder, rowBg)}>
-                      <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-                        <UserAvatar
-                          name={u.name}
-                          photoUrl={u.photoURL || u.avatar}
-                          size="sm"
-                          className={cn(isCrossDept && "ring-2 ring-amber-400")}
-                          fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
-                        />
-                        <div className="text-center sm:text-left">
-                          <div className="flex items-center justify-center sm:justify-start gap-1.5">
-                            <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
+            <table className="w-full min-w-[600px] sm:min-w-full border-collapse">
+              <thead>
+                <tr>
+                  <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem]">
+                    Colaborador
+                  </th>
+                  {weekDays.map((day, i) => (
+                    <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
+                      <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                      <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
+                      <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {allVisibleUsers.map((u, rowIdx) => {
+                  const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
+                  const isLastRow = rowIdx === allVisibleUsers.length - 1;
+                  const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
+                  const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
+                  return (
+                    <tr key={u.id} className={cn(rowBorder, rowBg)}>
+                      <td className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem] align-middle", rowBorder, rowBg)}>
+                        <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
+                          <UserAvatar
+                            name={u.name}
+                            photoUrl={u.photoURL || u.avatar}
+                            size="sm"
+                            className={cn(isCrossDept && "ring-2 ring-amber-400")}
+                            fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
+                          />
+                          <div className="text-center sm:text-left">
+                            <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                              <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
+                              {isCrossDept && (
+                                <div 
+                                  className="p-0.5 rounded bg-amber-100" 
+                                  title={u.department.replace(/_/g, ' ')}
+                                >
+                                  <DeptIcon department={u.department} className="w-3.5 h-3.5 text-amber-600" />
+                                </div>
+                              )}
+                            </div>
+                            <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
                             {isCrossDept && (
-                              <div 
-                                className="p-0.5 rounded bg-amber-100" 
-                                title={u.department.replace(/_/g, ' ')}
-                              >
-                                <DeptIcon department={u.department} className="w-3.5 h-3.5 text-amber-600" />
-                              </div>
+                              <p className="text-[10px] text-amber-600 font-medium">
+                                {DEPT_SHORT_NAMES[u.department]}
+                              </p>
                             )}
                           </div>
-                          <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
-                          {isCrossDept && (
-                            <p className="text-[10px] text-amber-600 font-medium">
-                              {DEPT_SHORT_NAMES[u.department]}
-                            </p>
-                          )}
                         </div>
-                      </div>
-                    </div>
-                    {weekDays.map((day, i) => {
-                      const dayAssignments = getUserAssignmentsForDay(u.id, day);
-                      const dropId = `${u.id}|${toLocalISODate(day)}`;
-                      const dateStr = toLocalISODate(day);
-                      const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
-                      const hasIncapacity = !!incapacityInfo;
-                      const timeOffInfo = approvedTimeOff.find(
-                        (r) => r.userId === u.id && isDateInRange(dateStr, r.startDate, r.endDate)
-                      );
-                      const hasTimeOff = !!timeOffInfo;
-                      const isBlocked = hasTimeOff;
+                      </td>
+                      {weekDays.map((day, i) => {
+                        const dayAssignments = getUserAssignmentsForDay(u.id, day);
+                        const dropId = `${u.id}|${toLocalISODate(day)}`;
+                        const dateStr = toLocalISODate(day);
+                        const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
+                        const hasIncapacity = !!incapacityInfo;
+                        const timeOffInfo = approvedTimeOff.find(
+                          (r) => r.userId === u.id && isDateInRange(dateStr, r.startDate, r.endDate)
+                        );
+                        const hasTimeOff = !!timeOffInfo;
+                        const isBlocked = hasTimeOff;
 
-                      const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
-                        enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
-                        accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
-                        cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita méd.' },
-                        inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
-                      };
-                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
-                      const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+                        const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
+                          enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
+                          accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
+                          cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita méd.' },
+                          inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
+                        };
+                        const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                        const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
-                      return (
-                        <div key={i} className={cn("p-1 sm:p-2 flex items-center justify-center min-w-0", rowBorder, rowBg)}>
-                          <DroppableCell id={dropId} disabled={isBlocked}>
-                            <div className="space-y-1 w-full min-w-0">
-                              {hasTimeOff && timeOffStyle && (
-                                <div className={cn(
-                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
-                                  timeOffStyle.bgColor,
-                                  timeOffStyle.color,
-                                  timeOffStyle.borderColor
-                                )}>
-                                  {TIME_OFF_LABELS[timeOffInfo.type]}
-                                </div>
-                              )}
-                              {hasIncapacity && incapacityStyle && (
-                                <div className={cn(
-                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
-                                  incapacityStyle.bgColor,
-                                  incapacityStyle.color,
-                                  incapacityStyle.borderColor
-                                )}>
-                                  {incapacityStyle.label}
-                                </div>
-                              )}
-                              {dayAssignments.map((assignment, idx) => {
-                                const shift = shifts.find(s => s.id === assignment.shiftId);
-                                const isCrossDepartment = shift && shift.department !== selectedDepartment && selectedDepartment !== 'ALL';
+                        return (
+                          <td key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", rowBorder, rowBg)}>
+                            <DroppableCell id={dropId} disabled={isBlocked}>
+                              <div className="space-y-1 w-full min-w-0">
+                                {hasTimeOff && timeOffStyle && (
+                                  <div className={cn(
+                                    'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
+                                    timeOffStyle.bgColor,
+                                    timeOffStyle.color,
+                                    timeOffStyle.borderColor
+                                  )}>
+                                    {TIME_OFF_LABELS[timeOffInfo.type]}
+                                  </div>
+                                )}
+                                {hasIncapacity && incapacityStyle && (
+                                  <div className={cn(
+                                    'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
+                                    incapacityStyle.bgColor,
+                                    incapacityStyle.color,
+                                    incapacityStyle.borderColor
+                                  )}>
+                                    {incapacityStyle.label}
+                                  </div>
+                                )}
+                                {dayAssignments.map((assignment, idx) => {
+                                  const shift = shifts.find(s => s.id === assignment.shiftId);
+                                  const isCrossDepartment = shift && shift.department !== selectedDepartment && selectedDepartment !== 'ALL';
 
-                                return shift ? (
-                                  <div
-                                    key={idx}
-                                    onDoubleClick={() => {
-                                      if (assignment.status === AssignmentStatus.ELIMINADO) {
-                                        restoreShift(assignment.id);
-                                      } else {
-                                        removeShift(assignment.id);
-                                      }
-                                    }}
-                                    className={cn(
-                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105 min-w-0 break-words',
-                                      assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
-                                    )}
-                                    style={{
-                                      backgroundColor: assignment.status === AssignmentStatus.ELIMINADO
-                                        ? '#F5F5F7'
-                                        : assignment.status === AssignmentStatus.BORRADOR
-                                          ? `${shift.color}20`
-                                          : `${shift.color}30`,
-                                      color: assignment.status === AssignmentStatus.ELIMINADO ? '#86868B' : shift.color,
-                                      border: assignment.status === AssignmentStatus.BORRADOR
-                                        ? `2px dashed ${shift.color}`
-                                        : assignment.status === AssignmentStatus.ELIMINADO
-                                          ? '2px dashed #C7C7CC'
-                                          : 'none',
-                                      opacity: assignment.status === AssignmentStatus.ELIMINADO || assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
-                                    }}
-                                    title={assignment.status === AssignmentStatus.ELIMINADO
-                                      ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
-                                      : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
-                                  >
-                                    <div className="flex flex-wrap items-center justify-center gap-1">
-                                      {assignment.status === AssignmentStatus.ELIMINADO && (
-                                        <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
+                                  return shift ? (
+                                    <div
+                                      key={idx}
+                                      onDoubleClick={() => {
+                                        if (assignment.status === AssignmentStatus.ELIMINADO) {
+                                          restoreShift(assignment.id);
+                                        } else {
+                                          removeShift(assignment.id);
+                                        }
+                                      }}
+                                      className={cn(
+                                        'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105 min-w-0 break-words',
+                                        assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
                                       )}
-                                      <span className="break-words leading-tight">{shift.name}</span>
-                                      {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
-                                        <div 
-                                          className="p-0.5 rounded bg-white/70 flex-shrink-0"
-                                          title={shift.department.replace(/_/g, ' ')}
-                                        >
-                                          <DeptIcon department={shift.department} className="w-3 h-3" />
-                                        </div>
+                                      style={{
+                                        backgroundColor: assignment.status === AssignmentStatus.ELIMINADO
+                                          ? '#F5F5F7'
+                                          : assignment.status === AssignmentStatus.BORRADOR
+                                            ? `${shift.color}20`
+                                            : `${shift.color}30`,
+                                        color: assignment.status === AssignmentStatus.ELIMINADO ? '#86868B' : shift.color,
+                                        border: assignment.status === AssignmentStatus.BORRADOR
+                                          ? `2px dashed ${shift.color}`
+                                          : assignment.status === AssignmentStatus.ELIMINADO
+                                            ? '2px dashed #C7C7CC'
+                                            : 'none',
+                                        opacity: assignment.status === AssignmentStatus.ELIMINADO || assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
+                                      }}
+                                      title={assignment.status === AssignmentStatus.ELIMINADO
+                                        ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
+                                        : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
+                                    >
+                                      <div className="flex flex-wrap items-center justify-center gap-1">
+                                        {assignment.status === AssignmentStatus.ELIMINADO && (
+                                          <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
+                                        )}
+                                        <span className="break-words leading-tight">{shift.name}</span>
+                                        {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
+                                          <div 
+                                            className="p-0.5 rounded bg-white/70 flex-shrink-0"
+                                            title={shift.department.replace(/_/g, ' ')}
+                                          >
+                                            <DeptIcon department={shift.department} className="w-3 h-3" />
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="text-[9px] opacity-70">{shift.startTime}-{shift.endTime}</div>
+                                      {assignment.status === AssignmentStatus.BORRADOR && (
+                                        <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                                          <span className="text-[7px] text-white font-bold">B</span>
+                                        </span>
+                                      )}
+                                      {assignment.status === AssignmentStatus.ELIMINADO && (
+                                        <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                                          <span className="text-[7px] text-white font-bold">-</span>
+                                        </span>
                                       )}
                                     </div>
-                                    <div className="text-[9px] opacity-70">{shift.startTime}-{shift.endTime}</div>
-                                    {assignment.status === AssignmentStatus.BORRADOR && (
-                                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
-                                        <span className="text-[7px] text-white font-bold">B</span>
-                                      </span>
-                                    )}
-                                    {assignment.status === AssignmentStatus.ELIMINADO && (
-                                      <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
-                                        <span className="text-[7px] text-white font-bold">-</span>
-                                      </span>
-                                    )}
-                                  </div>
-                                ) : null;
-                              })}
-                            </div>
-                          </DroppableCell>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
+                                  ) : null;
+                                })}
+                              </div>
+                            </DroppableCell>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -6599,7 +6607,8 @@ function SolicitudesTab() {
 
           {activeSubTab === 'mis-cambios' && (
             <>
-              <div className="flex gap-2">
+              {/* Desktop: botones Recibidas/Enviadas/Historial/Equipo */}
+              <div className="hidden md:flex gap-2">
                 {[
                   { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
                   { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
@@ -6628,6 +6637,49 @@ function SolicitudesTab() {
                     )}
                   </button>
                 ))}
+              </div>
+
+              {/* Mobile: dropdown Recibidas/Enviadas/Historial/Equipo */}
+              <div className="md:hidden">
+                <Select value={misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                    {(() => {
+                      const active = [
+                        { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
+                        { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
+                        { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
+                        { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
+                      ].find((f) => f.id === misCambiosFilter);
+                      const ActiveIcon = active?.icon || Inbox;
+                      return (
+                        <span className="flex items-center gap-2 text-[#86868B]">
+                          <ActiveIcon className="w-4 h-4" />
+                          <span>{active?.label}</span>
+                          {active && active.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{active.count}</span>}
+                        </span>
+                      );
+                    })()}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
+                      { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
+                      { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
+                      { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
+                    ].map((filter) => {
+                      const FilterIcon = filter.icon;
+                      return (
+                        <SelectItem key={filter.id} value={filter.id}>
+                          <span className="flex items-center gap-2">
+                            <FilterIcon className="w-4 h-4" />
+                            <span>{filter.label}</span>
+                            {filter.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{filter.count}</span>}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
 
               {misCambiosFilter === 'equipo' && (
@@ -6730,32 +6782,61 @@ function SolicitudesTab() {
           {activeSubTab === 'mis-solicitudes' && (
             <>
               {canApproveTimeOff && (
-                <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
-                  <button
-                    onClick={() => setTimeOffView('mias')}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                      timeOffView === 'mias'
-                        ? 'bg-white text-corporate shadow-sm'
-                        : 'text-[#86868B] hover:text-[#1D1D1F]'
-                    )}
-                  >
-                    <User className="w-4 h-4" />
-                    Mis solicitudes
-                  </button>
-                  <button
-                    onClick={() => setTimeOffView('equipo')}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                      timeOffView === 'equipo'
-                        ? 'bg-white text-corporate shadow-sm'
-                        : 'text-[#86868B] hover:text-[#1D1D1F]'
-                    )}
-                  >
-                    <Users className="w-4 h-4" />
-                    Equipo
-                  </button>
-                </div>
+                <>
+                  {/* Desktop: botones Mis solicitudes/Equipo */}
+                  <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+                    <button
+                      onClick={() => setTimeOffView('mias')}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                        timeOffView === 'mias'
+                          ? 'bg-white text-corporate shadow-sm'
+                          : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      <User className="w-4 h-4" />
+                      Mis solicitudes
+                    </button>
+                    <button
+                      onClick={() => setTimeOffView('equipo')}
+                      className={cn(
+                        'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                        timeOffView === 'equipo'
+                          ? 'bg-white text-corporate shadow-sm'
+                          : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      <Users className="w-4 h-4" />
+                      Equipo
+                    </button>
+                  </div>
+
+                  {/* Mobile: dropdown Mis solicitudes/Equipo */}
+                  <div className="md:hidden">
+                    <Select value={timeOffView} onValueChange={(v) => setTimeOffView(v as 'mias' | 'equipo')}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <span className="flex items-center gap-2 text-[#86868B]">
+                          {timeOffView === 'mias' ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                          <span>{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
+                        </span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mias">
+                          <span className="flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            <span>Mis solicitudes</span>
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="equipo">
+                          <span className="flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            <span>Equipo</span>
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </>
               )}
 
               {timeOffView === 'equipo' && canApproveTimeOff && (
