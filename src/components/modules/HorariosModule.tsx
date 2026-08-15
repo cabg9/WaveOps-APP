@@ -1264,7 +1264,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </div>
                     )}
                     {hasIncapacity && incapacityInfo && incapacityStyle && (
-                      <div className={cn("mt-1 text-[9px] sm:text-[10px] font-semibold leading-tight text-center break-all", incapacityStyle.color)}>
+                      <div className={cn("mt-1 text-[9px] sm:text-[10px] font-semibold leading-tight text-center break-words", incapacityStyle.color)}>
                         {incapacityStyle.label}
                       </div>
                     )}
