@@ -575,6 +575,36 @@ export default function HorariosModule() {
             )}
           </div>
 
+          {/* Fila 2 (Incapacidades): sub-pestañas Mis Incapacidades | Equipo */}
+          {activeTab === 'incapacidades' && (
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit md:w-full">
+              <button
+                onClick={() => setIncapacidadesSubTab('mias')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  incapacidadesSubTab === 'mias'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <User className="w-4 h-4" />
+                Mis Incapacidades
+              </button>
+              <button
+                onClick={() => setIncapacidadesSubTab('equipo')}
+                className={cn(
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                  incapacidadesSubTab === 'equipo'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <Users className="w-4 h-4" />
+                Equipo
+              </button>
+            </div>
+          )}
+
           {/* Desktop: controles de Equipo en header principal */}
           {activeTab === 'equipo' && (
             <div className="hidden md:flex items-center gap-2">
@@ -640,111 +670,90 @@ export default function HorariosModule() {
             </div>
           )}
 
-          {/* Desktop: filtros de Incapacidades Equipo junto al selector principal */}
-          {activeTab === 'incapacidades' && incapacidadesSubTab === 'equipo' && (
-            <>
-              <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-                {[
-                  { id: 'todas', label: 'Todas' },
-                  { id: 'pendiente', label: 'Pendientes' },
-                  { id: 'verificada', label: 'Verificadas' },
-                  { id: 'registrada', label: 'Registradas' },
-                  { id: 'rechazada', label: 'Rechazadas' },
-                ].map((filter) => (
-                  <button
-                    key={filter.id}
-                    onClick={() => setIncapacidadesStatusFilter(filter.id as typeof incapacidadesStatusFilter)}
-                    className={cn(
-                      'px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
-                      incapacidadesStatusFilter === filter.id
-                        ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                        : 'text-[#86868B] hover:text-[#1D1D1F]'
-                    )}
-                  >
-                    {filter.label}
-                  </button>
-                ))}
-              </div>
-              <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
-                <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {incapacidadesDeptFilter === 'ALL' ? (
-                      <div className="flex items-center gap-2 text-[#86868B]">
+          {/* Fila 3 (Incapacidades): filtros de estado y departamento (desktop) */}
+          {activeTab === 'incapacidades' && (
+            <div className="hidden md:flex flex-wrap items-center gap-2 w-full">
+              {incapacidadesSubTab === 'mias' && (
+                <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                  {[
+                    { id: 'enviadas', label: 'Enviadas' },
+                    { id: 'registradas', label: 'Registradas' },
+                    { id: 'rechazadas', label: 'Rechazadas' },
+                    { id: 'historial', label: 'Historial' },
+                  ].map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => setMyIncapacidadesFilter(filter.id as typeof myIncapacidadesFilter)}
+                      className={cn(
+                        'px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                        myIncapacidadesFilter === filter.id
+                          ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                          : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {incapacidadesSubTab === 'equipo' && (
+                <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                  {[
+                    { id: 'todas', label: 'Todas' },
+                    { id: 'pendiente', label: 'Pendientes' },
+                    { id: 'verificada', label: 'Verificadas' },
+                    { id: 'registrada', label: 'Registradas' },
+                    { id: 'rechazada', label: 'Rechazadas' },
+                  ].map((filter) => (
+                    <button
+                      key={filter.id}
+                      onClick={() => setIncapacidadesStatusFilter(filter.id as typeof incapacidadesStatusFilter)}
+                      className={cn(
+                        'px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap',
+                        incapacidadesStatusFilter === filter.id
+                          ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                          : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {incapacidadesSubTab === 'equipo' && (
+                <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                    <SelectValue>
+                      {incapacidadesDeptFilter === 'ALL' ? (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                          <span>Todos</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate max-w-[120px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent position="popper" className="z-50">
+                    <SelectItem value="ALL">
+                      <div className="flex items-center gap-2">
                         <LayoutGrid className="w-4 h-4" />
                         <span>Todos</span>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-[#86868B]">
-                        <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4" />
-                        <span className="truncate max-w-[120px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
-                      </div>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">
-                    <div className="flex items-center gap-2">
-                      <LayoutGrid className="w-4 h-4" />
-                      <span>Todos</span>
-                    </div>
-                  </SelectItem>
-                  {departmentOptions.map((dept) => (
-                    <SelectItem key={dept.code} value={dept.code}>
-                      <div className="flex items-center gap-2">
-                        <DeptIcon department={dept.code} className="w-4 h-4" />
-                        <span>{dept.name}</span>
-                      </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </>
-          )}
-
-          {/* Desktop: sub-pestañas de incapacidades + filtro Mis Incapacidades */}
-          {activeTab === 'incapacidades' && (
-            <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-              <button
-                onClick={() => setIncapacidadesSubTab('mias')}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  incapacidadesSubTab === 'mias'
-                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                    : 'text-[#86868B] hover:text-[#1D1D1F]'
-                )}
-              >
-                <User className="w-4 h-4" />
-                Mis Incapacidades
-              </button>
-              <button
-                onClick={() => setIncapacidadesSubTab('equipo')}
-                className={cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
-                  incapacidadesSubTab === 'equipo'
-                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                    : 'text-[#86868B] hover:text-[#1D1D1F]'
-                )}
-              >
-                <Users className="w-4 h-4" />
-                Equipo
-              </button>
-              {incapacidadesSubTab === 'mias' && (
-                <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
-                  <SelectTrigger className="h-9 px-3 bg-white border-[#E5E5E7] rounded-lg hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                    <SelectValue>
-                      {{
-                        enviadas: 'Enviadas',
-                        registradas: 'Registradas',
-                        rechazadas: 'Rechazadas',
-                        historial: 'Historial',
-                      }[myIncapacidadesFilter]}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="enviadas">Enviadas</SelectItem>
-                    <SelectItem value="registradas">Registradas</SelectItem>
-                    <SelectItem value="rechazadas">Rechazadas</SelectItem>
-                    <SelectItem value="historial">Historial</SelectItem>
+                    {departmentOptions.map((dept) => (
+                      <SelectItem key={dept.code} value={dept.code}>
+                        <div className="flex items-center gap-2">
+                          <DeptIcon department={dept.code} className="w-4 h-4" />
+                          <span>{dept.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               )}
