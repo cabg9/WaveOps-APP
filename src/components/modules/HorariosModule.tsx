@@ -6671,9 +6671,9 @@ function SolicitudesTab() {
               </div>
 
               {/* Mobile: dropdown Recibidas/Enviadas/Historial/Equipo */}
-              <div className="md:hidden">
+              <div className="md:hidden w-full">
                 <Select value={misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
                     {(() => {
                       const active = [
                         { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
@@ -6716,7 +6716,7 @@ function SolicitudesTab() {
               {misCambiosFilter === 'equipo' && (
                 <>
                   <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-full min-w-[140px]">
                       <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
                       <SelectValue placeholder="Departamento" />
                     </SelectTrigger>
@@ -6731,9 +6731,9 @@ function SolicitudesTab() {
                   </Select>
 
                   {/* Mobile: dropdown de estado del equipo */}
-                  <div className="md:hidden">
+                  <div className="md:hidden min-w-[140px]">
                     <Select value={equipoFilter} onValueChange={(v) => setEquipoFilter(v as typeof equipoFilter)}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
                         <SelectValue>
                           {(() => {
                             const active = [
@@ -6843,9 +6843,9 @@ function SolicitudesTab() {
                   </div>
 
                   {/* Mobile: dropdown Mis solicitudes/Equipo */}
-                  <div className="md:hidden">
+                  <div className="md:hidden min-w-[140px]">
                     <Select value={timeOffView} onValueChange={(v) => setTimeOffView(v as 'mias' | 'equipo')}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
                         <span className="flex items-center gap-2 text-[#86868B]">
                           {timeOffView === 'mias' ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
                           <span>{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
@@ -6872,7 +6872,7 @@ function SolicitudesTab() {
 
               {timeOffView === 'equipo' && canApproveTimeOff && (
                 <Select value={timeOffDeptFilter} onValueChange={(v) => setTimeOffDeptFilter(v as string | 'ALL')}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B]">
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-full min-w-[140px]">
                     <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
                     <SelectValue placeholder="Departamento" />
                   </SelectTrigger>
@@ -6901,9 +6901,9 @@ function SolicitudesTab() {
                 ];
                 return (
                   <>
-                    <div className="md:hidden">
+                    <div className="md:hidden min-w-[140px]">
                       <Select value={timeOffFilter} onValueChange={(v) => setTimeOffFilter(v as typeof timeOffFilter)}>
-                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
                           <SelectValue>
                             {(() => {
                               const active = filterButtons.find((f) => f.id === timeOffFilter);
