@@ -575,9 +575,9 @@ export default function HorariosModule() {
             )}
           </div>
 
-          {/* Fila 2 (Incapacidades): sub-pestañas + filtros */}
+          {/* Desktop: Fila 2 (Incapacidades): sub-pestañas + filtros */}
           {activeTab === 'incapacidades' && (
-            <div className="flex flex-wrap items-center gap-2 w-full">
+            <div className="hidden md:flex flex-wrap items-center gap-2 w-full">
               {/* Sub-pestañas */}
               <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
                 <button
@@ -606,9 +606,9 @@ export default function HorariosModule() {
                 </button>
               </div>
 
-              {/* Desktop: filtros Mis Incapacidades */}
+              {/* Filtros Mis Incapacidades */}
               {incapacidadesSubTab === 'mias' && (
-                <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
                   {[
                     { id: 'enviadas', label: 'Enviadas' },
                     { id: 'registradas', label: 'Registradas' },
@@ -631,11 +631,11 @@ export default function HorariosModule() {
                 </div>
               )}
 
-              {/* Desktop: filtros Equipo */}
+              {/* Filtros Equipo */}
               {incapacidadesSubTab === 'equipo' && (
                 <>
                   <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
-                    <SelectTrigger className="hidden md:flex h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
                       <SelectValue>
                         {incapacidadesDeptFilter === 'ALL' ? (
                           <div className="flex items-center gap-2 text-[#86868B]">
@@ -668,7 +668,7 @@ export default function HorariosModule() {
                     </SelectContent>
                   </Select>
 
-                  <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+                  <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
                     {[
                       { id: 'todas', label: 'Todas' },
                       { id: 'pendiente', label: 'Pendientes' },
