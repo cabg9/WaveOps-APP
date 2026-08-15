@@ -2501,15 +2501,38 @@ function EquipoTab({
 
       {/* Calendario */}
       <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full min-w-[600px] sm:min-w-full border-collapse">
-            <thead>
-              <tr>
-                <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem]">
-                  Usuario
-                </th>
+        <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[12rem_1fr]">
+          {/* Columna fija de colaboradores */}
+          <div className="bg-white z-10 border-r border-[#E5E5E7]">
+            <div className="h-14 sm:h-16 flex items-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7]">
+              Colaborador
+            </div>
+            {deptUsers.map((u, rowIdx) => {
+              const isLastRow = rowIdx === deptUsers.length - 1;
+              return (
+                <div key={u.id} className={cn("h-[72px] sm:h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
+                  <button
+                    onClick={() => handleUserClick(u)}
+                    className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
+                  >
+                    <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
+                    <div className="text-center sm:text-left min-w-0">
+                      <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
+                      <p className="hidden sm:block text-xs text-[#86868B] truncate">{u.position}</p>
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Área scrollable de días */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[600px]">
+              {/* Header de días */}
+              <div className="h-14 sm:h-16 grid grid-cols-7 border-b border-[#E5E5E7]">
                 {weekDays.map((day, i) => (
-                  <th key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
+                  <div key={i} className="text-center p-1 sm:p-2 text-xs sm:text-sm font-medium text-[#86868B] flex items-center justify-center">
                     <button
                       onClick={() => {
                         setSelectedHeaderDay(day);
@@ -2521,28 +2544,15 @@ function EquipoTab({
                       <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
                       <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
                     </button>
-                  </th>
+                  </div>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
+              </div>
+
+              {/* Filas de días */}
               {deptUsers.map((u, rowIdx) => {
                 const isLastRow = rowIdx === deptUsers.length - 1;
-                const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
                 return (
-                  <tr key={u.id} className={rowBorder}>
-                    <td className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem] align-middle", rowBorder)}>
-                      <button
-                        onClick={() => handleUserClick(u)}
-                        className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
-                      >
-                        <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" />
-                        <div className="text-center sm:text-left">
-                          <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
-                          <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
-                        </div>
-                      </button>
-                    </td>
+                  <div key={u.id} className={cn("h-[72px] sm:h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
                     {weekDays.map((day, i) => {
                       const dayShifts = getUserShiftsForDay(u.id, day);
                       const dateStr = toLocalISODate(day);
@@ -2562,7 +2572,7 @@ function EquipoTab({
                       const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
                       return (
-                        <td key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", rowBorder)}>
+                        <div key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", isLastRow ? "" : "border-b border-[#E5E5E7]")}>
                           <button
                             onClick={() => handleDayClick(u, day)}
                             className="w-full min-w-0"
@@ -2626,14 +2636,14 @@ function EquipoTab({
                               )}
                             </div>
                           </button>
-                        </td>
+                        </div>
                       );
                     })}
-                  </tr>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       </div>
 
