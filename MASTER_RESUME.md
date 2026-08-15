@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (controles de Equipo en header desktop, filtros reubicados/corregidos en Solicitudes/Incapacidades, columna usuario fija en Equipo/Asignar, info extra en indicadores; deployado)
+> Última actualización: 2026-08-14 (tablas Equipo/Asignar con columna usuario realmente fija, dropdowns en móvil para Solicitudes/Incapacidades; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -178,6 +178,10 @@
     - **Equipo / Asignar (móvil)**: la columna de usuario se reconstruyó sin `display: contents` para que `position: sticky left-0` funcione correctamente al hacer scroll horizontal. Ancho móvil aumentado a `110px` para evitar cortar nombres; desktop sigue en `12rem`.
     - **Solicitudes (móvil)**: los sub-filtros de Cambios (`Recibidas | Enviadas | Historial | Equipo`), el selector de departamento de Equipo y el filtro de estado ahora van junto a las pestañas `Cambios | Solicitudes` en una fila scrollable. Se eliminó el selector de departamento duplicado en el contenido de Equipo.
     - **Indicadores de incapacidades**: tarjetas celeste/verde ahora incluyen `% vs ant.` (Mis Incapacidades) y `Prom.: X días/pers.` (Equipo) para dar más contexto.
+  - **Correcciones puntuales solicitadas**:
+    - **Equipo / Asignar (móvil)**: el calendario se reescribió con `<table>`, `<thead>`, `<tbody>`, `<tr>`, `<th>` y `<td>`. La columna de usuario usa `position: sticky left-0` sobre celdas de tabla con ancho fijo (`110px` móvil / `12rem` desktop), lo que la mantiene realmente fija al desplazarse horizontalmente hasta jueves/viernes/sábado.
+    - **Solicitudes (móvil)**: los sub-filtros de Cambios (`Recibidas | Enviadas | Historial | Equipo`) y el selector `Mis solicitudes | Equipo` se convirtieron en dropdowns; en desktop siguen siendo botones. El filtro de estado ya era dropdown en móvil y botones en desktop.
+    - **Incapacidades (móvil)**: el dropdown principal de pestañas y los dropdowns de estado/departamento van en la primera fila; las sub-pestañas `Mis Incapacidades | Equipo` bajan a una segunda fila. En desktop el filtro de estado sigue siendo botones.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
