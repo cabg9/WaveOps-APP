@@ -1238,7 +1238,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </div>
                     )}
                     <span className={cn(
-                      'text-sm sm:text-base font-semibold mt-2 sm:mt-0 mb-1',
+                      'text-sm sm:text-base font-semibold mt-3 sm:mt-0 mb-1',
                       isToday ? 'text-corporate' : 'text-[#1D1D1F]',
                       hasIncapacity && incapacityStyle?.color,
                       !hasIncapacity && hasTimeOff && timeOffStyle?.color
@@ -1250,7 +1250,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         {dayShifts.slice(0, 3).map((shift, i) => (
                           <div
                             key={i}
-                            className="text-[9px] px-1.5 py-1 rounded-md truncate text-center font-medium leading-tight"
+                            className="text-[9px] px-1.5 py-1 rounded-md text-center font-medium leading-tight break-words whitespace-normal"
                             style={{ backgroundColor: `${shift.color}20`, color: shift.color }}
                           >
                             <span className="font-bold">{shift.name}</span>
