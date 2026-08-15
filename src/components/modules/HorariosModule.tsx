@@ -1238,7 +1238,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </div>
                     )}
                     <span className={cn(
-                      'text-base font-semibold mb-1',
+                      'text-sm sm:text-base font-semibold mt-2 sm:mt-0 mb-1',
                       isToday ? 'text-corporate' : 'text-[#1D1D1F]',
                       hasIncapacity && incapacityStyle?.color,
                       !hasIncapacity && hasTimeOff && timeOffStyle?.color
