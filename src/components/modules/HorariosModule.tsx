@@ -1228,17 +1228,17 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                   >
                     {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
                     {hasIncapacity && IncapacityIcon && (
-                      <div className={cn("absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
-                        <IncapacityIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
+                      <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
+                        <IncapacityIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
                       </div>
                     )}
                     {!hasIncapacity && hasTimeOff && TimeOffIcon && (
-                      <div className={cn("absolute top-1 right-1 w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
-                        <TimeOffIcon className={cn("w-2 h-2 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
+                      <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
+                        <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
                       </div>
                     )}
                     <span className={cn(
-                      'text-sm sm:text-base font-semibold mt-3 sm:mt-0 mb-1',
+                      'text-sm sm:text-base font-semibold mt-2 sm:mt-0 mb-1',
                       isToday ? 'text-corporate' : 'text-[#1D1D1F]',
                       hasIncapacity && incapacityStyle?.color,
                       !hasIncapacity && hasTimeOff && timeOffStyle?.color
@@ -1264,7 +1264,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       </div>
                     )}
                     {hasIncapacity && incapacityInfo && incapacityStyle && (
-                      <div className={cn("mt-1 text-[10px] font-semibold", incapacityStyle.color)}>
+                      <div className={cn("mt-1 text-[9px] sm:text-[10px] font-semibold leading-tight text-center break-all", incapacityStyle.color)}>
                         {incapacityStyle.label}
                       </div>
                     )}
