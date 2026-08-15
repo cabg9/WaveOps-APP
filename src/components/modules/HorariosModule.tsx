@@ -6862,15 +6862,15 @@ function SolicitudesTab() {
                   </div>
 
                   {/* Mobile: dropdown Mis solicitudes/Equipo */}
-                  <div className="md:hidden min-w-[140px]">
+                  <div className="md:hidden min-w-0">
                     <Select value={timeOffView} onValueChange={(v) => setTimeOffView(v as 'mias' | 'equipo')}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
-                        <span className="flex items-center gap-2 text-[#86868B]">
-                          {timeOffView === 'mias' ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                          <span>{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                        <span className="flex items-center gap-2 text-[#86868B] truncate">
+                          {timeOffView === 'mias' ? <User className="w-4 h-4 flex-shrink-0" /> : <Users className="w-4 h-4 flex-shrink-0" />}
+                          <span className="truncate">{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
                         </span>
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent position="popper" className="z-50">
                         <SelectItem value="mias">
                           <span className="flex items-center gap-2">
                             <User className="w-4 h-4" />
@@ -6891,11 +6891,11 @@ function SolicitudesTab() {
 
               {timeOffView === 'equipo' && canApproveTimeOff && (
                 <Select value={timeOffDeptFilter} onValueChange={(v) => setTimeOffDeptFilter(v as string | 'ALL')}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-full min-w-[140px]">
-                    <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-fit min-w-0">
+                    <Building2 className="w-4 h-4 text-[#86868B] mr-1 flex-shrink-0" />
                     <SelectValue placeholder="Departamento" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-50">
                     <SelectItem value="ALL">Todos</SelectItem>
                     {departmentOptions.map((opt) => (
                       <SelectItem key={opt.code} value={opt.code}>
@@ -6920,23 +6920,23 @@ function SolicitudesTab() {
                 ];
                 return (
                   <>
-                    <div className="md:hidden min-w-[140px]">
+                    <div className="md:hidden min-w-0">
                       <Select value={timeOffFilter} onValueChange={(v) => setTimeOffFilter(v as typeof timeOffFilter)}>
-                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
                           <SelectValue>
                             {(() => {
                               const active = filterButtons.find((f) => f.id === timeOffFilter);
                               const count = deptFilteredRequests.filter((r) => timeOffFilter === 'todas' || r.status === timeOffFilter).length;
                               return (
-                                <span className="flex items-center gap-2 text-[#86868B]">
-                                  <span>{active?.label || 'Estado'}</span>
-                                  {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{count}</span>}
+                                <span className="flex items-center gap-2 text-[#86868B] truncate">
+                                  <span className="truncate">{active?.label || 'Estado'}</span>
+                                  {count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate flex-shrink-0">{count}</span>}
                                 </span>
                               );
                             })()}
                           </SelectValue>
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="popper" className="z-50">
                           {filterButtons.map((f) => {
                             const count = deptFilteredRequests.filter((r) => f.id === 'todas' || r.status === f.id).length;
                             return (
