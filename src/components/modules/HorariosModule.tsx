@@ -3031,7 +3031,7 @@ function EquipoTab({
 
       {/* Modal de día seleccionado */}
       <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md mx-auto rounded-2xl">
           <DialogHeader>
             <DialogTitle>
               {selectedDayInfo && (
@@ -4787,59 +4787,118 @@ function IncapacidadesTab({
     return { personasMes, personasMesAnterior, personasAnio, diasMes, diasMesAnterior, diasAnio, diasAnioAnterior };
   }, [incapacidades, selectedDepartment]);
 
+  const StatCard = ({
+    icon: Icon,
+    title,
+    value,
+    unit,
+    prevLabel,
+    prevValue,
+    accent,
+    extra,
+  }: {
+    icon: React.ElementType;
+    title: string;
+    value: number;
+    unit: string;
+    prevLabel: string;
+    prevValue: number;
+    accent: 'blue' | 'green';
+    extra?: string;
+  }) => {
+    const isBlue = accent === 'blue';
+    return (
+      <div
+        className={cn(
+          'rounded-2xl border p-3 flex flex-col justify-between min-h-[120px] sm:min-h-[132px] flex-1 sm:w-44 sm:flex-none',
+          isBlue ? 'bg-[#F0F7FF] border-[#D1E3F6]' : 'bg-[#F0FFF4] border-[#C6F6D5]'
+        )}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs font-medium text-[#1D1D1F] leading-tight">{title}</p>
+          <Icon className={cn('w-5 h-5 shrink-0', isBlue ? 'text-corporate' : 'text-green-600')} />
+        </div>
+        <div>
+          <p className="text-2xl sm:text-3xl font-bold text-[#1D1D1F]">{value}</p>
+          <p className="text-xs text-[#86868B]">{unit}</p>
+        </div>
+        <div className={cn('pt-2 border-t space-y-0.5', isBlue ? 'border-[#D1E3F6]' : 'border-[#C6F6D5]')}>
+          <p className="text-xs text-[#86868B]">
+            {prevLabel}: {prevValue}
+          </p>
+          {extra && (
+            <p className={cn('text-xs font-medium', isBlue ? 'text-corporate' : 'text-green-600')}>{extra}</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Estadísticas */}
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         {activeSubTab === 'mias' ? (
           <>
-            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
-              <Calendar className="w-3.5 h-3.5 text-corporate mb-1" />
-              <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasMes}</span>
-              <span className="text-[9px] text-[#86868B]">Este mes</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasMesAnterior}</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
-                {myStats.diasMesAnterior === 0
-                  ? '% vs ant.: N/A'
-                  : `% vs ant.: ${((myStats.diasMes - myStats.diasMesAnterior) / myStats.diasMesAnterior * 100).toFixed(0)}%`}
-              </span>
-            </div>
-            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
-              <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
-              <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{myStats.diasAnio}</span>
-              <span className="text-[9px] text-[#86868B]">Este año</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {myStats.diasAnioAnterior}</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
-                {myStats.diasAnioAnterior === 0
-                  ? '% vs ant.: N/A'
-                  : `% vs ant.: ${((myStats.diasAnio - myStats.diasAnioAnterior) / myStats.diasAnioAnterior * 100).toFixed(0)}%`}
-              </span>
-            </div>
+            <StatCard
+              icon={Calendar}
+              title="Este mes"
+              value={myStats.diasMes}
+              unit="días"
+              prevLabel="Mes anterior"
+              prevValue={myStats.diasMesAnterior}
+              accent="blue"
+              extra={
+                myStats.diasMesAnterior === 0
+                  ? 'vs anterior: N/A'
+                  : `vs anterior: ${((myStats.diasMes - myStats.diasMesAnterior) / myStats.diasMesAnterior * 100).toFixed(0)}%`
+              }
+            />
+            <StatCard
+              icon={CalendarDays}
+              title="Este año"
+              value={myStats.diasAnio}
+              unit="días"
+              prevLabel="Año anterior"
+              prevValue={myStats.diasAnioAnterior}
+              accent="green"
+              extra={
+                myStats.diasAnioAnterior === 0
+                  ? 'vs anterior: N/A'
+                  : `vs anterior: ${((myStats.diasAnio - myStats.diasAnioAnterior) / myStats.diasAnioAnterior * 100).toFixed(0)}%`
+              }
+            />
           </>
         ) : (
           <>
-            <div className="bg-[#F0F7FF] rounded-xl border border-[#D1E3F6] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
-              <Users className="w-3.5 h-3.5 text-corporate mb-1" />
-              <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.personasMes}</span>
-              <span className="text-[9px] text-[#86868B]">Este mes</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.personasMesAnterior}</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
-                {deptStats.personasMes === 0
-                  ? 'Prom.: 0 días/pers.'
-                  : `Prom.: ${(deptStats.diasMes / deptStats.personasMes).toFixed(1)} días/pers.`}
-              </span>
-            </div>
-            <div className="bg-[#F0FFF4] rounded-xl border border-[#C6F6D5] flex-1 h-20 sm:w-40 sm:flex-none sm:h-24 flex flex-col items-center justify-center text-center">
-              <CalendarDays className="w-3.5 h-3.5 text-green-600 mb-1" />
-              <span className="text-lg sm:text-xl font-semibold text-[#1D1D1F]">{deptStats.diasAnio}</span>
-              <span className="text-[9px] text-[#86868B]">Este año</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B] mt-0.5">Ant.: {deptStats.diasAnioAnterior}</span>
-              <span className="text-[8px] sm:text-[10px] text-[#86868B]">
-                {deptStats.personasAnio === 0
-                  ? 'Prom.: 0 días/pers.'
-                  : `Prom.: ${(deptStats.diasAnio / deptStats.personasAnio).toFixed(1)} días/pers.`}
-              </span>
-            </div>
+            <StatCard
+              icon={Users}
+              title="Personas este mes"
+              value={deptStats.personasMes}
+              unit="personas"
+              prevLabel="Mes anterior"
+              prevValue={deptStats.personasMesAnterior}
+              accent="blue"
+              extra={
+                deptStats.personasMes === 0
+                  ? 'Promedio: 0 días/persona'
+                  : `Promedio: ${(deptStats.diasMes / deptStats.personasMes).toFixed(1)} días/persona`
+              }
+            />
+            <StatCard
+              icon={CalendarDays}
+              title="Días este año"
+              value={deptStats.diasAnio}
+              unit="días"
+              prevLabel="Año anterior"
+              prevValue={deptStats.diasAnioAnterior}
+              accent="green"
+              extra={
+                deptStats.personasAnio === 0
+                  ? 'Promedio: 0 días/persona'
+                  : `Promedio: ${(deptStats.diasAnio / deptStats.personasAnio).toFixed(1)} días/persona`
+              }
+            />
           </>
         )}
       </div>
