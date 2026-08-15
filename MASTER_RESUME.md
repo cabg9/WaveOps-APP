@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (Solicitudes móvil: dropdown Recibidas/Enviadas/Historial pasa a segunda fila debajo de Cambios|Solicitudes; deployado)
+> Última actualización: 2026-08-14 (Solicitudes móvil: corrección de anchos en dropdowns para que sean clickeables y Equipo sea visible; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -196,6 +196,7 @@
     - **Solicitudes (móvil)**:
       - El header pasó de `flex-nowrap` con scroll horizontal a `flex-wrap`.
       - El dropdown de **Recibidas/Enviadas/Historial/Equipo** (pestaña **Cambios**) ahora se ubica en una segunda fila debajo de las pestañas principales **Cambios | Solicitudes**.
+      - Se corrigieron los anchos de todos los dropdowns móviles (`SelectTrigger` con `w-full` y contenedores con `min-w-[140px]`) para evitar que colapsen y dejen de ser clickeables; ahora la opción **Equipo** es visible y seleccionable.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
