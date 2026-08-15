@@ -424,7 +424,7 @@ export default function HorariosModule() {
 
             {/* Mobile: filtros de incapacidades */}
             {activeTab === 'incapacidades' && (
-              <div className="md:hidden flex flex-col items-start gap-2 w-full">
+              <div className="md:hidden flex flex-row items-start gap-2 w-full">
                 {incapacidadesSubTab === 'mias' && (
                   <Select value={myIncapacidadesFilter} onValueChange={(v) => setMyIncapacidadesFilter(v as typeof myIncapacidadesFilter)}>
                     <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
