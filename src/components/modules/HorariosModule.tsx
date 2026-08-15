@@ -6670,33 +6670,31 @@ function SolicitudesTab() {
                 ))}
               </div>
 
-              {/* Mobile: dropdown Recibidas/Enviadas/Historial/Equipo */}
-              <div className="md:hidden w-full">
-                <Select value={misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
+              {/* Mobile: dropdown Recibidas/Enviadas/Historial + botón Equipo */}
+              <div className="md:hidden flex items-center gap-2 w-full min-w-0">
+                <Select value={misCambiosFilter === 'equipo' ? 'recibidas' : misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
                     {(() => {
                       const active = [
                         { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
                         { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
                         { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
-                        { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
-                      ].find((f) => f.id === misCambiosFilter);
+                      ].find((f) => f.id === (misCambiosFilter === 'equipo' ? 'recibidas' : misCambiosFilter));
                       const ActiveIcon = active?.icon || Inbox;
                       return (
-                        <span className="flex items-center gap-2 text-[#86868B]">
-                          <ActiveIcon className="w-4 h-4" />
-                          <span>{active?.label}</span>
-                          {active && active.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate">{active.count}</span>}
+                        <span className="flex items-center gap-2 text-[#86868B] truncate">
+                          <ActiveIcon className="w-4 h-4 flex-shrink-0" />
+                          <span className="truncate">{active?.label}</span>
+                          {active && active.count > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-corporate/10 text-corporate flex-shrink-0">{active.count}</span>}
                         </span>
                       );
                     })()}
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent position="popper" className="z-50">
                     {[
                       { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
                       { id: 'enviadas', label: 'Enviadas', icon: Send, count: misCambiosCounts.enviadas },
                       { id: 'historial', label: 'Historial', icon: History, count: misCambiosCounts.historialCount },
-                      { id: 'equipo', label: 'Equipo', icon: Users, count: equipoCounts.todas },
                     ].map((filter) => {
                       const FilterIcon = filter.icon;
                       return (
@@ -6711,6 +6709,27 @@ function SolicitudesTab() {
                     })}
                   </SelectContent>
                 </Select>
+
+                <button
+                  onClick={() => setMisCambiosFilter('equipo')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-2 h-10 rounded-xl text-sm font-medium transition-all whitespace-nowrap shrink-0',
+                    misCambiosFilter === 'equipo'
+                      ? 'bg-corporate text-white'
+                      : 'bg-white text-[#86868B] hover:bg-[#F5F5F7] border border-[#E5E5E7]'
+                  )}
+                >
+                  <Users className="w-4 h-4" />
+                  <span>Equipo</span>
+                  {equipoCounts.todas > 0 && (
+                    <span className={cn(
+                      'px-1.5 py-0.5 text-[10px] rounded-full',
+                      misCambiosFilter === 'equipo' ? 'bg-white/20' : 'bg-corporate/10 text-corporate'
+                    )}>
+                      {equipoCounts.todas}
+                    </span>
+                  )}
+                </button>
               </div>
 
               {misCambiosFilter === 'equipo' && (
