@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (Solicitudes móvil: corrección de anchos en dropdowns para que sean clickeables y Equipo sea visible; deployado)
+> Última actualización: 2026-08-14 (Solicitudes móvil: separar filtro Equipo y reparar dropdown Cambios; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -195,8 +195,9 @@
       - `DroppableCell` ahora acepta `className` para ocupar toda la altura de la celda y mejorar el área de drop.
     - **Solicitudes (móvil)**:
       - El header pasó de `flex-nowrap` con scroll horizontal a `flex-wrap`.
-      - El dropdown de **Recibidas/Enviadas/Historial/Equipo** (pestaña **Cambios**) ahora se ubica en una segunda fila debajo de las pestañas principales **Cambios | Solicitudes**.
-      - Se corrigieron los anchos de todos los dropdowns móviles (`SelectTrigger` con `w-full` y contenedores con `min-w-[140px]`) para evitar que colapsen y dejen de ser clickeables; ahora la opción **Equipo** es visible y seleccionable.
+      - El dropdown de **Recibidas/Enviadas/Historial** (pestaña **Cambios**) se separó del filtro **Equipo**.
+      - El filtro **Equipo** ahora es un botón visible e independiente en móvil.
+      - Se reparó el dropdown de **Cambios** agregando `position="popper"`, `z-50` y `min-w-0` al trigger para que se despliegue correctamente.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
