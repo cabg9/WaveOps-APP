@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-14 (Equipo y Asignar: columna 'Colaborador' fija fuera del scroll, 7 días movibles en área scrollable sincronizada; deployado)
+> Última actualización: 2026-08-14 (Solicitudes móvil: dropdown Recibidas/Enviadas/Historial pasa a segunda fila debajo de Cambios|Solicitudes; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -193,6 +193,9 @@
       - Se replicó la estructura de `grid` de dos columnas de **Equipo**.
       - Se mantuvo el drag-and-drop (`DroppableCell`), el doble click para borrador/eliminado, los badges de turno, el bloqueo por tiempo libre aprobado y el resaltado de colaboradores de otros departamentos.
       - `DroppableCell` ahora acepta `className` para ocupar toda la altura de la celda y mejorar el área de drop.
+    - **Solicitudes (móvil)**:
+      - El header pasó de `flex-nowrap` con scroll horizontal a `flex-wrap`.
+      - El dropdown de **Recibidas/Enviadas/Historial/Equipo** (pestaña **Cambios**) ahora se ubica en una segunda fila debajo de las pestañas principales **Cambios | Solicitudes**.
 - **TasksModule**:
   - Inputs de fecha/hora a ancho completo con texto legible.
   - Header de crear tareas con wrap.
