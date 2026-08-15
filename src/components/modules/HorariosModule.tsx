@@ -1008,6 +1008,28 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
     setCurrentMonth(new Date());
   };
 
+  // Agrupar días en semanas para mantener la fila de números fija al expandir
+  const weeks = useMemo(() => {
+    const result: Date[][] = [];
+    for (let i = 0; i < monthDays.length; i += 7) {
+      result.push(monthDays.slice(i, i + 7));
+    }
+    return result;
+  }, [monthDays]);
+
+  // Datos del día expandido calculados una sola vez
+  const expandedDayInfo = useMemo(() => {
+    if (!expandedDate) return null;
+    const date = new Date(expandedDate + 'T00:00:00');
+    const dateStr = expandedDate;
+    const dayShifts = user ? getUserShifts(userIdForShifts, dateStr, user.email) : [];
+    const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
+    const hasIncapacity = !!incapacityInfo;
+    const timeOffInfo = findTimeOffForDate(approvedTimeOff, dateStr, user?.id);
+    const dayTasks = user ? getTasksByUser(user.id).filter(t => t.dueDate === dateStr) : [];
+    return { date, dateStr, dayShifts, incapacityInfo, hasIncapacity, timeOffInfo, dayTasks };
+  }, [expandedDate, user?.id, user?.email, userIdForShifts, incapacityDates, approvedTimeOff, getUserShifts, getTasksByUser]);
+
   return (
     <div className="space-y-6">
       {/* Hoy Card */}
@@ -1196,197 +1218,214 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
           ))}
         </div>
 
-        {/* Grid de días */}
-        <div className="grid grid-cols-7 gap-1">
-          {monthDays.map((date, index) => {
-            const dateStr = toLocalISODate(date);
-            const isToday = dateStr === today;
-            const dayShifts = user ? getUserShifts(userIdForShifts, dateStr, user.email) : [];
-            const hasShifts = dayShifts.length > 0;
-            const isExpanded = expandedDate === dateStr;
-            const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
-            const hasIncapacity = !!incapacityInfo;
-            const timeOffInfo = findTimeOffForDate(approvedTimeOff, dateStr, user?.id);
-            const hasTimeOff = !!timeOffInfo;
-            const dayTasks = user ? getTasksByUser(user.id).filter(t => t.dueDate === dateStr) : [];
-            
-            // Configuración de iconos y colores por tipo de incapacidad
-            const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
-              enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Enfermedad' },
-              accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100', label: 'Accidente' },
-              cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Cita médica' },
-              inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-100', label: 'Inasistencia' },
-            };
-            const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
-            const IncapacityIcon = incapacityStyle?.icon;
-            const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
-            const TimeOffIcon = timeOffStyle?.icon;
-
+        {/* Grid de días por semanas */}
+        <div className="space-y-1">
+          {weeks.map((week, weekIndex) => {
+            const weekHasExpanded = expandedDate && week.some(d => toLocalISODate(d) === expandedDate);
             return (
-              <div key={index} className={cn("contents", isExpanded && "col-span-7")}>
-                {/* Celda del día */}
-                <div className="relative">
-                  <button
-                    onClick={() => setExpandedDate(isExpanded ? null : dateStr)}
-                    className={cn(
-                      'w-full h-[90px] sm:h-[110px] lg:h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
-                      isToday ? 'ring-2 ring-corporate bg-corporate/5' : 'hover:bg-[#F5F5F7]',
-                      hasIncapacity && incapacityStyle?.bgColor.replace('100', '50'),
-                      !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
-                    )}
-                  >
-                    {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
-                    {hasIncapacity && IncapacityIcon && (
-                      <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
-                        <IncapacityIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
-                      </div>
-                    )}
-                    {!hasIncapacity && hasTimeOff && TimeOffIcon && (
-                      <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
-                        <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
-                      </div>
-                    )}
-                    <span className={cn(
-                      'text-sm sm:text-base font-semibold mt-2 sm:mt-0 mb-1',
-                      isToday ? 'text-corporate' : 'text-[#1D1D1F]',
-                      hasIncapacity && incapacityStyle?.color,
-                      !hasIncapacity && hasTimeOff && timeOffStyle?.color
-                    )}>
-                      {date.getDate()}
-                    </span>
-                    {hasShifts && !hasIncapacity && !hasTimeOff && (
-                      <div className="flex flex-col gap-1 w-full">
-                        {dayShifts.slice(0, 3).map((shift, i) => (
-                          <div
-                            key={i}
-                            className="text-[9px] px-1.5 py-1 rounded-md text-center font-medium leading-tight break-words whitespace-normal"
-                            style={{ backgroundColor: `${shift.color}20`, color: shift.color }}
-                          >
-                            <span className="font-bold">{shift.name}</span>
-                            <span className="opacity-80 ml-0.5">{shift.startTime}</span>
-                            <span className="opacity-60 ml-0.5">· {DEPT_SHORT_NAMES[shift.department]}</span>
-                          </div>
-                        ))}
-                        {dayShifts.length > 3 && (
-                          <span className="text-[9px] text-[#86868B] text-center font-medium">+{dayShifts.length - 3}</span>
-                        )}
-                      </div>
-                    )}
-                    {hasIncapacity && incapacityInfo && incapacityStyle && (
-                      <div className={cn(
-                        "mt-1 text-[9px] sm:text-[10px] font-semibold leading-tight text-center w-full min-w-0",
-                        incapacityStyle.label.includes(' ') ? 'break-words' : 'break-all',
-                        incapacityStyle.color
-                      )}>
-                        {incapacityStyle.label}
-                      </div>
-                    )}
-                    {!hasIncapacity && hasTimeOff && timeOffInfo && timeOffStyle && (
-                      <div className={cn("mt-1 text-[10px] font-semibold", timeOffStyle.color)}>
-                        {TIME_OFF_LABELS[timeOffInfo.type]}
-                      </div>
-                    )}
-                  </button>
-                </div>
+              <div key={weekIndex} className="space-y-1">
+                <div className="grid grid-cols-7 gap-1">
+                  {week.map((date, index) => {
+                    const dateStr = toLocalISODate(date);
+                    const isToday = dateStr === today;
+                    const dayShifts = user ? getUserShifts(userIdForShifts, dateStr, user.email) : [];
+                    const hasShifts = dayShifts.length > 0;
+                    const isExpanded = expandedDate === dateStr;
+                    const incapacityInfo = incapacityDates.find(i => i.date === dateStr && i.userId === user?.id);
+                    const hasIncapacity = !!incapacityInfo;
+                    const timeOffInfo = findTimeOffForDate(approvedTimeOff, dateStr, user?.id);
+                    const hasTimeOff = !!timeOffInfo;
 
-                {/* Expansión del día - DEBAJO del día presionado */}
-                {isExpanded && (
-                  <div className="col-span-7 mt-2 mb-3 p-4 bg-[#F5F5F7] rounded-xl">
-                    <div className="flex items-center justify-between mb-4">
-                      <h4 className="font-medium text-[#1D1D1F]">
-                        {date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </h4>
-                      <button
-                        onClick={() => {
-                          setShowChangeShiftModal(true);
-                          setSelectedShiftForChange(null);
-                          setRequestType('change');
-                          setSelectedTargetShift(null);
-                          setSelectedSwapUser(null);
-                          setChangeReason('');
-                        }}
-                        className="text-xs text-corporate hover:text-corporate/80 px-3 py-1.5 rounded-lg bg-corporate/10 hover:bg-corporate/20 transition-colors font-medium"
-                      >
-                        Solicitar cambio
-                      </button>
-                    </div>
+                    // Configuración de iconos y colores por tipo de incapacidad
+                    const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
+                      enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Enfermedad' },
+                      accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100', label: 'Accidente' },
+                      cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Cita médica' },
+                      inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-100', label: 'Inasistencia' },
+                    };
+                    const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                    const IncapacityIcon = incapacityStyle?.icon;
+                    const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+                    const TimeOffIcon = timeOffStyle?.icon;
 
-                    {!hasIncapacity && timeOffInfo && (
-                      <div className="mb-4">
-                        {(() => {
-                          const style = TIME_OFF_VISUAL[timeOffInfo.type];
-                          const Icon = style.icon;
-                          return (
-                            <div className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg border', style.bgColor, style.borderColor)}>
-                              <Icon className={cn('w-4 h-4', style.color)} />
-                              <span className={cn('text-sm font-medium', style.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
-                              <span className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</span>
-                              {timeOffInfo.reason && (
-                                <span className="text-xs text-[#86868B]">· {timeOffInfo.reason}</span>
+                    return (
+                      <div key={index} className="relative">
+                        <button
+                          onClick={() => setExpandedDate(isExpanded ? null : dateStr)}
+                          className={cn(
+                            'w-full h-[90px] sm:h-[110px] lg:h-[120px] rounded-xl p-2 flex flex-col items-center justify-start transition-all relative overflow-hidden',
+                            isToday ? 'ring-2 ring-corporate bg-corporate/5' : 'hover:bg-[#F5F5F7]',
+                            isExpanded && 'bg-[#F5F5F7]',
+                            hasIncapacity && incapacityStyle?.bgColor.replace('100', '50'),
+                            !hasIncapacity && hasTimeOff && timeOffStyle?.bgColor.replace('100', '50')
+                          )}
+                        >
+                          {/* Icono según tipo de incapacidad / tiempo libre aprobado */}
+                          {hasIncapacity && IncapacityIcon && (
+                            <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", incapacityStyle?.bgColor)}>
+                              <IncapacityIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", incapacityStyle?.color)} />
+                            </div>
+                          )}
+                          {!hasIncapacity && hasTimeOff && TimeOffIcon && (
+                            <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
+                              <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
+                            </div>
+                          )}
+                          <span className={cn(
+                            'text-sm sm:text-base font-semibold mt-2 sm:mt-0 mb-1',
+                            isToday ? 'text-corporate' : 'text-[#1D1D1F]',
+                            hasIncapacity && incapacityStyle?.color,
+                            !hasIncapacity && hasTimeOff && timeOffStyle?.color
+                          )}>
+                            {date.getDate()}
+                          </span>
+                          {hasShifts && !hasIncapacity && !hasTimeOff && (
+                            <div className="flex flex-col gap-1 w-full">
+                              {dayShifts.slice(0, 3).map((shift, i) => (
+                                <div
+                                  key={i}
+                                  className="text-[9px] px-1.5 py-1 rounded-md text-center font-medium leading-tight break-words whitespace-normal"
+                                  style={{ backgroundColor: `${shift.color}20`, color: shift.color }}
+                                >
+                                  <span className="font-bold">{shift.name}</span>
+                                  <span className="opacity-80 ml-0.5">{shift.startTime}</span>
+                                  <span className="opacity-60 ml-0.5">· {DEPT_SHORT_NAMES[shift.department]}</span>
+                                </div>
+                              ))}
+                              {dayShifts.length > 3 && (
+                                <span className="text-[9px] text-[#86868B] text-center font-medium">+{dayShifts.length - 3}</span>
                               )}
                             </div>
-                          );
-                        })()}
+                          )}
+                          {hasIncapacity && incapacityInfo && incapacityStyle && (
+                            <div className={cn(
+                              "mt-1 text-[9px] sm:text-[10px] font-semibold leading-tight text-center w-full min-w-0",
+                              incapacityStyle.label.includes(' ') ? 'break-words' : 'break-all',
+                              incapacityStyle.color
+                            )}>
+                              {incapacityStyle.label}
+                            </div>
+                          )}
+                          {!hasIncapacity && hasTimeOff && timeOffInfo && timeOffStyle && (
+                            <div className={cn("mt-1 text-[10px] font-semibold", timeOffStyle.color)}>
+                              {TIME_OFF_LABELS[timeOffInfo.type]}
+                            </div>
+                          )}
+                        </button>
                       </div>
-                    )}
+                    );
+                  })}
+                </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* Turnos - Izquierda */}
-                      <div>
-                        <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5" /> Turnos ({dayShifts.length})
-                        </p>
-                        {dayShifts.length > 0 ? (
-                          <div className="space-y-2">
-                            {dayShifts.map((shift, i) => (
-                              <div 
-                                key={i} 
-                                className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg"
-                              >
-                                <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color }} />
-                                <span className="text-sm font-medium" style={{ color: shift.color }}>{shift.name}</span>
-                                <span className="text-xs text-[#86868B]">{shift.startTime} - {shift.endTime}</span>
-                                <div className="flex items-center gap-1 ml-auto px-1.5 py-0.5 bg-[#F5F5F7] rounded">
-                                  <DeptIcon department={shift.department} className="w-3 h-3 text-[#86868B]" />
-                                  <span className="text-[10px] text-[#86868B]">{shift.department.replace(/_/g, ' ')}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-[#86868B]">Sin turnos asignados</p>
-                        )}
-                      </div>
+                {/* Expansión del día - DEBAJO de toda la fila de la semana */}
+                {weekHasExpanded && expandedDayInfo && (
+                  <div className="p-4 bg-[#F5F5F7] rounded-xl mt-2 mb-3">
+                    {(() => {
+                      const { date, dateStr, dayShifts, incapacityInfo, hasIncapacity, timeOffInfo, dayTasks } = expandedDayInfo;
 
-                      {/* Tasks - Derecha */}
-                      <div>
-                        <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1.5">
-                          <CheckSquare className="w-3.5 h-3.5" /> Tasks ({dayTasks.length})
-                        </p>
-                        {dayTasks.length > 0 ? (
-                          <div className="space-y-2">
-                            {dayTasks.map((task, i) => (
-                              <div key={i} className="flex items-start gap-2 p-2.5 bg-white rounded-lg">
-                                <div className={cn(
-                                  'w-2 h-2 rounded-full mt-1 flex-shrink-0',
-                                  task.priority === 'HIGH' && 'bg-red-500',
-                                  task.priority === 'MEDIUM' && 'bg-amber-500',
-                                  task.priority === 'LOW' && 'bg-green-500'
-                                )} />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-[#1D1D1F]">{task.title}</p>
-                                  {task.description && (
-                                    <p className="text-xs text-[#86868B] line-clamp-2 mt-0.5">{task.description}</p>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
+                      const incapacityConfig: Record<string, { icon: React.ElementType, color: string, bgColor: string, label: string }> = {
+                        enfermedad: { icon: Activity, color: 'text-red-500', bgColor: 'bg-red-100', label: 'Enfermedad' },
+                        accidente: { icon: AlertTriangle, color: 'text-orange-500', bgColor: 'bg-orange-100', label: 'Accidente' },
+                        cita_medica: { icon: Stethoscope, color: 'text-blue-500', bgColor: 'bg-blue-100', label: 'Cita médica' },
+                        inasistencia: { icon: UserX, color: 'text-purple-500', bgColor: 'bg-purple-100', label: 'Inasistencia' },
+                      };
+                      const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                      const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+
+                      return (
+                        <>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-medium text-[#1D1D1F]">
+                              {date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}
+                            </h4>
+                            <button
+                              onClick={() => {
+                                setShowChangeShiftModal(true);
+                                setSelectedShiftForChange(null);
+                                setRequestType('change');
+                                setSelectedTargetShift(null);
+                                setSelectedSwapUser(null);
+                                setChangeReason('');
+                              }}
+                              className="text-xs text-corporate hover:text-corporate/80 px-3 py-1.5 rounded-lg bg-corporate/10 hover:bg-corporate/20 transition-colors font-medium"
+                            >
+                              Solicitar cambio
+                            </button>
                           </div>
-                        ) : (
-                          <p className="text-sm text-[#86868B]">Sin tareas asignadas</p>
-                        )}
-                      </div>
-                    </div>
+
+                          {!hasIncapacity && timeOffInfo && timeOffStyle && (
+                            <div className="mb-4">
+                              <div className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg border', timeOffStyle.bgColor, timeOffStyle.borderColor)}>
+                                <timeOffStyle.icon className={cn('w-4 h-4', timeOffStyle.color)} />
+                                <span className={cn('text-sm font-medium', timeOffStyle.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
+                                <span className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</span>
+                                {timeOffInfo.reason && (
+                                  <span className="text-xs text-[#86868B]">· {timeOffInfo.reason}</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Turnos - Izquierda */}
+                            <div>
+                              <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1.5">
+                                <Clock className="w-3.5 h-3.5" /> Turnos ({dayShifts.length})
+                              </p>
+                              {dayShifts.length > 0 ? (
+                                <div className="space-y-2">
+                                  {dayShifts.map((shift, i) => (
+                                    <div
+                                      key={i}
+                                      className="flex items-center gap-3 px-3 py-2.5 bg-white rounded-lg"
+                                    >
+                                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color }} />
+                                      <span className="text-sm font-medium" style={{ color: shift.color }}>{shift.name}</span>
+                                      <span className="text-xs text-[#86868B]">{shift.startTime} - {shift.endTime}</span>
+                                      <div className="flex items-center gap-1 ml-auto px-1.5 py-0.5 bg-[#F5F5F7] rounded">
+                                        <DeptIcon department={shift.department} className="w-3 h-3 text-[#86868B]" />
+                                        <span className="text-[10px] text-[#86868B]">{shift.department.replace(/_/g, ' ')}</span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-[#86868B]">Sin turnos asignados</p>
+                              )}
+                            </div>
+
+                            {/* Tasks - Derecha */}
+                            <div>
+                              <p className="text-xs text-[#86868B] mb-2 flex items-center gap-1.5">
+                                <CheckSquare className="w-3.5 h-3.5" /> Tasks ({dayTasks.length})
+                              </p>
+                              {dayTasks.length > 0 ? (
+                                <div className="space-y-2">
+                                  {dayTasks.map((task, i) => (
+                                    <div key={i} className="flex items-start gap-2 p-2.5 bg-white rounded-lg">
+                                      <div className={cn(
+                                        'w-2 h-2 rounded-full mt-1 flex-shrink-0',
+                                        task.priority === 'HIGH' && 'bg-red-500',
+                                        task.priority === 'MEDIUM' && 'bg-amber-500',
+                                        task.priority === 'LOW' && 'bg-green-500'
+                                      )} />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-[#1D1D1F]">{task.title}</p>
+                                        {task.description && (
+                                          <p className="text-xs text-[#86868B] line-clamp-2 mt-0.5">{task.description}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-[#86868B]">Sin tareas asignadas</p>
+                              )}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
