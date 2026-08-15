@@ -4017,179 +4017,195 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
           </div>
 
           {/* Calendario */}
-          <div className="overflow-x-auto w-full">
-            <table className="w-full min-w-[600px] sm:min-w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className="text-left p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem]">
-                    Colaborador
-                  </th>
-                  {weekDays.map((day, i) => (
-                    <th key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7] min-w-0">
-                      <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
-                      <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
-                      <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">
+            <div className="grid grid-cols-[110px_1fr] sm:grid-cols-[12rem_1fr]">
+              {/* Columna fija de colaboradores */}
+              <div className="bg-white z-10 border-r border-[#E5E5E7]">
+                <div className="h-14 sm:h-16 flex items-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] border-b border-[#E5E5E7]">
+                  Colaborador
+                </div>
                 {allVisibleUsers.map((u, rowIdx) => {
                   const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
                   const isLastRow = rowIdx === allVisibleUsers.length - 1;
-                  const rowBorder = isLastRow ? '' : 'border-b border-[#E5E5E7]';
                   const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                   return (
-                    <tr key={u.id} className={cn(rowBorder, rowBg)}>
-                      <td className={cn("p-1 sm:p-4 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] w-[110px] sm:w-[12rem] min-w-[110px] sm:min-w-[12rem] align-middle", rowBorder, rowBg)}>
-                        <div className="flex flex-col items-center gap-1 sm:flex-row sm:items-center sm:gap-3">
-                          <UserAvatar
-                            name={u.name}
-                            photoUrl={u.photoURL || u.avatar}
-                            size="sm"
-                            className={cn(isCrossDept && "ring-2 ring-amber-400")}
-                            fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
-                          />
-                          <div className="text-center sm:text-left">
-                            <div className="flex items-center justify-center sm:justify-start gap-1.5">
-                              <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
-                              {isCrossDept && (
-                                <div 
-                                  className="p-0.5 rounded bg-amber-100" 
-                                  title={u.department.replace(/_/g, ' ')}
-                                >
-                                  <DeptIcon department={u.department} className="w-3.5 h-3.5 text-amber-600" />
-                                </div>
-                              )}
-                            </div>
-                            <p className="hidden sm:block text-xs text-[#86868B]">{u.position}</p>
+                    <div key={u.id} className={cn("h-[72px] sm:h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
+                      <div className="flex flex-col items-center gap-1 w-full sm:flex-row sm:items-center sm:gap-3">
+                        <UserAvatar
+                          name={u.name}
+                          photoUrl={u.photoURL || u.avatar}
+                          size="sm"
+                          className={cn(isCrossDept && "ring-2 ring-amber-400")}
+                          fallbackClassName={cn("text-xs", isCrossDept ? "bg-amber-500" : "bg-corporate")}
+                        />
+                        <div className="text-center sm:text-left min-w-0">
+                          <div className="flex items-center justify-center sm:justify-start gap-1.5">
+                            <p className="text-[10px] sm:text-sm font-medium text-[#1D1D1F] leading-tight truncate">{u.name.split(' ')[0]}</p>
                             {isCrossDept && (
-                              <p className="text-[10px] text-amber-600 font-medium">
-                                {DEPT_SHORT_NAMES[u.department]}
-                              </p>
+                              <div 
+                                className="p-0.5 rounded bg-amber-100" 
+                                title={u.department.replace(/_/g, ' ')}
+                              >
+                                <DeptIcon department={u.department} className="w-3.5 h-3.5 text-amber-600" />
+                              </div>
                             )}
                           </div>
+                          <p className="hidden sm:block text-xs text-[#86868B] truncate">{u.position}</p>
+                          {isCrossDept && (
+                            <p className="text-[10px] text-amber-600 font-medium">
+                              {DEPT_SHORT_NAMES[u.department]}
+                            </p>
+                          )}
                         </div>
-                      </td>
-                      {weekDays.map((day, i) => {
-                        const dayAssignments = getUserAssignmentsForDay(u.id, day);
-                        const dropId = `${u.id}|${toLocalISODate(day)}`;
-                        const dateStr = toLocalISODate(day);
-                        const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
-                        const hasIncapacity = !!incapacityInfo;
-                        const timeOffInfo = approvedTimeOff.find(
-                          (r) => r.userId === u.id && isDateInRange(dateStr, r.startDate, r.endDate)
-                        );
-                        const hasTimeOff = !!timeOffInfo;
-                        const isBlocked = hasTimeOff;
-
-                        const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
-                          enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
-                          accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
-                          cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita méd.' },
-                          inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
-                        };
-                        const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
-                        const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
-
-                        return (
-                          <td key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", rowBorder, rowBg)}>
-                            <DroppableCell id={dropId} disabled={isBlocked}>
-                              <div className="space-y-1 w-full min-w-0">
-                                {hasTimeOff && timeOffStyle && (
-                                  <div className={cn(
-                                    'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
-                                    timeOffStyle.bgColor,
-                                    timeOffStyle.color,
-                                    timeOffStyle.borderColor
-                                  )}>
-                                    {TIME_OFF_LABELS[timeOffInfo.type]}
-                                  </div>
-                                )}
-                                {hasIncapacity && incapacityStyle && (
-                                  <div className={cn(
-                                    'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
-                                    incapacityStyle.bgColor,
-                                    incapacityStyle.color,
-                                    incapacityStyle.borderColor
-                                  )}>
-                                    {incapacityStyle.label}
-                                  </div>
-                                )}
-                                {dayAssignments.map((assignment, idx) => {
-                                  const shift = shifts.find(s => s.id === assignment.shiftId);
-                                  const isCrossDepartment = shift && shift.department !== selectedDepartment && selectedDepartment !== 'ALL';
-
-                                  return shift ? (
-                                    <div
-                                      key={idx}
-                                      onDoubleClick={() => {
-                                        if (assignment.status === AssignmentStatus.ELIMINADO) {
-                                          restoreShift(assignment.id);
-                                        } else {
-                                          removeShift(assignment.id);
-                                        }
-                                      }}
-                                      className={cn(
-                                        'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105 min-w-0 break-words',
-                                        assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
-                                      )}
-                                      style={{
-                                        backgroundColor: assignment.status === AssignmentStatus.ELIMINADO
-                                          ? '#F5F5F7'
-                                          : assignment.status === AssignmentStatus.BORRADOR
-                                            ? `${shift.color}20`
-                                            : `${shift.color}30`,
-                                        color: assignment.status === AssignmentStatus.ELIMINADO ? '#86868B' : shift.color,
-                                        border: assignment.status === AssignmentStatus.BORRADOR
-                                          ? `2px dashed ${shift.color}`
-                                          : assignment.status === AssignmentStatus.ELIMINADO
-                                            ? '2px dashed #C7C7CC'
-                                            : 'none',
-                                        opacity: assignment.status === AssignmentStatus.ELIMINADO || assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
-                                      }}
-                                      title={assignment.status === AssignmentStatus.ELIMINADO
-                                        ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
-                                        : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
-                                    >
-                                      <div className="flex flex-wrap items-center justify-center gap-1">
-                                        {assignment.status === AssignmentStatus.ELIMINADO && (
-                                          <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
-                                        )}
-                                        <span className="break-words leading-tight">{shift.name}</span>
-                                        {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
-                                          <div 
-                                            className="p-0.5 rounded bg-white/70 flex-shrink-0"
-                                            title={shift.department.replace(/_/g, ' ')}
-                                          >
-                                            <DeptIcon department={shift.department} className="w-3 h-3" />
-                                          </div>
-                                        )}
-                                      </div>
-                                      <div className="text-[9px] opacity-70">{shift.startTime}-{shift.endTime}</div>
-                                      {assignment.status === AssignmentStatus.BORRADOR && (
-                                        <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
-                                          <span className="text-[7px] text-white font-bold">B</span>
-                                        </span>
-                                      )}
-                                      {assignment.status === AssignmentStatus.ELIMINADO && (
-                                        <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
-                                          <span className="text-[7px] text-white font-bold">-</span>
-                                        </span>
-                                      )}
-                                    </div>
-                                  ) : null;
-                                })}
-                              </div>
-                            </DroppableCell>
-                          </td>
-                        );
-                      })}
-                    </tr>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Área scrollable de días */}
+              <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                  {/* Header de días */}
+                  <div className="h-14 sm:h-16 grid grid-cols-7 border-b border-[#E5E5E7]">
+                    {weekDays.map((day, i) => (
+                      <div key={i} className="text-center p-1 sm:p-4 text-xs sm:text-sm font-medium text-[#86868B] flex items-center justify-center">
+                        <div>
+                          <div className="hidden sm:block">{['LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB', 'DOM'][i]}</div>
+                          <div className="sm:hidden">{['L', 'Ma', 'Mi', 'J', 'V', 'S', 'D'][i]}</div>
+                          <div className="text-[10px] sm:text-xs text-[#C7C7CC]">{day.getDate()}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Filas de días */}
+                  {allVisibleUsers.map((u, rowIdx) => {
+                    const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
+                    const isLastRow = rowIdx === allVisibleUsers.length - 1;
+                    const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
+                    return (
+                      <div key={u.id} className={cn("h-[72px] sm:h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
+                        {weekDays.map((day, i) => {
+                          const dayAssignments = getUserAssignmentsForDay(u.id, day);
+                          const dropId = `${u.id}|${toLocalISODate(day)}`;
+                          const dateStr = toLocalISODate(day);
+                          const incapacityInfo = _getIncapacityForDate(dateStr, u.id);
+                          const hasIncapacity = !!incapacityInfo;
+                          const timeOffInfo = approvedTimeOff.find(
+                            (r) => r.userId === u.id && isDateInRange(dateStr, r.startDate, r.endDate)
+                          );
+                          const hasTimeOff = !!timeOffInfo;
+                          const isBlocked = hasTimeOff;
+
+                          const incapacityConfig: Record<string, { color: string, bgColor: string, borderColor: string, label: string }> = {
+                            enfermedad: { color: 'text-red-600', bgColor: 'bg-red-50', borderColor: 'border-red-200', label: 'Enfermedad' },
+                            accidente: { color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200', label: 'Accidente' },
+                            cita_medica: { color: 'text-blue-600', bgColor: 'bg-blue-50', borderColor: 'border-blue-200', label: 'Cita méd.' },
+                            inasistencia: { color: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200', label: 'Inasist.' },
+                          };
+                          const incapacityStyle = incapacityInfo ? incapacityConfig[incapacityInfo.type] : null;
+                          const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
+
+                          return (
+                            <div key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", isLastRow ? "" : "border-b border-[#E5E5E7]")}>
+                              <DroppableCell id={dropId} disabled={isBlocked} className="h-full flex flex-col justify-center">
+                                <div className="space-y-1 w-full min-w-0">
+                                  {hasTimeOff && timeOffStyle && (
+                                    <div className={cn(
+                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
+                                      timeOffStyle.bgColor,
+                                      timeOffStyle.color,
+                                      timeOffStyle.borderColor
+                                    )}>
+                                      {TIME_OFF_LABELS[timeOffInfo.type]}
+                                    </div>
+                                  )}
+                                  {hasIncapacity && incapacityStyle && (
+                                    <div className={cn(
+                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
+                                      incapacityStyle.bgColor,
+                                      incapacityStyle.color,
+                                      incapacityStyle.borderColor
+                                    )}>
+                                      {incapacityStyle.label}
+                                    </div>
+                                  )}
+                                  {dayAssignments.map((assignment, idx) => {
+                                    const shift = shifts.find(s => s.id === assignment.shiftId);
+                                    const isCrossDepartment = shift && shift.department !== selectedDepartment && selectedDepartment !== 'ALL';
+
+                                    return shift ? (
+                                      <div
+                                        key={idx}
+                                        onDoubleClick={() => {
+                                          if (assignment.status === AssignmentStatus.ELIMINADO) {
+                                            restoreShift(assignment.id);
+                                          } else {
+                                            removeShift(assignment.id);
+                                          }
+                                        }}
+                                        className={cn(
+                                          'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium text-center relative cursor-pointer select-none transition-all hover:scale-105 min-w-0 break-words',
+                                          assignment.status === AssignmentStatus.ELIMINADO && 'line-through'
+                                        )}
+                                        style={{
+                                          backgroundColor: assignment.status === AssignmentStatus.ELIMINADO
+                                            ? '#F5F5F7'
+                                            : assignment.status === AssignmentStatus.BORRADOR
+                                              ? `${shift.color}20`
+                                              : `${shift.color}30`,
+                                          color: assignment.status === AssignmentStatus.ELIMINADO ? '#86868B' : shift.color,
+                                          border: assignment.status === AssignmentStatus.BORRADOR
+                                            ? `2px dashed ${shift.color}`
+                                            : assignment.status === AssignmentStatus.ELIMINADO
+                                              ? '2px dashed #C7C7CC'
+                                              : 'none',
+                                          opacity: assignment.status === AssignmentStatus.ELIMINADO || assignment.status === AssignmentStatus.BORRADOR ? 0.7 : 1,
+                                        }}
+                                        title={assignment.status === AssignmentStatus.ELIMINADO
+                                          ? `${shift.name} (${shift.startTime}-${shift.endTime}) - ELIMINADO - Doble click para restaurar`
+                                          : `${shift.name} (${shift.startTime}-${shift.endTime}) - ${shift.department.replace(/_/g, ' ')} - ${assignment.status === AssignmentStatus.BORRADOR ? 'BORRADOR' : 'PUBLICADO'} - Doble click para eliminar`}
+                                      >
+                                        <div className="flex flex-wrap items-center justify-center gap-1">
+                                          {assignment.status === AssignmentStatus.ELIMINADO && (
+                                            <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
+                                          )}
+                                          <span className="break-words leading-tight">{shift.name}</span>
+                                          {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
+                                            <div 
+                                              className="p-0.5 rounded bg-white/70 flex-shrink-0"
+                                              title={shift.department.replace(/_/g, ' ')}
+                                            >
+                                              <DeptIcon department={shift.department} className="w-3 h-3" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        <div className="text-[9px] opacity-70">{shift.startTime}-{shift.endTime}</div>
+                                        {assignment.status === AssignmentStatus.BORRADOR && (
+                                          <span className="absolute -top-2 -right-2 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center shadow-sm">
+                                            <span className="text-[7px] text-white font-bold">B</span>
+                                          </span>
+                                        )}
+                                        {assignment.status === AssignmentStatus.ELIMINADO && (
+                                          <span className="absolute -top-2 -right-2 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center shadow-sm">
+                                            <span className="text-[7px] text-white font-bold">-</span>
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : null;
+                                  })}
+                                </div>
+                              </DroppableCell>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -4273,12 +4289,12 @@ function DraggableShift({ shift }: { shift: Shift }) {
   );
 }
 
-function DroppableCell({ id, children, disabled }: { id: string; children: React.ReactNode; disabled?: boolean }) {
+function DroppableCell({ id, children, disabled, className }: { id: string; children: React.ReactNode; disabled?: boolean; className?: string }) {
   const { isOver, setNodeRef } = useDroppable({ id, disabled });
 
   if (disabled) {
     return (
-      <div className="min-h-[40px] rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] p-1">
+      <div className={cn("min-h-[40px] rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] p-1", className)}>
         {children}
       </div>
     );
@@ -4289,7 +4305,8 @@ function DroppableCell({ id, children, disabled }: { id: string; children: React
       ref={setNodeRef}
       className={cn(
         'min-h-[40px] rounded-lg transition-all',
-        isOver && 'bg-corporate/10 ring-2 ring-corporate/30'
+        isOver && 'bg-corporate/10 ring-2 ring-corporate/30',
+        className
       )}
     >
       {children}
