@@ -6673,7 +6673,7 @@ function SolicitudesTab() {
               {/* Mobile: dropdown Recibidas/Enviadas/Historial + botón Equipo */}
               <div className="md:hidden flex items-center gap-2 w-full min-w-0">
                 <Select value={misCambiosFilter === 'equipo' ? 'recibidas' : misCambiosFilter} onValueChange={(v) => setMisCambiosFilter(v as typeof misCambiosFilter)}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
                     {(() => {
                       const active = [
                         { id: 'recibidas', label: 'Recibidas', icon: Inbox, count: misCambiosCounts.recibidas },
@@ -6735,7 +6735,7 @@ function SolicitudesTab() {
               {misCambiosFilter === 'equipo' && (
                 <>
                   <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-full min-w-[140px]">
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-fit min-w-0">
                       <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
                       <SelectValue placeholder="Departamento" />
                     </SelectTrigger>
@@ -6750,9 +6750,9 @@ function SolicitudesTab() {
                   </Select>
 
                   {/* Mobile: dropdown de estado del equipo */}
-                  <div className="md:hidden min-w-[140px]">
+                  <div className="md:hidden min-w-0">
                     <Select value={equipoFilter} onValueChange={(v) => setEquipoFilter(v as typeof equipoFilter)}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full">
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
                         <SelectValue>
                           {(() => {
                             const active = [
