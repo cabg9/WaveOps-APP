@@ -6607,7 +6607,7 @@ function SolicitudesTab() {
           <p className="text-sm text-[#86868B]">Gestiona cambios de turno y solicitudes de tiempo libre</p>
         </div>
 
-        <div className="flex items-center gap-2 flex-nowrap overflow-x-auto pb-1 md:flex-wrap md:overflow-visible">
+        <div className="flex flex-wrap items-center gap-2 pb-1">
           {/* Pestañas principales: Cambios | Solicitudes */}
           <div className="flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
             <button
