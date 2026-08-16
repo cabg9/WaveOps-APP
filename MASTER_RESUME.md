@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-16 (Tasks: formulario Tarea Específica rediseñado con secciones, hora 24h y botones de tiempo; deployado)
+> Última actualización: 2026-08-16 (Tasks: unificado diseño de crear/editar Tarea Extra con secciones, hora 24h y botones de tiempo; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -257,6 +257,13 @@
     - **¿Dónde y cuándo se cumple?**: departamento con botones, turno sincronizado con Horarios, hora de inicio con selects de **24 horas** (hora 00-23 + minutos 00/15/30/45), tiempo estimado con **botones rápidos** (15, 30, 45, 60, 90, 120 min) y opción "Otro", y hora límite calculada.
     - **¿Quién controla?**: supervisor automático (supervisor del departamento o gerente) y observadores de control (RRHH y Gerente de Operaciones).
     - **Configuración adicional**: vigencia (30 días, 8/12 semanas, 6 meses, 1 año, 1.5 años, 2 años, indefinido) y opción de requerir foto.
+  - **Formulario de Tarea Extra (crear y editar) unificado y rediseñado** con el mismo estilo de secciones:
+    - **Información de la tarea**: título, prioridad, descripción, subtareas.
+    - **Responsable y Supervisor**: departamento, asignación a usuarios, supervisor.
+    - **Programación**: fecha de inicio, hora de inicio con selects de **24 horas**, tiempo estimado con **botones rápidos** y fecha límite calculada.
+    - **Requisitos**: foto requerida.
+    - **Solicitar Apoyo**: departamento y usuarios de apoyo (solo para roles autorizados).
+    - El modal de edición (`EditTaskModal.tsx`) y el modal de creación (`TaskFormModal` en `TasksModule.tsx`) ahora comparten look, colores y patrones de interacción.
   - Sin periodicidad: la tarea se repite automáticamente cada vez que el turno vuelve a ser asignado y publicado.
 
 ### Archivos modificados
