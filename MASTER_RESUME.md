@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-15 (Mi Horario: expansión de día no mueve números de la semana; deployado)
+> Última actualización: 2026-08-15 (FAB global con Feedback + reorganización de filtros en TasksModule; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -217,8 +217,23 @@
   - Grid de tareas 1 columna en móvil.
   - Detalle de tarea, departamentos y apoyo en 1 columna en móvil.
   - Foto maximizada de incidencia ajustada al viewport.
-  - **Dropdowns en móvil**: pestañas principales (Mis Tareas, Mi Departamento, Todas, Incidencias), filtro de tiempo y filtro de estado se muestran como selects en pantallas pequeñas (`md:hidden`), manteniendo los botones en desktop.
-  - **Ajustes finales de selects**: los dropdowns de pestaña, periodo y estado ahora se ajustan al contenido y usan el mismo estilo de botón redondeado que Horarios.
+  - **Reorganización de filtros**:
+    - **Móvil**: los tres dropdowns (pestañas principales, filtro de tiempo, filtro de estado) se muestran en una sola fila.
+    - **Desktop**: tres filas separadas — primera fila pestañas principales + filtro de tiempo a la derecha; segunda fila filtros de estado; tercera fila buscador + toggle de vista.
+  - **Botones de creación reemplazados por FAB global**: se eliminaron los botones "Tarea Extra", "Tarea Específica" e "Incidencia" del header de Tasks.
+- **FAB global (`GlobalFAB`)**:
+  - Botón flotante fijo en la esquina inferior derecha, visible en toda la app.
+  - Al presionar se despliega con animación mostrando cuatro acciones:
+    - **Tarea extra** → navega a `/tasks?create=extra` y abre el modal de creación.
+    - **Tarea específica** → navega a `/tasks?create=specific` y abre el modal de creación (solo visible para `DIRECTOR_GENERAL`).
+    - **Incidencia** → navega a `/tasks?create=incidencia` y abre el modal de creación.
+    - **Feedback** → abre un modal global para enviar sugerencias o reportar problemas.
+  - `TasksModule` lee el query param `create` y abre el modal correspondiente automáticamente, luego lo limpia de la URL.
+- **Sistema de Feedback**:
+  - Modal global con selección de tipo: "Sugerencia" o "Problema".
+  - Detecta automáticamente la ubicación del usuario (ruta actual como Dashboard, Tasks, Horarios, Develops, Configuración, etc.).
+  - Guarda en la colección `feedback` de Firestore: `userId`, `userName`, `userEmail`, `userRole`, `location`, `fullPath`, `type`, `message`, `status` (`nuevo`) y `createdAt`.
+  - Permite complementar la ubicación automática con el mensaje del usuario para dar contexto completo a los desarrolladores.
 - **DevelopsModule**:
   - Tarjetas de módulos, roles, papelera y usuarios con layout apilado en móvil.
   - Modal de usuario usa `max-w-[95vw] sm:max-w-lg`.
@@ -230,6 +245,7 @@
 
 ### Archivos modificados
 - `src/components/Layout.tsx`
+- `src/components/GlobalFAB.tsx` (nuevo)
 - `src/components/modules/HorariosModule.tsx`
 - `src/components/modules/TasksModule.tsx`
 - `src/components/modules/DevelopsModule.tsx`
