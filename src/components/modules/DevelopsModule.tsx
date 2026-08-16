@@ -2,17 +2,17 @@
 // DEVELOPS MODULE - Panel maestro de administracion
 // ═══════════════════════════════════════════════════════════════════
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2, Building2,
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save, Clock, HeartPulse,
+  LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare,
 } from 'lucide-react';
 import {
-  collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot,
+  collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { Layout } from '@/components/Layout';
@@ -33,7 +33,7 @@ import { TurnosTab } from './TurnosTab';
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos';
+type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos' | 'feedback';
 
 interface TabConfig {
   id: DevelopTab;
@@ -60,6 +60,7 @@ const TABS: TabConfig[] = [
   { id: 'seguridad', label: 'Seguridad', icon: Lock, description: 'Politicas de seguridad', impact: 'high' },
   { id: 'papelera', label: 'Papelera', icon: Trash2, description: 'Elementos eliminados', impact: 'medium' },
   { id: 'turnos', label: 'Turnos', icon: Clock, description: 'Gestion de turnos por departamento', impact: 'high' },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquare, description: 'Sugerencias y problemas reportados por usuarios', impact: 'low' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1310,6 +1311,224 @@ function PapeleraTab() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// PESTANA: Feedback — Sugerencias y problemas reportados
+// ═══════════════════════════════════════════════════════════════════
+
+interface FeedbackItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userRole: string;
+  location: string;
+  fullPath: string;
+  type: 'sugerencia' | 'problema';
+  message: string;
+  status: 'nuevo' | 'en_revision' | 'resuelto' | 'descartado';
+  createdAt: string;
+}
+
+function FeedbackTab() {
+  const [items, setItems] = useState<FeedbackItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'todos' | 'sugerencia' | 'problema'>('todos');
+  const [statusFilter, setStatusFilter] = useState<'todos' | FeedbackItem['status']>('todos');
+
+  useEffect(() => {
+    const q = query(collection(db, 'feedback'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      (snapshot) => {
+        const data = snapshot.docs.map((docSnap) => {
+          const d = docSnap.data();
+          return {
+            id: docSnap.id,
+            userId: d.userId || '',
+            userName: d.userName || '',
+            userEmail: d.userEmail || '',
+            userRole: d.userRole || '',
+            location: d.location || '',
+            fullPath: d.fullPath || '',
+            type: d.type || 'sugerencia',
+            message: d.message || '',
+            status: d.status || 'nuevo',
+            createdAt: d.createdAt?.toDate?.()?.toISOString?.() || d.createdAt || new Date().toISOString(),
+          } as FeedbackItem;
+        });
+        setItems(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Error al cargar feedback:', err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
+
+  const updateStatus = async (id: string, status: FeedbackItem['status']) => {
+    try {
+      await updateDoc(doc(db, 'feedback', id), { status, updatedAt: new Date().toISOString() });
+    } catch (err) {
+      console.error('Error actualizando feedback:', err);
+      alert('Error al actualizar el estado');
+    }
+  };
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesType = filter === 'todos' || item.type === filter;
+      const matchesStatus = statusFilter === 'todos' || item.status === statusFilter;
+      return matchesType && matchesStatus;
+    });
+  }, [items, filter, statusFilter]);
+
+  const counts = useMemo(() => ({
+    total: items.length,
+    sugerencias: items.filter((i) => i.type === 'sugerencia').length,
+    problemas: items.filter((i) => i.type === 'problema').length,
+    nuevos: items.filter((i) => i.status === 'nuevo').length,
+  }), [items]);
+
+  const statusLabel = (status: FeedbackItem['status']) => {
+    const labels: Record<FeedbackItem['status'], string> = {
+      nuevo: 'Nuevo',
+      en_revision: 'En revisión',
+      resuelto: 'Resuelto',
+      descartado: 'Descartado',
+    };
+    return labels[status];
+  };
+
+  const statusColor = (status: FeedbackItem['status']) => {
+    switch (status) {
+      case 'nuevo': return 'bg-[#FF3B30]/10 text-[#FF3B30] border-[#FF3B30]/20';
+      case 'en_revision': return 'bg-[#FF9500]/10 text-[#FF9500] border-[#FF9500]/20';
+      case 'resuelto': return 'bg-[#34C759]/10 text-[#34C759] border-[#34C759]/20';
+      case 'descartado': return 'bg-[#8E8E93]/10 text-[#8E8E93] border-[#8E8E93]/20';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-2xl p-12 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
+        <RefreshCw className="w-8 h-8 text-corporate animate-spin mx-auto mb-4" />
+        <p className="text-sm text-[#86868B]">Cargando feedback...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard title="Total" value={counts.total} icon={MessageSquare} color="text-corporate" />
+        <StatCard title="Sugerencias" value={counts.sugerencias} icon={CheckCircle} color="text-apple-blue" />
+        <StatCard title="Problemas" value={counts.problemas} icon={AlertTriangle} color="text-apple-red" />
+        <StatCard title="Nuevos" value={counts.nuevos} icon={Clock} color="text-apple-orange" />
+      </div>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-[#86868B]" />
+          <span className="text-sm font-medium text-[#1D1D1F]">Tipo:</span>
+        </div>
+        {(['todos', 'sugerencia', 'problema'] as const).map((f) => (
+          <button
+            key={f}
+            onClick={() => setFilter(f)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all border',
+              filter === f ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]'
+            )}
+          >
+            {f === 'todos' ? 'Todos' : f === 'sugerencia' ? 'Sugerencias' : 'Problemas'}
+          </button>
+        ))}
+        <div className="w-px h-6 bg-[#E5E5E7] mx-1 hidden sm:block" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-[#1D1D1F]">Estado:</span>
+        </div>
+        {(['todos', 'nuevo', 'en_revision', 'resuelto', 'descartado'] as const).map((s) => (
+          <button
+            key={s}
+            onClick={() => setStatusFilter(s)}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all border',
+              statusFilter === s ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]'
+            )}
+          >
+            {s === 'todos' ? 'Todos' : statusLabel(s)}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista */}
+      {filteredItems.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-center">
+          <MessageSquare className="w-12 h-12 text-[#C7C7CC] mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-[#1D1D1F] mb-2">No hay feedback</h3>
+          <p className="text-sm text-[#86868B]">Los reportes y sugerencias de los usuarios aparecerán aquí.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredItems.map((item) => (
+            <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', item.type === 'sugerencia' ? 'bg-apple-blue/10' : 'bg-apple-red/10')}>
+                    {item.type === 'sugerencia' ? <CheckCircle className="w-5 h-5 text-apple-blue" /> : <AlertTriangle className="w-5 h-5 text-apple-red" />}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-[#1D1D1F]">{item.userName || 'Usuario desconocido'}</p>
+                    <p className="text-xs text-[#86868B]">{item.userEmail} • {item.userRole.replace(/_/g, ' ')}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border', statusColor(item.status))}>{statusLabel(item.status)}</span>
+                  <span className="text-xs text-[#86868B]">{new Date(item.createdAt).toLocaleString('es-ES')}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-xs text-[#86868B]">
+                  <LayoutDashboard className="w-3.5 h-3.5" />
+                  <span>Ubicación: <span className="font-medium text-[#1D1D1F]">{item.location}</span></span>
+                </div>
+                {item.fullPath && (
+                  <div className="flex items-center gap-2 text-xs text-[#86868B]">
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Ruta: <span className="font-medium text-[#1D1D1F]">{item.fullPath}</span></span>
+                  </div>
+                )}
+              </div>
+
+              <p className="text-sm text-[#1D1D1F] bg-[#F5F5F7] rounded-xl p-3">{item.message}</p>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {item.status !== 'en_revision' && (
+                  <Button size="sm" variant="outline" onClick={() => updateStatus(item.id, 'en_revision')}>Marcar en revisión</Button>
+                )}
+                {item.status !== 'resuelto' && (
+                  <Button size="sm" variant="outline" className="text-[#34C759] border-[#34C759]/30 hover:bg-[#34C759]/10" onClick={() => updateStatus(item.id, 'resuelto')}>Resuelto</Button>
+                )}
+                {item.status !== 'descartado' && (
+                  <Button size="sm" variant="outline" className="text-[#8E8E93] border-[#8E8E93]/30 hover:bg-[#8E8E93]/10" onClick={() => updateStatus(item.id, 'descartado')}>Descartar</Button>
+                )}
+                {item.status !== 'nuevo' && (
+                  <Button size="sm" variant="outline" className="text-[#FF3B30] border-[#FF3B30]/30 hover:bg-[#FF3B30]/10" onClick={() => updateStatus(item.id, 'nuevo')}>Reabrir</Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function DevelopsModule() {
   const navigate = useNavigate();
   const { user, hasPermission } = useAuth();
@@ -1327,6 +1546,7 @@ export default function DevelopsModule() {
     seguridad: <SeguridadTab />,
     papelera: <PapeleraTab />,
     turnos: <TurnosTab />,
+    feedback: <FeedbackTab />,
   };
 
   return (

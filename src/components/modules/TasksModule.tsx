@@ -522,6 +522,25 @@ export default function TasksModule() {
           </Select>
         </div>
 
+        {/* MÓVIL: selector de departamento para incidencias (autorizados) */}
+        {isIncidenciasTab && user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
+          <div className="md:hidden">
+            <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los departamentos</SelectItem>
+                {allDepartments.map((dept) => (
+                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                    {dept.name}{dept.name === user?.department ? ' (tú)' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* DESKTOP: tres filas */}
         <div className="hidden md:block space-y-3">
           {/* Fila 1: pestañas + tiempo */}
@@ -666,47 +685,97 @@ export default function TasksModule() {
 
             <div className="overflow-y-auto px-6 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
             {createType === 'incidencia' ? (
-              <div className="space-y-4 py-4">
-                {/* Departamento que envía */}
-                <div className="bg-[#F5F5F7] rounded-lg p-3">
-                  <span className="text-xs text-[#86868B]">Departamento que envía:</span>
-                  <p className="text-sm font-medium text-[#1D1D1F]">{user?.department?.replace(/_/g, ' ') || 'ADMINISTRATIVO'}</p>
-                </div>
-                <div className="space-y-2"><Label>Título *</Label><Input placeholder="Título de la incidencia..." value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} /></div>
-                <div className="space-y-2"><Label>Descripción detallada *</Label><Textarea placeholder="Describe la incidencia..." value={incidenciaForm.description} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, description: e.target.value })} rows={4} /></div>
-                <div className="space-y-2">
-                  <Label>Departamentos reportados *</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {allDepartments.map((dept) => (
-                      <button key={dept.code} onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.code) ? prev.targetDepartments.filter(d => d !== dept.code) : [...prev.targetDepartments, dept.code] }))} className={cn('px-3 py-1.5 rounded-full text-xs transition-all', incidenciaForm.targetDepartments.includes(dept.code) ? 'border border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')}>{dept.name}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Prioridad</Label>
-                  <div className="flex gap-2">
-                    {[{ value: TaskPriority.CRITICAL, label: 'Crítica', color: '#FF3B30' }, { value: TaskPriority.HIGH, label: 'Alta', color: '#FF9500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: '#007AFF' }, { value: TaskPriority.LOW, label: 'Baja', color: '#8E8E93' }].map((p) => (
-                      <button key={p.value} onClick={() => setIncidenciaForm({ ...incidenciaForm, priority: p.value })} className={cn('flex-1 py-2 rounded-lg text-sm font-medium transition-all', incidenciaForm.priority === p.value ? 'text-white' : 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]')} style={incidenciaForm.priority === p.value ? { backgroundColor: p.color } : undefined}>{p.label}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Evidencia fotográfica</Label>
-                  <CameraCapture onCapture={handlePhotoCapture} />
-                  {incidenciaPhotos.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      {incidenciaPhotos.map((url, idx) => (
-                        <div key={idx} className="relative w-16 h-16 rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden">
-                          <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
+              <div className="space-y-4 py-2 px-2 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
+                {/* Helper local */}
+                {(() => {
+                  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
+                    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
+                        {Icon && <Icon className="w-4 h-4 text-corporate" />}
+                        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
+                      </div>
+                      {children}
                     </div>
-                  )}
-                </div>
-                <div className="flex justify-end gap-3 pt-4 pb-6">
-                  <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
-                  <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || defaultDepartment, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
-                </div>
+                  );
+                  return (
+                    <>
+                      {/* SECCIÓN 1: Información */}
+                      <Section title="Información" icon={FileText}>
+                        <div className="bg-[#F5F5F7] rounded-xl p-3">
+                          <span className="text-xs text-[#86868B]">Departamento que envía</span>
+                          <p className="text-sm font-medium text-[#1D1D1F]">{user?.department?.replace(/_/g, ' ') || 'ADMINISTRATIVO'}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Título *</Label>
+                          <Input placeholder="Título de la incidencia..." value={incidenciaForm.title} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, title: e.target.value })} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Descripción detallada *</Label>
+                          <Textarea placeholder="Describe la incidencia..." value={incidenciaForm.description} onChange={(e) => setIncidenciaForm({ ...incidenciaForm, description: e.target.value })} rows={4} />
+                        </div>
+                      </Section>
+
+                      {/* SECCIÓN 2: Departamentos reportados */}
+                      <Section title="Departamentos reportados *" icon={Users}>
+                        <div className="flex flex-wrap gap-2">
+                          {allDepartments.map((dept) => (
+                            <button
+                              key={dept.code}
+                              type="button"
+                              onClick={() => setIncidenciaForm(prev => ({ ...prev, targetDepartments: prev.targetDepartments.includes(dept.code) ? prev.targetDepartments.filter(d => d !== dept.code) : [...prev.targetDepartments, dept.code] }))}
+                              className={cn('px-3 py-2 rounded-xl text-sm font-medium transition-all border', incidenciaForm.targetDepartments.includes(dept.code) ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]')}
+                            >
+                              {dept.name}
+                            </button>
+                          ))}
+                        </div>
+                      </Section>
+
+                      {/* SECCIÓN 3: Prioridad */}
+                      <Section title="Prioridad" icon={AlertCircle}>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {[{ value: TaskPriority.CRITICAL, label: 'Crítica', color: '#FF3B30' }, { value: TaskPriority.HIGH, label: 'Alta', color: '#FF9500' }, { value: TaskPriority.MEDIUM, label: 'Media', color: '#007AFF' }, { value: TaskPriority.LOW, label: 'Baja', color: '#8E8E93' }].map((p) => (
+                            <button
+                              key={p.value}
+                              type="button"
+                              onClick={() => setIncidenciaForm({ ...incidenciaForm, priority: p.value })}
+                              className={cn('px-2 py-2 rounded-xl text-sm font-medium transition-all border', incidenciaForm.priority === p.value ? 'text-white border-transparent' : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]')}
+                              style={incidenciaForm.priority === p.value ? { backgroundColor: p.color } : undefined}
+                            >
+                              {p.label}
+                            </button>
+                          ))}
+                        </div>
+                      </Section>
+
+                      {/* SECCIÓN 4: Evidencia fotográfica */}
+                      <Section title="Evidencia fotográfica" icon={Camera}>
+                        <CameraCapture onCapture={handlePhotoCapture} />
+                        {incidenciaPhotos.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {incidenciaPhotos.map((url, idx) => (
+                              <div key={idx} className="relative w-16 h-16 rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden">
+                                <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </Section>
+
+                      {/* Botones */}
+                      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-2">
+                        <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
+                        <Button
+                          className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white w-full sm:w-auto"
+                          onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || defaultDepartment, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }}
+                          disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}
+                        >
+                          Reportar Incidencia
+                        </Button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             ) : createType === 'specific' ? (
               <SpecificTaskForm
