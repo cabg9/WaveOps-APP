@@ -330,7 +330,7 @@ export default function TasksModule() {
             else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
             else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
           }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
               <SelectValue placeholder="Vista" />
             </SelectTrigger>
             <SelectContent>
@@ -350,7 +350,7 @@ export default function TasksModule() {
               if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
             }
           }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent>
@@ -381,7 +381,7 @@ export default function TasksModule() {
               else setStatusFilter(v as IncidenciaStatus);
             }
           }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
               <SelectValue placeholder="Estado" />
             </SelectTrigger>
             <SelectContent>
