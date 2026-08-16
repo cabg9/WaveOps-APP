@@ -335,7 +335,7 @@ export default function TasksModule() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="my-tasks">Mis Tareas</SelectItem>
-              <SelectItem value="my-department">Mi Departamento</SelectItem>
+              <SelectItem value="my-department">Mi Depto</SelectItem>
               {hasPermission('canViewAllDepartments') && <SelectItem value="all">Todas</SelectItem>}
               <SelectItem value="incidencias">Incidencias</SelectItem>
             </SelectContent>
@@ -510,17 +510,6 @@ export default function TasksModule() {
         {/* Buscador móvil (debajo de los dropdowns) */}
         <div className="md:hidden flex items-center gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-            <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
-          </div>
-          <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1">
-            <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
-            <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
-          </div>
-        </div>
-
-        <div className="min-h-[400px]">
-          <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
             <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
           </div>
