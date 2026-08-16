@@ -334,21 +334,43 @@ Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos d
 Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de los rediseños, y ajustes generales de usabilidad que no correspondan a una fase posterior.
 
 ### Progreso
-- **Selector de minutos en Tarea Específica**: ahora permite seleccionar minutos de **00 a 59 de uno en uno** (`startMinuteOptions = Array.from({ length: 60 }, (_, i) => i)`).
+- **Selector de minutos en Tarea Específica y Tarea Extra**: ahora permite seleccionar minutos de **00 a 59 de uno en uno**.
 - **Generación de tareas específicas al publicar asignaciones**:
-  - Se detectó que `useFirestoreShifts.ts` usaba consultas compuestas (`templateId + dueDate + source`, `shiftIds array-contains + dueDate + status`, etc.) que fallaban silenciosamente por falta de índices en Firestore.
-  - Se simplificaron las consultas a **una sola condición** y se filtra el resto en memoria:
-    - `specificTaskTemplates`: solo `where('isActive', '==', true)`; filtro por `shiftId` en memoria.
-    - `tasks` en `generateSpecificTasksFromAssignments`: solo `where('templateId', '==', template.id)`; filtro por `dueDate` y `source` en memoria; se usa `existingDoc` filtrado en lugar de `existingSnapshot.docs[0]`.
-    - `tasks` en `cleanupSpecificTasksForRemovedAssignment`: solo `where('shiftIds', 'array-contains', assignment.shiftId)`; filtro por `dueDate`, `status` y `source` en memoria.
-  - Se simplificaron `updateTemplate` y `deleteTemplate` en `useSpecificTaskTemplates.ts`: solo `where('templateId', '==', id)` y filtro de estado/dueDate en memoria.
-  - Se agregaron **índices de respaldo** en `firestore.indexes.json` para `tasks` (templateId + status + dueDate; shiftIds + dueDate + status).
-- **Build**: `npm run build` pasa limpio sin errores de TypeScript.
-- **Commit local**: se hizo commit en `fix-horarios-provider` con los cambios de tareas específicas y ajustes de UI.
+  - Se detectó que `useFirestoreShifts.ts` usaba consultas compuestas que fallaban silenciosamente por falta de índices en Firestore.
+  - Se simplificaron las consultas a **una sola condición** y se filtra el resto en memoria.
+  - Se usa `existingDoc` filtrado en lugar de `existingSnapshot.docs[0]`.
+- **Plantillas de tareas específicas**:
+  - Nuevo campo `shiftIds` (array) para soportar **múltiples turnos** por plantilla, manteniendo `shiftId` legacy por compatibilidad.
+  - UI del formulario con selección múltiple de turnos.
+  - Sección "Plantillas existentes" con botones **Editar** y **Eliminar** dentro del modal de Tarea Específica.
+  - `updateTemplate` expuesto y usado para guardar cambios en plantillas existentes.
+- **Supervisor automático para tareas específicas**:
+  - Prioridad 1: supervisor del departamento que tenga alguno de los turnos seleccionados asignado (publicado).
+  - Prioridad 2: cualquier supervisor del departamento.
+  - Prioridad 3: gerente del departamento.
+  - Prioridad 4: Gerente de Operaciones (si el departamento es operativo), RRHH, Director o Director General.
+- **Tareas e incidencias visibles para Gerente de Operaciones**:
+  - Se agregó `isOperational` a `DynamicDepartment` y helpers `operationalDepartmentCodes` / `isOperationalDepartment`.
+  - En Tasks → **Mi Depto**, el Gerente de Operaciones ve tareas de todos los departamentos marcados como operativos.
+  - En Tasks → **Incidencias**, el Gerente de Operaciones ve incidencias de departamentos operativos por defecto (`all`).
+- **Incidencias**:
+  - Botón **Resolver** solo aparece cuando cada departamento involucrado ha sido verificado por su gerente/supervisor; si un departamento no tiene gerente/supervisor, permite verificación de superiores (Gerente de Operaciones si es operativo, RRHH, Director, Director General).
+  - Notas: botón **Guardar** ahora usa `form onSubmit` para funcionar tanto con click como con Enter.
+  - Fotos: muestran avatar y nombre del que subió, tanto en la tarjeta como en el historial.
+  - Avatares reales en reportero, verificadores y visualizadores.
+  - Se eliminó la visualización duplicada de fotos en el formulario de creación (`hidePreview` en `CameraCapture`).
+  - Deduplicación defensiva de incidencias y tareas por si hay documentos repetidos en Firestore.
+  - Mayor espaciado inferior en botones del modal de crear incidencia.
+- **Tareas Extra**:
+  - Botón **Guardar** de notas usa `form onSubmit`.
+  - Calificación negativa y su historial ahora solo son visibles para usuarios autorizados (nivel ≤ 6, creador o quien calificó), no para staff.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
-- Verificar que las tareas específicas ahora sí se generan/reflejan en Tasks cuando se publican asignaciones.
-- Validar fallback de supervisor → gerente de departamento cuando no hay supervisor disponible.
+- Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
+- Validar edición/eliminación de plantillas de tareas específicas.
+- Validar supervisor automático y fallback en distintos escenarios.
 - Validar requisitos para completar tarea específica (subtareas/foto).
 
 ### Contenido tentativo adicional
