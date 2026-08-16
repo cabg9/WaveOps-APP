@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-16 (Tasks: rediseño incidencia, selector de departamento móvil en incidencias y panel Feedback en Develops; deployado)
+> Última actualización: 2026-08-16 (FASE 7 reestructurada en sub-fases 7.3–7.6; inicio FASE 7.3)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -319,6 +319,53 @@ Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos d
 - `src/data/shiftAssignments.ts`
 - `src/components/modules/TasksModule.tsx`
 - `src/components/modules/HorariosModule.tsx`
+
+---
+
+## FASE 7.4: Pulido residual en Tasks, Horarios y UI general
+
+**Estado:** PENDIENTE
+
+### Objetivo
+Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de los rediseños, y ajustes generales de usabilidad que no correspondan a una fase posterior.
+
+### Contenido tentativo
+- Ajustes de espaciado, alineación y comportamiento de dropdowns en móvil.
+- Correcciones de labels, tooltips o textos confusos.
+- Optimizaciones de carga de fotos/avatares.
+- Cualquier fix pequeño que surja durante las pruebas de la 7.3.
+
+---
+
+## FASE 7.5: Nuevos módulos operativos
+
+**Estado:** PENDIENTE
+
+### Estructura
+Cada módulo nuevo que se defina para WaveOps ocupará su propia sub-fase numerada dentro de la 7.5. Se irán nombrando conforme se vayan definiendo.
+
+- **7.5.1** — Por definir
+- **7.5.2** — Por definir
+- **7.5.3** — Por definir
+
+### Principios
+- Cada sub-fase incluye: diseño de datos en Firestore, UI/UX, reglas de seguridad si aplica, build + deploy + commit.
+- Los módulos deben reutilizar los patrones establecidos (usuarios, departamentos, permisos) y no depender de datos estáticos.
+
+---
+
+## FASE 7.6: Cierre y validación de la FASE 7
+
+**Estado:** PENDIENTE
+
+### Objetivo
+Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados antes de pasar a la FASE 8.
+
+### Checklist
+- Build limpio sin errores de TypeScript.
+- Deploy a Firebase Hosting funcionando.
+- `MASTER_RESUME.md` actualizado con todas las sub-fases.
+- Push a GitHub en `fix-horarios-provider`.
 
 ---
 
