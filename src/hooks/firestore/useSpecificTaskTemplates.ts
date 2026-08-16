@@ -107,16 +107,21 @@ export function useSpecificTaskTemplates() {
 
       if (affectOnlyFuture) {
         const today = new Date().toISOString().split('T')[0];
+        // Consulta simple por templateId y se filtra en memoria para evitar índices compuestos
         const q = query(
           collection(db, TASKS_COLLECTION),
-          where('templateId', '==', id),
-          where('status', 'in', [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]),
-          where('dueDate', '>=', today)
+          where('templateId', '==', id)
         );
         const snapshot = await getDocs(q);
+        const eligibleStatuses = [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED];
         const batch = writeBatch(db);
 
         snapshot.docs.forEach((taskDoc) => {
+          const taskData = taskDoc.data();
+          // Filtrar en memoria: solo futuras y con estado editable
+          if (taskData.dueDate < today) return;
+          if (!eligibleStatuses.includes(taskData.status)) return;
+
           const updateData: DocumentData = {};
           if (updates.title !== undefined) updateData.title = updates.title;
           if (updates.description !== undefined) updateData.description = updates.description;
@@ -125,13 +130,11 @@ export function useSpecificTaskTemplates() {
             updateData.startTime = updates.startTime;
             updateData.dueTime = calculateDueTime(updates.startTime, updates.estimatedMinutes);
           } else if (updates.startTime !== undefined) {
-            const currentTask = taskDoc.data();
             updateData.startTime = updates.startTime;
-            updateData.dueTime = calculateDueTime(updates.startTime, currentTask.estimatedMinutes || 0);
+            updateData.dueTime = calculateDueTime(updates.startTime, taskData.estimatedMinutes || 0);
           } else if (updates.estimatedMinutes !== undefined) {
-            const currentTask = taskDoc.data();
             updateData.estimatedMinutes = updates.estimatedMinutes;
-            updateData.dueTime = calculateDueTime(currentTask.startTime || '00:00', updates.estimatedMinutes);
+            updateData.dueTime = calculateDueTime(taskData.startTime || '00:00', updates.estimatedMinutes);
           }
           if (updates.supervisorId !== undefined) updateData.supervisorId = updates.supervisorId;
           if (updates.requiresPhoto !== undefined) updateData.requiresPhoto = updates.requiresPhoto;
@@ -155,16 +158,20 @@ export function useSpecificTaskTemplates() {
       await updateDoc(templateRef, { isActive: false, deletedAt: new Date().toISOString() });
 
       const today = new Date().toISOString().split('T')[0];
+      // Consulta simple por templateId y se filtra en memoria para evitar índices compuestos
       const q = query(
         collection(db, TASKS_COLLECTION),
-        where('templateId', '==', id),
-        where('status', 'in', [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]),
-        where('dueDate', '>=', today)
+        where('templateId', '==', id)
       );
       const snapshot = await getDocs(q);
+      const eligibleStatuses = [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED];
       const batch = writeBatch(db);
       snapshot.docs.forEach((taskDoc) => {
-        batch.delete(taskDoc.ref);
+        const taskData = taskDoc.data();
+        // Filtrar en memoria: solo futuras y con estado editable
+        if (taskData.dueDate >= today && eligibleStatuses.includes(taskData.status)) {
+          batch.delete(taskDoc.ref);
+        }
       });
       await batch.commit();
     } catch (err: any) {

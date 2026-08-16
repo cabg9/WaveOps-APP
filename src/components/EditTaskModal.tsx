@@ -15,6 +15,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Section } from "@/components/ui/Section";
 import { Task, TaskPriority, Subtask } from "@/types";
 import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
@@ -138,17 +139,6 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
   const handleRemoveSubtask = (id: string) => setSubtasks((prev) => prev.filter((s) => s.id !== id));
   const handleToggleSubtask = (id: string) => setSubtasks((prev) => prev.map((s) => s.id === id ? { ...s, completed: !s.completed } : s));
   const handleRemovePhoto = (url: string) => { if (!window.confirm("Eliminar esta foto?")) return; setPhotos((prev) => prev.filter((p) => p !== url)); };
-
-  // Helper para secciones con título
-  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
-      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
-        {Icon && <Icon className="w-4 h-4 text-corporate" />}
-        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

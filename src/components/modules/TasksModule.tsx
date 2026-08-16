@@ -42,6 +42,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Section } from '@/components/ui/Section';
 import { toast } from 'sonner';
 
 
@@ -685,18 +686,7 @@ export default function TasksModule() {
             <div className="overflow-y-auto px-6 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
             {createType === 'incidencia' ? (
               <div className="space-y-4 py-2 px-2 pb-6" style={{ maxHeight: 'calc(90vh - 100px)' }}>
-                {/* Helper local */}
-                {(() => {
-                  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-                    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
-                      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
-                        {Icon && <Icon className="w-4 h-4 text-corporate" />}
-                        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
-                      </div>
-                      {children}
-                    </div>
-                  );
-                  return (
+                {(() => (
                     <>
                       {/* SECCIÓN 1: Información */}
                       <Section title="Información" icon={FileText}>
@@ -762,7 +752,7 @@ export default function TasksModule() {
                       </Section>
 
                       {/* Botones */}
-                      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-2">
+                      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-6 mb-4">
                         <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
                         <Button
                           className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white w-full sm:w-auto"
@@ -773,8 +763,7 @@ export default function TasksModule() {
                         </Button>
                       </div>
                     </>
-                  );
-                })()}
+                ))()}
               </div>
             ) : createType === 'specific' ? (
               <SpecificTaskForm
@@ -862,23 +851,12 @@ function SpecificTaskForm({
   ];
 
   const minuteOptions = [15, 30, 45, 60, 90, 120];
-  const quickMinutes = [0, 15, 30, 45];
+  const startMinuteOptions = Array.from({ length: 60 }, (_, i) => i);
   const [startHour, startMinute] = form.startTime.split(':').map((v) => v || '00');
 
   const setStartTime = (hour: string, minute: string) => {
     setForm((prev) => ({ ...prev, startTime: `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}` }));
   };
-
-  // Helper para secciones con título
-  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
-      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
-        {Icon && <Icon className="w-4 h-4 text-corporate" />}
-        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
 
   return (
     <div className="space-y-4 py-2 px-2 pb-6">
@@ -995,8 +973,8 @@ function SpecificTaskForm({
                 <SelectTrigger className="w-20 h-10 text-center">
                   <SelectValue placeholder="MM" />
                 </SelectTrigger>
-                <SelectContent>
-                  {quickMinutes.map((m) => {
+                <SelectContent className="max-h-60">
+                  {startMinuteOptions.map((m) => {
                     const ms = String(m).padStart(2, '0');
                     return <SelectItem key={ms} value={ms}>{ms}</SelectItem>;
                   })}
@@ -1179,17 +1157,6 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
 
   const [showApoyo, setShowApoyo] = useState(!!taskForm.supportDepartment);
 
-  // Helper para secciones con título
-  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
-      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
-        {Icon && <Icon className="w-4 h-4 text-corporate" />}
-        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
-      </div>
-      {children}
-    </div>
-  );
-
   const [startHour, startMinute] = taskForm.startTime.split(':').map((v) => v || '09');
   const setStartTime = (hour: string, minute: string) => {
     setTaskForm({ ...taskForm, startTime: `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}` });
@@ -1285,8 +1252,8 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
         <div className="space-y-2">
           <Label>Supervisor</Label>
           <div className="space-y-2">
-            <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all border', taskForm.supervisor === '' ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
-              Sin supervisor
+            <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: currentUserId || '' })} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all border', taskForm.supervisor === currentUserId ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
+              Yo (seré el supervisor)
             </button>
             {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
               <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between gap-2 border', taskForm.supervisor === supervisor.id ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
@@ -1428,7 +1395,7 @@ interface TaskCardProps {
   canReopen?: boolean;
   canUnblock?: boolean;
   currentUserId?: string;
-  currentUser?: { id: string; name: string; role: Role; department: string } | null;
+  currentUser?: { id: string; name: string; role: Role; department: string; email?: string; level?: number } | null;
 }
 
 function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canReopen, canUnblock, onToggleSubtask, onAddPhoto, onDelete, onEdit, onRateTask, currentUserId, currentUser }: TaskCardProps) {
@@ -1477,6 +1444,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   const canDelete = currentUserId && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL);
   const canVerify = currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId)) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
   const canRate = currentUserId && (task.status === TaskStatus.VERIFIED) && !task.rating && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId)) || currentUser?.role === Role.GERENTE_DEPARTAMENTO || currentUser?.role === Role.SUPERVISOR || currentUser?.role === Role.GERENTE_OPERACIONES || currentUser?.role === Role.RRHH || currentUser?.role === Role.DIRECTOR || currentUser?.role === Role.DIRECTOR_GENERAL);
+  const canSeeRating = currentUser && (currentUser.level <= 6 || task.createdBy === currentUserId || task.ratedBy === currentUserId);
   const toggleSubtask = (subtaskId: string) => {
     const target = localSubtasks.find(s => s.id === subtaskId);
     if ((task.status === TaskStatus.COMPLETED || task.status === TaskStatus.VERIFIED) && target?.completed) {
@@ -1573,7 +1541,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             </div>
             <div className="text-sm bg-blue-50 rounded-lg p-2"><span className="text-blue-600 font-medium">Supervisor:</span> <span className="text-[#1D1D1F]">{supervisorName}</span></div>
 
-            {task.rating === 'bad' && task.ratingNote && (
+            {task.rating === 'bad' && task.ratingNote && canSeeRating && (
               <div className="text-sm bg-red-50 border border-red-200 rounded-lg p-2">
                 <div className="flex items-center gap-1 text-red-600 font-medium">
                   <ThumbsDown className="w-3.5 h-3.5" />
@@ -1610,7 +1578,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
 
 <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
               <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
-              {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = allUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
+              {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = allUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
               {currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}
             </div>
           </div>
@@ -1646,8 +1614,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             )}
             {task.status === TaskStatus.BLOCKED && canUnblock && (<Button size="sm" className="bg-[#FF9500] hover:bg-[#FF9500]/90 text-white" onClick={() => setShowUnblockModal(true)}>Desbloquear</Button>)}
             {(task.status === TaskStatus.PENDING || task.status === TaskStatus.IN_PROGRESS) && canComplete && (<Button size="sm" variant="outline" onClick={() => setShowBlockModal(true)}>Bloquear</Button>)}
-            {task.status !== TaskStatus.VERIFIED && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30]" onClick={() => { if (window.confirm('¿Eliminar esta tarea permanentemente?')) { onDelete?.(task.id); } }}>Eliminar</Button>)}
-            {task.type === TaskType.EXTRA && (task.createdBy === currentUserId || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#007AFF] text-[#007AFF]" onClick={() => onEdit?.(task)}>Editar</Button>)}
+            {task.status !== TaskStatus.VERIFIED && (task.createdBy === currentUserId || task.createdBy === currentUser?.email || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30]" onClick={() => { if (window.confirm('¿Eliminar esta tarea permanentemente?')) { onDelete?.(task.id); } }}>Eliminar</Button>)}
+            {task.type === TaskType.EXTRA && (task.createdBy === currentUserId || task.createdBy === currentUser?.email || currentUser?.role === Role.DIRECTOR_GENERAL) && (<Button size="sm" variant="outline" className="border-[#007AFF] text-[#007AFF]" onClick={() => onEdit?.(task)}>Editar</Button>)}
           </div>
 
           {showCompleteConfirm && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"><div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4"><h3 className="text-lg font-semibold mb-2">¿Completar tarea?</h3><p className="text-sm text-slate-600 mb-4">¿Confirmas que la tarea "{task.title}" fue completada correctamente?</p><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setShowCompleteConfirm(false)}>Cancelar</Button><Button className="bg-[#34C759] hover:bg-[#34C759]/90 text-white" onClick={() => { onComplete?.(task.id); setShowCompleteConfirm(false); }}>Sí, completar</Button></div></div></div>)}
@@ -1733,8 +1701,17 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
 
   const statusColor = getIncidenciaStatusColor(incidencia.status);
   const priorityColor = getPriorityColor(incidencia.priority);
-  // DEBUG: log datos de la incidencia
-  const reporter = firestoreUsers.find((u) => u.id === incidencia.reportedBy);
+
+  const getUserName = (userId?: string) => {
+    if (!userId) return 'Usuario desconocido';
+    const byId = firestoreUsers.find((u) => u.id === userId);
+    if (byId) return byId.name;
+    const byEmail = firestoreUsers.find((u) => u.email === userId);
+    if (byEmail) return byEmail.name;
+    return userId;
+  };
+
+  const reporter = firestoreUsers.find((u) => u.id === incidencia.reportedBy || u.email === incidencia.reportedBy);
   
   // Verificar si el usuario actual ya vio la incidencia
   const hasViewed = currentUserId && incidencia.viewers?.some((v) => v.userId === currentUserId);
@@ -1793,7 +1770,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                       {incidencia.verifiedByList.map((vId) => {
                         const vUser = firestoreUsers.find((u) => u.id === vId || u.email === vId);
                         const vEntry = (incidencia.history || []).find((h) => h.action === "Incidencia verificada" && (h.performedBy === vId || h.performedBy === vUser?.email));
-                        return (vUser?.name || vId) + (vEntry?.performedAt ? " • " + formatHistoryDateTime(vEntry.performedAt) : "");
+                        return (getUserName(vId)) + (vEntry?.performedAt ? " • " + formatHistoryDateTime(vEntry.performedAt) : "");
                       }).join(", ")}
                     </span>
                   </div>
@@ -1802,7 +1779,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                     <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
                     <span className="text-[#86868B]">Verificada por:</span>
                     <span className="text-[#1D1D1F] font-medium">
-                      {firestoreUsers.find((u) => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}{incidencia.confirmedAt ? " • " + formatHistoryDateTime(incidencia.confirmedAt) : ""}
+                      {getUserName(incidencia.confirmedBy)}{incidencia.confirmedAt ? " • " + formatHistoryDateTime(incidencia.confirmedAt) : ""}
                     </span>
                   </div>
                 ) : null}
@@ -1844,29 +1821,29 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   <div className="bg-[#007AFF]/10 border border-[#007AFF] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2"><Unlock className="w-4 h-4 text-[#007AFF]" /><span className="text-xs font-semibold text-[#007AFF] uppercase tracking-wide">Motivo de reapertura</span></div>
                     <p className="text-sm text-[#1D1D1F]">{reopenHist.note}</p>
-                    {incidencia.reopenedBy && <p className="text-xs text-[#86868B] mt-1">{firestoreUsers.find(u => u.id === incidencia.reopenedBy)?.name || incidencia.reopenedBy} • {incidencia.reopenedAt ? formatHistoryDateTime(incidencia.reopenedAt) : ""}</p>}
+                    {incidencia.reopenedBy && <p className="text-xs text-[#86868B] mt-1">{getUserName(incidencia.reopenedBy)} • {incidencia.reopenedAt ? formatHistoryDateTime(incidencia.reopenedAt) : ""}</p>}
                   </div>
                 );
                 if (incidencia.status === IncidenciaStatus.CLOSED && closeHist?.note) return (
                   <div className="bg-[#8E8E93]/10 border border-[#8E8E93] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2"><Lock className="w-4 h-4 text-[#8E8E93]" /><span className="text-xs font-semibold text-[#8E8E93] uppercase tracking-wide">Motivo de cierre</span></div>
                     <p className="text-sm text-[#1D1D1F]">{closeHist.note}</p>
-                    {incidencia.closedBy && <p className="text-xs text-[#86868B] mt-1">{firestoreUsers.find(u => u.id === incidencia.closedBy)?.name || incidencia.closedBy} • {incidencia.closedAt ? formatHistoryDateTime(incidencia.closedAt) : ""}</p>}
+                    {incidencia.closedBy && <p className="text-xs text-[#86868B] mt-1">{getUserName(incidencia.closedBy)} • {incidencia.closedAt ? formatHistoryDateTime(incidencia.closedAt) : ""}</p>}
                   </div>
                 );
                 if (incidencia.status === IncidenciaStatus.RESOLVED && resNote) return (
                   <div className="bg-[#34C759]/10 border border-[#34C759] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2"><CheckCircle2 className="w-4 h-4 text-[#34C759]" /><span className="text-xs font-semibold text-[#34C759] uppercase tracking-wide">Resolucion</span></div>
                     <p className="text-sm text-[#1D1D1F]">{resNote.content.replace(/Resoluci[óo]n:\s*/i, "")}</p>
-                    <p className="text-xs text-[#86868B] mt-1">{firestoreUsers.find(u => u.id === resNote.createdBy || u.email === resNote.createdBy)?.name || resNote.createdBy} • {formatRelativeTime(resNote.createdAt)}</p>
+                    <p className="text-xs text-[#86868B] mt-1">{getUserName(resNote.createdBy)} • {formatRelativeTime(resNote.createdAt)}</p>
                   </div>
                 );
                 return null;
               })()}
               <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || incidencia.reportedBy}</span></div>
+                <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || getUserName(incidencia.reportedBy)}</span></div>
                 <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{getDeptName(incidencia.targetDepartment)}</span></div>
-                {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{firestoreUsers.find(u => u.id === incidencia.confirmedBy)?.name || incidencia.confirmedBy}</span></div>)}
+                {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{getUserName(incidencia.confirmedBy)}</span></div>)}
 
 
 
@@ -1879,10 +1856,10 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(incidencia.viewers || []).map((viewerObj) => {
-                      const viewer = firestoreUsers.find((u) => u.id === viewerObj.userId);
-                      return viewer ? (
+                      const viewerName = getUserName(viewerObj.userId);
+                      return viewerName !== viewerObj.userId ? (
                         <span key={viewerObj.userId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
-                          <span className="w-2 h-2 rounded-full bg-green-500"></span>{viewer.name} <span className="text-[#86868B] text-[10px]">({new Date(viewerObj.viewedAt).toLocaleDateString()})</span>
+                          <span className="w-2 h-2 rounded-full bg-green-500"></span>{viewerName} <span className="text-[#86868B] text-[10px]">({new Date(viewerObj.viewedAt).toLocaleDateString()})</span>
                         </span>
                       ) : null;
                     })}
@@ -1900,7 +1877,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                       <div key={photo.url} className="relative group aspect-square rounded-lg overflow-hidden border border-[#E5E5E7] bg-[#F5F5F7]">
                         <img src={photo.url} alt="Foto" className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => setMaximizedPhoto(photo.url)} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <p className="text-[8px] text-white truncate">{firestoreUsers.find((u) => u.id === photo.uploadedBy)?.name || photo.uploadedBy}</p>
+                          <p className="text-[8px] text-white truncate">{getUserName(photo.uploadedBy)}</p>
                         </div>
                       </div>
                     ))}
@@ -1909,7 +1886,7 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               )}
 
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = firestoreUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
+              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || getUserName(note.createdBy)}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
             </div>
               
               <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">

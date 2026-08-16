@@ -259,23 +259,16 @@ export function useFirestoreShifts() {
     if (shiftIds.length === 0) return;
 
     try {
-      // Consultar plantillas activas para los turnos publicados
-      // Firestore permite máximo 10 elementos en 'in', pero en una semana no debería haber tantos turnos distintos
-      const batches: string[][] = [];
-      for (let i = 0; i < shiftIds.length; i += 10) {
-        batches.push(shiftIds.slice(i, i + 10));
-      }
-
-      const templates: any[] = [];
-      for (const batch of batches) {
-        const q = query(
-          collection(db, 'specificTaskTemplates'),
-          where('shiftId', 'in', batch),
-          where('isActive', '==', true)
-        );
-        const snapshot = await getDocs(q);
-        templates.push(...snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-      }
+      // Consultar todas las plantillas activas y filtrar en memoria por turno.
+      // Se evita el índice compuesto shiftId+isActive y se respeta el límite de 10 de 'in'.
+      const templatesQuery = query(
+        collection(db, 'specificTaskTemplates'),
+        where('isActive', '==', true)
+      );
+      const templatesSnapshot = await getDocs(templatesQuery);
+      const templates = templatesSnapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() } as any))
+        .filter((t: any) => shiftIds.includes(t.shiftId));
 
       if (templates.length === 0) return;
 
@@ -302,13 +295,15 @@ export function useFirestoreShifts() {
           // Evitar duplicados: buscar si ya existe una tarea para este template + fecha
           const existingQuery = query(
             collection(db, 'tasks'),
-            where('templateId', '==', template.id),
-            where('dueDate', '==', date),
-            where('source', '==', 'specific-task-template')
+            where('templateId', '==', template.id)
           );
           const existingSnapshot = await getDocs(existingQuery);
+          const existingDoc = existingSnapshot.docs.find((d) => {
+            const data = d.data();
+            return data.dueDate === date && data.source === 'specific-task-template';
+          });
 
-          if (existingSnapshot.empty) {
+          if (!existingDoc) {
             // Crear nueva tarea compartida
             await addDoc(collection(db, 'tasks'), {
               title: template.title || '',
@@ -341,7 +336,6 @@ export function useFirestoreShifts() {
             });
           } else {
             // Actualizar asignados de la tarea existente agregando los nuevos usuarios
-            const existingDoc = existingSnapshot.docs[0];
             const existingData = existingDoc.data();
             const currentAssignedTo = existingData.assignedTo || [];
             const newAssignedTo = [...new Set([...currentAssignedTo, ...assignedTo])];
@@ -365,17 +359,20 @@ export function useFirestoreShifts() {
     try {
       if (!assignment.shiftId || !assignment.date || !assignment.userId) return;
 
+      // Consulta simple por shiftId y se filtra en memoria para evitar índices compuestos
       const q = query(
         collection(db, 'tasks'),
-        where('templateId', '!=', null),
-        where('shiftIds', 'array-contains', assignment.shiftId),
-        where('dueDate', '==', assignment.date),
-        where('status', '==', TaskStatus.PENDING)
+        where('shiftIds', 'array-contains', assignment.shiftId)
       );
       const snapshot = await getDocs(q);
 
       for (const taskDoc of snapshot.docs) {
         const taskData = taskDoc.data();
+        // Filtrar en memoria: solo tareas de esta fecha, pendientes y generadas desde plantilla
+        if (taskData.dueDate !== assignment.date) continue;
+        if (taskData.status !== TaskStatus.PENDING) continue;
+        if (taskData.source !== 'specific-task-template') continue;
+
         const assignedTo = (taskData.assignedTo || []).filter((id: string) => id !== assignment.userId);
         if (assignedTo.length === 0) {
           await deleteDoc(taskDoc.ref);

@@ -189,6 +189,8 @@ export interface Task {
   verifiedBy?: string; // userId
   rating?: 'good' | 'bad';
   ratingNote?: string;
+  ratedBy?: string; // userId
+  ratedAt?: string; // ISO date
   blockedReason?: string;
   blockedAt?: string; // ISO date
   blockedBy?: string; // userId
