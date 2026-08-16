@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-15 (Tasks: dropdowns móviles ajustan ancho al texto seleccionado; deployado)
+> Última actualización: 2026-08-15 (Tasks: Tarea Específica vinculada a turnos de Horarios; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -246,6 +246,14 @@
 - **DepartamentosTab**: formulario y modal de equipo con `max-w-[95vw]`; grids de 2 columnas pasan a 1 en móvil.
 - **ProfilePage**: título con `break-words`, badges con `flex-wrap`, tipografía responsive.
 - **OnboardingPage**: padding reducido en móvil, select de país más angosto, grids y botones apilados en móvil.
+- **Sistema de Tareas Específicas vinculadas a turnos**:
+  - Nuevo tipo `SpecificTaskTemplate` y campos `templateId`, `source`, `notifyOnDelay` y `vigenciaDays` en `Task`.
+  - Hook `useSpecificTaskTemplates` con CRUD de plantillas y actualización/eliminación de tareas futuras vinculadas.
+  - Al publicar asignaciones en **Horarios → Asignar**, `publishAssignments` lee las plantillas activas del turno y genera automáticamente tareas en **Tasks**.
+  - Si varios usuarios comparten el mismo turno el mismo día, comparten la misma tarea (`assignedTo` múltiple).
+  - Al eliminar una asignación publicada (doble click en **Asignar**), se limpian las tareas específicas pendientes asociadas; si la tarea ya está en progreso/completada/bloqueada, el supervisor debe reasignarla manualmente.
+  - Formulario de **Tarea Específica** rediseñado: título, descripción, departamento con botones, turno sincronizado con los turnos de Horarios, hora de inicio 24h, tiempo estimado en minutos, prioridad con botones, vigencia (30 días, 8/12 semanas, 6 meses, 1 año, 1.5 años, 2 años, indefinido), supervisor automático (supervisor del departamento o gerente), observadores de control (RRHH y Gerente de Operaciones) y opción de requerir foto.
+  - Sin periodicidad: la tarea se repite automáticamente cada vez que el turno vuelve a ser asignado y publicado.
 
 ### Archivos modificados
 - `src/components/Layout.tsx`
@@ -257,6 +265,11 @@
 - `src/components/modules/DepartamentosTab.tsx`
 - `src/components/ProfilePage.tsx`
 - `src/components/OnboardingPage.tsx`
+- `src/hooks/firestore/useSpecificTaskTemplates.ts` (nuevo)
+- `src/hooks/firestore/useFirestoreShifts.ts`
+- `src/hooks/firestore/ShiftsProvider.tsx`
+- `src/hooks/useShifts.tsx`
+- `src/types/index.ts`
 
 ### Restricciones respetadas
 - No se tocó lógica de negocio, solo clases de Tailwind y estructura de layout.
