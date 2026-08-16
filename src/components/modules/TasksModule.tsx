@@ -9,7 +9,7 @@ import {
   Search, List, LayoutTemplate, Calendar, CheckCircle2, Camera,
   ChevronUp, ChevronDown, UserCircle, Building2, CheckSquare,
   Lock, Unlock, History, MessageSquare, X, Image as ImageIcon,
-  ThumbsDown, Clock,
+  ThumbsDown, Clock, FileText, Zap,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { CameraCapture } from '@/components/CameraCapture';
@@ -813,7 +813,7 @@ function SpecificTaskForm({
   );
 
   return (
-    <div className="space-y-4 py-2">
+    <div className="space-y-4 py-2 px-2 pb-6">
       {/* SECCIÓN 1: ¿Qué hay que hacer? */}
       <Section title="¿Qué hay que hacer?">
         <div className="space-y-2">
@@ -1058,7 +1058,7 @@ function SpecificTaskForm({
       </Section>
 
       {/* Botones */}
-      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-2">
         <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancelar</Button>
         <Button
           className="bg-corporate hover:bg-corporate/90 text-white w-full sm:w-auto"
@@ -1111,208 +1111,233 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
 
   const [showApoyo, setShowApoyo] = useState(!!taskForm.supportDepartment);
 
+  // Helper para secciones con título
+  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
+    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
+      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
+        {Icon && <Icon className="w-4 h-4 text-corporate" />}
+        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+
+  const [startHour, startMinute] = taskForm.startTime.split(':').map((v) => v || '09');
+  const setStartTime = (hour: string, minute: string) => {
+    setTaskForm({ ...taskForm, startTime: `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}` });
+  };
+
+  const minuteOptions = [5, 10, 15, 20, 30, 40, 50, 60];
+  const isCustomTime = !minuteOptions.includes(taskForm.estimatedHours);
+
   return (
-    <div className="space-y-4 py-4 overflow-y-auto overflow-x-hidden px-4" style={{ maxHeight: 'calc(90vh - 120px)' }}>
-      {/* Título */}
-      <div className="space-y-2">
-        <Label>Título *</Label>
-        <Input placeholder="Nombre de la tarea" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
-      </div>
-
-      {/* Prioridad */}
-      <div className="space-y-2">
-        <Label>Prioridad</Label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[{ value: TaskPriority.LOW, label: 'Baja', color: 'bg-[#8E8E93]' }, { value: TaskPriority.MEDIUM, label: 'Media', color: 'bg-[#007AFF]' }, { value: TaskPriority.HIGH, label: 'Alta', color: 'bg-[#FF9500]' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: 'bg-[#FF3B30]' }].map((p) => (
-            <button key={p.value} type="button" onClick={() => setTaskForm({ ...taskForm, priority: p.value })} className={cn('px-2 sm:px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.priority === p.value ? `${p.color} text-white` : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-              {p.label}
-            </button>
-          ))}
+    <div className="space-y-4 py-2 px-2 pb-6 overflow-y-auto overflow-x-hidden" style={{ maxHeight: 'calc(90vh - 120px)' }}>
+      {/* SECCIÓN 1: Información de la tarea */}
+      <Section title="Información de la tarea" icon={FileText}>
+        <div className="space-y-2">
+          <Label>Título *</Label>
+          <Input placeholder="Nombre de la tarea" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
         </div>
-      </div>
 
-      {/* Descripción */}
-      <div className="space-y-2">
-        <Label>Descripción</Label>
-        <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
-      </div>
-
-      {/* Subtareas */}
-      <div className="space-y-2">
-        <Label>Subtareas</Label>
-        <div className="flex gap-2">
-          <Input placeholder="Nueva subtarea..." value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }} />
-          <Button type="button" variant="outline" onClick={() => { if (newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }}>
-            <Plus className="w-4 h-4" />
-          </Button>
-        </div>
-        {taskForm.subtasks && taskForm.subtasks.length > 0 && (
-          <div className="space-y-2 mt-2">
-            {taskForm.subtasks.map((subtask) => (
-              <div key={subtask.id} className="flex items-center gap-2 p-2 bg-slate-50 rounded">
-                <input type="checkbox" checked={subtask.completed} onChange={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.map((s) => s.id === subtask.id ? { ...s, completed: !s.completed } : s) }); }} className="w-4 h-4" />
-                <span className={cn('text-sm flex-1', subtask.completed && 'line-through text-slate-400')}>{subtask.title}</span>
-                <button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-red-500 hover:text-red-700 px-2">&times;</button>
-              </div>
+        <div className="space-y-2">
+          <Label>Prioridad</Label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[{ value: TaskPriority.LOW, label: 'Baja', color: '#8E8E93' }, { value: TaskPriority.MEDIUM, label: 'Media', color: '#007AFF' }, { value: TaskPriority.HIGH, label: 'Alta', color: '#FF9500' }, { value: TaskPriority.CRITICAL, label: 'Crítica', color: '#FF3B30' }].map((p) => (
+              <button key={p.value} type="button" onClick={() => setTaskForm({ ...taskForm, priority: p.value })} className={cn('px-2 py-2 rounded-xl text-sm font-medium transition-all border', taskForm.priority === p.value ? 'text-white border-transparent' : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]')} style={taskForm.priority === p.value ? { backgroundColor: p.color } : undefined}>
+                {p.label}
+              </button>
             ))}
           </div>
-        )}
-      </div>
-
-      <hr className="border-[#C7C7CC] my-6" />
-
-      {/* Departamento - botones */}
-      <div className="space-y-2">
-        <Label>Departamento</Label>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(() => {
-            const currentUser = staticUsers.find((u) => u.id === currentUserId);
-            let depts = allDepartments.map(d => d.code);
-            if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
-              depts = [currentUser.department];
-            }
-            return allDepartments.filter(d => depts.includes(d.code)).map((dept) => (
-              <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.code, supervisor: '' })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.department === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                {dept.name.toLowerCase()}
-              </button>
-            ));
-          })()}
         </div>
-      </div>
 
-      {/* Asignación a usuarios - SOLO para tareas EXTRA */}
-      {createType === 'extra' && (
         <div className="space-y-2">
-          <Label>Asignar a</Label>
-          <div className="space-y-2">
-            {usersByDepartment.length > 0 ? usersByDepartment.map((user) => {
-              const isSelected = taskForm.assignedTo.includes(user.id);
-              return (
-                <button key={user.id} type="button" onClick={() => { if (isSelected) { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSelected ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                  <span className="truncate">{user.name}</span>
-                  <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
+          <Label>Descripción</Label>
+          <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Subtareas</Label>
+          <div className="flex gap-2">
+            <Input placeholder="Nueva subtarea..." value={newSubtaskTitle} onChange={(e) => setNewSubtaskTitle(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }} />
+            <Button type="button" variant="outline" onClick={() => { if (newSubtaskTitle.trim()) { setTaskForm({ ...taskForm, subtasks: [...taskForm.subtasks, { id: generateId(), title: newSubtaskTitle.trim(), completed: false }] }); setNewSubtaskTitle(''); } }}>
+              <Plus className="w-4 h-4" />
+            </Button>
+          </div>
+          {taskForm.subtasks && taskForm.subtasks.length > 0 && (
+            <div className="space-y-2 mt-2">
+              {taskForm.subtasks.map((subtask) => (
+                <div key={subtask.id} className="flex items-center gap-2 p-2 bg-[#F5F5F7] rounded-lg group">
+                  <input type="checkbox" checked={subtask.completed} onChange={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.map((s) => s.id === subtask.id ? { ...s, completed: !s.completed } : s) }); }} className="w-4 h-4 rounded border-[#E5E5E7]" />
+                  <span className={cn('text-sm flex-1', subtask.completed && 'line-through text-[#86868B]')}>{subtask.title}</span>
+                  <button type="button" onClick={() => { setTaskForm({ ...taskForm, subtasks: taskForm.subtasks.filter((s) => s.id !== subtask.id) }); }} className="text-[#FF3B30] hover:text-[#FF3B30]/80 px-2 opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3.5 h-3.5" /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* SECCIÓN 2: Responsable y Supervisor */}
+      <Section title="Responsable y Supervisor" icon={Users}>
+        <div className="space-y-2">
+          <Label>Departamento</Label>
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              const currentUser = staticUsers.find((u) => u.id === currentUserId);
+              let depts = allDepartments.map(d => d.code);
+              if (currentUser && (currentUser.role === 'GERENTE_DEPARTAMENTO' || currentUser.role === 'SUPERVISOR')) {
+                depts = [currentUser.department];
+              }
+              return allDepartments.filter(d => depts.includes(d.code)).map((dept) => (
+                <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, department: dept.code, supervisor: '' })} className={cn('px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize', taskForm.department === dept.code ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]')}>
+                  {dept.name.toLowerCase()}
                 </button>
-              );
-            }) : <p className="text-sm text-slate-500 p-2">No hay usuarios disponibles en este departamento</p>}
+              ));
+            })()}
           </div>
         </div>
-      )}
 
-      {/* Supervisor */}
-      <div className="space-y-2">
-        <Label>Supervisor</Label>
-        <div className="space-y-2">
-          <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all', taskForm.supervisor === '' ? 'bg-[#8B5CF6] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-            Sin supervisor
-          </button>
-          {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
-            <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', taskForm.supervisor === supervisor.id ? 'bg-[#8B5CF6] text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-              <span className="truncate">{supervisor.name}</span>
-              <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{supervisor.position}</span>
-            </button>
-          )) : <p className="text-sm text-slate-500 p-2">No hay supervisores disponibles para este departamento</p>}
-        </div>
-        <p className="text-xs text-slate-400">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p>
-      </div>
-
-      <hr className="border-[#C7C7CC] my-6" />
-
-      {/* Fecha y hora de inicio */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
-        <div className="space-y-1.5 min-w-0 w-full">
-          <Label className="text-xs">Fecha inicio</Label>
-          <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="w-full text-sm min-w-0 max-w-full py-2 px-3 h-10 text-center" />
-        </div>
-        <div className="space-y-1.5 min-w-0 w-full">
-          <Label className="text-xs">Hora inicio</Label>
-          <Input type="time" value={taskForm.startTime} onChange={(e) => setTaskForm({ ...taskForm, startTime: e.target.value })} className="w-full text-sm min-w-0 max-w-full py-2 px-3 h-10 text-center" />
-        </div>
-      </div>
-
-      {/* Tiempo estimado - botones rápidos */}
-      <div className="space-y-2">
-        <Label>Tiempo estimado</Label>
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {[5, 10, 15, 20, 30, 40, 50, 60].map((m) => (
-            <button key={m} type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: m })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', taskForm.estimatedHours === m ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-              {m}m
-            </button>
-          ))}
-          <button type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: taskForm.estimatedHours < 61 ? 90 : taskForm.estimatedHours })} className={cn('px-2 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all', !([5,10,15,20,30,40,50,60].includes(taskForm.estimatedHours)) ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-            Otro
-          </button>
-        </div>
-        {taskForm.estimatedHours > 60 && (
-          <div className="flex items-center gap-2 pt-1">
-            <Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} className="w-32" />
-            <span className="text-sm text-slate-500">min = {Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</span>
+        {createType === 'extra' && (
+          <div className="space-y-2">
+            <Label>Asignar a</Label>
+            <div className="space-y-2">
+              {usersByDepartment.length > 0 ? usersByDepartment.map((user) => {
+                const isSelected = taskForm.assignedTo.includes(user.id);
+                return (
+                  <button key={user.id} type="button" onClick={() => { if (isSelected) { setTaskForm({ ...taskForm, assignedTo: taskForm.assignedTo.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, assignedTo: [...taskForm.assignedTo, user.id] }); } }} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between gap-2 border', isSelected ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
+                    <span className="truncate">{user.name}</span>
+                    <span className="text-xs text-[#86868B] flex-shrink-0 hidden sm:inline">{user.position}</span>
+                  </button>
+                );
+              }) : <p className="text-sm text-[#86868B] p-2">No hay usuarios disponibles en este departamento</p>}
+            </div>
           </div>
         )}
-      </div>
 
-      {/* Fecha límite - solo lectura */}
-      <div className="space-y-2">
-        <Label>Fecha límite</Label>
-        <div className="flex items-center gap-2 bg-slate-100 rounded-md px-3 py-2 border border-slate-200 overflow-hidden">
-          <span className="text-slate-700 text-sm truncate">{calculatedDueDate}</span>
-          <span className="text-slate-400 flex-shrink-0">&bull;</span>
-          <span className="text-slate-700 text-sm flex-shrink-0">{calculatedDueTime}</span>
+        <div className="space-y-2">
+          <Label>Supervisor</Label>
+          <div className="space-y-2">
+            <button type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: '' })} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all border', taskForm.supervisor === '' ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
+              Sin supervisor
+            </button>
+            {availableSupervisors.length > 0 ? availableSupervisors.map((supervisor) => (
+              <button key={supervisor.id} type="button" onClick={() => setTaskForm({ ...taskForm, supervisor: supervisor.id })} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between gap-2 border', taskForm.supervisor === supervisor.id ? 'border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
+                <span className="truncate">{supervisor.name}</span>
+                <span className="text-xs text-[#86868B] flex-shrink-0 hidden sm:inline">{supervisor.position}</span>
+              </button>
+            )) : <p className="text-sm text-[#86868B] p-2">No hay supervisores disponibles para este departamento</p>}
+          </div>
+          <p className="text-xs text-[#86868B]">Nota: Un supervisor/gerente no puede supervisarse a sí mismo. El gerente de operaciones supervisa a los demás.</p>
         </div>
-      </div>
+      </Section>
 
-      <hr className="border-[#C7C7CC] my-6" />
+      {/* SECCIÓN 3: Programación */}
+      <Section title="Programación" icon={Clock}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Fecha inicio</Label>
+            <Input type="date" value={taskForm.startDate} onChange={(e) => setTaskForm({ ...taskForm, startDate: e.target.value })} className="h-10" />
+          </div>
+          <div className="space-y-2">
+            <Label>Hora inicio *</Label>
+            <div className="flex items-center gap-2">
+              <Select value={startHour} onValueChange={(h) => setStartTime(h, startMinute)}>
+                <SelectTrigger className="w-20 h-10 text-center"><SelectValue placeholder="HH" /></SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="text-[#86868B] font-medium">:</span>
+              <Select value={startMinute} onValueChange={(m) => setStartTime(startHour, m)}>
+                <SelectTrigger className="w-20 h-10 text-center"><SelectValue placeholder="MM" /></SelectTrigger>
+                <SelectContent>
+                  {[0,15,30,45].map((m) => { const ms = String(m).padStart(2, '0'); return <SelectItem key={ms} value={ms}>{ms}</SelectItem>; })}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-[#86868B]">Formato 24 horas</p>
+          </div>
+        </div>
 
-      {/* Requiere foto */}
-      <div className="flex items-center gap-2">
-        <input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-slate-300" />
-        <Label htmlFor="requiresPhoto" className="cursor-pointer text-sm">Requiere foto para completar</Label>
-      </div>
+        <div className="space-y-2">
+          <Label>Tiempo estimado</Label>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {minuteOptions.map((m) => (
+              <button key={m} type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: m })} className={cn('px-2 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all border', taskForm.estimatedHours === m ? 'border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]')}>
+                {m}m
+              </button>
+            ))}
+            <button type="button" onClick={() => setTaskForm({ ...taskForm, estimatedHours: isCustomTime ? taskForm.estimatedHours : 90 })} className={cn('px-2 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all border', isCustomTime ? 'border-corporate text-corporate bg-white' : 'bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]')}>
+              Otro
+            </button>
+          </div>
+          {isCustomTime && (
+            <div className="flex items-center gap-2 pt-1">
+              <Input type="number" min={5} max={10080} step={5} value={taskForm.estimatedHours} onChange={(e) => setTaskForm({ ...taskForm, estimatedHours: parseInt(e.target.value) || 5 })} className="w-32 h-9" />
+              <span className="text-sm text-[#86868B]">min = {Math.floor(taskForm.estimatedHours / 60)}h {taskForm.estimatedHours % 60}min</span>
+            </div>
+          )}
+        </div>
 
-      {/* ========== BLOQUE 5: SOLICITAR APOYO ========== */}
+        <div className="bg-corporate/5 rounded-xl p-3 flex items-center gap-2 border border-corporate/20">
+          <Clock className="w-4 h-4 text-corporate" />
+          <span className="text-sm text-[#1D1D1F]">Fecha límite calculada</span>
+          <span className="text-sm font-semibold text-corporate ml-auto">{calculatedDueDate} • {calculatedDueTime}</span>
+        </div>
+      </Section>
+
+      {/* SECCIÓN 4: Requisitos */}
+      <Section title="Requisitos" icon={Camera}>
+        <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+          <input type="checkbox" id="requiresPhoto" checked={taskForm.requiresPhoto} onChange={(e) => setTaskForm({ ...taskForm, requiresPhoto: e.target.checked })} className="w-4 h-4 rounded border-[#E5E5E7] text-corporate focus:ring-corporate" />
+          <Label htmlFor="requiresPhoto" className="text-sm font-medium text-[#1D1D1F] mb-0 cursor-pointer">Requiere foto para completar</Label>
+        </div>
+      </Section>
+
+      {/* SECCIÓN 5: Solicitar Apoyo */}
       {createType === 'extra' && (() => { const cu = staticUsers.find((u) => u.id === currentUserId); return cu && (cu.role === Role.GERENTE_DEPARTAMENTO || cu.role === Role.GERENTE_OPERACIONES || cu.role === Role.DIRECTOR || cu.role === Role.DIRECTOR_GENERAL || cu.role === Role.RRHH); })() && (
-        <>
-          <hr className="border-[#C7C7CC] my-6" />
-
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="solicitarApoyo" checked={showApoyo} onChange={(e) => { if (!e.target.checked) { setShowApoyo(false); setTaskForm({ ...taskForm, supportDepartment: '', supportUsers: [] }); } else { setShowApoyo(true); } }} className="w-4 h-4 rounded border-slate-300" />
-            <Label htmlFor="solicitarApoyo" className="cursor-pointer text-sm">Solicitar apoyo</Label>
+        <Section title="Solicitar Apoyo" icon={Zap}>
+          <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+            <input type="checkbox" id="solicitarApoyo" checked={showApoyo} onChange={(e) => { if (!e.target.checked) { setShowApoyo(false); setTaskForm({ ...taskForm, supportDepartment: '', supportUsers: [] }); } else { setShowApoyo(true); } }} className="w-4 h-4 rounded border-[#E5E5E7] text-corporate focus:ring-corporate" />
+            <Label htmlFor="solicitarApoyo" className="text-sm font-medium text-[#1D1D1F] mb-0 cursor-pointer">Solicitar apoyo de otros departamentos</Label>
           </div>
 
-          {/* Apoyo de otros departamentos */}
           {showApoyo && (
-            <div className="space-y-2">
-              <Label>Departamento</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {allDepartments.filter((d) => d.name !== taskForm.department).map((dept) => (
-                  <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-lg text-sm font-medium transition-all capitalize', taskForm.supportDepartment === dept.code ? 'border border-corporate text-corporate bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
-                    {dept.name.toLowerCase()}
-                  </button>
-                ))}
+            <div className="space-y-3 pl-2 border-l-2 border-corporate/30">
+              <div className="space-y-2">
+                <Label>Departamento de apoyo</Label>
+                <div className="flex flex-wrap gap-2">
+                  {allDepartments.filter((d) => d.code !== taskForm.department).map((dept) => (
+                    <button key={dept.code} type="button" onClick={() => setTaskForm({ ...taskForm, supportDepartment: dept.code, supportUsers: [] })} className={cn('px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize', taskForm.supportDepartment === dept.code ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]')}>
+                      {dept.name.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
               </div>
               {taskForm.supportDepartment && (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-slate-500 mb-1">Usuarios disponibles:</div>
+                  <Label>Usuarios de apoyo</Label>
                   {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => {
                     const isSupSelected = taskForm.supportUsers.includes(user.id);
                     return (
-                      <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2 rounded-lg text-sm font-medium text-left transition-all flex items-center justify-between gap-2', isSupSelected ? 'border border-[#FF9500] text-[#FF9500] bg-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}>
+                      <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between gap-2 border', isSupSelected ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
                         <span className="truncate">{user.name}</span>
-                        <span className="text-xs opacity-75 flex-shrink-0 hidden sm:inline">{user.position}</span>
+                        <span className="text-xs text-[#86868B] flex-shrink-0 hidden sm:inline">{user.position}</span>
                       </button>
                     );
                   })}
-                  {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-slate-500 p-2">No hay usuarios disponibles</p>)}
+                  {staticUsers.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-[#86868B] p-2">No hay usuarios disponibles</p>)}
                 </div>
               )}
             </div>
           )}
-        </>
+        </Section>
       )}
 
       {/* Botones de acción */}
-      <div className="flex justify-end gap-3 pt-4 pb-6">
-        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
-        <Button className={createType === 'extra' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'} onClick={onSubmit} disabled={!taskForm.title}>
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-2">
+        <Button variant="outline" onClick={onCancel} className="w-full sm:w-auto">Cancelar</Button>
+        <Button className={cn('text-white w-full sm:w-auto', createType === 'extra' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700')} onClick={onSubmit} disabled={!taskForm.title}>
           Crear Tarea
         </Button>
       </div>

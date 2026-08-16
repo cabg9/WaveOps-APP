@@ -14,6 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Task, TaskPriority, Subtask } from "@/types";
 import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
@@ -138,51 +139,61 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
   const handleToggleSubtask = (id: string) => setSubtasks((prev) => prev.map((s) => s.id === id ? { ...s, completed: !s.completed } : s));
   const handleRemovePhoto = (url: string) => { if (!window.confirm("Eliminar esta foto?")) return; setPhotos((prev) => prev.filter((p) => p !== url)); };
 
+  // Helper para secciones con título
+  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
+    <div className="bg-white rounded-2xl border border-[#E5E5E7] p-4 space-y-4">
+      <div className="flex items-center gap-2 pb-2 border-b border-[#F5F5F7]">
+        {Icon && <Icon className="w-4 h-4 text-corporate" />}
+        <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-2">
           <DialogTitle className="mt-8 pb-2">
-            <span className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold w-full justify-center", task.type === "EXTRA" ? "bg-amber-500 text-white" : "border-2 border-corporate text-corporate bg-corporate/5")}>
+            <span className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold w-full justify-center", task.type === "EXTRA" ? "bg-amber-500 text-white" : "border-2 border-corporate text-corporate bg-corporate/5")}>
               {task.type === "EXTRA" ? <Plus className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
               Editar {task.type === "EXTRA" ? "Tarea Extra" : "Tarea Especifica"}
             </span>
           </DialogTitle>
         </DialogHeader>
-        <div className="px-6 pb-6 space-y-6">
+        <div className="px-6 pb-8 space-y-4">
 
-          {/* ===== BLOQUE 1: INFORMACION DE LA TAREA ===== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <FileText className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-700">Informacion de la Tarea</p>
+          {/* SECCIÓN 1: Información de la tarea */}
+          <Section title="Información de la tarea" icon={FileText}>
+            <div className="space-y-2">
+              <Label>Título</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEditAll} />
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Titulo</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEditAll} className="mt-1 bg-white" />
-            </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Prioridad</Label>
-              <div className="grid grid-cols-4 gap-2">
+
+            <div className="space-y-2">
+              <Label>Prioridad</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {Object.entries(priorityConfig).map(([key, cfg]) => (
                   <button key={key} type="button" disabled={!canEditAll} onClick={() => setPriority(key as TaskPriority)}
-                    className={cn("py-2.5 px-2 rounded-xl text-xs font-semibold text-white transition-all", cfg.color, priority === key ? "ring-2 ring-offset-1 ring-gray-400 scale-105" : "opacity-60 hover:opacity-100", !canEditAll && "cursor-not-allowed opacity-40")}>
+                    className={cn("px-2 py-2 rounded-xl text-sm font-medium transition-all border", priority === key ? `${cfg.color} text-white border-transparent` : "bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]", !canEditAll && "cursor-not-allowed opacity-40")}>
                     {cfg.label}
                   </button>
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Descripcion</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe la tarea..." rows={3} disabled={!canEditAll} className="mt-1 bg-white resize-none" />
-            </div>
+
             <div className="space-y-2">
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Subtareas</Label>
+              <Label>Descripción</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe la tarea..." rows={3} disabled={!canEditAll} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Subtareas</Label>
               {subtasks.length > 0 && (
                 <div className="space-y-2">
                   {subtasks.map((st) => (
                     <div key={st.id} className="flex items-center gap-2 group">
-                      <input type="checkbox" checked={st.completed} onChange={() => handleToggleSubtask(st.id)} className="w-4 h-4 rounded border-gray-300" />
+                      <input type="checkbox" checked={st.completed} onChange={() => handleToggleSubtask(st.id)} className="w-4 h-4 rounded border-[#E5E5E7]" />
                       <span className={cn("flex-1 text-sm", st.completed ? "text-[#86868B] line-through" : "text-[#1D1D1F]")}>{st.title}</span>
                       <button onClick={() => handleRemoveSubtask(st.id)} className="opacity-0 group-hover:opacity-100 p-1 text-[#FF3B30] hover:bg-[#FF3B30]/10 rounded transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
@@ -194,175 +205,172 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
                 <Button type="button" size="sm" variant="outline" onClick={handleAddSubtask} disabled={!newSubtaskTitle.trim()}><Plus className="w-4 h-4" /></Button>
               </div>
             </div>
-          </div>
+          </Section>
 
-          {/* ===== BLOQUE 2: RESPONSABLE Y SUPERVISOR ===== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <Users className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-700">Responsable y Supervisor</p>
-            </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Departamento</Label>
-              <div className="grid grid-cols-2 gap-2">
+          {/* SECCIÓN 2: Responsable y Supervisor */}
+          <Section title="Responsable y Supervisor" icon={Users}>
+            <div className="space-y-2">
+              <Label>Departamento</Label>
+              <div className="flex flex-wrap gap-2">
                 {departmentNames.map((dept) => (
                   <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setDepartment(dept); setAssignedTo([]); setSupervisorId(""); }}
-                    className={cn("py-3 px-4 rounded-xl text-sm font-medium border-2 transition-all capitalize", department === dept ? "border-[#007AFF] bg-[#007AFF]/5 text-[#007AFF]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "opacity-50 cursor-not-allowed")}>
+                    className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", department === dept ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}>
                     {dept.replace(/_/g, " ").toLowerCase()}
                   </button>
                 ))}
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Asignar a</Label>
+
+            <div className="space-y-2">
+              <Label>Asignar a</Label>
               <div className="grid grid-cols-1 gap-2">
                 {deptUsers.length > 0 ? deptUsers.map((u) => (
                   <button key={u.id} type="button" disabled={!canEditAll} onClick={() => toggleAssigned(u.id)}
-                    className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left", assignedTo.includes(u.id) ? "border-[#007AFF] bg-[#007AFF]/5 text-[#007AFF]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
-                    <User className="w-4 h-4 flex-shrink-0" />
-                    <div className="min-w-0"><p className="font-medium truncate">{u.name}</p><p className="text-xs opacity-70 truncate">{u.position}</p></div>
+                    className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all text-left", assignedTo.includes(u.id) ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]", !canEditAll && "cursor-not-allowed opacity-40")}>
+                    <User className="w-4 h-4 flex-shrink-0 text-[#86868B]" />
+                    <div className="min-w-0"><p className="font-medium truncate">{u.name}</p><p className="text-xs text-[#86868B] truncate">{u.position}</p></div>
                   </button>
-                )) : <p className="text-xs text-gray-400 text-center py-3">No hay usuarios disponibles</p>}
+                )) : <p className="text-xs text-[#86868B] text-center py-3">No hay usuarios disponibles</p>}
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Supervisor</Label>
+
+            <div className="space-y-2">
+              <Label>Supervisor</Label>
               <div className="grid grid-cols-1 gap-2">
                 <button type="button" disabled={!canEditAll} onClick={() => canEditAll && setSupervisorId("")}
-                  className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left", supervisorId === "" ? "border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
+                  className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all text-left", supervisorId === "" ? "border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]" : "border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]", !canEditAll && "cursor-not-allowed opacity-40")}>
                   <ShieldCheck className="w-4 h-4 flex-shrink-0" />Sin supervisor
                 </button>
                 {supervisors.map((s) => (
                   <button key={s.id} type="button" disabled={!canEditAll} onClick={() => canEditAll && setSupervisorId(s.id)}
-                    className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left", supervisorId === s.id ? "border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
+                    className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all text-left", supervisorId === s.id ? "border-[#8B5CF6] bg-[#8B5CF6]/5 text-[#8B5CF6]" : "border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]", !canEditAll && "cursor-not-allowed opacity-40")}>
                     <ShieldCheck className="w-4 h-4 flex-shrink-0" />{s.name}
                   </button>
                 ))}
               </div>
-              {supervisors.length === 0 && <p className="text-xs text-gray-400 text-center py-3">No hay supervisores para este departamento</p>}
+              {supervisors.length === 0 && <p className="text-xs text-[#86868B] text-center py-3">No hay supervisores para este departamento</p>}
             </div>
-          </div>
+          </Section>
 
-          {/* ===== BLOQUE 3: PROGRAMACION ===== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <Clock className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-700">Programacion</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fecha de inicio</Label>
-                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={!canEditAll} className="mt-1 bg-white" />
+          {/* SECCIÓN 3: Programación */}
+          <Section title="Programación" icon={Clock}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Fecha de inicio</Label>
+                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} disabled={!canEditAll} />
               </div>
-              <div>
-                <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Hora de inicio (24h)</Label>
-                <Input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} disabled={!canEditAll} className="mt-1 bg-white" />
+              <div className="space-y-2">
+                <Label>Hora de inicio *</Label>
+                <div className="flex items-center gap-2">
+                  <Select value={dueTime.split(':')[0] || '08'} onValueChange={(h) => setDueTime(`${h.padStart(2,'0')}:${dueTime.split(':')[1] || '00'}`)} disabled={!canEditAll}>
+                    <SelectTrigger className="w-20 h-10 text-center"><SelectValue placeholder="HH" /></SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')).map((h) => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-[#86868B] font-medium">:</span>
+                  <Select value={dueTime.split(':')[1] || '00'} onValueChange={(m) => setDueTime(`${dueTime.split(':')[0] || '08'}:${m.padStart(2,'0')}`)} disabled={!canEditAll}>
+                    <SelectTrigger className="w-20 h-10 text-center"><SelectValue placeholder="MM" /></SelectTrigger>
+                    <SelectContent>
+                      {[0,15,30,45].map((m) => { const ms = String(m).padStart(2,'0'); return <SelectItem key={ms} value={ms}>{ms}</SelectItem>; })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-xs text-[#86868B]">Formato 24 horas</p>
               </div>
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Tiempo estimado</Label>
-              <div className="grid grid-cols-5 gap-2">
+
+            <div className="space-y-2">
+              <Label>Tiempo estimado</Label>
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {timeButtons.map((m) => (
                   <button key={m} type="button" disabled={!canEditAll} onClick={() => { setEstimatedMinutes(m); setShowCustomTime(false); setCustomMinutes(""); }}
-                    className={cn("py-2 px-1 rounded-xl text-xs font-medium border-2 transition-all", estimatedMinutes === m && !showCustomTime ? "border-[#007AFF] bg-[#007AFF]/5 text-[#007AFF]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
+                    className={cn("px-2 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all border", estimatedMinutes === m && !showCustomTime ? "border-corporate text-corporate bg-white" : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]", !canEditAll && "cursor-not-allowed opacity-40")}>
                     {m}m
                   </button>
                 ))}
                 <button type="button" disabled={!canEditAll} onClick={() => setShowCustomTime(true)}
-                  className={cn("py-2 px-1 rounded-xl text-xs font-medium border-2 transition-all", showCustomTime ? "border-[#007AFF] bg-[#007AFF]/5 text-[#007AFF]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
+                  className={cn("px-2 py-2 rounded-xl text-xs sm:text-sm font-medium transition-all border", showCustomTime ? "border-corporate text-corporate bg-white" : "bg-[#F5F5F7] text-[#86868B] hover:bg-[#E5E5E7]", !canEditAll && "cursor-not-allowed opacity-40")}>
                   Otro
                 </button>
               </div>
               {showCustomTime && (
-                <div className="flex items-center gap-2 mt-2">
-                  <Input type="number" min={1} value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} placeholder="Minutos" disabled={!canEditAll} className="w-32 bg-white" />
-                  <span className="text-sm text-gray-500">min = {customMinutes ? `${Math.floor(Number(customMinutes) / 60)}h ${Number(customMinutes) % 60}min` : "—"}</span>
+                <div className="flex items-center gap-2 pt-1">
+                  <Input type="number" min={1} value={customMinutes} onChange={(e) => setCustomMinutes(e.target.value)} placeholder="Minutos" disabled={!canEditAll} className="w-32" />
+                  <span className="text-sm text-[#86868B]">min = {customMinutes ? `${Math.floor(Number(customMinutes) / 60)}h ${Number(customMinutes) % 60}min` : "—"}</span>
                 </div>
               )}
             </div>
-            <div>
-              <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fecha limite calculada</Label>
-              <div className="flex items-center gap-2 mt-1 bg-slate-100 rounded-xl px-4 py-3 border border-slate-200">
-                <Clock className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-700 font-medium">{calculatedDueLabel}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* ===== BLOQUE 4: REQUISITOS ===== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <Camera className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-700">Requisitos</p>
+            <div className="bg-corporate/5 rounded-xl p-3 flex items-center gap-2 border border-corporate/20">
+              <Clock className="w-4 h-4 text-corporate" />
+              <span className="text-sm text-[#1D1D1F]">Fecha límite calculada</span>
+              <span className="text-sm font-semibold text-corporate ml-auto">{calculatedDueLabel}</span>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
-              <input type="checkbox" id="edit-requiresPhoto" checked={requiresPhoto} onChange={(e) => setRequiresPhoto(e.target.checked)} disabled={!canEditAll} className="w-4 h-4 rounded border-gray-300" />
-              <Label htmlFor="edit-requiresPhoto" className={cn("text-sm font-medium cursor-pointer", !canEditAll && "opacity-50")}>Requiere foto para completar</Label>
-            </div>
-          </div>
+          </Section>
 
-          {/* ===== BLOQUE 5: SOLICITAR APOYO ===== */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-              <Zap className="w-4 h-4 text-gray-400" />
-              <p className="text-sm font-semibold text-gray-700">Solicitar Apoyo</p>
+          {/* SECCIÓN 4: Requisitos */}
+          <Section title="Requisitos" icon={Camera}>
+            <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+              <input type="checkbox" id="edit-requiresPhoto" checked={requiresPhoto} onChange={(e) => setRequiresPhoto(e.target.checked)} disabled={!canEditAll} className="w-4 h-4 rounded border-[#E5E5E7] text-corporate focus:ring-corporate" />
+              <Label htmlFor="edit-requiresPhoto" className={cn("text-sm font-medium text-[#1D1D1F] mb-0 cursor-pointer", !canEditAll && "opacity-50")}>Requiere foto para completar</Label>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
-              <input type="checkbox" id="showSupport" checked={showSupport} onChange={(e) => { setShowSupport(e.target.checked); if (!e.target.checked) { setSupportUserIds([]); setSupportDepartment(""); } }} disabled={!canEditAll} className="w-4 h-4 rounded border-gray-300" />
-              <Label htmlFor="showSupport" className={cn("text-sm font-medium cursor-pointer", !canEditAll && "opacity-50")}>Solicitar apoyo de otros departamentos</Label>
+          </Section>
+
+          {/* SECCIÓN 5: Solicitar Apoyo */}
+          <Section title="Solicitar Apoyo" icon={Zap}>
+            <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+              <input type="checkbox" id="showSupport" checked={showSupport} onChange={(e) => { setShowSupport(e.target.checked); if (!e.target.checked) { setSupportUserIds([]); setSupportDepartment(""); } }} disabled={!canEditAll} className="w-4 h-4 rounded border-[#E5E5E7] text-corporate focus:ring-corporate" />
+              <Label htmlFor="showSupport" className={cn("text-sm font-medium text-[#1D1D1F] mb-0 cursor-pointer", !canEditAll && "opacity-50")}>Solicitar apoyo de otros departamentos</Label>
             </div>
             {showSupport && (
-              <div className="space-y-3 pl-2 border-l-2 border-amber-200">
-                <div>
-                  <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Departamento de apoyo</Label>
-                  <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-3 pl-2 border-l-2 border-corporate/30">
+                <div className="space-y-2">
+                  <Label>Departamento de apoyo</Label>
+                  <div className="flex flex-wrap gap-2">
                     {departmentNames.filter((d) => d !== department).map((dept) => (
                       <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setSupportDepartment(dept); setSupportUserIds([]); }}
-                        className={cn("py-3 px-4 rounded-xl text-sm font-medium border-2 transition-all capitalize", supportDepartment === dept ? "border-[#FF9500] bg-[#FF9500]/5 text-[#FF9500]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "opacity-50 cursor-not-allowed")}>
+                        className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", supportDepartment === dept ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}>
                         {dept.replace(/_/g, " ").toLowerCase()}
                       </button>
                     ))}
                   </div>
                 </div>
                 {supportDepartment && (
-                  <div>
-                    <Label className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">Usuarios de apoyo</Label>
+                  <div className="space-y-2">
+                    <Label>Usuarios de apoyo</Label>
                     <div className="grid grid-cols-1 gap-2">
                       {supportDeptUsers.length > 0 ? supportDeptUsers.map((u) => (
                         <button key={u.id} type="button" disabled={!canEditAll} onClick={() => toggleSupport(u.id)}
-                          className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border-2 transition-all text-left", supportUserIds.includes(u.id) ? "border-[#FF9500] bg-[#FF9500]/5 text-[#FF9500]" : "border-gray-200 bg-white text-gray-700 hover:border-gray-300", !canEditAll && "cursor-not-allowed opacity-40")}>
-                          <User className="w-4 h-4 flex-shrink-0" />
-                          <div className="min-w-0"><p className="font-medium truncate">{u.name}</p><p className="text-xs opacity-70 truncate">{u.department?.replace(/_/g, " ")} - {u.position}</p></div>
+                          className={cn("flex items-center gap-3 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all text-left", supportUserIds.includes(u.id) ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]", !canEditAll && "cursor-not-allowed opacity-40")}>
+                          <User className="w-4 h-4 flex-shrink-0 text-[#86868B]" />
+                          <div className="min-w-0"><p className="font-medium truncate">{u.name}</p><p className="text-xs text-[#86868B] truncate">{u.department?.replace(/_/g, " ")} - {u.position}</p></div>
                         </button>
-                      )) : <p className="text-xs text-gray-400 text-center py-3">No hay usuarios disponibles</p>}
+                      )) : <p className="text-xs text-[#86868B] text-center py-3">No hay usuarios disponibles</p>}
                     </div>
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </Section>
 
-          {/* Fotos */}
+          {/* SECCIÓN 6: Fotos de evidencia */}
           {photos.length > 0 && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 pb-1 border-b border-gray-100">
-                <Camera className="w-4 h-4 text-gray-400" />
-                <p className="text-sm font-semibold text-gray-700">Fotos de evidencia</p>
-              </div>
+            <Section title="Fotos de evidencia" icon={Camera}>
               <div className="flex flex-wrap gap-2">
                 {photos.map((p, i) => (
-                  <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 group">
+                  <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden border border-[#E5E5E7] group">
                     <img src={p} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                     <button onClick={() => handleRemovePhoto(p)} className="absolute top-1 right-1 w-5 h-5 bg-[#FF3B30] text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
                   </div>
                 ))}
               </div>
-            </div>
+            </Section>
           )}
 
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)} className="flex-1 h-12 rounded-xl border-gray-300 text-gray-700 font-medium">Cancelar</Button>
-            <Button onClick={handleSave} className="flex-1 h-12 rounded-xl bg-corporate hover:bg-corporate/90 text-white font-medium">Guardar cambios</Button>
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Cancelar</Button>
+            <Button onClick={handleSave} className="bg-corporate hover:bg-corporate/90 text-white w-full sm:w-auto">Guardar cambios</Button>
           </div>
         </div>
       </DialogContent>
