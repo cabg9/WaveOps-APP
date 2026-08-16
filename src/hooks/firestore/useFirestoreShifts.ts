@@ -268,7 +268,10 @@ export function useFirestoreShifts() {
       const templatesSnapshot = await getDocs(templatesQuery);
       const templates = templatesSnapshot.docs
         .map((d) => ({ id: d.id, ...d.data() } as any))
-        .filter((t: any) => shiftIds.includes(t.shiftId));
+        .filter((t: any) => {
+          const templateShiftIds = t.shiftIds || (t.shiftId ? [t.shiftId] : []);
+          return templateShiftIds.some((sid: string) => shiftIds.includes(sid));
+        });
 
       if (templates.length === 0) return;
 
@@ -276,10 +279,11 @@ export function useFirestoreShifts() {
       const today = now.split('T')[0];
 
       for (const template of templates) {
-        const templateAssignments = assignments.filter(a => a.shiftId === template.shiftId);
+        const templateShiftIds = template.shiftIds || (template.shiftId ? [template.shiftId] : []);
+        const templateAssignments = assignments.filter(a => templateShiftIds.includes(a.shiftId));
         if (templateAssignments.length === 0) continue;
 
-        // Agrupar asignaciones del mismo turno por fecha
+        // Agrupar asignaciones de los turnos de la plantilla por fecha
         const byDate = new Map<string, FirestoreAssignment[]>();
         for (const assignment of templateAssignments) {
           if (!byDate.has(assignment.date)) byDate.set(assignment.date, []);
@@ -291,6 +295,7 @@ export function useFirestoreShifts() {
           if (!isTemplateWithinVigency(template, date)) continue;
 
           const assignedTo = [...new Set(dateAssignments.map(a => a.userId))];
+          const assignedShiftIds = [...new Set(dateAssignments.map(a => a.shiftId))];
 
           // Evitar duplicados: buscar si ya existe una tarea para este template + fecha
           const existingQuery = query(
@@ -320,7 +325,7 @@ export function useFirestoreShifts() {
               dueTime: calculateDueTime(template.startTime || '00:00', template.estimatedMinutes || 0),
               estimatedMinutes: template.estimatedMinutes || 0,
               requiresPhoto: template.requiresPhoto || false,
-              shiftIds: [template.shiftId],
+              shiftIds: assignedShiftIds,
               templateId: template.id,
               source: 'specific-task-template',
               createdBy: template.createdBy || '',
@@ -335,13 +340,17 @@ export function useFirestoreShifts() {
               ],
             });
           } else {
-            // Actualizar asignados de la tarea existente agregando los nuevos usuarios
+            // Actualizar asignados y turnos de la tarea existente
             const existingData = existingDoc.data();
             const currentAssignedTo = existingData.assignedTo || [];
             const newAssignedTo = [...new Set([...currentAssignedTo, ...assignedTo])];
-            if (newAssignedTo.length !== currentAssignedTo.length) {
+            const currentShiftIds = existingData.shiftIds || [];
+            const newShiftIds = [...new Set([...currentShiftIds, ...assignedShiftIds])];
+            const hasChanges = newAssignedTo.length !== currentAssignedTo.length || newShiftIds.length !== currentShiftIds.length;
+            if (hasChanges) {
               await updateDoc(existingDoc.ref, {
                 assignedTo: newAssignedTo,
+                shiftIds: newShiftIds,
                 updatedAt: now,
               });
             }

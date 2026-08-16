@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 
@@ -24,6 +24,7 @@ export interface DynamicDepartment {
   shortName: string;
   order: number;
   isActive: boolean;
+  isOperational?: boolean;
   parentId?: string | null;
   type?: 'parent' | 'child';
   createdAt?: string;
@@ -57,6 +58,7 @@ export function useDynamicDepartments() {
           shortName: data.shortName || name,
           order: data.order ?? 999,
           isActive: data.isActive !== false,
+          isOperational: data.isOperational === true,
           parentId: data.parentId || null,
           type: data.type,
           createdAt: data.createdAt,
@@ -101,12 +103,22 @@ export function useDynamicDepartments() {
     return dept?.shortName || code;
   };
 
+  const operationalDepartmentCodes = useMemo(() => {
+    return activeDepartments.filter(d => d.isOperational).map(d => d.code);
+  }, [activeDepartments]);
+
+  const isOperationalDepartment = useCallback((code: string): boolean => {
+    return operationalDepartmentCodes.includes(code);
+  }, [operationalDepartmentCodes]);
+
   return {
     departments,
     departmentCodes,
     departmentNames,
     departmentOptions,
     defaultDepartment,
+    operationalDepartmentCodes,
+    isOperationalDepartment,
     getDeptName,
     getDeptCode,
     getDeptIcon,

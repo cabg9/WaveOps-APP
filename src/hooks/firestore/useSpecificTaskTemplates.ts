@@ -26,7 +26,8 @@ export interface CreateSpecificTaskTemplateData {
   title: string;
   description: string;
   department: string;
-  shiftId: string;
+  shiftId?: string;
+  shiftIds?: string[];
   startTime: string;
   estimatedMinutes: number;
   priority: string;
@@ -83,11 +84,17 @@ export function useSpecificTaskTemplates() {
   // Crear plantilla
   const createTemplate = useCallback(async (data: CreateSpecificTaskTemplateData): Promise<string> => {
     try {
-      const docRef = await addDoc(collection(db, TEMPLATES_COLLECTION), {
+      const payload: any = {
         ...data,
         isActive: true,
         createdAt: new Date().toISOString(),
-      });
+      };
+      // Normalizar a shiftIds si viene shiftId legacy
+      if (data.shiftId && !data.shiftIds) {
+        payload.shiftIds = [data.shiftId];
+      }
+      delete payload.shiftId;
+      const docRef = await addDoc(collection(db, TEMPLATES_COLLECTION), payload);
       return docRef.id;
     } catch (err: any) {
       console.error('Error al crear plantilla de tarea específica:', err);

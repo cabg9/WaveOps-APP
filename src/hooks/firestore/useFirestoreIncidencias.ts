@@ -249,11 +249,23 @@ export function useFirestoreIncidencias() {
   const addPhoto = useCallback(
     async (id: string, photoUrl: string, userId: string) => {
       const ref = doc(db, 'incidencias', id);
+      const inc = incidencias.find((i) => i.id === id);
       await updateDoc(ref, {
         photos: arrayUnion({ url: photoUrl, uploadedBy: userId, uploadedAt: new Date().toISOString() }),
+        history: [
+          ...(inc?.history || []).map((h) => ({
+            id: h.id, action: h.action, performedBy: h.performedBy, performedAt: h.performedAt, note: h.note || null,
+          })) || [],
+          {
+            id: Date.now().toString(),
+            action: 'Foto agregada a la incidencia',
+            performedBy: userId,
+            performedAt: new Date().toISOString(),
+          },
+        ],
       });
     },
-    []
+    [incidencias]
   );
 
   // Reabrir incidencia (CLOSED -> REOPENED)

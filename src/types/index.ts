@@ -207,7 +207,8 @@ export interface SpecificTaskTemplate {
   title: string;
   description: string;
   department: string;
-  shiftId: string;
+  shiftId?: string; // Deprecated: mantenido para compatibilidad
+  shiftIds?: string[]; // Nuevo: permite múltiples turnos
   startTime: string; // HH:MM
   estimatedMinutes: number;
   priority: TaskPriority;

@@ -20,6 +20,7 @@ import { useTasks } from '@/hooks/useTasks';
 import {
   Task, TaskStatus, TaskPriority, TaskType, TimeFilter,
   IncidenciaStatus, Role, Incidencia, TaskRecurrence, TaskVigencia,
+  SpecificTaskTemplate,
 } from '@/types';
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
@@ -63,17 +64,17 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName } = useDynamicDepartments();
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
-  const { templates: specificTaskTemplates, createTemplate, deleteTemplate } = useSpecificTaskTemplates();
+  const { templates: specificTaskTemplates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
 
   const [mainTab, setMainTab] = useState<MainTab>('my-tasks');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>(TaskStatus.PENDING);
   const [viewType, setViewType] = useState<ViewType>('list');
-  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState(user?.department || 'all');
+  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState(user?.role === Role.GERENTE_OPERACIONES ? 'all' : (user?.department || 'all'));
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
@@ -100,13 +101,14 @@ export default function TasksModule() {
     title: '',
     description: '',
     department: defaultDepartment,
-    shiftId: '',
+    shiftIds: [] as string[],
     startTime: '08:00',
     estimatedMinutes: 60,
     priority: TaskPriority.MEDIUM,
     requiresPhoto: false,
     vigenciaDays: TaskVigencia.INDEFINIDO,
   });
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
   const { users: firestoreUsersForSupervisors } = useFirestoreUsers();
   const supervisorsByDepartment = useMemo(() => {
@@ -132,15 +134,36 @@ export default function TasksModule() {
     }
   }, [taskForm.startDate, taskForm.startTime, taskForm.estimatedHours]);
 
-  // Supervisor automático para tarea específica: primero supervisor del dept, luego gerente del dept
+  // Supervisor automático para tarea específica:
+  // 1. Supervisor del dept que tenga el turno seleccionado asignado (publicado)
+  // 2. Cualquier supervisor del dept
+  // 3. Gerente del departamento
+  // 4. Gerente de Operaciones (si el dept es operativo), RRHH, Director o Director General
   const specificTaskSupervisor = useMemo(() => {
-    const deptUsers = users.filter((u) => u.department === specificTaskForm.department);
+    const deptUsers = users.filter((u) => u.department === specificTaskForm.department && u.isActive !== false);
+    const selectedShiftIds = specificTaskForm.shiftIds || [];
+    if (selectedShiftIds.length > 0) {
+      const supervisorsWithShift = deptUsers.filter(
+        (u) => u.role === Role.SUPERVISOR && shiftAssignments.some((a) => selectedShiftIds.includes(a.shiftId) && a.userId === u.id && a.status === 'PUBLICADO')
+      );
+      if (supervisorsWithShift.length > 0) return supervisorsWithShift[0].id;
+    }
     const supervisor = deptUsers.find((u) => u.role === Role.SUPERVISOR);
     if (supervisor) return supervisor.id;
     const gerente = deptUsers.find((u) => u.role === Role.GERENTE_DEPARTAMENTO);
     if (gerente) return gerente.id;
-    return '';
-  }, [users, specificTaskForm.department]);
+    // Fallback a superiores
+    const isOperational = isOperationalDepartment(specificTaskForm.department);
+    const superior = users.find(
+      (u) => u.isActive !== false && (
+        u.role === Role.RRHH ||
+        u.role === Role.DIRECTOR ||
+        u.role === Role.DIRECTOR_GENERAL ||
+        (isOperational && u.role === Role.GERENTE_OPERACIONES)
+      )
+    );
+    return superior?.id || '';
+  }, [users, specificTaskForm.department, specificTaskForm.shiftIds, shiftAssignments, isOperationalDepartment]);
 
   // Observadores de control para tarea específica: RRHH y Gerente de Operaciones
   const specificTaskNotifyOnDelay = useMemo(() => {
@@ -204,13 +227,14 @@ export default function TasksModule() {
       title: '',
       description: '',
       department: defaultDepartment,
-      shiftId: '',
+      shiftIds: [] as string[],
       startTime: '08:00',
       estimatedMinutes: 60,
       priority: TaskPriority.MEDIUM,
       requiresPhoto: false,
       vigenciaDays: TaskVigencia.INDEFINIDO,
     });
+    setEditingTemplateId(null);
     setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
   };
@@ -228,8 +252,8 @@ export default function TasksModule() {
 
   const handleSubmitSpecificTask = async () => {
     if (!user?.id) return;
-    if (!specificTaskForm.title.trim() || !specificTaskForm.shiftId) {
-      toast.error('Completa el título y selecciona un turno');
+    if (!specificTaskForm.title.trim() || specificTaskForm.shiftIds.length === 0) {
+      toast.error('Completa el título y selecciona al menos un turno');
       return;
     }
     if (!specificTaskSupervisor) {
@@ -237,32 +261,69 @@ export default function TasksModule() {
       return;
     }
     try {
-      await createTemplate({
-        title: specificTaskForm.title.trim(),
-        description: specificTaskForm.description.trim(),
-        department: specificTaskForm.department,
-        shiftId: specificTaskForm.shiftId,
-        startTime: specificTaskForm.startTime,
-        estimatedMinutes: specificTaskForm.estimatedMinutes,
-        priority: specificTaskForm.priority,
-        supervisorId: specificTaskSupervisor,
-        notifyOnDelay: specificTaskNotifyOnDelay,
-        requiresPhoto: specificTaskForm.requiresPhoto,
-        vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
-        createdBy: user.id,
-      });
-      toast.success('Tarea específica creada. Se generará automáticamente al asignar el turno.');
+      if (editingTemplateId) {
+        await updateTemplate(editingTemplateId, {
+          title: specificTaskForm.title.trim(),
+          description: specificTaskForm.description.trim(),
+          department: specificTaskForm.department,
+          shiftIds: specificTaskForm.shiftIds,
+          startTime: specificTaskForm.startTime,
+          estimatedMinutes: specificTaskForm.estimatedMinutes,
+          priority: specificTaskForm.priority,
+          supervisorId: specificTaskSupervisor,
+          notifyOnDelay: specificTaskNotifyOnDelay,
+          requiresPhoto: specificTaskForm.requiresPhoto,
+          vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
+        });
+        toast.success('Plantilla de tarea específica actualizada.');
+      } else {
+        await createTemplate({
+          title: specificTaskForm.title.trim(),
+          description: specificTaskForm.description.trim(),
+          department: specificTaskForm.department,
+          shiftIds: specificTaskForm.shiftIds,
+          startTime: specificTaskForm.startTime,
+          estimatedMinutes: specificTaskForm.estimatedMinutes,
+          priority: specificTaskForm.priority,
+          supervisorId: specificTaskSupervisor,
+          notifyOnDelay: specificTaskNotifyOnDelay,
+          requiresPhoto: specificTaskForm.requiresPhoto,
+          vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
+          createdBy: user.id,
+        });
+        toast.success('Tarea específica creada. Se generará automáticamente al asignar el turno.');
+      }
       setIsCreateModalOpen(false);
+      setEditingTemplateId(null);
+      setSpecificTaskForm({
+        title: '',
+        description: '',
+        department: defaultDepartment,
+        shiftIds: [] as string[],
+        startTime: '08:00',
+        estimatedMinutes: 60,
+        priority: TaskPriority.MEDIUM,
+        requiresPhoto: false,
+        vigenciaDays: TaskVigencia.INDEFINIDO,
+      });
     } catch (err) {
-      console.error('Error al crear tarea específica:', err);
-      toast.error('Error al crear la tarea específica');
+      console.error('Error al guardar tarea específica:', err);
+      toast.error('Error al guardar la tarea específica');
     }
   };
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
     if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED)) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
-    else if (mainTab === 'my-department' && user) result = result.filter((t) => t.department && t.department === user.department);
+    else if (mainTab === 'my-department' && user) {
+      // Gerente de Operaciones ve tareas de todos los departamentos operativos
+      if (user.role === Role.GERENTE_OPERACIONES) {
+        const allowed = operationalDepartmentCodes.length > 0 ? operationalDepartmentCodes : [user.department];
+        result = result.filter((t) => allowed.includes(t.department));
+      } else {
+        result = result.filter((t) => t.department && t.department === user.department);
+      }
+    }
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
     const today = getLocalDate();
@@ -333,10 +394,16 @@ export default function TasksModule() {
     if (user && !(user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH)) {
       result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
     } else if (user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && incidenciaDepartmentFilter !== 'all') {
-      result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
+      // Gerente de Operaciones: al seleccionar su propio departamento u otro operativo, muestra incidencias de todos los departamentos operativos
+      if (user.role === Role.GERENTE_OPERACIONES && (incidenciaDepartmentFilter === user.department || isOperationalDepartment(incidenciaDepartmentFilter))) {
+        const allowed = operationalDepartmentCodes.length > 0 ? operationalDepartmentCodes : [user.department];
+        result = result.filter((i) => allowed.some((d) => i.targetDepartments?.includes(d) || i.targetDepartment === d));
+      } else {
+        result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
+      }
     }
     return result;
-  }, [incidencias, user, incidenciaDepartmentFilter]);
+  }, [incidencias, user, incidenciaDepartmentFilter, operationalDepartmentCodes, isOperationalDepartment]);
 
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {
@@ -410,6 +477,8 @@ export default function TasksModule() {
       // VERIFICADAS y otros: antiguas a nuevas. Prioridad critica primero.
       result.sort((a, b) => { const pd = prOrd[a.priority] - prOrd[b.priority]; return pd !== 0 ? pd : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); });
     }
+    // Deduplicar por si acaso hay documentos repetidos en Firestore
+    result = result.filter((item, index, self) => self.findIndex((i) => i.id === item.id) === index);
     return result;
   }, [incidenciasByTime, timeFilter, statusFilter, user?.id]);
 
@@ -739,7 +808,7 @@ export default function TasksModule() {
 
                       {/* SECCIÓN 4: Evidencia fotográfica */}
                       <Section title="Evidencia fotográfica" icon={Camera}>
-                        <CameraCapture onCapture={handlePhotoCapture} />
+                        <CameraCapture onCapture={handlePhotoCapture} hidePreview />
                         {incidenciaPhotos.length > 0 && (
                           <div className="flex flex-wrap gap-2 mt-2">
                             {incidenciaPhotos.map((url, idx) => (
@@ -752,7 +821,7 @@ export default function TasksModule() {
                       </Section>
 
                       {/* Botones */}
-                      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-6 mb-4">
+                      <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4 pb-10 mb-8">
                         <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
                         <Button
                           className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white w-full sm:w-auto"
@@ -777,6 +846,27 @@ export default function TasksModule() {
                 onCancel={() => setIsCreateModalOpen(false)}
                 onSubmit={handleSubmitSpecificTask}
                 disabled={false}
+                isEditing={!!editingTemplateId}
+                templates={specificTaskTemplates.filter((t) => t.department === specificTaskForm.department && t.isActive !== false)}
+                onEditTemplate={(template) => {
+                  setEditingTemplateId(template.id);
+                  setSpecificTaskForm({
+                    title: template.title,
+                    description: template.description || '',
+                    department: template.department,
+                    shiftIds: template.shiftIds || (template.shiftId ? [template.shiftId] : []),
+                    startTime: template.startTime,
+                    estimatedMinutes: template.estimatedMinutes,
+                    priority: template.priority as TaskPriority,
+                    requiresPhoto: template.requiresPhoto,
+                    vigenciaDays: template.vigenciaDays === null ? TaskVigencia.INDEFINIDO : (template.vigenciaDays as unknown as TaskVigencia),
+                  });
+                }}
+                onDeleteTemplate={(templateId) => {
+                  if (window.confirm('¿Eliminar esta plantilla de tarea específica?')) {
+                    deleteTemplate(templateId);
+                  }
+                }}
               />
             ) : createType === 'extra' ? (
               <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
@@ -810,12 +900,16 @@ function SpecificTaskForm({
   onCancel,
   onSubmit,
   disabled,
+  isEditing,
+  templates,
+  onEditTemplate,
+  onDeleteTemplate,
 }: {
   form: {
     title: string;
     description: string;
     department: string;
-    shiftId: string;
+    shiftIds: string[];
     startTime: string;
     estimatedMinutes: number;
     priority: TaskPriority;
@@ -831,6 +925,10 @@ function SpecificTaskForm({
   onCancel: () => void;
   onSubmit: () => void;
   disabled?: boolean;
+  isEditing?: boolean;
+  templates?: SpecificTaskTemplate[];
+  onEditTemplate?: (template: SpecificTaskTemplate) => void;
+  onDeleteTemplate?: (templateId: string) => void;
 }) {
   const vigenciaOptions = [
     { value: TaskVigencia.DAYS_30, label: '30 días' },
@@ -860,6 +958,26 @@ function SpecificTaskForm({
 
   return (
     <div className="space-y-4 py-2 px-2 pb-6">
+      {/* Lista de plantillas existentes del departamento */}
+      {templates && templates.length > 0 && (
+        <Section title="Plantillas existentes">
+          <div className="space-y-2">
+            {templates.map((template) => (
+              <div key={template.id} className="flex items-center justify-between gap-2 p-3 bg-[#F5F5F7] rounded-xl border border-[#E5E5E7]">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#1D1D1F] truncate">{template.title}</p>
+                  <p className="text-xs text-[#86868B]">{(template.shiftIds || (template.shiftId ? [template.shiftId] : [])).map((sid) => shifts.find((s) => s.id === sid)?.name || sid).join(', ')} • {template.startTime} • {template.estimatedMinutes}min</p>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button type="button" size="sm" variant="outline" onClick={() => onEditTemplate?.(template)}>Editar</Button>
+                  <Button type="button" size="sm" variant="outline" className="border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30]/10" onClick={() => onDeleteTemplate?.(template.id)}>Eliminar</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* SECCIÓN 1: ¿Qué hay que hacer? */}
       <Section title="¿Qué hay que hacer?">
         <div className="space-y-2">
@@ -928,28 +1046,39 @@ function SpecificTaskForm({
         </div>
 
         <div className="space-y-2">
-          <Label>Turno *</Label>
+          <Label>Turnos *</Label>
           {shifts.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {shifts.map((shift) => (
-                <button
-                  key={shift.id}
-                  type="button"
-                  onClick={() => setForm((prev) => ({ ...prev, shiftId: shift.id }))}
-                  className={cn(
-                    'px-3 py-3 rounded-xl text-sm text-left border transition-all',
-                    form.shiftId === shift.id
-                      ? 'border-corporate bg-corporate/5 text-corporate'
-                      : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]'
-                  )}
-                >
-                  <span className="font-medium block">{shift.name}</span>
-                  <span className="text-xs text-[#86868B] block">{shift.startTime} - {shift.endTime}</span>
-                </button>
-              ))}
+              {shifts.map((shift) => {
+                const isSelected = form.shiftIds.includes(shift.id);
+                return (
+                  <button
+                    key={shift.id}
+                    type="button"
+                    onClick={() => setForm((prev) => ({
+                      ...prev,
+                      shiftIds: isSelected
+                        ? prev.shiftIds.filter((id) => id !== shift.id)
+                        : [...prev.shiftIds, shift.id],
+                    }))}
+                    className={cn(
+                      'px-3 py-3 rounded-xl text-sm text-left border transition-all',
+                      isSelected
+                        ? 'border-corporate bg-corporate/5 text-corporate'
+                        : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                    )}
+                  >
+                    <span className="font-medium block">{shift.name}</span>
+                    <span className="text-xs text-[#86868B] block">{shift.startTime} - {shift.endTime}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-[#86868B]">No hay turnos activos para este departamento.</p>
+          )}
+          {form.shiftIds.length > 0 && (
+            <p className="text-xs text-[#86868B]">{form.shiftIds.length} turno{form.shiftIds.length > 1 ? 's' : ''} seleccionado{form.shiftIds.length > 1 ? 's' : ''}</p>
           )}
         </div>
 
@@ -1109,9 +1238,9 @@ function SpecificTaskForm({
         <Button
           className="bg-corporate hover:bg-corporate/90 text-white w-full sm:w-auto"
           onClick={onSubmit}
-          disabled={disabled || !form.title.trim() || !form.shiftId}
+          disabled={disabled || !form.title.trim() || form.shiftIds.length === 0}
         >
-          Crear tarea específica
+          {isEditing ? 'Guardar cambios' : 'Crear tarea específica'}
         </Button>
       </div>
     </div>
@@ -1285,8 +1414,8 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               <span className="text-[#86868B] font-medium">:</span>
               <Select value={startMinute} onValueChange={(m) => setStartTime(startHour, m)}>
                 <SelectTrigger className="w-20 h-10 text-center"><SelectValue placeholder="MM" /></SelectTrigger>
-                <SelectContent>
-                  {[0,15,30,45].map((m) => { const ms = String(m).padStart(2, '0'); return <SelectItem key={ms} value={ms}>{ms}</SelectItem>; })}
+                <SelectContent className="max-h-60">
+                  {Array.from({ length: 60 }, (_, i) => i).map((m) => { const ms = String(m).padStart(2, '0'); return <SelectItem key={ms} value={ms}>{ms}</SelectItem>; })}
                 </SelectContent>
               </Select>
             </div>
@@ -1499,7 +1628,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             <h4 className="font-medium text-[#1D1D1F] truncate">{task.title}</h4>
             <div className="flex items-center gap-1.5 flex-shrink-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse">Por verificar: {supervisorName}</Badge>)}
             {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
-            {task.rating === 'bad' && task.ratingNote && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
+            {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
             <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
           <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
@@ -1573,13 +1702,13 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
                 })}</div>
               ) : <p className="text-sm text-[#86868B]">No hay fotos</p>}
             </div>
-            {task.history && task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.map((h) => { const performer = allUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
+            {task.history && task.history.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{task.history.filter((h) => canSeeRating || !(h.action?.toLowerCase().includes('calificada') || h.action?.toLowerCase().includes('calificacion'))).map((h) => { const performer = allUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
             
 
 <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
               <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
               {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = allUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
-              {currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}
+              {currentUserId && (<>{!showNoteInput ? (<Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<form onSubmit={(e) => { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(task.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button><Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></form>)}</>)}
             </div>
           </div>
 
@@ -1682,7 +1811,7 @@ interface IncidenciaCardProps {
 
 function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncidencia, onResolveIncidencia, onCloseIncidencia, onReopenIncidencia, onAddNote, onAddViewer, onAddPhoto }: IncidenciaCardProps) {
   const [expanded, setExpanded] = useState(false);
-  const { getDeptName } = useDynamicDepartments();
+  const { getDeptName, isOperationalDepartment } = useDynamicDepartments();
   const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showResolveModal, setShowResolveModal] = useState(false);
@@ -1726,20 +1855,24 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
 
   // Verificadores requeridos: GDs + supervisores de deptos involucrados + superiores
   const deptosInvolucrados = incidencia.targetDepartments || [incidencia.targetDepartment];
-  const verificadoresRequeridos = firestoreUsers.filter((u) =>
-    (deptosInvolucrados.includes(u.department) &&
-      (u.role === Role.GERENTE_DEPARTAMENTO || u.role === Role.SUPERVISOR)) ||
-    u.role === Role.GERENTE_OPERACIONES ||
-    u.role === Role.RRHH ||
-    u.role === Role.DIRECTOR ||
-    u.role === Role.DIRECTOR_GENERAL
-  );
-  // Verificación por departamento: cada depto involucrado necesita al menos 1 verificación de su GD/Supervisor
-  const deptosVerificados = new Set<string>((incidencia.verifiedByList || []).map((v) => {
-    const verifier = firestoreUsers.find((u) => u.id === v || u.email === v);
-    return verifier?.department as string;
-  }).filter(Boolean));
-  const todosVerificaron = deptosInvolucrados.every((d) => deptosVerificados.has(d));
+
+  // Para cada departamento involucrado, determinar si tiene gerente/supervisor y si ya fue verificado por alguien válido
+  const todosVerificaron = deptosInvolucrados.every((dept) => {
+    const deptManagers = firestoreUsers.filter((u) => u.department === dept && (u.role === Role.GERENTE_DEPARTAMENTO || u.role === Role.SUPERVISOR));
+    const verifiers = (incidencia.verifiedByList || []).map((v) => firestoreUsers.find((u) => u.id === v || u.email === v)).filter(Boolean);
+    if (deptManagers.length > 0) {
+      // El departamento tiene gerente/supervisor: al menos uno debe verificar
+      return verifiers.some((v) => v?.department === dept && (v?.role === Role.GERENTE_DEPARTAMENTO || v?.role === Role.SUPERVISOR));
+    }
+    // Sin gerente/supervisor en el departamento: permite verificación de superiores (Gerente de Operaciones si es operativo, RRHH, Director, Director General)
+    const isOperational = isOperationalDepartment(dept);
+    return verifiers.some((v) =>
+      v?.role === Role.RRHH ||
+      v?.role === Role.DIRECTOR ||
+      v?.role === Role.DIRECTOR_GENERAL ||
+      (isOperational && v?.role === Role.GERENTE_OPERACIONES)
+    );
+  });
   const yaVerifico = currentUserId && (incidencia.verifiedByList || []).includes(currentUserId);
   
   const canConfirm = currentUser && (currentUser.role === Role.GERENTE_DEPARTAMENTO || currentUser.role === Role.SUPERVISOR || currentUser.role === Role.GERENTE_OPERACIONES || currentUser.role === Role.RRHH || currentUser.role === Role.DIRECTOR || currentUser.role === Role.DIRECTOR_GENERAL);
@@ -1763,25 +1896,34 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
 
 
                 {(incidencia.verifiedByList || []).length > 0 ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
                     <span className="text-[#86868B]">Verificada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">
-                      {incidencia.verifiedByList.map((vId) => {
-                        const vUser = firestoreUsers.find((u) => u.id === vId || u.email === vId);
-                        const vEntry = (incidencia.history || []).find((h) => h.action === "Incidencia verificada" && (h.performedBy === vId || h.performedBy === vUser?.email));
-                        return (getUserName(vId)) + (vEntry?.performedAt ? " • " + formatHistoryDateTime(vEntry.performedAt) : "");
-                      }).join(", ")}
-                    </span>
+                    {incidencia.verifiedByList.map((vId) => {
+                      const vUser = firestoreUsers.find((u) => u.id === vId || u.email === vId);
+                      const vEntry = (incidencia.history || []).find((h) => h.action === "Incidencia verificada" && (h.performedBy === vId || h.performedBy === vUser?.email));
+                      return (
+                        <span key={vId} className="inline-flex items-center gap-1 text-[#1D1D1F] font-medium">
+                          <UserAvatar name={vUser?.name || getUserName(vId)} photoUrl={vUser?.photoURL || vUser?.avatar} size="xs" />
+                          {vUser?.name || getUserName(vId)}{vEntry?.performedAt ? " • " + formatHistoryDateTime(vEntry.performedAt) : ""}
+                        </span>
+                      );
+                    })}
                   </div>
                 ) : incidencia.confirmedBy ? (
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
-                    <span className="text-[#86868B]">Verificada por:</span>
-                    <span className="text-[#1D1D1F] font-medium">
-                      {getUserName(incidencia.confirmedBy)}{incidencia.confirmedAt ? " • " + formatHistoryDateTime(incidencia.confirmedAt) : ""}
-                    </span>
-                  </div>
+                  (() => {
+                    const cUser = firestoreUsers.find((u) => u.id === incidencia.confirmedBy || u.email === incidencia.confirmedBy);
+                    return (
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3 h-3 text-[#5856D6]" />
+                        <span className="text-[#86868B]">Verificada por:</span>
+                        <span className="inline-flex items-center gap-1 text-[#1D1D1F] font-medium">
+                          <UserAvatar name={cUser?.name || getUserName(incidencia.confirmedBy)} photoUrl={cUser?.photoURL || cUser?.avatar} size="xs" />
+                          {cUser?.name || getUserName(incidencia.confirmedBy)}{incidencia.confirmedAt ? " • " + formatHistoryDateTime(incidencia.confirmedAt) : ""}
+                        </span>
+                      </div>
+                    );
+                  })()
                 ) : null}
                 <div className="flex items-center gap-1.5">
                   <LayoutGrid className="w-3 h-3 text-[#86868B]" />
@@ -1841,9 +1983,12 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                 return null;
               })()}
               <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="text-[#1D1D1F] font-medium">{reporter?.name || getUserName(incidencia.reportedBy)}</span></div>
+                <div className="flex items-center gap-2"><UserCircle className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Reportado por:</span><span className="inline-flex items-center gap-1.5 text-[#1D1D1F] font-medium"><UserAvatar name={reporter?.name || getUserName(incidencia.reportedBy)} photoUrl={reporter?.photoURL || reporter?.avatar} size="xs" />{reporter?.name || getUserName(incidencia.reportedBy)}</span></div>
                 <div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-[#86868B]" /><span className="text-[#86868B]">Departamento:</span><span className="text-[#1D1D1F] font-medium">{getDeptName(incidencia.targetDepartment)}</span></div>
-                {incidencia.confirmedBy && (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="text-[#1D1D1F] font-medium">{getUserName(incidencia.confirmedBy)}</span></div>)}
+                {incidencia.confirmedBy && (() => {
+                  const cUser = firestoreUsers.find((u) => u.id === incidencia.confirmedBy || u.email === incidencia.confirmedBy);
+                  return (<div className="flex items-center gap-2"><CheckSquare className="w-4 h-4 text-[#5856D6]" /><span className="text-[#86868B]">Verificado por:</span><span className="inline-flex items-center gap-1.5 text-[#1D1D1F] font-medium"><UserAvatar name={cUser?.name || getUserName(incidencia.confirmedBy)} photoUrl={cUser?.photoURL || cUser?.avatar} size="xs" />{cUser?.name || getUserName(incidencia.confirmedBy)}</span></div>);
+                })()}
 
 
 
@@ -1856,10 +2001,11 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(incidencia.viewers || []).map((viewerObj) => {
-                      const viewerName = getUserName(viewerObj.userId);
+                      const viewer = firestoreUsers.find((u) => u.id === viewerObj.userId || u.email === viewerObj.userId);
+                      const viewerName = viewer?.name || getUserName(viewerObj.userId);
                       return viewerName !== viewerObj.userId ? (
-                        <span key={viewerObj.userId} className="inline-flex items-center gap-1 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
-                          <span className="w-2 h-2 rounded-full bg-green-500"></span>{viewerName} <span className="text-[#86868B] text-[10px]">({new Date(viewerObj.viewedAt).toLocaleDateString()})</span>
+                        <span key={viewerObj.userId} className="inline-flex items-center gap-1.5 px-2 py-1 bg-[#F5F5F7] rounded-full text-xs">
+                          <UserAvatar name={viewerName} photoUrl={viewer?.photoURL || viewer?.avatar} size="xs" />{viewerName} <span className="text-[#86868B] text-[10px]">({new Date(viewerObj.viewedAt).toLocaleDateString()})</span>
                         </span>
                       ) : null;
                     })}
@@ -1872,21 +2018,27 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                     <ImageIcon className="w-4 h-4 text-[#86868B]" />
                     <h5 className="text-sm font-medium text-[#1D1D1F]">Fotos ({incidencia.photos.length})</h5>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {incidencia.photos.map((photo) => (
-                      <div key={photo.url} className="relative group aspect-square rounded-lg overflow-hidden border border-[#E5E5E7] bg-[#F5F5F7]">
-                        <img src={photo.url} alt="Foto" className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => setMaximizedPhoto(photo.url)} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                        <div className="absolute inset-x-0 bottom-0 bg-black/60 px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <p className="text-[8px] text-white truncate">{getUserName(photo.uploadedBy)}</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {incidencia.photos.map((photo) => {
+                      const uploader = firestoreUsers.find((u) => u.id === photo.uploadedBy || u.email === photo.uploadedBy);
+                      return (
+                        <div key={photo.url} className="space-y-1">
+                          <div className="relative group aspect-square rounded-lg overflow-hidden border border-[#E5E5E7] bg-[#F5F5F7]">
+                            <img src={photo.url} alt="Foto" className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform" onClick={() => setMaximizedPhoto(photo.url)} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <UserAvatar name={uploader?.name || getUserName(photo.uploadedBy)} photoUrl={uploader?.photoURL || uploader?.avatar} size="xs" />
+                            <p className="text-[10px] text-[#86868B] truncate">{uploader?.name || getUserName(photo.uploadedBy)}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = firestoreUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || getUserName(note.createdBy)}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<div className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button size="sm" onClick={() => { if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} disabled={!newNote.trim()}>Guardar</Button><Button size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></div>)}</>)}</div>
+              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || getUserName(note.createdBy)}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<form onSubmit={(e) => { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } }} className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (newNote.trim() && currentUserId) { onAddNote?.(incidencia.id, newNote, currentUserId); setNewNote(''); setShowNoteInput(false); } } }} /><Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button><Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></form>)}</>)}</div>
             </div>
               
               <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">
