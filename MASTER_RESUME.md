@@ -328,16 +328,34 @@ Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos d
 
 ## FASE 7.4: Pulido residual en Tasks, Horarios y UI general
 
-**Estado:** PENDIENTE
+**Estado:** EN PROGRESO
 
 ### Objetivo
 Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de los rediseños, y ajustes generales de usabilidad que no correspondan a una fase posterior.
 
-### Contenido tentativo
+### Progreso
+- **Selector de minutos en Tarea Específica**: ahora permite seleccionar minutos de **00 a 59 de uno en uno** (`startMinuteOptions = Array.from({ length: 60 }, (_, i) => i)`).
+- **Generación de tareas específicas al publicar asignaciones**:
+  - Se detectó que `useFirestoreShifts.ts` usaba consultas compuestas (`templateId + dueDate + source`, `shiftIds array-contains + dueDate + status`, etc.) que fallaban silenciosamente por falta de índices en Firestore.
+  - Se simplificaron las consultas a **una sola condición** y se filtra el resto en memoria:
+    - `specificTaskTemplates`: solo `where('isActive', '==', true)`; filtro por `shiftId` en memoria.
+    - `tasks` en `generateSpecificTasksFromAssignments`: solo `where('templateId', '==', template.id)`; filtro por `dueDate` y `source` en memoria; se usa `existingDoc` filtrado en lugar de `existingSnapshot.docs[0]`.
+    - `tasks` en `cleanupSpecificTasksForRemovedAssignment`: solo `where('shiftIds', 'array-contains', assignment.shiftId)`; filtro por `dueDate`, `status` y `source` en memoria.
+  - Se simplificaron `updateTemplate` y `deleteTemplate` en `useSpecificTaskTemplates.ts`: solo `where('templateId', '==', id)` y filtro de estado/dueDate en memoria.
+  - Se agregaron **índices de respaldo** en `firestore.indexes.json` para `tasks` (templateId + status + dueDate; shiftIds + dueDate + status).
+- **Build**: `npm run build` pasa limpio sin errores de TypeScript.
+- **Commit local**: se hizo commit en `fix-horarios-provider` con los cambios de tareas específicas y ajustes de UI.
+
+### Pendiente en esta fase
+- Verificar que las tareas específicas ahora sí se generan/reflejan en Tasks cuando se publican asignaciones.
+- Validar fallback de supervisor → gerente de departamento cuando no hay supervisor disponible.
+- Validar requisitos para completar tarea específica (subtareas/foto).
+
+### Contenido tentativo adicional
 - Ajustes de espaciado, alineación y comportamiento de dropdowns en móvil.
 - Correcciones de labels, tooltips o textos confusos.
 - Optimizaciones de carga de fotos/avatares.
-- Cualquier fix pequeño que surja durante las pruebas de la 7.3.
+- Cualquier fix pequeño que surja durante las pruebas.
 
 ---
 
