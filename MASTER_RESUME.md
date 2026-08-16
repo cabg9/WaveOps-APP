@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-15 (FAB global con Feedback + reorganización de filtros en TasksModule; deployado)
+> Última actualización: 2026-08-15 (Tasks: fix buscador duplicado + abreviatura Mi Depto en móvil; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -221,6 +221,7 @@
     - **Móvil**: los tres dropdowns (pestañas principales, filtro de tiempo, filtro de estado) se muestran en una sola fila.
     - **Desktop**: tres filas separadas — primera fila pestañas principales + filtro de tiempo a la derecha; segunda fila filtros de estado; tercera fila buscador + toggle de vista.
   - **Botones de creación reemplazados por FAB global**: se eliminaron los botones "Tarea Extra", "Tarea Específica" e "Incidencia" del header de Tasks.
+  - **Fixes posteriores**: se eliminó el buscador duplicado que quedó tras el refactor y "Mi Departamento" se abrevió a "Mi Depto" en el dropdown de pestañas de móvil.
 - **FAB global (`GlobalFAB`)**:
   - Botón flotante fijo en la esquina inferior derecha, visible en toda la app.
   - Al presionar se despliega con animación mostrando cuatro acciones:
