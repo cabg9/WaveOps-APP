@@ -19,6 +19,7 @@ interface ShiftsContextType {
   removeShift: (assignmentId: string) => Promise<void>;
   restoreShift: (assignmentId: string) => Promise<void>;
   publishAssignments: (department: Department | 'ALL', weekStart: Date, publishedBy: string) => Promise<void>;
+  cleanupSpecificTasksForRemovedAssignment: (assignment: { id: string; shiftId: string; date: string; userId: string }) => Promise<void>;
   getBorradorCount: (department: Department | 'ALL', weekStart: Date) => number;
   getPendingChangesCount: (department: Department | 'ALL', weekStart: Date) => number;
   createShift: (shiftData: Omit<FirestoreShift, 'id'>) => Promise<string>;

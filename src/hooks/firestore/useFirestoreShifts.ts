@@ -13,10 +13,11 @@ import {
   query,
   orderBy,
   where,
+  getDocs,
   DocumentData,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { AssignmentStatus } from '@/types';
+import { AssignmentStatus, TaskStatus, TaskPriority } from '@/types';
 
 export interface FirestoreShift {
   id: string;
@@ -221,7 +222,8 @@ export function useFirestoreShifts() {
     }
   }, [assignments]);
 
-  // Publicar asignaciones: publica borradores y elimina definitivamente los marcados como ELIMINADO
+  // Publicar asignaciones: publica borradores, elimina definitivamente los marcados como ELIMINADO
+  // y genera tareas específicas vinculadas a los turnos publicados.
   const publishAssignments = useCallback(async (department: string | 'ALL', weekStart: Date, publishedBy: string): Promise<void> => {
     try {
       const weekAssignments = getWeekAssignments(department, weekStart);
@@ -240,11 +242,151 @@ export function useFirestoreShifts() {
       for (const assignment of eliminadoAssignments) {
         await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
       }
+
+      // Generar tareas específicas para las asignaciones publicadas
+      await generateSpecificTasksFromAssignments(borradorAssignments);
     } catch (err: any) {
       console.error('Error al publicar asignaciones:', err);
       throw err;
     }
   }, [getWeekAssignments]);
+
+  // Generar tareas específicas a partir de asignaciones publicadas
+  const generateSpecificTasksFromAssignments = useCallback(async (assignments: FirestoreAssignment[]): Promise<void> => {
+    if (assignments.length === 0) return;
+
+    const shiftIds = [...new Set(assignments.map(a => a.shiftId))];
+    if (shiftIds.length === 0) return;
+
+    try {
+      // Consultar plantillas activas para los turnos publicados
+      // Firestore permite máximo 10 elementos en 'in', pero en una semana no debería haber tantos turnos distintos
+      const batches: string[][] = [];
+      for (let i = 0; i < shiftIds.length; i += 10) {
+        batches.push(shiftIds.slice(i, i + 10));
+      }
+
+      const templates: any[] = [];
+      for (const batch of batches) {
+        const q = query(
+          collection(db, 'specificTaskTemplates'),
+          where('shiftId', 'in', batch),
+          where('isActive', '==', true)
+        );
+        const snapshot = await getDocs(q);
+        templates.push(...snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      }
+
+      if (templates.length === 0) return;
+
+      const now = new Date().toISOString();
+      const today = now.split('T')[0];
+
+      for (const template of templates) {
+        const templateAssignments = assignments.filter(a => a.shiftId === template.shiftId);
+        if (templateAssignments.length === 0) continue;
+
+        // Agrupar asignaciones del mismo turno por fecha
+        const byDate = new Map<string, FirestoreAssignment[]>();
+        for (const assignment of templateAssignments) {
+          if (!byDate.has(assignment.date)) byDate.set(assignment.date, []);
+          byDate.get(assignment.date)!.push(assignment);
+        }
+
+        for (const [date, dateAssignments] of byDate.entries()) {
+          // Verificar vigencia de la plantilla
+          if (!isTemplateWithinVigency(template, date)) continue;
+
+          const assignedTo = [...new Set(dateAssignments.map(a => a.userId))];
+
+          // Evitar duplicados: buscar si ya existe una tarea para este template + fecha
+          const existingQuery = query(
+            collection(db, 'tasks'),
+            where('templateId', '==', template.id),
+            where('dueDate', '==', date),
+            where('source', '==', 'specific-task-template')
+          );
+          const existingSnapshot = await getDocs(existingQuery);
+
+          if (existingSnapshot.empty) {
+            // Crear nueva tarea compartida
+            await addDoc(collection(db, 'tasks'), {
+              title: template.title || '',
+              description: template.description || '',
+              type: 'SPECIFIC',
+              status: TaskStatus.PENDING,
+              priority: template.priority || TaskPriority.MEDIUM,
+              assignedTo,
+              supervisorId: template.supervisorId || '',
+              notifyOnDelay: template.notifyOnDelay || [],
+              department: template.department || '',
+              dueDate: date,
+              startTime: template.startTime || '',
+              dueTime: calculateDueTime(template.startTime || '00:00', template.estimatedMinutes || 0),
+              estimatedMinutes: template.estimatedMinutes || 0,
+              requiresPhoto: template.requiresPhoto || false,
+              shiftIds: [template.shiftId],
+              templateId: template.id,
+              source: 'specific-task-template',
+              createdBy: template.createdBy || '',
+              createdAt: now,
+              updatedAt: now,
+              history: [
+                {
+                  date: now,
+                  action: 'Tarea creada automáticamente desde asignación de turno',
+                  userId: template.createdBy || '',
+                }
+              ],
+            });
+          } else {
+            // Actualizar asignados de la tarea existente agregando los nuevos usuarios
+            const existingDoc = existingSnapshot.docs[0];
+            const existingData = existingDoc.data();
+            const currentAssignedTo = existingData.assignedTo || [];
+            const newAssignedTo = [...new Set([...currentAssignedTo, ...assignedTo])];
+            if (newAssignedTo.length !== currentAssignedTo.length) {
+              await updateDoc(existingDoc.ref, {
+                assignedTo: newAssignedTo,
+                updatedAt: now,
+              });
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error('Error al generar tareas específicas:', err);
+      // No lanzamos el error para no bloquear la publicación de asignaciones
+    }
+  }, []);
+
+  // Eliminar tareas específicas pendientes asociadas a una asignación eliminada
+  const cleanupSpecificTasksForRemovedAssignment = useCallback(async (assignment: FirestoreAssignment): Promise<void> => {
+    try {
+      if (!assignment.shiftId || !assignment.date || !assignment.userId) return;
+
+      const q = query(
+        collection(db, 'tasks'),
+        where('templateId', '!=', null),
+        where('shiftIds', 'array-contains', assignment.shiftId),
+        where('dueDate', '==', assignment.date),
+        where('status', '==', TaskStatus.PENDING)
+      );
+      const snapshot = await getDocs(q);
+
+      for (const taskDoc of snapshot.docs) {
+        const taskData = taskDoc.data();
+        const assignedTo = (taskData.assignedTo || []).filter((id: string) => id !== assignment.userId);
+        if (assignedTo.length === 0) {
+          await deleteDoc(taskDoc.ref);
+        } else {
+          await updateDoc(taskDoc.ref, { assignedTo, updatedAt: new Date().toISOString() });
+        }
+      }
+    } catch (err: any) {
+      console.error('Error al limpiar tareas específicas:', err);
+    }
+  }, []);
 
   // Contar borradores
   const getBorradorCount = useCallback((department: string | 'ALL', weekStart: Date): number => {
@@ -307,10 +449,31 @@ export function useFirestoreShifts() {
     removeShift,
     restoreShift,
     publishAssignments,
+    cleanupSpecificTasksForRemovedAssignment,
     getBorradorCount,
     getPendingChangesCount,
     createShift,
     updateShift,
     deleteShift,
   };
+}
+
+// Helper: calcular hora límite a partir de hora de inicio + minutos estimados
+function calculateDueTime(startTime: string, estimatedMinutes: number): string {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes + estimatedMinutes, 0, 0);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+// Helper: verificar si una fecha está dentro de la vigencia de una plantilla
+function isTemplateWithinVigency(template: any, dateStr: string): boolean {
+  if (template.vigenciaDays === null || template.vigenciaDays === undefined || template.vigenciaDays <= 0) {
+    return true; // Indefinido
+  }
+  const createdAt = template.createdAt?.toDate ? template.createdAt.toDate() : new Date(template.createdAt);
+  const targetDate = new Date(dateStr + 'T00:00:00');
+  const diffTime = targetDate.getTime() - createdAt.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays <= template.vigenciaDays;
 }

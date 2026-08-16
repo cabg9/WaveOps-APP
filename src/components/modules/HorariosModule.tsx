@@ -3744,6 +3744,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     getPendingChangesCount,
     removeShift,
     restoreShift,
+    cleanupSpecificTasksForRemovedAssignment,
     shifts,
   } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
@@ -4190,6 +4191,14 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                           if (assignment.status === AssignmentStatus.ELIMINADO) {
                                             restoreShift(assignment.id);
                                           } else {
+                                            if (assignment.status === AssignmentStatus.PUBLICADO) {
+                                              cleanupSpecificTasksForRemovedAssignment({
+                                                id: assignment.id,
+                                                shiftId: assignment.shiftId,
+                                                date: assignment.date,
+                                                userId: assignment.userId,
+                                              });
+                                            }
                                             removeShift(assignment.id);
                                           }
                                         }}

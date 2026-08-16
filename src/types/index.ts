@@ -81,6 +81,17 @@ export enum TaskRecurrence {
   YEARLY = 'YEARLY',
 }
 
+export enum TaskVigencia {
+  DAYS_30 = 30,
+  WEEKS_8 = 56,
+  WEEKS_12 = 84,
+  MONTHS_6 = 183,
+  YEAR_1 = 365,
+  YEAR_1_5 = 548,
+  YEARS_2 = 730,
+  INDEFINIDO = 0,
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // INTERFACES
 // ═══════════════════════════════════════════════════════════════════
@@ -184,6 +195,27 @@ export interface Task {
   shiftIds?: string[]; // IDs de turnos asignados
   supportUserIds?: string[]; // IDs de usuarios de apoyo
   recurrence?: TaskRecurrence; // Periodicidad para tareas específicas
+  templateId?: string; // ID de la plantilla de tarea específica
+  source?: 'specific-task-template' | 'manual'; // Origen de la tarea
+  notifyOnDelay?: string[]; // IDs de usuarios que reciben alertas de atraso (RRHH, Gerente de Operaciones)
+}
+
+export interface SpecificTaskTemplate {
+  id: string;
+  title: string;
+  description: string;
+  department: string;
+  shiftId: string;
+  startTime: string; // HH:MM
+  estimatedMinutes: number;
+  priority: TaskPriority;
+  supervisorId: string;
+  notifyOnDelay: string[]; // RRHH y Gerente de Operaciones
+  requiresPhoto: boolean;
+  vigenciaDays: number | null; // null = indefinido
+  createdBy: string;
+  createdAt: string;
+  isActive: boolean;
 }
 
 export interface Incidencia {

@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useTasks } from '@/hooks/useTasks';
 import {
   Task, TaskStatus, TaskPriority, TaskType, TimeFilter,
-  IncidenciaStatus, Role, Incidencia, TaskRecurrence,
+  IncidenciaStatus, Role, Incidencia, TaskRecurrence, TaskVigencia,
 } from '@/types';
 import {
   cn, getStatusColor, getPriorityColor, getPriorityLabel,
@@ -30,6 +30,7 @@ import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
+import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
   const getLocalDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
   const getLocalDateFromISO = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
@@ -41,6 +42,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
 import { users as staticUsers } from '@/data/users';
 
 
@@ -65,6 +67,7 @@ export default function TasksModule() {
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
+  const { templates: specificTaskTemplates, createTemplate, deleteTemplate } = useSpecificTaskTemplates();
 
   const [mainTab, setMainTab] = useState<MainTab>('my-tasks');
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
@@ -93,6 +96,18 @@ export default function TasksModule() {
   });
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
+  const [specificTaskForm, setSpecificTaskForm] = useState({
+    title: '',
+    description: '',
+    department: defaultDepartment,
+    shiftId: '',
+    startTime: '08:00',
+    estimatedMinutes: 60,
+    priority: TaskPriority.MEDIUM,
+    requiresPhoto: false,
+    vigenciaDays: TaskVigencia.INDEFINIDO,
+  });
+
   const { users: firestoreUsersForSupervisors } = useFirestoreUsers();
   const supervisorsByDepartment = useMemo(() => {
     const allUsers = firestoreUsersForSupervisors.length > 0 ? firestoreUsersForSupervisors : staticUsers;
@@ -117,6 +132,53 @@ export default function TasksModule() {
     }
   }, [taskForm.startDate, taskForm.startTime, taskForm.estimatedHours]);
 
+  // Supervisor automático para tarea específica: primero supervisor del dept, luego gerente del dept
+  const specificTaskSupervisor = useMemo(() => {
+    const deptUsers = users.filter((u) => u.department === specificTaskForm.department);
+    const supervisor = deptUsers.find((u) => u.role === Role.SUPERVISOR);
+    if (supervisor) return supervisor.id;
+    const gerente = deptUsers.find((u) => u.role === Role.GERENTE_DEPARTAMENTO);
+    if (gerente) return gerente.id;
+    return '';
+  }, [users, specificTaskForm.department]);
+
+  // Observadores de control para tarea específica: RRHH y Gerente de Operaciones
+  const specificTaskNotifyOnDelay = useMemo(() => {
+    return users
+      .filter((u) => u.role === Role.RRHH || u.role === Role.GERENTE_OPERACIONES)
+      .map((u) => u.id);
+  }, [users]);
+
+  // Turnos disponibles para el departamento seleccionado en tarea específica
+  const shiftsForSpecificTask = useMemo(() => {
+    return shifts.filter((s) => s.department === specificTaskForm.department && s.isActive !== false);
+  }, [shifts, specificTaskForm.department]);
+
+  // Hora límite calculada para tarea específica (solo informativa en el formulario)
+  const specificTaskDueTime = useMemo(() => {
+    try {
+      const [hours, minutes] = specificTaskForm.startTime.split(':').map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes + specificTaskForm.estimatedMinutes, 0, 0);
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    } catch (e) {
+      return specificTaskForm.startTime;
+    }
+  }, [specificTaskForm.startTime, specificTaskForm.estimatedMinutes]);
+
+  // Nombre y rol del supervisor automático para mostrar en el formulario
+  const specificTaskSupervisorName = useMemo(() => {
+    const s = users.find((u) => u.id === specificTaskSupervisor);
+    return s ? `${s.name} (${s.role.replace(/_/g, ' ')})` : '';
+  }, [users, specificTaskSupervisor]);
+
+  // Observadores de control (RRHH y Gerente de Operaciones) con nombre y rol
+  const specificTaskObservers = useMemo(() => {
+    return users
+      .filter((u) => specificTaskNotifyOnDelay.includes(u.id))
+      .map((u) => ({ name: u.name, role: u.role }));
+  }, [users, specificTaskNotifyOnDelay]);
+
   
   const { uploadImage } = useStorageUpload();
 
@@ -138,6 +200,17 @@ export default function TasksModule() {
       requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
     });
+    setSpecificTaskForm({
+      title: '',
+      description: '',
+      department: defaultDepartment,
+      shiftId: '',
+      startTime: '08:00',
+      estimatedMinutes: 60,
+      priority: TaskPriority.MEDIUM,
+      requiresPhoto: false,
+      vigenciaDays: TaskVigencia.INDEFINIDO,
+    });
     setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
   };
@@ -152,6 +225,39 @@ export default function TasksModule() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams]);
+
+  const handleSubmitSpecificTask = async () => {
+    if (!user?.id) return;
+    if (!specificTaskForm.title.trim() || !specificTaskForm.shiftId) {
+      toast.error('Completa el título y selecciona un turno');
+      return;
+    }
+    if (!specificTaskSupervisor) {
+      toast.error('No se encontró un supervisor o gerente para el departamento seleccionado');
+      return;
+    }
+    try {
+      await createTemplate({
+        title: specificTaskForm.title.trim(),
+        description: specificTaskForm.description.trim(),
+        department: specificTaskForm.department,
+        shiftId: specificTaskForm.shiftId,
+        startTime: specificTaskForm.startTime,
+        estimatedMinutes: specificTaskForm.estimatedMinutes,
+        priority: specificTaskForm.priority,
+        supervisorId: specificTaskSupervisor,
+        notifyOnDelay: specificTaskNotifyOnDelay,
+        requiresPhoto: specificTaskForm.requiresPhoto,
+        vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
+        createdBy: user.id,
+      });
+      toast.success('Tarea específica creada. Se generará automáticamente al asignar el turno.');
+      setIsCreateModalOpen(false);
+    } catch (err) {
+      console.error('Error al crear tarea específica:', err);
+      toast.error('Error al crear la tarea específica');
+    }
+  };
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
@@ -602,9 +708,22 @@ export default function TasksModule() {
                   <Button className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white" onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || defaultDepartment, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }} disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}>Reportar Incidencia</Button>
                 </div>
               </div>
-            ) : (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: createType === 'extra' ? (taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id]) : [], createdBy: user.id, status: TaskStatus.PENDING, type: createType === 'extra' ? TaskType.EXTRA : TaskType.SPECIFIC, supervisorId: taskForm.supervisor || (createType === 'extra' ? user.id : undefined), requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: createType === 'extra' ? taskForm.supportUsers : [], recurrence: createType === 'specific' ? taskForm.recurrence : undefined }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
-            )}
+            ) : createType === 'specific' ? (
+              <SpecificTaskForm
+                form={specificTaskForm}
+                setForm={setSpecificTaskForm}
+                departments={allDepartments}
+                shifts={shiftsForSpecificTask}
+                supervisorName={specificTaskSupervisorName}
+                observers={specificTaskObservers}
+                dueTime={specificTaskDueTime}
+                onCancel={() => setIsCreateModalOpen(false)}
+                onSubmit={handleSubmitSpecificTask}
+                disabled={false}
+              />
+            ) : createType === 'extra' ? (
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
+            ) : null}
             </div>
           </DialogContent>
         </Dialog>
@@ -622,6 +741,251 @@ export default function TasksModule() {
   );
 }
 
+
+function SpecificTaskForm({
+  form,
+  setForm,
+  departments,
+  shifts,
+  supervisorName,
+  observers,
+  dueTime,
+  onCancel,
+  onSubmit,
+  disabled,
+}: {
+  form: {
+    title: string;
+    description: string;
+    department: string;
+    shiftId: string;
+    startTime: string;
+    estimatedMinutes: number;
+    priority: TaskPriority;
+    requiresPhoto: boolean;
+    vigenciaDays: TaskVigencia;
+  };
+  setForm: React.Dispatch<React.SetStateAction<typeof form>>;
+  departments: { code: string; name: string }[];
+  shifts: { id: string; name: string; startTime: string; endTime: string; department: string }[];
+  supervisorName: string;
+  observers: { name: string; role: string }[];
+  dueTime: string;
+  onCancel: () => void;
+  onSubmit: () => void;
+  disabled?: boolean;
+}) {
+  const vigenciaOptions = [
+    { value: TaskVigencia.DAYS_30, label: '30 días' },
+    { value: TaskVigencia.WEEKS_8, label: '8 semanas' },
+    { value: TaskVigencia.WEEKS_12, label: '12 semanas' },
+    { value: TaskVigencia.MONTHS_6, label: '6 meses' },
+    { value: TaskVigencia.YEAR_1, label: '1 año' },
+    { value: TaskVigencia.YEAR_1_5, label: '1 año y medio' },
+    { value: TaskVigencia.YEARS_2, label: '2 años' },
+    { value: TaskVigencia.INDEFINIDO, label: 'Indefinido' },
+  ];
+
+  const priorityOptions = [
+    { value: TaskPriority.CRITICAL, label: 'Crítica', color: '#FF3B30' },
+    { value: TaskPriority.HIGH, label: 'Alta', color: '#FF9500' },
+    { value: TaskPriority.MEDIUM, label: 'Media', color: '#007AFF' },
+    { value: TaskPriority.LOW, label: 'Baja', color: '#8E8E93' },
+  ];
+
+  return (
+    <div className="space-y-5 py-4">
+      {/* Título */}
+      <div className="space-y-2">
+        <Label>Título *</Label>
+        <Input
+          placeholder="Ej: Checklist de apertura Dive Shop"
+          value={form.title}
+          onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
+        />
+      </div>
+
+      {/* Descripción */}
+      <div className="space-y-2">
+        <Label>Descripción</Label>
+        <Textarea
+          placeholder="Describe lo que debe cumplirse..."
+          value={form.description}
+          onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+          rows={3}
+        />
+      </div>
+
+      {/* Departamento */}
+      <div className="space-y-2">
+        <Label>Departamento *</Label>
+        <div className="flex flex-wrap gap-2">
+          {departments.map((dept) => (
+            <button
+              key={dept.code}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, department: dept.code, shiftId: '' }))}
+              className={cn(
+                'px-3 py-2 rounded-xl text-sm font-medium transition-all border',
+                form.department === dept.code
+                  ? 'border-corporate text-corporate bg-corporate/5'
+                  : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]'
+              )}
+            >
+              {dept.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Turno */}
+      <div className="space-y-2">
+        <Label>Turno *</Label>
+        {shifts.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {shifts.map((shift) => (
+              <button
+                key={shift.id}
+                type="button"
+                onClick={() => setForm((prev) => ({ ...prev, shiftId: shift.id }))}
+                className={cn(
+                  'px-3 py-2.5 rounded-xl text-sm text-left border transition-all',
+                  form.shiftId === shift.id
+                    ? 'border-corporate bg-corporate/5 text-corporate'
+                    : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                )}
+              >
+                <span className="font-medium">{shift.name}</span>
+                <span className="text-xs text-[#86868B] block">{shift.startTime} - {shift.endTime}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-[#86868B]">No hay turnos para este departamento.</p>
+        )}
+      </div>
+
+      {/* Hora de inicio + tiempo estimado */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Hora de inicio *</Label>
+          <Input
+            type="time"
+            value={form.startTime}
+            onChange={(e) => setForm((prev) => ({ ...prev, startTime: e.target.value }))}
+            className="h-10"
+          />
+          <p className="text-xs text-[#86868B]">Formato 24 horas</p>
+        </div>
+        <div className="space-y-2">
+          <Label>Tiempo estimado (min) *</Label>
+          <Input
+            type="number"
+            min={1}
+            value={form.estimatedMinutes}
+            onChange={(e) => setForm((prev) => ({ ...prev, estimatedMinutes: parseInt(e.target.value) || 0 }))}
+            className="h-10"
+          />
+        </div>
+      </div>
+
+      {/* Fecha límite calculada */}
+      <div className="bg-[#F5F5F7] rounded-xl p-3 flex items-center justify-between">
+        <span className="text-sm text-[#86868B]">Hora límite calculada:</span>
+        <span className="text-sm font-medium text-[#1D1D1F]">{dueTime}</span>
+      </div>
+
+      {/* Prioridad */}
+      <div className="space-y-2">
+        <Label>Prioridad *</Label>
+        <div className="flex gap-2 flex-wrap">
+          {priorityOptions.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, priority: p.value }))}
+              className={cn(
+                'flex-1 min-w-[80px] py-2 rounded-lg text-sm font-medium transition-all border',
+                form.priority === p.value
+                  ? 'text-white border-transparent'
+                  : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+              )}
+              style={form.priority === p.value ? { backgroundColor: p.color } : undefined}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Supervisor automático */}
+      <div className="bg-[#F5F5F7] rounded-xl p-3 space-y-1">
+        <span className="text-xs text-[#86868B]">Supervisor asignado automáticamente</span>
+        <p className="text-sm font-medium text-[#1D1D1F]">{supervisorName || 'No se encontró supervisor'}</p>
+      </div>
+
+      {/* Observadores de control */}
+      {observers.length > 0 && (
+        <div className="bg-[#F5F5F7] rounded-xl p-3 space-y-1">
+          <span className="text-xs text-[#86868B]">Recibirán alertas de atraso / incumplimiento</span>
+          <div className="flex flex-wrap gap-2">
+            {observers.map((obs, idx) => (
+              <span key={idx} className="text-sm text-[#1D1D1F]">{obs.name} <span className="text-[#86868B]">({obs.role.replace(/_/g, ' ')})</span></span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vigencia */}
+      <div className="space-y-2">
+        <Label>Vigencia *</Label>
+        <div className="flex flex-wrap gap-2">
+          {vigenciaOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setForm((prev) => ({ ...prev, vigenciaDays: opt.value }))}
+              className={cn(
+                'px-3 py-2 rounded-xl text-sm font-medium transition-all border',
+                form.vigenciaDays === opt.value
+                  ? 'border-corporate text-corporate bg-corporate/5'
+                  : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]'
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Requiere foto */}
+      <div className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+        <input
+          id="requires-photo-specific"
+          type="checkbox"
+          checked={form.requiresPhoto}
+          onChange={(e) => setForm((prev) => ({ ...prev, requiresPhoto: e.target.checked }))}
+          className="w-4 h-4 rounded border-[#E5E5E7] text-corporate focus:ring-corporate"
+        />
+        <Label htmlFor="requires-photo-specific" className="text-sm font-medium text-[#1D1D1F] mb-0 cursor-pointer">
+          Requiere foto para completar
+        </Label>
+      </div>
+
+      {/* Botones */}
+      <div className="flex justify-end gap-3 pt-2">
+        <Button variant="outline" onClick={onCancel}>Cancelar</Button>
+        <Button
+          className="bg-corporate hover:bg-corporate/90 text-white"
+          onClick={onSubmit}
+          disabled={disabled || !form.title.trim() || !form.shiftId}
+        >
+          Crear tarea específica
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 interface TaskFormModalProps {
   createType: 'extra' | 'specific';

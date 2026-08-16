@@ -132,6 +132,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       shiftsHook.publishAssignments(department, weekStart, publishedBy);
     },
 
+    cleanupSpecificTasksForRemovedAssignment: (assignment: { id: string; shiftId: string; date: string; userId: string }) => {
+      shiftsHook.cleanupSpecificTasksForRemovedAssignment(assignment as any);
+    },
+
     getBorradorCount: (department: string | 'ALL', weekStart: Date) => {
       return shiftsHook.getBorradorCount(department, weekStart);
     },

@@ -40,6 +40,9 @@ export interface FirestoreTask {
   shiftIds?: string[];
   supportUserIds?: string[];
   recurrence?: string;
+  templateId?: string;
+  source?: 'specific-task-template' | 'manual';
+  notifyOnDelay?: string[];
   updatedAt?: string;
   notes?: Note[];
   subtasks?: Subtask[];
