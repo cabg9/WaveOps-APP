@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { UserAvatar } from '@/components/UserAvatar';
+import { GlobalFAB } from '@/components/GlobalFAB';
 import {
   Sheet,
   SheetContent,
@@ -394,6 +395,9 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
       onMarkAllAsRead={markAllAsRead}
       onDelete={deleteNotification}
     />
+
+    {/* Botón flotante global */}
+    <GlobalFAB />
     </>
   );
 }

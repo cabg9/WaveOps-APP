@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Plus, Target, AlertCircle, User, Users, LayoutGrid, AlertTriangle,
   Search, List, LayoutTemplate, Calendar, CheckCircle2, Camera,
@@ -73,6 +74,8 @@ export default function TasksModule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
+
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
@@ -138,6 +141,17 @@ export default function TasksModule() {
     setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
     setIsCreateModalOpen(true);
   };
+
+  // Abrir modal de creación desde query param (FAB global)
+  useEffect(() => {
+    const create = searchParams.get('create');
+    if (create === 'extra' || create === 'specific' || create === 'incidencia') {
+      handleOpenModal(create);
+      const next = new URLSearchParams(searchParams);
+      next.delete('create');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams]);
 
   const tasksByTabAndTime = useMemo(() => {
     let result = [...tasks];
@@ -299,31 +313,16 @@ export default function TasksModule() {
   return (
     <Layout title="Tasks" showDate={true}>
       <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-semibold text-[#1D1D1F]">Tasks</h2>
             <p className="text-sm text-[#86868B]">Gestiona tareas e incidencias</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {hasPermission('canCreateExtraTask') && (
-              <Button onClick={() => handleOpenModal('extra')} variant="outline" className="border-amber-500 text-amber-500 hover:bg-amber-50 rounded-lg gap-2">
-                <Plus className="w-4 h-4" />Tarea Extra
-              </Button>
-            )}
-            {/* Solo DIRECTOR_GENERAL puede crear tareas específicas */}
-            {user?.role === Role.DIRECTOR_GENERAL && (
-              <Button onClick={() => handleOpenModal('specific')} variant="outline" className="rounded-lg gap-2 border-corporate text-corporate hover:bg-corporate/5">
-                <Target className="w-4 h-4" />Tarea Específica
-              </Button>
-            )}
-            <Button onClick={() => handleOpenModal('incidencia')} variant="outline" className="rounded-lg gap-2 border-[#FF3B30] text-[#FF3B30] hover:bg-[#FF3B30]/5">
-              <AlertCircle className="w-4 h-4" />Incidencia
-            </Button>
-          </div>
         </div>
 
-        {/* Mobile: dropdown de pestaña */}
-        <div className="md:hidden">
+        {/* MÓVIL: tres dropdowns en una sola fila */}
+        <div className="md:hidden flex items-center gap-2">
           <Select value={mainTab} onValueChange={(v) => {
             const tab = v as MainTab;
             setMainTab(tab);
@@ -331,8 +330,8 @@ export default function TasksModule() {
             else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
             else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
           }}>
-            <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-              <SelectValue placeholder="Seleccionar vista" />
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+              <SelectValue placeholder="Vista" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="my-tasks">Mis Tareas</SelectItem>
@@ -341,34 +340,7 @@ export default function TasksModule() {
               <SelectItem value="incidencias">Incidencias</SelectItem>
             </SelectContent>
           </Select>
-        </div>
 
-        {/* Desktop: pestañas como botones */}
-        <div className="hidden md:flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
-          <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
-          <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
-          {hasPermission('canViewAllDepartments') && (
-            <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
-          )}
-          <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
-          <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
-        </div>
-
-        {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-[#86868B]">Departamento:</span>
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="w-[200px] h-9 rounded-lg border-[#E5E5E7]"><SelectValue placeholder="Seleccionar departamento" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* Mobile: dropdown tiempo */}
-        <div className="md:hidden">
           <Select value={timeFilter} onValueChange={(v) => {
             const tf = v as TimeFilter;
             setTimeFilter(tf);
@@ -378,7 +350,7 @@ export default function TasksModule() {
               if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
             }
           }}>
-            <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
               <SelectValue placeholder="Periodo" />
             </SelectTrigger>
             <SelectContent>
@@ -399,83 +371,102 @@ export default function TasksModule() {
               )}
             </SelectContent>
           </Select>
+
+          <Select value={String(statusFilter)} onValueChange={(v) => {
+            if (!isIncidenciasTab) {
+              if (v === 'all') setStatusFilter('all');
+              else setStatusFilter(v as TaskStatus);
+            } else {
+              if (v === 'all') setStatusFilter('all');
+              else setStatusFilter(v as IncidenciaStatus);
+            }
+          }}>
+            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] flex-1 min-w-0">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {!isIncidenciasTab ? (
+                <>
+                  <SelectItem value="all">Todas ({filteredTaskCounts.total})</SelectItem>
+                  <SelectItem value={TaskStatus.PENDING}>Pendientes ({filteredTaskCounts.pending})</SelectItem>
+                  <SelectItem value={TaskStatus.IN_PROGRESS}>En Progreso ({filteredTaskCounts.inProgress})</SelectItem>
+                  {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                    <>
+                      <SelectItem value={TaskStatus.COMPLETED}>Completadas ({filteredTaskCounts.completed})</SelectItem>
+                      <SelectItem value={TaskStatus.VERIFIED}>Verificadas ({filteredTaskCounts.verified})</SelectItem>
+                    </>
+                  )}
+                  <SelectItem value={TaskStatus.BLOCKED}>Bloqueadas ({filteredTaskCounts.blocked})</SelectItem>
+                  {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                    <SelectItem value={TaskStatus.OVERDUE}>Atrasadas ({filteredTaskCounts.overdue})</SelectItem>
+                  )}
+                </>
+              ) : (
+                <>
+                  <SelectItem value="all">Todas ({incidenciaCounts.total})</SelectItem>
+                  {timeFilter === TimeFilter.TODAY && <SelectItem value={IncidenciaStatus.NEW}>Nuevas ({incidenciaCounts.new})</SelectItem>}
+                  <SelectItem value={IncidenciaStatus.OPEN}>Visualizadas ({incidenciaCounts.open})</SelectItem>
+                  <SelectItem value={IncidenciaStatus.VERIFIED}>Verificadas ({incidenciaCounts.verified})</SelectItem>
+                  <SelectItem value={IncidenciaStatus.RESOLVED}>Resueltas ({incidenciaCounts.resolved})</SelectItem>
+                  <SelectItem value={IncidenciaStatus.CLOSED}>Cerradas ({incidenciaCounts.closed})</SelectItem>
+                  <SelectItem value={IncidenciaStatus.REOPENED}>Reabiertas ({incidenciaCounts.reopened})</SelectItem>
+                </>
+              )}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Desktop: botones tiempo */}
-        {!isIncidenciasTab && (
-          <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
-            {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
-            ))}
-          </div>
-        )}
+        {/* DESKTOP: tres filas */}
+        <div className="hidden md:block space-y-3">
+          {/* Fila 1: pestañas + tiempo */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
+              <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
+              <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
+              {hasPermission('canViewAllDepartments') && (
+                <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
+              )}
+              <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
+              <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
+            </div>
 
-        {isIncidenciasTab && (
-          <div className="hidden md:flex items-center gap-2 overflow-x-auto pb-1">
-            {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
-              <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
-            ))}
-            {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
-              <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-                <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0"><SelectValue placeholder="Departamento" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Mobile: dropdown estado */}
-          <div className="md:hidden">
-            <Select value={String(statusFilter)} onValueChange={(v) => {
-              if (!isIncidenciasTab) {
-                if (v === 'all') setStatusFilter('all');
-                else setStatusFilter(v as TaskStatus);
-              } else {
-                if (v === 'all') setStatusFilter('all');
-                else setStatusFilter(v as IncidenciaStatus);
-              }
-            }}>
-              <SelectTrigger className="h-10 px-4 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                {!isIncidenciasTab ? (
-                  <>
-                    <SelectItem value="all">Todas ({filteredTaskCounts.total})</SelectItem>
-                    <SelectItem value={TaskStatus.PENDING}>Pendientes ({filteredTaskCounts.pending})</SelectItem>
-                    <SelectItem value={TaskStatus.IN_PROGRESS}>En Progreso ({filteredTaskCounts.inProgress})</SelectItem>
-                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                      <>
-                        <SelectItem value={TaskStatus.COMPLETED}>Completadas ({filteredTaskCounts.completed})</SelectItem>
-                        <SelectItem value={TaskStatus.VERIFIED}>Verificadas ({filteredTaskCounts.verified})</SelectItem>
-                      </>
-                    )}
-                    <SelectItem value={TaskStatus.BLOCKED}>Bloqueadas ({filteredTaskCounts.blocked})</SelectItem>
-                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                      <SelectItem value={TaskStatus.OVERDUE}>Atrasadas ({filteredTaskCounts.overdue})</SelectItem>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <SelectItem value="all">Todas ({incidenciaCounts.total})</SelectItem>
-                    {timeFilter === TimeFilter.TODAY && <SelectItem value={IncidenciaStatus.NEW}>Nuevas ({incidenciaCounts.new})</SelectItem>}
-                    <SelectItem value={IncidenciaStatus.OPEN}>Visualizadas ({incidenciaCounts.open})</SelectItem>
-                    <SelectItem value={IncidenciaStatus.VERIFIED}>Verificadas ({incidenciaCounts.verified})</SelectItem>
-                    <SelectItem value={IncidenciaStatus.RESOLVED}>Resueltas ({incidenciaCounts.resolved})</SelectItem>
-                    <SelectItem value={IncidenciaStatus.CLOSED}>Cerradas ({incidenciaCounts.closed})</SelectItem>
-                    <SelectItem value={IncidenciaStatus.REOPENED}>Reabiertas ({incidenciaCounts.reopened})</SelectItem>
-                  </>
-                )}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {!isIncidenciasTab ? (
+                <>
+                  {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
+                    <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+                  ))}
+                  {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos los departamentos</SelectItem>
+                        {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </>
+              ) : (
+                <>
+                  {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
+                    <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
+                  ))}
+                  {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
+                    <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+                      <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
-          {/* Desktop: botones estado */}
-          <div className="hidden md:flex items-center gap-2 flex-wrap">
+          {/* Fila 2: estados */}
+          <div className="flex items-center gap-2 flex-wrap">
             {!isIncidenciasTab ? (
               <>
                 <button onClick={() => setStatusFilter('all')} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all', statusFilter === 'all' ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]')}><span className="font-semibold">{filteredTaskCounts.total}</span><span>Todas</span></button>
@@ -502,9 +493,33 @@ export default function TasksModule() {
               </>
             )}
           </div>
+
+          {/* Fila 3: buscador */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+              <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
+            </div>
+            <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1">
+              <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
+              <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* Buscador móvil (debajo de los dropdowns) */}
+        <div className="md:hidden flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+            <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
+          </div>
+          <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1">
+            <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
+            <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
+          </div>
+        </div>
+
+        <div className="min-h-[400px]">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
             <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
