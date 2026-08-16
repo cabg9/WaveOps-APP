@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-15 (Tasks: Tarea Específica vinculada a turnos de Horarios; deployado)
+> Última actualización: 2026-08-16 (Tasks: formulario Tarea Específica rediseñado con secciones, hora 24h y botones de tiempo; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -252,7 +252,11 @@
   - Al publicar asignaciones en **Horarios → Asignar**, `publishAssignments` lee las plantillas activas del turno y genera automáticamente tareas en **Tasks**.
   - Si varios usuarios comparten el mismo turno el mismo día, comparten la misma tarea (`assignedTo` múltiple).
   - Al eliminar una asignación publicada (doble click en **Asignar**), se limpian las tareas específicas pendientes asociadas; si la tarea ya está en progreso/completada/bloqueada, el supervisor debe reasignarla manualmente.
-  - Formulario de **Tarea Específica** rediseñado: título, descripción, departamento con botones, turno sincronizado con los turnos de Horarios, hora de inicio 24h, tiempo estimado en minutos, prioridad con botones, vigencia (30 días, 8/12 semanas, 6 meses, 1 año, 1.5 años, 2 años, indefinido), supervisor automático (supervisor del departamento o gerente), observadores de control (RRHH y Gerente de Operaciones) y opción de requerir foto.
+  - Formulario de **Tarea Específica** rediseñado y organizado en secciones visuales:
+    - **¿Qué hay que hacer?**: título, descripción y prioridad con botones.
+    - **¿Dónde y cuándo se cumple?**: departamento con botones, turno sincronizado con Horarios, hora de inicio con selects de **24 horas** (hora 00-23 + minutos 00/15/30/45), tiempo estimado con **botones rápidos** (15, 30, 45, 60, 90, 120 min) y opción "Otro", y hora límite calculada.
+    - **¿Quién controla?**: supervisor automático (supervisor del departamento o gerente) y observadores de control (RRHH y Gerente de Operaciones).
+    - **Configuración adicional**: vigencia (30 días, 8/12 semanas, 6 meses, 1 año, 1.5 años, 2 años, indefinido) y opción de requerir foto.
   - Sin periodicidad: la tarea se repite automáticamente cada vez que el turno vuelve a ser asignado y publicado.
 
 ### Archivos modificados
