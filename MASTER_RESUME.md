@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-16 (Tasks: unificado diseño de crear/editar Tarea Extra con secciones, hora 24h y botones de tiempo; deployado)
+> Última actualización: 2026-08-16 (Tasks: rediseño incidencia, selector de departamento móvil en incidencias y panel Feedback en Develops; deployado)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -225,6 +225,8 @@
     - Se eliminó el buscador duplicado que quedó tras el refactor.
     - "Mi Departamento" se abrevió a "Mi Depto" en el dropdown de pestañas de móvil.
     - Los dropdowns de móvil ahora usan `w-fit` para ajustar su ancho al texto de la opción seleccionada y ganar espacio en palabras cortas.
+    - **Popup de crear incidencia** rediseñado con secciones visuales: información, departamentos reportados, prioridad y evidencia fotográfica.
+    - **Selector de departamento en incidencias** ahora visible también en pantallas pequeñas para usuarios autorizados (Director General, Gerente de Operaciones, RRHH).
 - **FAB global (`GlobalFAB`)**:
   - Botón flotante fijo en la esquina inferior derecha, visible en toda la app.
   - Al presionar se despliega con animación mostrando cuatro acciones:
@@ -238,6 +240,7 @@
   - Detecta automáticamente la ubicación del usuario (ruta actual como Dashboard, Tasks, Horarios, Develops, Configuración, etc.).
   - Guarda en la colección `feedback` de Firestore: `userId`, `userName`, `userEmail`, `userRole`, `location`, `fullPath`, `type`, `message`, `status` (`nuevo`) y `createdAt`.
   - Permite complementar la ubicación automática con el mensaje del usuario para dar contexto completo a los desarrolladores.
+  - Nuevo panel **Develops → Feedback** para leer, filtrar y gestionar sugerencias/problemas: muestra totales, tipo, estado, ubicación, mensaje y botones para cambiar estado a "En revisión", "Resuelto", "Descartado" o "Reabrir".
 - **DevelopsModule**:
   - Tarjetas de módulos, roles, papelera y usuarios con layout apilado en móvil.
   - Modal de usuario usa `max-w-[95vw] sm:max-w-lg`.
@@ -277,6 +280,7 @@
 - `src/components/ProfilePage.tsx`
 - `src/components/OnboardingPage.tsx`
 - `src/hooks/firestore/useSpecificTaskTemplates.ts` (nuevo)
+- `src/components/EditTaskModal.tsx`
 - `src/hooks/firestore/useFirestoreShifts.ts`
 - `src/hooks/firestore/ShiftsProvider.tsx`
 - `src/hooks/useShifts.tsx`
