@@ -96,6 +96,11 @@ export function useDynamicDepartments() {
     return dept?.icon || 'Building2';
   };
 
+  const getDeptShortName = (code: string): string => {
+    const dept = departments.find(d => d.code === code);
+    return dept?.shortName || code;
+  };
+
   return {
     departments,
     departmentCodes,
@@ -105,6 +110,7 @@ export function useDynamicDepartments() {
     getDeptName,
     getDeptCode,
     getDeptIcon,
+    getDeptShortName,
     loading,
   };
 }

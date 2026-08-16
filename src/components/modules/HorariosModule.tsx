@@ -73,7 +73,7 @@ import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType } from '@/types';
-import { DEPT_ICON_KEYS, DEPT_SHORT_NAMES, sortShiftsByTime } from '@/data/shifts';
+import { sortShiftsByTime } from '@/lib/utils';
 
 import {
   cn,
@@ -182,7 +182,7 @@ interface IncapacidadesTabProps {
 
 export default function HorariosModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
@@ -806,7 +806,7 @@ interface MiHorarioTabProps {
 
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
   const { getUserShifts, getUsersByDepartment } = useShifts();
   const { users: firestoreUsers } = useFirestoreUsers();
   // Encontrar el usuario en Firestore por email para obtener su ID correcto
@@ -1289,7 +1289,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                 >
                                   <span className="font-bold">{shift.name}</span>
                                   <span className="opacity-80 ml-0.5">{shift.startTime}</span>
-                                  <span className="opacity-60 ml-0.5">· {DEPT_SHORT_NAMES[shift.department]}</span>
+                                  <span className="opacity-60 ml-0.5">· {getDeptShortName(shift.department)}</span>
                                 </div>
                               ))}
                               {dayShifts.length > 3 && (
@@ -1900,7 +1900,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                           >
                             <span className="font-bold">{shift.name}</span>
                             <span className="opacity-70">({shift.startTime}-{shift.endTime})</span>
-                            <span className="opacity-50">· {DEPT_SHORT_NAMES[shift.department]}</span>
+                            <span className="opacity-50">· {getDeptShortName(shift.department)}</span>
                           </button>
                         ))}
                       </div>
@@ -3747,7 +3747,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     cleanupSpecificTasksForRemovedAssignment,
     shifts,
   } = useShifts();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
   const [weekOffset, setWeekOffset] = useState(0);
@@ -4102,7 +4102,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                           <p className="hidden sm:block text-xs text-[#86868B] truncate">{u.position}</p>
                           {isCrossDept && (
                             <p className="text-[10px] text-amber-600 font-medium">
-                              {DEPT_SHORT_NAMES[u.department]}
+                              {getDeptShortName(u.department)}
                             </p>
                           )}
                         </div>
@@ -4287,9 +4287,11 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 // ═══════════════════════════════════════════════════════════════════
 
 function DeptIcon({ department, className = 'w-4 h-4' }: { department: string; className?: string }) {
+  const { getDeptIcon } = useDynamicDepartments();
   const iconProps = { className };
-  
-  switch (DEPT_ICON_KEYS[department]) {
+  const icon = getDeptIcon(department);
+
+  switch (icon) {
     case 'Building2': return <Building2 {...iconProps} />;
     case 'DollarSign': return <DollarSign {...iconProps} />;
     case 'ShoppingCart': return <ShoppingCart {...iconProps} />;

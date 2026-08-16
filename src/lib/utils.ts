@@ -6,7 +6,7 @@ import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { format as dateFnsFormat, isSameDay as dateFnsIsSameDay, addDays as dateFnsAddDays, startOfWeek, endOfWeek, isPast, isToday, isTomorrow, parseISO as dateFnsParseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { TaskStatus, TaskPriority, IncidenciaStatus } from '@/types';
+import { TaskStatus, TaskPriority, IncidenciaStatus, Shift } from '@/types';
 
 // Re-exportar funciones de date-fns
 export const format = dateFnsFormat;
@@ -451,4 +451,11 @@ export function sortByDate<T>(
     const dateB = new Date(b[dateKey] as string).getTime();
     return order === 'asc' ? dateA - dateB : dateB - dateA;
   });
+}
+
+/**
+ * Ordena turnos por hora de inicio
+ */
+export function sortShiftsByTime(shifts: Shift[]): Shift[] {
+  return [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
 }

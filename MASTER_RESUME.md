@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-16 (FASE 7 reestructurada en sub-fases 7.3–7.6; inicio FASE 7.3)
+> Última actualización: 2026-08-16 (FASE 7.3 completada: app 100% online, sin datos hardcodeados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -294,31 +294,35 @@
 
 ## FASE 7.3: Eliminar datos hardcodeados y fallback a datos estáticos
 
-**Estado:** EN PROGRESO (HorariosModule limpio; TasksModule pendiente)
+**Estado:** COMPLETADA
 
 ### Objetivo
 Dejar la app 100% dependiente de Firebase. Eliminar el uso de datos estáticos de `src/data/` como fuente de verdad o fallback, y migrar todo a lectura/escritura desde Firestore en tiempo real.
 
 ### Progreso
-- **HorariosModule**: se eliminó completamente la importación de `staticUsers` y todos los fallback (`firestoreUsers.length > 0 ? firestoreUsers : staticUsers`). Ahora Equipo, Asignar, Incapacidades y Solicitudes usan exclusivamente los usuarios reales de Firestore.
-- **MiHorarioTab**: se agregó lectura de `useFirestoreUsers` para resolver el usuario actual sin depender de `staticUsers`.
-- **addIncapacity**: ahora busca el usuario en `firestoreUsers` en lugar de `staticUsers`.
-- **Filtro "Todos" los departamentos**: se corrigió la recalculación de listas de usuarios en Equipo/Asignar agregando `users` a las dependencias de `useMemo`, evitando que se mostraran usuarios hardcodeados/fantasma cuando `useFirestoreUsers` aún no había devuelto datos.
+- **TasksModule**: se eliminó por completo `staticUsers` de `@/data/users`. Todos los lookups de usuarios en `TaskCard` e `IncidenciaCard` (historial, notas, reporteros, verificadores, visualizadores, fotos) ahora usan `useFirestoreUsers`.
+- **HorariosModule**: se eliminó la dependencia de `@/data/shifts`. Los mapeos estáticos `DEPT_SHORT_NAMES` y `DEPT_ICON_KEYS` se reemplazaron por `useDynamicDepartments` (lee `shortName` e `icon` de la colección `departments` en Firestore). `sortShiftsByTime` se movió a `src/lib/utils.ts`.
+- **Eliminación de archivos de datos estáticos**: se borraron `src/data/users.ts`, `src/data/tasks.ts`, `src/data/incidencias.ts`, `src/data/shiftAssignments.ts` y `src/data/shifts.ts`; la carpeta `src/data` ya no existe.
+- **Auditoría de persistencia local**: no queda ningún uso de `localStorage` ni `sessionStorage` para datos de negocio en `src/`.
+- **Build**: `npm run build` pasa limpio sin errores de TypeScript.
 
-### Pendiente
-- **TasksModule**: aún usa `staticUsers` en múltiples lugares (creación de tareas, asignación de apoyo, historial, notas, incidencias). Debe migrarse a `firestoreUsers`.
-- Auditar `src/data/tasks.ts` e `src/data/incidencias.ts`; eliminar si no se usan o si solo son datos de demo.
-- Mantener `src/data/shifts.ts` solo si contiene puras constantes/mapeos (iconos, nombres cortos) y no datos de negocio.
-- Verificar que no quede ningún `localStorage`/`sessionStorage` de datos de negocio.
-- Hacer build, deploy, commit y push cuando TasksModule también esté limpio.
+### Restricciones respetadas
+- No se borraron datos de Firebase.
+- No se tocó el modal de "Solicitar Días Libres".
+- Sin emojis; solo íconos de `lucide-react`.
 
-### Archivos a revisar
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `src/components/modules/HorariosModule.tsx`
+- `src/hooks/firestore/useDynamicDepartments.ts`
+- `src/lib/utils.ts`
+
+### Archivos eliminados
 - `src/data/users.ts`
 - `src/data/tasks.ts`
 - `src/data/incidencias.ts`
 - `src/data/shiftAssignments.ts`
-- `src/components/modules/TasksModule.tsx`
-- `src/components/modules/HorariosModule.tsx`
+- `src/data/shifts.ts`
 
 ---
 
