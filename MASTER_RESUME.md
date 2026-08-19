@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de tasks, incidencias, plantillas y resúmenes de equipo)
+> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de Dashboard, subtareas en tareas específicas, TurnosTab detallado y resumen de Equipo)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -289,6 +289,10 @@
 - `src/hooks/firestore/ShiftsProvider.tsx`
 - `src/hooks/useShifts.tsx`
 - `src/types/index.ts`
+- `src/components/modules/TurnosTab.tsx`
+- `src/hooks/firestore/useSpecificTaskTemplates.ts`
+- `src/components/modules/HorariosModule.tsx`
+- `src/components/Dashboard.tsx`
 
 ### Restricciones respetadas
 - No se tocó lógica de negocio, solo clases de Tailwind y estructura de layout.
@@ -382,13 +386,37 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (post-deploy anterior)
+- **Dashboard: pantalla en blanco para staff/supervisores/gerentes**:
+  - Se corrigió el orden de declaración de `todayStr` en `Dashboard.tsx`; la variable se usaba antes de ser definida, causando un crash en blanco para roles que no eran Director General.
+- **Dashboard: Resumen del Equipo para Director General**:
+  - Cuando el usuario tiene rol `DIRECTOR_GENERAL`, el resumen de equipo muestra **todos los departamentos**; para otros roles sigue filtrando por `user.department`.
+- **Subtareas en Tareas Específicas**:
+  - Campo `subtasks` agregado a `SpecificTaskTemplate` y a los datos de creación/actualización.
+  - UI de subtareas en `SpecificTaskForm` (agregar/eliminar) y en `DepartamentosTab`.
+  - `useFirestoreShifts.ts` copia las subtareas al generar la tarea desde una asignación publicada.
+  - `updateTemplate` en `useSpecificTaskTemplates.ts` ahora propaga `subtasks` a las tareas futuras pendientes generadas desde la plantilla.
+  - `TaskCard` ya bloquea el botón **Completar** mientras haya subtareas sin marcar.
+- **Horarios → Equipo: resumen de tasks por departamento seleccionado**:
+  - El resumen ya no usa fijo `user.department`; respeta el departamento seleccionado en el dropdown (incluyendo **Todos**).
+  - El cálculo ahora es: tareas para **hoy** + **atrasadas de otras fechas** del departamento objetivo.
+  - Los contadores muestran Total, Completados (hoy), Pendientes (hoy) y Atrasados.
+- **Develops → Turnos: detalle de turno enriquecido**:
+  - Cada tarjeta de turno muestra contadores de tareas específicas vinculadas y personas asignadas.
+  - Al hacer click en una tarjeta se abre un modal con dos secciones:
+    - **Tareas específicas vinculadas**: tabla con título, inicio, duración, supervisor, cantidad de asignados y botones **Editar** / **Eliminar**.
+    - **Personas asignadas recientemente**: lista de usuarios con avatar, nombre y fechas de asignación publicadas.
+  - El modal de edición reutiliza `SpecificTaskForm` con supervisor y observadores calculados automáticamente.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
-- Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos.
+- Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
 - Validar que el botón flotante de Tarea Específica ya no liste plantillas y solo cree.
 - Validar supervisor automático y fallback en distintos escenarios.
 - Validar requisitos para completar tarea específica (subtareas/foto).
-- Validar resúmenes de tasks en Dashboard, Mi Horario y Equipo.
+- Validar resúmenes de tasks en Dashboard, Mi Horario y Equipo con el departamento seleccionado.
 - Validar que Resolver en incidencias exija verificación de supervisor Y gerente.
 
 ### Contenido tentativo adicional

@@ -216,6 +216,7 @@ export interface SpecificTaskTemplate {
   notifyOnDelay: string[]; // RRHH y Gerente de Operaciones
   requiresPhoto: boolean;
   vigenciaDays: number | null; // null = indefinido
+  subtasks?: Subtask[]; // Subtareas obligatorias para completar la tarea
   createdBy: string;
   createdAt: string;
   isActive: boolean;

@@ -2548,16 +2548,25 @@ function EquipoTab({
       </div>
 
       {/* Resumen de Tasks del departamento */}
-      {user?.department && (
+      {(selectedDepartment || user?.department) && (
         <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           {(() => {
-            const today = toLocalISODate(new Date());
-            const deptUsersList = getUsersByDepartment(user.department);
+            const referenceDate = toLocalISODate(new Date());
+            const isAllDepartments = selectedDepartment === 'ALL';
+            const targetDept = isAllDepartments ? undefined : (selectedDepartment || user?.department);
+            const deptUsersList = isAllDepartments
+              ? users.filter((u) => u.isActive)
+              : getUsersByDepartment(targetDept as string);
             const deptMemberIds = deptUsersList.map((u) => u.id);
+
+            const belongsToTargetDept = (t: Task) => {
+              if (isAllDepartments) return true;
+              return t.department === targetDept;
+            };
 
             const todayDeptTasks = deptMemberIds.flatMap((memberId) =>
               getTasksByUser(memberId).filter(
-                (t) => t.department === user.department && t.dueDate === today
+                (t) => belongsToTargetDept(t) && t.dueDate === referenceDate
               )
             );
             const uniqueTodayTasks = [...new Map(todayDeptTasks.map((t) => [t.id, t])).values()] as Task[];
@@ -2565,9 +2574,9 @@ function EquipoTab({
             const overdueDeptTasks = deptMemberIds.flatMap((memberId) =>
               getTasksByUser(memberId).filter(
                 (t) =>
-                  t.department === user.department &&
+                  belongsToTargetDept(t) &&
                   t.dueDate &&
-                  t.dueDate < today &&
+                  t.dueDate < referenceDate &&
                   t.status !== 'COMPLETED' &&
                   t.status !== 'VERIFIED'
               )
@@ -2584,7 +2593,7 @@ function EquipoTab({
 
             const memberProgress = deptMemberIds.map((memberId) => {
               const memberTasks = getTasksByUser(memberId).filter(
-                (t) => t.department === user.department && t.dueDate === today
+                (t) => belongsToTargetDept(t) && t.dueDate === referenceDate
               );
               const memberCompleted = memberTasks.filter(
                 (t) => t.status === 'COMPLETED' || t.status === 'VERIFIED'
@@ -2598,14 +2607,16 @@ function EquipoTab({
                   )
                 : 0;
 
+            const title = isAllDepartments
+              ? 'Tasks del equipo - Todos los departamentos'
+              : `Tasks del equipo - ${getDeptName(targetDept as string)}`;
+
             return (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-corporate" />
-                    <span className="text-sm font-medium text-[#1D1D1F]">
-                      Tasks del equipo - {getDeptName(user.department)}
-                    </span>
+                    <span className="text-sm font-medium text-[#1D1D1F]">{title}</span>
                   </div>
                   <span className="text-xs font-medium text-green-600">{teamProgress}%</span>
                 </div>

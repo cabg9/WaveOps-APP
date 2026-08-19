@@ -2,7 +2,8 @@
 // FORMULARIO DE PLANTILLA DE TAREA ESPECÍFICA
 // ═══════════════════════════════════════════════════════════════════
 
-import { Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +23,7 @@ export interface SpecificTaskFormData {
   priority: TaskPriority;
   requiresPhoto: boolean;
   vigenciaDays: TaskVigencia;
+  subtasks: { id: string; title: string; completed: boolean }[];
 }
 
 interface SpecificTaskFormProps {
@@ -72,6 +74,7 @@ export function SpecificTaskForm({
   const minuteOptions = [15, 30, 45, 60, 90, 120];
   const startMinuteOptions = Array.from({ length: 60 }, (_, i) => i);
   const [startHour, startMinute] = form.startTime.split(':').map((v) => v || '00');
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   const setStartTime = (hour: string, minute: string) => {
     setForm((prev) => ({ ...prev, startTime: `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}` }));
@@ -120,6 +123,61 @@ export function SpecificTaskForm({
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Subtareas */}
+        <div className="space-y-2">
+          <Label>Subtareas</Label>
+          <div className="space-y-2">
+            {form.subtasks && form.subtasks.length > 0 && (
+              <div className="space-y-1">
+                {form.subtasks.map((subtask, idx) => (
+                  <div key={subtask.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-lg px-3 py-2">
+                    <CheckCircle2 className="w-4 h-4 text-corporate" />
+                    <span className="text-sm text-[#1D1D1F] flex-1">{subtask.title}</span>
+                    <button
+                      type="button"
+                      onClick={() => setForm((prev) => ({ ...prev, subtasks: prev.subtasks.filter((_, i) => i !== idx) }))}
+                      className="text-[#86868B] hover:text-red-500"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                placeholder="Ej: Revisar equipos de buceo"
+                value={newSubtaskTitle}
+                onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (newSubtaskTitle.trim()) {
+                      setForm((prev) => ({ ...prev, subtasks: [...prev.subtasks, { id: Date.now().toString(), title: newSubtaskTitle.trim(), completed: false }] }));
+                      setNewSubtaskTitle('');
+                    }
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (newSubtaskTitle.trim()) {
+                    setForm((prev) => ({ ...prev, subtasks: [...prev.subtasks, { id: Date.now().toString(), title: newSubtaskTitle.trim(), completed: false }] }));
+                    setNewSubtaskTitle('');
+                  }
+                }}
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-[#86868B]">La tarea no se podrá completar hasta que todas las subtareas estén marcadas.</p>
         </div>
       </Section>
 

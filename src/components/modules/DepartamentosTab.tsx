@@ -111,6 +111,7 @@ export function DepartamentosTab() {
     priority: TaskPriority.MEDIUM,
     requiresPhoto: false,
     vigenciaDays: TaskVigencia.INDEFINIDO,
+    subtasks: [],
   });
   const [templateCounts, setTemplateCounts] = useState<Record<string, number>>({});
 
@@ -269,6 +270,7 @@ export function DepartamentosTab() {
       priority: (template?.priority as TaskPriority) || TaskPriority.MEDIUM,
       requiresPhoto: template?.requiresPhoto || false,
       vigenciaDays: template?.vigenciaDays === null ? TaskVigencia.INDEFINIDO : (template?.vigenciaDays as TaskVigencia) || TaskVigencia.INDEFINIDO,
+      subtasks: template?.subtasks || [],
     });
     setShowTemplateModal(true);
   };
@@ -286,6 +288,7 @@ export function DepartamentosTab() {
       priority: TaskPriority.MEDIUM,
       requiresPhoto: false,
       vigenciaDays: TaskVigencia.INDEFINIDO,
+      subtasks: [],
     });
   };
 
@@ -311,6 +314,7 @@ export function DepartamentosTab() {
       notifyOnDelay: templateNotifyOnDelay,
       requiresPhoto: templateForm.requiresPhoto,
       vigenciaDays: templateForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : templateForm.vigenciaDays,
+      subtasks: templateForm.subtasks,
     };
     setSavingTemplate(true);
     try {

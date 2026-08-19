@@ -35,6 +35,7 @@ export interface CreateSpecificTaskTemplateData {
   notifyOnDelay: string[];
   requiresPhoto: boolean;
   vigenciaDays: number | null;
+  subtasks?: { id: string; title: string; completed: boolean }[];
   createdBy: string;
 }
 
@@ -146,6 +147,7 @@ export function useSpecificTaskTemplates() {
           if (updates.supervisorId !== undefined) updateData.supervisorId = updates.supervisorId;
           if (updates.requiresPhoto !== undefined) updateData.requiresPhoto = updates.requiresPhoto;
           if (updates.notifyOnDelay !== undefined) updateData.notifyOnDelay = updates.notifyOnDelay;
+          if (updates.subtasks !== undefined) updateData.subtasks = updates.subtasks;
           updateData.updatedAt = new Date().toISOString();
           batch.update(taskDoc.ref, updateData);
         });

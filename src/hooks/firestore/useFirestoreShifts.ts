@@ -325,6 +325,7 @@ export function useFirestoreShifts() {
               dueTime: calculateDueTime(template.startTime || '00:00', template.estimatedMinutes || 0),
               estimatedMinutes: template.estimatedMinutes || 0,
               requiresPhoto: template.requiresPhoto || false,
+              subtasks: template.subtasks || [],
               shiftIds: assignedShiftIds,
               templateId: template.id,
               source: 'specific-task-template',

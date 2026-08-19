@@ -31,6 +31,7 @@ import { useShifts } from '@/hooks/useShifts';
 import { db } from '@/firebase-config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
+import { Role } from '@/types';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
@@ -136,22 +137,27 @@ export default function Dashboard() {
 
   const taskCounts = getTaskCounts();
 
-  // ─── CONTEOS DEL DEPARTAMENTO DEL USUARIO (Resumen de Equipo) ───
-  const userDept = user?.department;
-  const deptTasks = userDept ? tasks.filter((t) => t.department === userDept) : [];
-  const deptTodayTasks = deptTasks.filter((t) => t.dueDate === todayStr);
-  const deptOverdue = deptTasks.filter(
-    (t) => t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED'
-  );
-  const deptCompletedToday = deptTodayTasks.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED');
-  const teamTotalTasks = deptTodayTasks.length + deptOverdue.length;
-
   // ─── CONTEOS PERSONALES DEL USUARIO ACTUAL ───
   const getLocalDate = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   };
   const todayStr = getLocalDate();
+
+  // ─── CONTEOS DEL DEPARTAMENTO DEL USUARIO (Resumen de Equipo) ───
+  const userDept = user?.department;
+  const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL;
+  const deptTasks = canViewAllDepartments
+    ? tasks
+    : userDept
+      ? tasks.filter((t) => t.department === userDept)
+      : [];
+  const deptTodayTasks = deptTasks.filter((t) => t.dueDate === todayStr);
+  const deptOverdue = deptTasks.filter(
+    (t) => t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED'
+  );
+  const deptCompletedToday = deptTodayTasks.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED');
+  const teamTotalTasks = deptTodayTasks.length + deptOverdue.length;
   const userId = user?.id;
 
   // ─── TURNO DE HOY ───
@@ -442,7 +448,9 @@ export default function Dashboard() {
               <Users className="w-5 h-5 text-corporate" />
               <h3 className="font-semibold text-[#1D1D1F]">Resumen del Equipo</h3>
             </div>
-            <p className="text-sm text-[#86868B] mb-4">{user?.department?.replace(/_/g, ' ') || 'Dive Shop'}</p>
+            <p className="text-sm text-[#86868B] mb-4">
+              {canViewAllDepartments ? 'Todos los departamentos' : (user?.department?.replace(/_/g, ' ') || 'Dive Shop')}
+            </p>
             
             <div className="space-y-3">
               <div className="flex items-center justify-between py-2 border-b border-[#E5E5E7]">

@@ -107,6 +107,7 @@ export default function TasksModule() {
     priority: TaskPriority.MEDIUM,
     requiresPhoto: false,
     vigenciaDays: TaskVigencia.INDEFINIDO,
+    subtasks: [] as { id: string; title: string; completed: boolean }[],
   });
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
 
@@ -233,6 +234,7 @@ export default function TasksModule() {
       priority: TaskPriority.MEDIUM,
       requiresPhoto: false,
       vigenciaDays: TaskVigencia.INDEFINIDO,
+      subtasks: [],
     });
     setEditingTemplateId(null);
     setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
@@ -274,6 +276,7 @@ export default function TasksModule() {
           notifyOnDelay: specificTaskNotifyOnDelay,
           requiresPhoto: specificTaskForm.requiresPhoto,
           vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
+          subtasks: specificTaskForm.subtasks,
         });
         toast.success('Plantilla de tarea específica actualizada.');
       } else {
@@ -289,6 +292,7 @@ export default function TasksModule() {
           notifyOnDelay: specificTaskNotifyOnDelay,
           requiresPhoto: specificTaskForm.requiresPhoto,
           vigenciaDays: specificTaskForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : specificTaskForm.vigenciaDays,
+          subtasks: specificTaskForm.subtasks,
           createdBy: user.id,
         });
         toast.success('Tarea específica creada. Se generará automáticamente al asignar el turno.');
@@ -305,6 +309,7 @@ export default function TasksModule() {
         priority: TaskPriority.MEDIUM,
         requiresPhoto: false,
         vigenciaDays: TaskVigencia.INDEFINIDO,
+        subtasks: [],
       });
     } catch (err) {
       console.error('Error al guardar tarea específica:', err);

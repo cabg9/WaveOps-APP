@@ -1,16 +1,23 @@
 // TURNOS TAB - CRUD de turnos por departamento
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
+import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
+import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useTasks } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Clock } from 'lucide-react';
+import { UserAvatar } from '@/components/UserAvatar';
+import { SpecificTaskForm, SpecificTaskFormData } from '@/components/SpecificTaskForm';
+import { Plus, Pencil, Trash2, Clock, Eye, Users, CheckSquare, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Role, TaskPriority, TaskVigencia, SpecificTaskTemplate } from '@/types';
 
 interface Shift {
   id: string;
@@ -32,9 +39,21 @@ function generateShiftId(name: string, dept: string) {
   return `${deptPrefix}-${nameSuffix}`;
 }
 
+function calculateDueTime(startTime: string, estimatedMinutes: number): string {
+  const [hours, minutes] = startTime.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hours, minutes + estimatedMinutes, 0, 0);
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export function TurnosTab() {
   const { departmentOptions } = useDynamicDepartments();
-  const [firestoreShifts, setFirestoreShifts] = useState<Record<string, any>>({});
+  const { shifts: firestoreShifts, assignments } = useFirestoreShifts();
+  const { templates, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
+  const { users } = useFirestoreUsers();
+  const { tasks } = useTasks();
+
+  const [firestoreShiftsLocal, setFirestoreShiftsLocal] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
@@ -48,7 +67,26 @@ export function TurnosTab() {
     color: '#007AFF',
   });
 
-  // Listen to Firestore shifts
+  // Modales de detalle y edición de plantilla
+  const [selectedShift, setSelectedShift] = useState<Shift | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<SpecificTaskTemplate | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateForm, setTemplateForm] = useState<SpecificTaskFormData>({
+    title: '',
+    description: '',
+    department: '',
+    shiftIds: [],
+    startTime: '08:00',
+    estimatedMinutes: 60,
+    priority: TaskPriority.MEDIUM,
+    requiresPhoto: false,
+    vigenciaDays: TaskVigencia.INDEFINIDO,
+    subtasks: [],
+  });
+
+  // Listen to Firestore shifts (fallback si useFirestoreShifts aún no carga)
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'shifts'), (snap) => {
       const data: Record<string, any> = {};
@@ -56,7 +94,7 @@ export function TurnosTab() {
         const docData = d.data();
         data[d.id] = { _docId: d.id, id: docData.id || d.id, ...docData };
       });
-      setFirestoreShifts(data);
+      setFirestoreShiftsLocal(data);
       setLoading(false);
     });
     return () => unsub();
@@ -64,8 +102,10 @@ export function TurnosTab() {
 
   // Combine static + Firestore shifts
   const allShifts = useMemo(() => {
-    return Object.values(firestoreShifts).filter((fs: any) => fs.name && fs.startTime && fs.isActive !== false) as Shift[];
-  }, [firestoreShifts]);
+    const fromHook = firestoreShifts || [];
+    const merged = fromHook.length > 0 ? fromHook : Object.values(firestoreShiftsLocal);
+    return merged.filter((fs: any) => fs.name && fs.startTime && fs.isActive !== false) as Shift[];
+  }, [firestoreShifts, firestoreShiftsLocal]);
 
   const resetForm = () => {
     setForm({ name: '', department: departmentOptions[0]?.code || '', startTime: '08:00', endTime: '16:00', color: '#007AFF' });
@@ -118,7 +158,7 @@ export function TurnosTab() {
     if (!confirm(`Mover turno "${shift.name}" a la papelera?`)) return;
     try {
       const docRefId = (shift as any)._docId || shift.id;
-      await setDoc(doc(db, "shifts", docRefId), {
+      await setDoc(doc(db, 'shifts', docRefId), {
         ...shift,
         isActive: false,
         deletedAt: new Date().toISOString(),
@@ -129,15 +169,172 @@ export function TurnosTab() {
     }
   };
 
-
   const filteredShifts = filterDept === 'all'
     ? allShifts
     : allShifts.filter(s => s.department === filterDept);
 
+  // ── Detalle del turno ──
+  const openDetail = (shift: Shift) => {
+    setSelectedShift(shift);
+    setShowDetailModal(true);
+  };
+
+  const getTemplatesForShift = (shift: Shift) => {
+    return templates.filter((t: SpecificTaskTemplate) => {
+      const shiftIds = t.shiftIds || (t.shiftId ? [t.shiftId] : []);
+      return shiftIds.includes(shift.id);
+    });
+  };
+
+  const getAssignedPeopleForShift = (shift: Shift) => {
+    const shiftAssignments = assignments.filter(
+      (a: any) => a.shiftId === shift.id && a.status === 'PUBLICADO'
+    );
+    const map = new Map<string, { user: any; dates: string[] }>();
+    shiftAssignments.forEach((a: any) => {
+      const user = users.find((u: any) => u.id === a.userId);
+      if (!user) return;
+      if (!map.has(user.id)) {
+        map.set(user.id, { user, dates: [] });
+      }
+      map.get(user.id)!.dates.push(a.date);
+    });
+    return Array.from(map.values()).map((entry) => ({
+      ...entry,
+      dates: [...new Set(entry.dates)].sort(),
+    }));
+  };
+
+  const getAssignedCountForTemplate = (templateId: string) => {
+    return tasks
+      .filter((t: any) => t.templateId === templateId && t.source === 'specific-task-template')
+      .reduce((sum: number, t: any) => sum + (t.assignedTo?.length || 0), 0);
+  };
+
+  // ── Edición de plantilla ──
+  const shiftsForTemplateForm = useMemo(() => {
+    return firestoreShifts.filter((s: any) => s.department === templateForm.department && s.isActive !== false);
+  }, [firestoreShifts, templateForm.department]);
+
+  const templateSupervisorId = useMemo(() => {
+    if (!templateForm.department) return '';
+    const deptUsers = users.filter((u: any) => u.department === templateForm.department && u.isActive !== false);
+    const supervisor = deptUsers.find((u: any) => u.role === Role.SUPERVISOR);
+    if (supervisor) return supervisor.id;
+    const gerente = deptUsers.find((u: any) => u.role === Role.GERENTE_DEPARTAMENTO);
+    if (gerente) return gerente.id;
+    const fallback = deptUsers
+      .filter((u: any) => [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.GERENTE_OPERACIONES, Role.RRHH].includes(u.role))
+      .sort((a: any, b: any) => (a.level || 7) - (b.level || 7))[0];
+    return fallback?.id || '';
+  }, [users, templateForm.department]);
+
+  const templateSupervisorName = useMemo(() => {
+    const s = users.find((u: any) => u.id === templateSupervisorId);
+    return s ? `${s.name} (${s.role.replace(/_/g, ' ')})` : '';
+  }, [users, templateSupervisorId]);
+
+  const templateNotifyOnDelay = useMemo(() => {
+    return users
+      .filter((u: any) => u.isActive !== false && (u.role === Role.RRHH || u.role === Role.GERENTE_OPERACIONES))
+      .map((u: any) => u.id);
+  }, [users]);
+
+  const templateObservers = useMemo(() => {
+    return users
+      .filter((u: any) => templateNotifyOnDelay.includes(u.id))
+      .map((u: any) => ({ name: u.name, role: u.role }));
+  }, [users, templateNotifyOnDelay]);
+
+  const templateDueTime = useMemo(() => {
+    try {
+      return calculateDueTime(templateForm.startTime || '00:00', templateForm.estimatedMinutes || 0);
+    } catch {
+      return '';
+    }
+  }, [templateForm.startTime, templateForm.estimatedMinutes]);
+
+  const openEditTemplate = (template: SpecificTaskTemplate) => {
+    setEditingTemplate(template);
+    setTemplateForm({
+      title: template.title || '',
+      description: template.description || '',
+      department: template.department || '',
+      shiftIds: template.shiftIds || (template.shiftId ? [template.shiftId] : []),
+      startTime: template.startTime || '08:00',
+      estimatedMinutes: template.estimatedMinutes || 60,
+      priority: (template.priority as TaskPriority) || TaskPriority.MEDIUM,
+      requiresPhoto: template.requiresPhoto || false,
+      vigenciaDays: template.vigenciaDays === null ? TaskVigencia.INDEFINIDO : (template.vigenciaDays as TaskVigencia) || TaskVigencia.INDEFINIDO,
+      subtasks: template.subtasks || [],
+    });
+    setShowEditModal(true);
+  };
+
+  const closeEditTemplate = () => {
+    setShowEditModal(false);
+    setEditingTemplate(null);
+    setTemplateForm({
+      title: '',
+      description: '',
+      department: '',
+      shiftIds: [],
+      startTime: '08:00',
+      estimatedMinutes: 60,
+      priority: TaskPriority.MEDIUM,
+      requiresPhoto: false,
+      vigenciaDays: TaskVigencia.INDEFINIDO,
+      subtasks: [],
+    });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!editingTemplate) return;
+    if (!templateForm.title.trim() || templateForm.shiftIds.length === 0) {
+      toast.error('Completa el título y selecciona al menos un turno');
+      return;
+    }
+    if (!templateSupervisorId) {
+      toast.error('No se encontró un supervisor o gerente para el departamento');
+      return;
+    }
+    const payload = {
+      title: templateForm.title.trim(),
+      description: templateForm.description.trim(),
+      department: templateForm.department,
+      shiftIds: templateForm.shiftIds,
+      startTime: templateForm.startTime,
+      estimatedMinutes: templateForm.estimatedMinutes,
+      priority: templateForm.priority,
+      supervisorId: templateSupervisorId,
+      notifyOnDelay: templateNotifyOnDelay,
+      requiresPhoto: templateForm.requiresPhoto,
+      vigenciaDays: templateForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : templateForm.vigenciaDays,
+      subtasks: templateForm.subtasks,
+    };
+    setSavingTemplate(true);
+    try {
+      await updateTemplate(editingTemplate.id, payload);
+      toast.success('Plantilla actualizada');
+      closeEditTemplate();
+    } catch (err: any) {
+      toast.error('Error al actualizar: ' + err.message);
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!confirm('¿Eliminar esta plantilla de tarea específica?')) return;
+    try {
+      await deleteTemplate(templateId);
+      toast.success('Plantilla eliminada');
+    } catch (err: any) {
+      toast.error('Error al eliminar: ' + err.message);
+    }
+  };
+
   if (loading) return <div className="p-8 text-center text-[#86868B]">Cargando turnos...</div>;
-
-
-  // Migrar turnos estaticos a Firestore
 
   return (
     <div className="space-y-6">
@@ -164,27 +361,41 @@ export function TurnosTab() {
 
       {/* Lista de turnos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredShifts.map(shift => (
-          <Card key={shift.id} className="overflow-hidden">
-            <div className="h-2" style={{ backgroundColor: shift.color }} />
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h3 className="font-medium text-[#1D1D1F]">{shift.name}</h3>
-                  <p className="text-xs text-[#86868B] mt-1">{shift.department?.replace(/_/g, ' ')}</p>
-                  <div className="flex items-center gap-1 mt-2 text-sm text-[#86868B]">
-                    <Clock className="w-3.5 h-3.5" />
-                    <span>{shift.startTime} - {shift.endTime}</span>
+        {filteredShifts.map(shift => {
+          const shiftTemplates = getTemplatesForShift(shift);
+          const assignedPeople = getAssignedPeopleForShift(shift);
+          return (
+            <Card key={shift.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => openDetail(shift)}>
+              <div className="h-2" style={{ backgroundColor: shift.color }} />
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-medium text-[#1D1D1F]">{shift.name}</h3>
+                    <p className="text-xs text-[#86868B] mt-1">{shift.department?.replace(/_/g, ' ')}</p>
+                    <div className="flex items-center gap-1 mt-2 text-sm text-[#86868B]">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{shift.startTime} - {shift.endTime}</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
+                    <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
-                <div className="flex gap-1">
-                  <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#F5F5F7]">
+                  <div className="flex items-center gap-1.5 text-xs text-[#86868B]">
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-[#86868B]">
+                    <Users className="w-3.5 h-3.5" />
+                    <span>{assignedPeople.length} asignado{assignedPeople.length !== 1 ? 's' : ''}</span>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
         {filteredShifts.length === 0 && (
           <div className="col-span-full text-center py-12 text-[#86868B]">
             No hay turnos {filterDept !== 'all' && 'para este departamento'}
@@ -192,7 +403,7 @@ export function TurnosTab() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal crear/editar turno */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
         <DialogContent className="max-w-[95vw] sm:max-w-lg">
           <DialogHeader>
@@ -232,6 +443,135 @@ export function TurnosTab() {
               <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">Cancelar</Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal detalle del turno */}
+      <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedShift && (
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${selectedShift.color}20` }}>
+                    <Clock className="w-5 h-5" style={{ color: selectedShift.color }} />
+                  </div>
+                  <div>
+                    <p className="text-lg">{selectedShift.name}</p>
+                    <p className="text-sm font-normal text-[#86868B]">{selectedShift.department?.replace(/_/g, ' ')} · {selectedShift.startTime} - {selectedShift.endTime}</p>
+                  </div>
+                </div>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedShift && (
+            <div className="space-y-6">
+              {/* Tareas específicas */}
+              <div>
+                <h4 className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-corporate" />
+                  Tareas específicas vinculadas
+                </h4>
+                {(() => {
+                  const shiftTemplates = getTemplatesForShift(selectedShift);
+                  if (shiftTemplates.length === 0) {
+                    return <p className="text-sm text-[#86868B] bg-[#F5F5F7] rounded-lg p-3">No hay tareas específicas vinculadas a este turno.</p>;
+                  }
+                  return (
+                    <div className="border border-[#E5E5E7] rounded-xl overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-[#F5F5F7] text-[#86868B]">
+                          <tr>
+                            <th className="text-left px-3 py-2 font-medium">Título</th>
+                            <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Inicio</th>
+                            <th className="text-left px-3 py-2 font-medium hidden sm:table-cell">Supervisor</th>
+                            <th className="text-left px-3 py-2 font-medium">Asignados</th>
+                            <th className="text-right px-3 py-2 font-medium">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[#E5E5E7]">
+                          {shiftTemplates.map((template) => {
+                            const supervisor = users.find((u: any) => u.id === template.supervisorId);
+                            const assignedCount = getAssignedCountForTemplate(template.id);
+                            return (
+                              <tr key={template.id} className="hover:bg-[#F5F5F7]/50">
+                                <td className="px-3 py-2">
+                                  <p className="font-medium text-[#1D1D1F]">{template.title}</p>
+                                  {template.description && <p className="text-xs text-[#86868B] line-clamp-1">{template.description}</p>}
+                                </td>
+                                <td className="px-3 py-2 text-[#86868B] hidden sm:table-cell">{template.startTime} · {template.estimatedMinutes}m</td>
+                                <td className="px-3 py-2 text-[#86868B] hidden sm:table-cell">{supervisor?.name || 'Sin asignar'}</td>
+                                <td className="px-3 py-2">
+                                  <span className="inline-flex items-center gap-1 text-xs bg-[#F5F5F7] px-2 py-1 rounded-lg">
+                                    <Users className="w-3 h-3" /> {assignedCount}
+                                  </span>
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button onClick={() => openEditTemplate(template)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => handleDeleteTemplate(template.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Personas asignadas */}
+              <div>
+                <h4 className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-corporate" />
+                  Personas asignadas recientemente
+                </h4>
+                {(() => {
+                  const assignedPeople = getAssignedPeopleForShift(selectedShift);
+                  if (assignedPeople.length === 0) {
+                    return <p className="text-sm text-[#86868B] bg-[#F5F5F7] rounded-lg p-3">No hay asignaciones publicadas para este turno.</p>;
+                  }
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {assignedPeople.map(({ user, dates }) => (
+                        <div key={user.id} className="flex items-center gap-3 p-3 bg-[#F5F5F7] rounded-xl">
+                          <UserAvatar name={user.name} photoUrl={user.photoURL || user.avatar} size="sm" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-[#1D1D1F] truncate">{user.name}</p>
+                            <p className="text-xs text-[#86868B] truncate">{dates.length} día{dates.length !== 1 ? 's' : ''}: {dates.slice(0, 3).join(', ')}{dates.length > 3 ? '...' : ''}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal editar plantilla */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar plantilla de tarea específica</DialogTitle>
+          </DialogHeader>
+          <SpecificTaskForm
+            form={templateForm}
+            setForm={setTemplateForm}
+            departments={departmentOptions.map((d: any) => ({ code: d.code || d.id, name: d.name }))}
+            shifts={shiftsForTemplateForm}
+            supervisorName={templateSupervisorName}
+            observers={templateObservers}
+            dueTime={templateDueTime}
+            onCancel={closeEditTemplate}
+            onSubmit={handleSaveTemplate}
+            disabled={savingTemplate}
+            isEditing={true}
+          />
         </DialogContent>
       </Dialog>
     </div>
