@@ -418,6 +418,7 @@ export function useFirestoreTasks() {
 
   // Contadores
   const getTaskCounts = useCallback(() => {
+    const today = new Date().toISOString().split('T')[0];
     return {
       total: tasks.length,
       pending: tasks.filter(t => t.status === TaskStatus.PENDING).length,
@@ -425,9 +426,8 @@ export function useFirestoreTasks() {
       completed: tasks.filter(t => t.status === TaskStatus.COMPLETED).length,
       verified: tasks.filter(t => t.status === TaskStatus.VERIFIED).length,
       overdue: tasks.filter(t => {
-        const due = new Date(t.dueDate);
-        const now = new Date();
-        return due < now && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED;
+        if (!t.dueDate) return false;
+        return t.dueDate < today && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED;
       }).length,
     };
   }, [tasks]);

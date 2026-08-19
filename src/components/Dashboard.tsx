@@ -136,6 +136,16 @@ export default function Dashboard() {
 
   const taskCounts = getTaskCounts();
 
+  // ─── CONTEOS DEL DEPARTAMENTO DEL USUARIO (Resumen de Equipo) ───
+  const userDept = user?.department;
+  const deptTasks = userDept ? tasks.filter((t) => t.department === userDept) : [];
+  const deptTodayTasks = deptTasks.filter((t) => t.dueDate === todayStr);
+  const deptOverdue = deptTasks.filter(
+    (t) => t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED'
+  );
+  const deptCompletedToday = deptTodayTasks.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED');
+  const teamTotalTasks = deptTodayTasks.length + deptOverdue.length;
+
   // ─── CONTEOS PERSONALES DEL USUARIO ACTUAL ───
   const getLocalDate = () => {
     const d = new Date();
@@ -442,19 +452,19 @@ export default function Dashboard() {
                   </div>
                   <span className="text-sm text-[#1D1D1F]">Total Tasks</span>
                 </div>
-                <span className="text-lg font-semibold text-[#1D1D1F]">{taskCounts.total}</span>
+                <span className="text-lg font-semibold text-[#1D1D1F]">{teamTotalTasks}</span>
               </div>
-              
+
               <div className="flex items-center justify-between py-2 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-apple-green/10 rounded-lg flex items-center justify-center">
                     <CheckCircle2 className="w-4 h-4 text-apple-green" />
                   </div>
-                  <span className="text-sm text-[#1D1D1F]">Completados</span>
+                  <span className="text-sm text-[#1D1D1F]">Completados hoy</span>
                 </div>
-                <span className="text-lg font-semibold text-[#1D1D1F]">{taskCounts.completed + taskCounts.verified}</span>
+                <span className="text-lg font-semibold text-[#1D1D1F]">{deptCompletedToday.length}</span>
               </div>
-              
+
               <div className="flex items-center justify-between py-2">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 bg-apple-red/10 rounded-lg flex items-center justify-center">
@@ -462,7 +472,7 @@ export default function Dashboard() {
                   </div>
                   <span className="text-sm text-[#1D1D1F]">Atrasados</span>
                 </div>
-                <span className="text-lg font-semibold text-[#1D1D1F]">{taskCounts.overdue}</span>
+                <span className="text-lg font-semibold text-[#1D1D1F]">{deptOverdue.length}</span>
               </div>
             </div>
           </div>

@@ -49,16 +49,16 @@ export function TasksProvider({ children }: TasksProviderProps) {
 
     getTaskById: (id: string) => tasksHook.tasks.find((t: any) => t.id === id),
 
-    getTasksByUser: (userId: string) => tasksHook.tasks.filter((t: any) => t.assignedTo === userId),
+    getTasksByUser: (userId: string) => tasksHook.tasks.filter((t: any) => t.assignedTo?.includes(userId)),
 
     getTasksByDepartment: (department: string) => tasksHook.tasks.filter((t: any) => t.department === department),
 
     getTasksByStatus: (status: TaskStatus) => tasksHook.tasks.filter((t: any) => t.status === status),
 
     getOverdueTasks: () => tasksHook.tasks.filter((t: any) => {
-      const due = new Date(t.dueDate);
-      const now = new Date();
-      return due < now && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED;
+      if (!t.dueDate) return false;
+      const today = new Date().toISOString().split('T')[0];
+      return t.dueDate < today && t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.VERIFIED;
     }),
 
     createTask: (task: any) => {

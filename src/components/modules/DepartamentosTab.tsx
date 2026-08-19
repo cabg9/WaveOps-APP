@@ -1,17 +1,22 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Pencil, Trash2, Plus, Building2, X, GitBranch,
-  Shield, Crown, HardHat, Users, Briefcase, Save, UserCog
+  Shield, Crown, HardHat, Users, Briefcase, Save, UserCog,
+  LayoutTemplate, Clock
 } from "lucide-react";
 import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
+import { useFirestoreShifts } from "@/hooks/firestore/useFirestoreShifts";
+import { useSpecificTaskTemplates, CreateSpecificTaskTemplateData } from "@/hooks/firestore/useSpecificTaskTemplates";
+import { useAuth } from "@/hooks/useFirestoreAuth";
 import { useAudit } from "@/hooks/useAudit";
 import { executeWithConfirm } from "@/lib/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SpecificTaskForm, SpecificTaskFormData } from "@/components/SpecificTaskForm";
 import type { DepartmentFormData } from "@/types/department";
-import { Role } from "@/types";
+import { Role, TaskPriority, TaskVigencia, TaskStatus, SpecificTaskTemplate } from "@/types";
 import { writeBatch, collection, getDocs, query, where, doc } from "firebase/firestore";
 import { db } from "@/firebase-config";
 
@@ -73,6 +78,9 @@ export function DepartamentosTab() {
   const { departments, loading, createDepartment, updateDepartment, deleteDepartment, checkUsersInDepartment } = useFirestoreDepartments();
   const { users, updateUser } = useFirestoreUsers();
   const { logAction } = useAudit();
+  const { user: currentUser } = useAuth();
+  const { shifts } = useFirestoreShifts();
+  const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -89,6 +97,22 @@ export function DepartamentosTab() {
   const [editRole, setEditRole] = useState("");
   const [editLevel, setEditLevel] = useState<number>(7);
   const [editPosition, setEditPosition] = useState("");
+
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [templateForm, setTemplateForm] = useState<SpecificTaskFormData>({
+    title: "",
+    description: "",
+    department: "",
+    shiftIds: [],
+    startTime: "08:00",
+    estimatedMinutes: 60,
+    priority: TaskPriority.MEDIUM,
+    requiresPhoto: false,
+    vigenciaDays: TaskVigencia.INDEFINIDO,
+  });
+  const [templateCounts, setTemplateCounts] = useState<Record<string, number>>({});
 
   const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId).sort((a: any, b: any) => a.name.localeCompare(b.name)), [departments]);
   const childDepts = useMemo(() => departments.filter((d: any) => d.parentId), [departments]);
@@ -149,6 +173,168 @@ export function DepartamentosTab() {
 
   const startEditUser = (u: any) => { setEditingUserId(u.id); setEditRole(u.role || ""); setEditLevel(u.level || 7); setEditPosition(u.position || ""); };
   const getDeptUsers = (dept: any) => users.filter((u: any) => (u.department === dept.code || u.department === dept.name) && u.isActive !== false);
+
+  const deptTemplates = useMemo(() => {
+    if (!selectedDept) return [];
+    return templates
+      .filter((t: any) => t.department === selectedDept.code && t.isActive !== false)
+      .sort((a: any, b: any) => (a.title || "").localeCompare(b.title || ""));
+  }, [templates, selectedDept]);
+
+  const shiftsForTemplateForm = useMemo(() => {
+    return shifts.filter((s: any) => s.department === templateForm.department && s.isActive !== false);
+  }, [shifts, templateForm.department]);
+
+  const templateSupervisorId = useMemo(() => {
+    const deptUsers = users.filter((u: any) => (u.department === templateForm.department || u.department === departments.find((d: any) => d.code === templateForm.department)?.name) && u.isActive !== false);
+    const supervisor = deptUsers.find((u: any) => u.role === Role.SUPERVISOR);
+    if (supervisor) return supervisor.id;
+    const gerente = deptUsers.find((u: any) => u.role === Role.GERENTE_DEPARTAMENTO);
+    if (gerente) return gerente.id;
+    const fallbackRoles = [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.RRHH, Role.GERENTE_OPERACIONES];
+    const fallback = users
+      .filter((u: any) => u.isActive !== false && fallbackRoles.includes(u.role))
+      .sort((a: any, b: any) => (a.level || 7) - (b.level || 7))[0];
+    return fallback?.id || "";
+  }, [users, templateForm.department, departments]);
+
+  const templateSupervisorName = useMemo(() => {
+    const s = users.find((u: any) => u.id === templateSupervisorId);
+    return s ? `${s.name} (${s.role.replace(/_/g, " ")})` : "";
+  }, [users, templateSupervisorId]);
+
+  const templateNotifyOnDelay = useMemo(() => {
+    return users
+      .filter((u: any) => u.isActive !== false && (u.role === Role.RRHH || u.role === Role.GERENTE_OPERACIONES))
+      .map((u: any) => u.id);
+  }, [users]);
+
+  const templateObservers = useMemo(() => {
+    return users
+      .filter((u: any) => templateNotifyOnDelay.includes(u.id))
+      .map((u: any) => ({ name: u.name, role: u.role }));
+  }, [users, templateNotifyOnDelay]);
+
+  const templateDueTime = useMemo(() => {
+    try {
+      const [hours, minutes] = templateForm.startTime.split(":").map(Number);
+      const date = new Date();
+      date.setHours(hours, minutes + templateForm.estimatedMinutes, 0, 0);
+      return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+    } catch (e) {
+      return templateForm.startTime;
+    }
+  }, [templateForm.startTime, templateForm.estimatedMinutes]);
+
+  useEffect(() => {
+    if (!selectedDept) {
+      setTemplateCounts({});
+      return;
+    }
+    const fetchCounts = async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        deptTemplates.map(async (template: any) => {
+          try {
+            const q = query(collection(db, "tasks"), where("templateId", "==", template.id));
+            const snap = await getDocs(q);
+            let total = 0;
+            snap.forEach((d) => {
+              const data = d.data();
+              if (data.source !== "specific-task-template") return;
+              if (data.status === TaskStatus.COMPLETED || data.status === TaskStatus.VERIFIED) return;
+              total += (data.assignedTo || []).length;
+            });
+            counts[template.id] = total;
+          } catch (err) {
+            console.error("Error contando tareas de plantilla:", err);
+            counts[template.id] = 0;
+          }
+        })
+      );
+      setTemplateCounts(counts);
+    };
+    fetchCounts();
+  }, [deptTemplates, selectedDept]);
+
+  const openTemplateModal = (dept: any, template?: SpecificTaskTemplate) => {
+    setEditingTemplateId(template?.id || null);
+    setTemplateForm({
+      title: template?.title || "",
+      description: template?.description || "",
+      department: template?.department || dept.code || "",
+      shiftIds: template?.shiftIds || (template?.shiftId ? [template.shiftId] : []),
+      startTime: template?.startTime || "08:00",
+      estimatedMinutes: template?.estimatedMinutes || 60,
+      priority: (template?.priority as TaskPriority) || TaskPriority.MEDIUM,
+      requiresPhoto: template?.requiresPhoto || false,
+      vigenciaDays: template?.vigenciaDays === null ? TaskVigencia.INDEFINIDO : (template?.vigenciaDays as TaskVigencia) || TaskVigencia.INDEFINIDO,
+    });
+    setShowTemplateModal(true);
+  };
+
+  const closeTemplateModal = () => {
+    setShowTemplateModal(false);
+    setEditingTemplateId(null);
+    setTemplateForm({
+      title: "",
+      description: "",
+      department: "",
+      shiftIds: [],
+      startTime: "08:00",
+      estimatedMinutes: 60,
+      priority: TaskPriority.MEDIUM,
+      requiresPhoto: false,
+      vigenciaDays: TaskVigencia.INDEFINIDO,
+    });
+  };
+
+  const handleSaveTemplate = async () => {
+    if (!currentUser?.id) return;
+    if (!templateForm.title.trim() || templateForm.shiftIds.length === 0) {
+      alert("Completa el título y selecciona al menos un turno");
+      return;
+    }
+    if (!templateSupervisorId) {
+      alert("No se encontró un supervisor o gerente para el departamento seleccionado");
+      return;
+    }
+    const payload: Omit<CreateSpecificTaskTemplateData, "createdBy"> = {
+      title: templateForm.title.trim(),
+      description: templateForm.description.trim(),
+      department: templateForm.department,
+      shiftIds: templateForm.shiftIds,
+      startTime: templateForm.startTime,
+      estimatedMinutes: templateForm.estimatedMinutes,
+      priority: templateForm.priority,
+      supervisorId: templateSupervisorId,
+      notifyOnDelay: templateNotifyOnDelay,
+      requiresPhoto: templateForm.requiresPhoto,
+      vigenciaDays: templateForm.vigenciaDays === TaskVigencia.INDEFINIDO ? null : templateForm.vigenciaDays,
+    };
+    setSavingTemplate(true);
+    try {
+      if (editingTemplateId) {
+        await updateTemplate(editingTemplateId, payload);
+      } else {
+        await createTemplate({ ...payload, createdBy: currentUser.id });
+      }
+      closeTemplateModal();
+    } catch (err: any) {
+      alert("Error al guardar la plantilla: " + err.message);
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!window.confirm("¿Eliminar esta plantilla de tarea específica?")) return;
+    try {
+      await deleteTemplate(templateId);
+    } catch (err: any) {
+      alert("Error al eliminar la plantilla: " + err.message);
+    }
+  };
 
   const renderFormModal = () => {
     if (!showFormModal) return null;
@@ -319,6 +505,93 @@ export function DepartamentosTab() {
               </div>
             )}
           </div>
+
+          {/* Plantillas de tareas específicas */}
+          <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/30">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Plantillas de tareas específicas ({deptTemplates.length})</h4>
+              <Button
+                size="sm"
+                onClick={() => openTemplateModal(selectedDept)}
+                className="bg-sky-600 hover:bg-sky-700 text-white"
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />Nueva plantilla
+              </Button>
+            </div>
+            {deptTemplates.length === 0 ? (
+              <p className="px-4 py-6 text-center text-xs text-slate-500">No hay plantillas de tareas específicas para este departamento.</p>
+            ) : (
+              <div className="overflow-x-auto p-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400 uppercase tracking-wider">
+                      <th className="pb-3 pr-4">Título</th>
+                      <th className="pb-3 pr-4">Turnos</th>
+                      <th className="pb-3 pr-4">Asignadas</th>
+                      <th className="pb-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/50">
+                    {deptTemplates.map((template: any) => {
+                      const shiftNames = (template.shiftIds || (template.shiftId ? [template.shiftId] : []))
+                        .map((sid: string) => shifts.find((s: any) => s.id === sid)?.name || sid)
+                        .join(", ");
+                      return (
+                        <tr key={template.id} className="group">
+                          <td className="py-3 pr-4">
+                            <div className="flex items-center gap-2">
+                              <LayoutTemplate className="h-4 w-4 text-slate-500" />
+                              <span className="font-medium text-slate-200">{template.title}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 pr-4 text-xs text-slate-400">{shiftNames || "-"}</td>
+                          <td className="py-3 pr-4">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300 border border-slate-700">
+                              <Clock className="h-3 w-3" />
+                              {templateCounts[template.id] ?? 0}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => openTemplateModal(selectedDept, template)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-sky-400 hover:bg-sky-900/20"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => handleDeleteTemplate(template.id)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-red-400 hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderTemplateModal = () => {
+    if (!showTemplateModal) return null;
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeTemplateModal(); }}>
+        <div className="w-full max-w-[95vw] sm:max-w-2xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="mb-5 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-100">{editingTemplateId ? "Editar plantilla" : "Nueva plantilla"}</h3>
+            <button onClick={closeTemplateModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+          </div>
+          <SpecificTaskForm
+            form={templateForm}
+            setForm={setTemplateForm}
+            departments={departments.map((d: any) => ({ code: d.code || d.id, name: d.name }))}
+            shifts={shiftsForTemplateForm}
+            supervisorName={templateSupervisorName}
+            observers={templateObservers}
+            dueTime={templateDueTime}
+            onCancel={closeTemplateModal}
+            onSubmit={handleSaveTemplate}
+            disabled={savingTemplate}
+            isEditing={!!editingTemplateId}
+          />
         </div>
       </div>
     );
@@ -404,6 +677,7 @@ export function DepartamentosTab() {
 
       {renderFormModal()}
       {renderTeamModal()}
+      {renderTemplateModal()}
     </div>
   );
 }

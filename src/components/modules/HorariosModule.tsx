@@ -72,7 +72,7 @@ import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
-import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType } from '@/types';
+import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType, Task } from '@/types';
 import { sortShiftsByTime } from '@/lib/utils';
 
 import {
@@ -2546,6 +2546,98 @@ function EquipoTab({
           </button>
         </div>
       </div>
+
+      {/* Resumen de Tasks del departamento */}
+      {user?.department && (
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          {(() => {
+            const today = toLocalISODate(new Date());
+            const deptUsersList = getUsersByDepartment(user.department);
+            const deptMemberIds = deptUsersList.map((u) => u.id);
+
+            const todayDeptTasks = deptMemberIds.flatMap((memberId) =>
+              getTasksByUser(memberId).filter(
+                (t) => t.department === user.department && t.dueDate === today
+              )
+            );
+            const uniqueTodayTasks = [...new Map(todayDeptTasks.map((t) => [t.id, t])).values()] as Task[];
+
+            const overdueDeptTasks = deptMemberIds.flatMap((memberId) =>
+              getTasksByUser(memberId).filter(
+                (t) =>
+                  t.department === user.department &&
+                  t.dueDate &&
+                  t.dueDate < today &&
+                  t.status !== 'COMPLETED' &&
+                  t.status !== 'VERIFIED'
+              )
+            );
+            const uniqueOverdueTasks = [...new Map(overdueDeptTasks.map((t) => [t.id, t])).values()] as Task[];
+
+            const completedToday = uniqueTodayTasks.filter(
+              (t) => t.status === 'COMPLETED' || t.status === 'VERIFIED'
+            ).length;
+            const pendingToday = uniqueTodayTasks.filter(
+              (t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS'
+            ).length;
+            const totalTasks = uniqueTodayTasks.length + uniqueOverdueTasks.length;
+
+            const memberProgress = deptMemberIds.map((memberId) => {
+              const memberTasks = getTasksByUser(memberId).filter(
+                (t) => t.department === user.department && t.dueDate === today
+              );
+              const memberCompleted = memberTasks.filter(
+                (t) => t.status === 'COMPLETED' || t.status === 'VERIFIED'
+              ).length;
+              return memberTasks.length > 0 ? memberCompleted / memberTasks.length : 1;
+            });
+            const teamProgress =
+              memberProgress.length > 0
+                ? Math.round(
+                    (memberProgress.reduce((a, b) => a + b, 0) / memberProgress.length) * 100
+                  )
+                : 0;
+
+            return (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-corporate" />
+                    <span className="text-sm font-medium text-[#1D1D1F]">
+                      Tasks del equipo - {getDeptName(user.department)}
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-green-600">{teamProgress}%</span>
+                </div>
+                <div className="h-1.5 bg-[#E5E5E7] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 rounded-full transition-all"
+                    style={{ width: `${teamProgress}%` }}
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-[#F5F5F7] rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-[#1D1D1F]">{totalTasks}</p>
+                    <p className="text-[10px] text-[#86868B]">Total</p>
+                  </div>
+                  <div className="bg-green-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-green-600">{completedToday}</p>
+                    <p className="text-[10px] text-green-700">Completados</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-amber-600">{pendingToday}</p>
+                    <p className="text-[10px] text-amber-700">Pendientes</p>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-red-600">{uniqueOverdueTasks.length}</p>
+                    <p className="text-[10px] text-red-700">Atrasados</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Calendario */}
       <div className="bg-white rounded-2xl overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.04)] w-full max-w-full min-w-0">

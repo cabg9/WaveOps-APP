@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-16 (FASE 7.3 completada: app 100% online, sin datos hardcodeados)
+> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de tasks, incidencias, plantillas y resúmenes de equipo)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -272,6 +272,7 @@
 ### Archivos modificados
 - `src/components/Layout.tsx`
 - `src/components/GlobalFAB.tsx` (nuevo)
+- `src/components/SpecificTaskForm.tsx` (nuevo)
 - `src/components/modules/HorariosModule.tsx`
 - `src/components/modules/TasksModule.tsx`
 - `src/components/modules/DevelopsModule.tsx`
@@ -279,7 +280,10 @@
 - `src/components/modules/DepartamentosTab.tsx`
 - `src/components/ProfilePage.tsx`
 - `src/components/OnboardingPage.tsx`
+- `src/components/Dashboard.tsx`
+- `src/hooks/useTasks.tsx`
 - `src/hooks/firestore/useSpecificTaskTemplates.ts` (nuevo)
+- `src/hooks/firestore/useFirestoreTasks.ts`
 - `src/components/EditTaskModal.tsx`
 - `src/hooks/firestore/useFirestoreShifts.ts`
 - `src/hooks/firestore/ShiftsProvider.tsx`
@@ -342,8 +346,9 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Plantillas de tareas específicas**:
   - Nuevo campo `shiftIds` (array) para soportar **múltiples turnos** por plantilla, manteniendo `shiftId` legacy por compatibilidad.
   - UI del formulario con selección múltiple de turnos.
-  - Sección "Plantillas existentes" con botones **Editar** y **Eliminar** dentro del modal de Tarea Específica.
-  - `updateTemplate` expuesto y usado para guardar cambios en plantillas existentes.
+  - Nuevo componente reutilizable `SpecificTaskForm` extraído a `src/components/SpecificTaskForm.tsx`.
+  - **Las plantillas se gestionan desde Develops → Departamentos**: al abrir el detalle de un departamento aparece la sección "Plantillas de tareas específicas" con contador de personas asignadas y botones **Editar** / **Eliminar**.
+  - El botón flotante de **Tarea específica** en Tasks solo crea plantillas; ya no lista plantillas existentes.
 - **Supervisor automático para tareas específicas**:
   - Prioridad 1: supervisor del departamento que tenga alguno de los turnos seleccionados asignado (publicado).
   - Prioridad 2: cualquier supervisor del departamento.
@@ -353,8 +358,18 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Se agregó `isOperational` a `DynamicDepartment` y helpers `operationalDepartmentCodes` / `isOperationalDepartment`.
   - En Tasks → **Mi Depto**, el Gerente de Operaciones ve tareas de todos los departamentos marcados como operativos.
   - En Tasks → **Incidencias**, el Gerente de Operaciones ve incidencias de departamentos operativos por defecto (`all`).
+- **Fix crítico en lookup de tareas por usuario**:
+  - `getTasksByUser` en `useTasks.tsx` ahora filtra con `assignedTo?.includes(userId)` porque `assignedTo` es un array. Esto arregla los resúmenes de tasks que aparecían en 0 en Dashboard, Mi Horario y los popups de Equipo.
+- **Cálculo de atrasados por fecha local**:
+  - `getTaskCounts` (useFirestoreTasks) y `getOverdueTasks` (useTasks) ahora comparan `dueDate` (YYYY-MM-DD) contra la fecha local de hoy, evitando que tareas de hoy se marquen atrasadas por la hora UTC.
+- **Dashboard**:
+  - Tarjeta **Tasks** sigue mostrando pendientes y atrasados personales con cálculo local.
+  - **Resumen del Equipo** ahora usa el departamento del usuario: Total = tasks para hoy + atrasados de otras fechas; Completados = completados hoy; Atrasados = atrasados del departamento.
+- **Horarios → Equipo**:
+  - Nueva tarjeta "Tasks del equipo" con resumen del departamento del usuario para el día de hoy: total, completados, pendientes, atrasados y barra de progreso calculada entre los integrantes del departamento.
+  - Los popups de día y de colaborador ahora cargan correctamente las tareas asignadas gracias al fix de `getTasksByUser`.
 - **Incidencias**:
-  - Botón **Resolver** solo aparece cuando cada departamento involucrado ha sido verificado por su gerente/supervisor; si un departamento no tiene gerente/supervisor, permite verificación de superiores (Gerente de Operaciones si es operativo, RRHH, Director, Director General).
+  - Botón **Resolver** ahora requiere que **supervisor Y gerente del departamento reportado** hayan verificado. Si el departamento no tiene uno de esos roles, un superior (Gerente de Operaciones si es operativo, RRHH, Director, Director General) puede cubrirlo.
   - Notas: botón **Guardar** ahora usa `form onSubmit` para funcionar tanto con click como con Enter.
   - Fotos: muestran avatar y nombre del que subió, tanto en la tarjeta como en el historial.
   - Avatares reales en reportero, verificadores y visualizadores.
@@ -369,9 +384,12 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
-- Validar edición/eliminación de plantillas de tareas específicas.
+- Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos.
+- Validar que el botón flotante de Tarea Específica ya no liste plantillas y solo cree.
 - Validar supervisor automático y fallback en distintos escenarios.
 - Validar requisitos para completar tarea específica (subtareas/foto).
+- Validar resúmenes de tasks en Dashboard, Mi Horario y Equipo.
+- Validar que Resolver en incidencias exija verificación de supervisor Y gerente.
 
 ### Contenido tentativo adicional
 - Ajustes de espaciado, alineación y comportamiento de dropdowns en móvil.
