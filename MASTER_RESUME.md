@@ -437,6 +437,32 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Orden de turnos en Asignar**: se verificó que el listado de turnos disponibles se ordena cronológicamente por `startTime` mediante `sortShiftsByTime` tanto para un departamento específico como para "Todos los departamentos".
 - **Archivos modificados adicionales**: `src/hooks/firestore/useDynamicDepartments.ts`.
 
+### Fixes de esta ronda (P5-P10)
+- **Prioridad 5 — Solicitudes de días libres**:
+  - Nuevo botón **Eliminar** en las tarjetas de solicitudes de tiempo libre.
+  - Disponible para aprobadores en cualquier solicitud, y para el solicitante en sus solicitudes no aprobadas.
+  - Incluye modal de confirmación para evitar borrados accidentales.
+  - Al eliminar una solicitud ajena, el solicitante recibe una notificación.
+- **Prioridad 6 — Avatares y fotos reales**:
+  - `DevelopsModule`: la lista de **Directores Generales** y la **papelera de usuarios eliminados** ahora usan `UserAvatar` con `photoURL`/`avatar` en lugar de iniciales.
+  - `HorariosModule`: al registrar una incapacidad o crear una solicitud de cambio de turno, se guarda la foto real del usuario (`photoURL`/`avatar`) en lugar de generar iniciales.
+- **Prioridad 7 — Dashboard tarjeta Horarios**:
+  - El texto inferior de la tarjeta de Horarios ahora usa `getDeptName` para mostrar el nombre legible del departamento.
+- **Prioridad 8 — Feedback y FAB**:
+  - Ya estaba implementado: FAB global con Feedback, guardado en Firestore, panel **Develops → Feedback** para gestionar reportes.
+- **Prioridad 9 — Responsive**:
+  - Ya estaba implementado en la FASE 7.2; se mantienen los ajustes de filtros, tablas sticky y calendarios.
+- **Prioridad 10 — Invitaciones y permisos por usuario**:
+  - **Invitaciones**: se corrigió el enlace de invitación para que use el origen actual de la app (`window.location.origin`) en lugar de `my.waveops.app`.
+  - La función `sendInvitationEmail` ahora usa `set({ merge: true })` para soportar reenvío a usuarios cuyo documento fue eliminado.
+  - Se invalidan invitaciones anteriores pendientes al reenviar, para que el email más reciente sea el único válido.
+  - La función `acceptInvitation` ahora crea el documento de usuario en Firestore si no existe.
+  - **Permisos por usuario**: nuevo campo `visibleDepartments` en el tipo `User` y en el formulario de usuario de Develops.
+  - Nuevo helper `getVisibleDepartmentCodes` en `useDynamicDepartments`: respeta roles (DG/Director/RRHH = todos; Gerente de Operaciones = operativos; otros = propio + visibles adicionales).
+  - En **Horarios → Equipo/Asignar**, los dropdowns de departamento ahora respetan la combinación de permisos de rol + departamentos visibles configurados manualmente.
+- **Build + Deploy**: `npm run build` limpio, deploy de **functions** y **hosting** a Firebase realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
