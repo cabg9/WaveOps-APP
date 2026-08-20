@@ -159,19 +159,22 @@ export default function Dashboard() {
         ? tasks.filter((t) => t.department === userDept)
         : [];
 
+  const now = new Date();
+  const isTaskOverdue = (t: any) => {
+    if (!t.dueDate || t.status === 'COMPLETED' || t.status === 'VERIFIED') return false;
+    const due = new Date(`${t.dueDate}T${t.dueTime || '23:59'}`);
+    return due < now;
+  };
+
   const deptTodayTasks = deptTasks.filter((t) => t.dueDate === todayStr);
-  const deptOverdue = deptTasks.filter(
-    (t) =>
-      (t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED') ||
-      (t.dueDate === todayStr && t.status === 'OVERDUE')
-  );
+  const deptOverdue = deptTasks.filter(isTaskOverdue);
+  const deptOverduePrevious = deptOverdue.filter((t) => t.dueDate < todayStr);
   const deptCompletedToday = deptTodayTasks.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED');
-  const teamTotalTasks = deptTodayTasks.length + deptOverdue.length;
+  const teamTotalTasks = deptTodayTasks.length + deptOverduePrevious.length;
   const userId = user?.id;
 
   // ─── TURNO DE HOY ───
   const todayShifts = userId ? getUserShifts(userId, todayStr) : [];
-  const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
   const parseMinutes = (time: string) => {
     const [h, m] = time.split(':').map(Number);

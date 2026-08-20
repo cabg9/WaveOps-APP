@@ -409,10 +409,9 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Botón **Agregar** en el detalle del turno para crear una nueva tarea específica vinculada directamente a ese turno y departamento.
   - El modal de edición/creación reutiliza `SpecificTaskForm` con supervisor y observadores calculados automáticamente.
 - **Cálculo de atrasados corregido**:
-  - En **Dashboard → Resumen del Equipo** y **Horarios → Equipo**, el contador **Atrasados** ahora suma:
-    - Tareas con `dueDate < hoy` y estado distinto a COMPLETED/VERIFIED.
-    - Tareas de **hoy** con estado `OVERDUE`.
-  - Esto refleja el total real de tareas atrasadas del equipo, incluyendo las de fechas anteriores y las marcadas como atrasadas el día actual.
+  - En **Dashboard → Resumen del Equipo** y **Horarios → Equipo**, el contador **Atrasados** ahora usa la **misma lógica que Tasks**: una tarea es atrasada si `new Date(dueDate + 'T' + (dueTime || '23:59')) < ahora` y su estado no es COMPLETED/VERIFIED.
+  - Esto captura tareas de fechas anteriores y tareas de hoy cuya hora límite ya venció (independientemente de si su estado es PENDING, IN_PROGRESS u OVERDUE), alineando el resumen con el contador real de Tasks.
+  - Se evita el doble conteo en **Total**: `Total = tareas de hoy + atrasadas de fechas anteriores`; **Atrasados** muestra el total incluyendo las de hoy.
 - **Alcance del Resumen del Equipo por rol**:
   - Director General y Director: ven todos los departamentos.
   - RRHH: ve todos los departamentos.

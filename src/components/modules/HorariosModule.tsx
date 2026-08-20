@@ -2564,6 +2564,13 @@ function EquipoTab({
               return t.department === targetDept;
             };
 
+            const now = new Date();
+            const isTaskOverdue = (t: Task) => {
+              if (!t.dueDate || t.status === 'COMPLETED' || t.status === 'VERIFIED') return false;
+              const due = new Date(`${t.dueDate}T${t.dueTime || '23:59'}`);
+              return due < now;
+            };
+
             const todayDeptTasks = deptMemberIds.flatMap((memberId) =>
               getTasksByUser(memberId).filter(
                 (t) => belongsToTargetDept(t) && t.dueDate === referenceDate
@@ -2573,15 +2580,11 @@ function EquipoTab({
 
             const overdueDeptTasks = deptMemberIds.flatMap((memberId) =>
               getTasksByUser(memberId).filter(
-                (t) =>
-                  belongsToTargetDept(t) &&
-                  (
-                    (t.dueDate && t.dueDate < referenceDate && t.status !== 'COMPLETED' && t.status !== 'VERIFIED') ||
-                    (t.dueDate === referenceDate && t.status === 'OVERDUE')
-                  )
+                (t) => belongsToTargetDept(t) && isTaskOverdue(t)
               )
             );
             const uniqueOverdueTasks = [...new Map(overdueDeptTasks.map((t) => [t.id, t])).values()] as Task[];
+            const overduePreviousTasks = uniqueOverdueTasks.filter((t) => t.dueDate < referenceDate);
 
             const completedToday = uniqueTodayTasks.filter(
               (t) => t.status === 'COMPLETED' || t.status === 'VERIFIED'
@@ -2589,7 +2592,7 @@ function EquipoTab({
             const pendingToday = uniqueTodayTasks.filter(
               (t) => t.status === 'PENDING' || t.status === 'IN_PROGRESS'
             ).length;
-            const totalTasks = uniqueTodayTasks.length + uniqueOverdueTasks.length;
+            const totalTasks = uniqueTodayTasks.length + overduePreviousTasks.length;
 
             const memberProgress = deptMemberIds.map((memberId) => {
               const memberTasks = getTasksByUser(memberId).filter(
