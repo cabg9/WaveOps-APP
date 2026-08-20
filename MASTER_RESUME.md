@@ -458,8 +458,13 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Se invalidan invitaciones anteriores pendientes al reenviar, para que el email más reciente sea el único válido.
   - La función `acceptInvitation` ahora crea el documento de usuario en Firestore si no existe.
   - **Permisos por usuario**: nuevo campo `visibleDepartments` en el tipo `User` y en el formulario de usuario de Develops.
-  - Nuevo helper `getVisibleDepartmentCodes` en `useDynamicDepartments`: respeta roles (DG/Director/RRHH = todos; Gerente de Operaciones = operativos; otros = propio + visibles adicionales).
-  - En **Horarios → Equipo/Asignar**, los dropdowns de departamento ahora respetan la combinación de permisos de rol + departamentos visibles configurados manualmente.
+  - Nuevo helper `getVisibleDepartmentCodes` en `useDynamicDepartments` basado en jerarquía:
+    - **Staff**: no ve pestañas Equipo/Asignar.
+    - **Supervisor / Gerente de departamento**: solo su departamento.
+    - **Gerente de Operaciones**: solo departamentos marcados como `isOperational`.
+    - **RRHH / Director / Director General**: todos los departamentos.
+    - Cualquier rol puede sumar departamentos adicionales mediante `visibleDepartments` configurado manualmente en Develops.
+  - En **Horarios → Equipo/Asignar**, los dropdowns de departamento ahora respetan la jerarquía de rol + `visibleDepartments`; se eliminó la dependencia del toggle `canViewAllDepartmentsInTeam` para estos dropdowns.
 - **Build + Deploy**: `npm run build` limpio, deploy de **functions** y **hosting** a Firebase realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
