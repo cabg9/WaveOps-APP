@@ -100,7 +100,7 @@ export function useDynamicDepartments() {
 
   const getDeptShortName = (code: string): string => {
     const dept = departments.find(d => d.code === code);
-    return dept?.shortName || code;
+    return dept?.shortName || dept?.name || code;
   };
 
   const operationalDepartmentCodes = useMemo(() => {

@@ -420,6 +420,23 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (post-deploy anterior)
+- **Toggle en Develops para ver todos los departamentos en Horarios**:
+  - Nuevo permiso `canViewAllDepartmentsInTeam` en `Permission`, `permissions-config` y `DevelopsModule`.
+  - En **Equipo** y **Asignar**, el dropdown de departamento ahora muestra **"Todos los departamentos"** solo si el usuario tiene el permiso activo (también respeta plantillas de rol dinámicas desde Firestore).
+  - Si el usuario no tiene el permiso, el sistema fuerza automáticamente su departamento como selección.
+- **Restricciones de asignación por rol en Horarios → Asignar**:
+  - **Gerente de departamento / Supervisor / Staff**: solo pueden ver/asignar turnos de su propio departamento.
+  - **Gerente de Operaciones**: solo puede ver/asignar turnos de los departamentos marcados como `isOperational` en Develops → Departamentos.
+  - **RRHH, Director, Director General**: pueden asignar en todos los departamentos.
+  - La restricción aplica tanto al selector de departamento del sidebar desktop como al filtro móvil de Equipo/Asignar; el sistema corrige la selección si queda fuera del alcance permitido.
+- **Nombre corto correcto del departamento en Mi Horario**:
+  - `getDeptShortName` en `useDynamicDepartments` ahora hace fallback al **nombre completo** del departamento (`name`) cuando `shortName` no está configurado en Firestore, evitando mostrar códigos como `DIVE_SHOP`.
+  - El popup de detalle del día en **Mi Horario** muestra el nombre legible del departamento (`getDeptName`) en lugar de `shift.department.replace(/_/g, ' ')`.
+  - El label de ubicación en **Mi Horario** usa `getDeptName(user?.department)`.
+- **Orden de turnos en Asignar**: se verificó que el listado de turnos disponibles se ordena cronológicamente por `startTime` mediante `sortShiftsByTime` tanto para un departamento específico como para "Todos los departamentos".
+- **Archivos modificados adicionales**: `src/hooks/firestore/useDynamicDepartments.ts`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.

@@ -34,6 +34,7 @@ const LEVEL_1_PERMISSIONS: Permission[] = [
   'canReopenTask',
   // Horarios
   'canViewTeam',
+  'canViewAllDepartmentsInTeam',
   'canAssignShifts',
   'canModifyShifts',
   'canApproveChanges',
@@ -48,6 +49,14 @@ const LEVEL_1_PERMISSIONS: Permission[] = [
   'canResolveIncidencia',
   'canCloseIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 2: Director - Casi todo, sin Develops
@@ -74,6 +83,7 @@ const LEVEL_2_PERMISSIONS: Permission[] = [
   'canReopenTask',
   // Horarios
   'canViewTeam',
+  'canViewAllDepartmentsInTeam',
   'canAssignShifts',
   'canModifyShifts',
   'canApproveChanges',
@@ -88,6 +98,14 @@ const LEVEL_2_PERMISSIONS: Permission[] = [
   'canResolveIncidencia',
   'canCloseIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 3: RRHH - Gestión de personal, todo en Tasks
@@ -114,6 +132,7 @@ const LEVEL_3_PERMISSIONS: Permission[] = [
   'canReopenTask',
   // Horarios
   'canViewTeam',
+  'canViewAllDepartmentsInTeam',
   'canAssignShifts',
   'canModifyShifts',
   'canApproveChanges',
@@ -128,6 +147,14 @@ const LEVEL_3_PERMISSIONS: Permission[] = [
   'canResolveIncidencia',
   'canCloseIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 4: Gerente Operaciones - Todo operativo
@@ -154,6 +181,7 @@ const LEVEL_4_PERMISSIONS: Permission[] = [
   'canReopenTask',
   // Horarios
   'canViewTeam',
+  'canViewAllDepartmentsInTeam',
   'canAssignShifts',
   'canModifyShifts',
   'canApproveChanges',
@@ -167,6 +195,14 @@ const LEVEL_4_PERMISSIONS: Permission[] = [
   'canResolveIncidencia',
   'canCloseIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 5: Gerente Departamento - Su departamento
@@ -203,6 +239,14 @@ const LEVEL_5_PERMISSIONS: Permission[] = [
   'canResolveIncidencia',
   'canCloseIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 6: Supervisor - Su departamento, menos permisos
@@ -234,6 +278,14 @@ const LEVEL_6_PERMISSIONS: Permission[] = [
   'canConfirmIncidenciaAsSupervisor',
   'canResolveIncidencia',
   'canReopenIncidencia',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canViewTeamIncapacidades',
+  'canVerifyIncapacidad',
+  'canRegisterIncapacidad',
+  'canRejectIncapacidad',
+  'canRequestIncapacidadDocs',
+  'canUploadIncapacidadDocs',
 ];
 
 // Nivel 7: Staff - Solo operaciones básicas
@@ -253,6 +305,9 @@ const LEVEL_7_PERMISSIONS: Permission[] = [
   // Incidencias
   'canCreateIncidencia',
   'canViewOwnDepartmentIncidencias',
+  // Incapacidades
+  'canViewOwnIncapacidades',
+  'canUploadIncapacidadDocs',
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -473,6 +528,7 @@ export const getPermissionLabel = (permission: Permission): string => {
     'canReopenTask': 'Reabrir Tareas',
     // Horarios
     'canViewTeam': 'Ver Equipo',
+    'canViewAllDepartmentsInTeam': 'Ver todos los departamentos en Equipo',
     'canAssignShifts': 'Asignar Turnos',
     'canModifyShifts': 'Modificar Turnos',
     'canApproveChanges': 'Aprobar Cambios',
@@ -488,6 +544,14 @@ export const getPermissionLabel = (permission: Permission): string => {
     'canResolveIncidencia': 'Resolver Incidencias',
     'canCloseIncidencia': 'Cerrar Incidencias',
     'canReopenIncidencia': 'Reabrir Incidencias',
+    // Incapacidades
+    'canViewOwnIncapacidades': 'Ver Incapacidades Propias',
+    'canViewTeamIncapacidades': 'Ver Incapacidades del Equipo',
+    'canVerifyIncapacidad': 'Verificar Incapacidades',
+    'canRegisterIncapacidad': 'Registrar Incapacidades',
+    'canRejectIncapacidad': 'Rechazar Incapacidades',
+    'canRequestIncapacidadDocs': 'Solicitar Documentos de Incapacidad',
+    'canUploadIncapacidadDocs': 'Subir Documentos de Incapacidad',
   };
   return labels[permission] || permission;
 };

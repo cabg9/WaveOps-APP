@@ -13,6 +13,7 @@ import { db } from '@/firebase-config';
 import { useAuth } from './useFirestoreAuth';
 import { Role } from '@/types';
 import type { AppModule, AppSettings, RoleTemplate } from '@/types/develops';
+import { hasPermission as hasStaticPermission } from '@/lib/permissions-config';
 
 // ═══════════════════════════════════════════════════════════════════
 // ESTADO INICIAL
@@ -200,7 +201,10 @@ export function useAppConfig() {
       if (!user) return false;
       // Director General tiene acceso total
       if (user.role === Role.DIRECTOR_GENERAL) return true;
-      return userRoleTemplate?.permissions?.includes(perm) ?? false;
+      // Si hay plantilla de rol dinámica, usarla
+      if (userRoleTemplate?.permissions?.includes(perm)) return true;
+      // Fallback a permisos estáticos por nivel/rol
+      return hasStaticPermission(user, perm as any);
     },
     [user, userRoleTemplate]
   );

@@ -182,10 +182,53 @@ interface IncapacidadesTabProps {
 
 export default function HorariosModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
+
+  // Redirigir a Mi Horario si la pestaña activa ya no está permitida para el usuario
+  useEffect(() => {
+    const allowedTabs: TabType[] = ['mi-horario', 'solicitudes'];
+    if (hasPermission('canViewTeam')) allowedTabs.push('equipo');
+    if (hasPermission('canAssignShifts')) allowedTabs.push('asignar');
+    if (hasPermission('canViewOwnIncapacidades') || hasPermission('canViewTeamIncapacidades')) allowedTabs.push('incapacidades');
+    if (!allowedTabs.includes(activeTab)) {
+      setActiveTab('mi-horario');
+    }
+  }, [activeTab, hasPermission]);
+
+  // Forzar departamento permitido en Equipo/Asignar según permisos y rol
+  useEffect(() => {
+    if (!user) return;
+    const canViewAll = hasPermission('canViewAllDepartmentsInTeam');
+    if (!canViewAll) {
+      if (selectedDepartment === 'ALL' || selectedDepartment !== user.department) {
+        setSelectedDepartment(user.department || departmentCodes[0] || '');
+      }
+      return;
+    }
+    // Gerente de Operaciones en Asignar: solo departamentos operativos
+    if (activeTab === 'asignar' && user.role === Role.GERENTE_OPERACIONES) {
+      if (selectedDepartment === 'ALL' || !operationalDepartmentCodes.includes(selectedDepartment)) {
+        setSelectedDepartment(user.department && operationalDepartmentCodes.includes(user.department)
+          ? user.department
+          : operationalDepartmentCodes[0] || departmentCodes[0] || '');
+      }
+    }
+  }, [user, hasPermission, selectedDepartment, departmentCodes, activeTab, operationalDepartmentCodes]);
+
+  // Opciones de departamento para el filtro móvil de Equipo/Asignar
+  const mobileDeptOptions = useMemo(() => {
+    if (!user) return departmentOptions;
+    if (!hasPermission('canViewAllDepartmentsInTeam')) {
+      return departmentOptions.filter(d => d.code === user.department);
+    }
+    if (activeTab === 'asignar' && user.role === Role.GERENTE_OPERACIONES) {
+      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
+    }
+    return departmentOptions;
+  }, [departmentOptions, user, hasPermission, activeTab, operationalDepartmentCodes]);
 
   // Estado compartido para navegación de semana en Equipo (controlado desde header principal)
   const [equipoWeekOffset, setEquipoWeekOffset] = useState(0);
@@ -344,10 +387,10 @@ export default function HorariosModule() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="mi-horario">Mi Horario</SelectItem>
-                <SelectItem value="equipo">Equipo</SelectItem>
+                {hasPermission('canViewTeam') && <SelectItem value="equipo">Equipo</SelectItem>}
                 {hasPermission('canAssignShifts') && <SelectItem value="asignar">Asignar</SelectItem>}
                 <SelectItem value="solicitudes">Solicitudes</SelectItem>
-                {(user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || user?.role === Role.DIRECTOR_GENERAL) && (
+                {(hasPermission('canViewOwnIncapacidades') || hasPermission('canViewTeamIncapacidades')) && (
                   <SelectItem value="incapacidades">Incapacidades</SelectItem>
                 )}
               </SelectContent>
@@ -385,41 +428,48 @@ export default function HorariosModule() {
 
             {/* Mobile: filtro de departamento para Equipo/Asignar */}
             {(activeTab === 'equipo' || activeTab === 'asignar') && (
-              <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {selectedDepartment === 'ALL' ? (
-                      <div className="flex items-center gap-2 text-[#86868B]">
-                        <LayoutGrid className="w-4 h-4" />
-                        <span>Todos</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-[#86868B]">
-                        <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                        <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                      </div>
+              mobileDeptOptions.length > 1 ? (
+                <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                    <SelectValue>
+                      {selectedDepartment === 'ALL' ? (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <LayoutGrid className="w-4 h-4" />
+                          <span>Todos</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                          <span className="truncate max-w-[100px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hasPermission('canViewAllDepartmentsInTeam') && !(activeTab === 'asignar' && user?.role === Role.GERENTE_OPERACIONES) && (
+                      <SelectItem value="ALL">
+                        <div className="flex items-center gap-2">
+                          <LayoutGrid className="w-4 h-4" />
+                          <span>Todos</span>
+                        </div>
+                      </SelectItem>
                     )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.GERENTE_OPERACIONES) && (
-                    <SelectItem value="ALL">
-                      <div className="flex items-center gap-2">
-                        <LayoutGrid className="w-4 h-4" />
-                        <span>Todos</span>
-                      </div>
-                    </SelectItem>
-                  )}
-                  {departmentOptions.map((dept) => (
-                    <SelectItem key={dept.code} value={dept.code}>
-                      <div className="flex items-center gap-2">
-                        <DeptIcon department={dept.code} className="w-4 h-4" />
-                        <span>{dept.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {mobileDeptOptions.map((dept) => (
+                      <SelectItem key={dept.code} value={dept.code}>
+                        <div className="flex items-center gap-2">
+                          <DeptIcon department={dept.code} className="w-4 h-4" />
+                          <span>{dept.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
+                  <DeptIcon department={mobileDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
+                  <span className="truncate max-w-[120px]">{getDeptName(mobileDeptOptions[0]?.code || user?.department || '')}</span>
+                </div>
+              )
             )}
 
             {/* Mobile: filtros de incapacidades */}
@@ -521,18 +571,20 @@ export default function HorariosModule() {
               <User className="w-4 h-4" />
               Mi Horario
             </button>
-            <button
-              onClick={() => setActiveTab('equipo')}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                activeTab === 'equipo'
-                  ? 'bg-[#F5F5F7] text-[#1D1D1F]'
-                  : 'text-[#86868B] hover:text-[#1D1D1F]'
-              )}
-            >
-              <Users className="w-4 h-4" />
-              Equipo
-            </button>
+            {hasPermission('canViewTeam') && (
+              <button
+                onClick={() => setActiveTab('equipo')}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                  activeTab === 'equipo'
+                    ? 'bg-[#F5F5F7] text-[#1D1D1F]'
+                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <Users className="w-4 h-4" />
+                Equipo
+              </button>
+            )}
             {hasPermission('canAssignShifts') && (
               <button
                 onClick={() => setActiveTab('asignar')}
@@ -559,7 +611,7 @@ export default function HorariosModule() {
               <ClipboardList className="w-4 h-4" />
               Solicitudes
             </button>
-            {(user?.role === Role.SUPERVISOR || user?.role === Role.GERENTE_DEPARTAMENTO || user?.role === Role.GERENTE_OPERACIONES || user?.role === Role.DIRECTOR || user?.role === Role.DIRECTOR_GENERAL) && (
+            {(hasPermission('canViewOwnIncapacidades') || hasPermission('canViewTeamIncapacidades')) && (
               <button
                 onClick={() => setActiveTab('incapacidades')}
                 className={cn(
@@ -698,41 +750,46 @@ export default function HorariosModule() {
           {/* Desktop: controles de Equipo en header principal */}
           {activeTab === 'equipo' && (
             <div className="hidden md:flex items-center gap-2">
-              <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-                <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                  <SelectValue>
-                    {selectedDepartment === 'ALL' ? (
-                      <div className="flex items-center gap-2 text-[#86868B]">
-                        <LayoutGrid className="w-4 h-4" />
-                        <span>Todos</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-[#86868B]">
-                        <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                        <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                      </div>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.GERENTE_OPERACIONES) && (
+              {hasPermission('canViewAllDepartmentsInTeam') ? (
+                <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                    <SelectValue>
+                      {selectedDepartment === 'ALL' ? (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <LayoutGrid className="w-4 h-4" />
+                          <span>Todos</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 text-[#86868B]">
+                          <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                          <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                        </div>
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
                     <SelectItem value="ALL">
                       <div className="flex items-center gap-2">
                         <LayoutGrid className="w-4 h-4" />
                         <span>Todos</span>
                       </div>
                     </SelectItem>
-                  )}
-                  {departmentOptions.map((dept) => (
-                    <SelectItem key={dept.code} value={dept.code}>
-                      <div className="flex items-center gap-2">
-                        <DeptIcon department={dept.code} className="w-4 h-4" />
-                        <span>{dept.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {departmentOptions.map((dept) => (
+                      <SelectItem key={dept.code} value={dept.code}>
+                        <div className="flex items-center gap-2">
+                          <DeptIcon department={dept.code} className="w-4 h-4" />
+                          <span>{dept.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
+                  <DeptIcon department={user?.department || ''} className="w-4 h-4" />
+                  <span className="truncate max-w-[120px]">{getDeptName(user?.department || '')}</span>
+                </div>
+              )}
 
               <div className="flex items-center gap-1">
                 <button
@@ -1093,7 +1150,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
               <div className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-[#86868B]" />
                 <span className="text-sm text-[#86868B]">Ubicación:</span>
-                <span className="text-sm font-medium text-[#1D1D1F]">{user?.department?.replace(/_/g, ' ')}</span>
+                <span className="text-sm font-medium text-[#1D1D1F]">{getDeptName(user?.department || '')}</span>
               </div>
 
               {/* Botones de acción - Debajo de ubicación, más pequeños */}
@@ -1384,7 +1441,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                       <span className="text-xs text-[#86868B]">{shift.startTime} - {shift.endTime}</span>
                                       <div className="flex items-center gap-1 ml-auto px-1.5 py-0.5 bg-[#F5F5F7] rounded">
                                         <DeptIcon department={shift.department} className="w-3 h-3 text-[#86868B]" />
-                                        <span className="text-[10px] text-[#86868B]">{shift.department.replace(/_/g, ' ')}</span>
+                                        <span className="text-[10px] text-[#86868B]">{getDeptName(shift.department)}</span>
                                       </div>
                                     </div>
                                   ))}
@@ -2287,6 +2344,7 @@ function EquipoTab({
   weekDays: propWeekDays,
 }: EquipoTabProps) {
   const { user } = useAuth();
+  const { hasPermission } = useAppConfig();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
@@ -2486,43 +2544,48 @@ function EquipoTab({
     <div className="space-y-4">
       {/* Header: visible solo en móvil, en desktop se mueve a HorariosModule */}
       <div className="flex flex-row flex-wrap items-center justify-between gap-2 md:hidden">
-        {/* Desktop: filtro de departamento */}
+        {/* Filtro de departamento */}
         <div className="hidden sm:block">
-          <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-              <SelectValue>
-                {selectedDepartment === 'ALL' ? (
-                  <div className="flex items-center gap-2 text-[#86868B]">
-                    <LayoutGrid className="w-4 h-4" />
-                    <span>Todos</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-[#86868B]">
-                    <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                    <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                  </div>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {canViewAllDepartments && (
+          {hasPermission('canViewAllDepartmentsInTeam') ? (
+            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                <SelectValue>
+                  {selectedDepartment === 'ALL' ? (
+                    <div className="flex items-center gap-2 text-[#86868B]">
+                      <LayoutGrid className="w-4 h-4" />
+                      <span>Todos</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-[#86868B]">
+                      <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                      <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
                 <SelectItem value="ALL">
                   <div className="flex items-center gap-2">
                     <LayoutGrid className="w-4 h-4" />
                     <span>Todos los departamentos</span>
                   </div>
                 </SelectItem>
-              )}
-              {departments.map(dept => (
-                <SelectItem key={dept.code} value={dept.code}>
-                  <div className="flex items-center gap-2">
-                    <DeptIcon department={dept.code} className="w-4 h-4" />
-                    <span>{dept.name}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+                {departments.map(dept => (
+                  <SelectItem key={dept.code} value={dept.code}>
+                    <div className="flex items-center gap-2">
+                      <DeptIcon department={dept.code} className="w-4 h-4" />
+                      <span>{dept.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
+              <DeptIcon department={user?.department || ''} className="w-4 h-4" />
+              <span className="truncate max-w-[120px]">{getDeptName(user?.department || '')}</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -3839,6 +3902,7 @@ interface AsignarTabProps {
 
 function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate, selectedDepartment, setSelectedDepartment }: AsignarTabProps) {
   const { user } = useAuth();
+  const { hasPermission } = useAppConfig();
   const { 
     assignments: allAssignments,
     getShiftsByDepartment, 
@@ -3853,11 +3917,25 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     cleanupSpecificTasksForRemovedAssignment,
     shifts,
   } = useShifts();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
+
+  // Restricciones de asignación por rol
+  const canAssignAllDepartments = hasPermission('canViewAllDepartmentsInTeam');
+  const canAssignOperationalDepartments = user?.role === Role.GERENTE_OPERACIONES;
+
+  // Departamentos visibles en el selector de Asignar según rol
+  const visibleDepartmentOptions = useMemo(() => {
+    if (canAssignAllDepartments) return departmentOptions;
+    if (canAssignOperationalDepartments) {
+      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
+    }
+    // Gerente de departamento / Supervisor / Staff: solo su departamento
+    return departmentOptions.filter(d => d.code === user?.department);
+  }, [departmentOptions, canAssignAllDepartments, canAssignOperationalDepartments, operationalDepartmentCodes, user?.department]);
 
   // Solicitudes de tiempo libre aprobadas para bloquear asignaciones
   const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
@@ -3931,9 +4009,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   }, [users, getUsersByDepartment, selectedDepartment]);
 
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
-  const canViewCrossDepartment = user?.role === Role.DIRECTOR_GENERAL || 
-                                  user?.role === Role.GERENTE_OPERACIONES ||
-                                  user?.role === Role.DIRECTOR;
+  const canViewCrossDepartment = canAssignAllDepartments || canAssignOperationalDepartments;
   
   // Obtener usuarios de otros departamentos que tienen turnos asignados aquí
   const crossDeptUsers = useMemo(() => {
@@ -4062,9 +4138,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
               </SelectTrigger>
               <SelectContent>
                 {/* Opción Todos los departamentos - solo para usuarios con permisos */}
-                {(user?.role === Role.DIRECTOR_GENERAL || 
-                  user?.role === Role.DIRECTOR || 
-                  user?.role === Role.GERENTE_OPERACIONES) && (
+                {hasPermission('canViewAllDepartmentsInTeam') && (
                   <SelectItem value="ALL">
                     <div className="flex items-center gap-2">
                       <LayoutGrid className="w-4 h-4" />
@@ -4072,7 +4146,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     </div>
                   </SelectItem>
                 )}
-                {departments.map(dept => (
+                {visibleDepartmentOptions.map(dept => (
                   <SelectItem key={dept.code} value={dept.code}>
                     <div className="flex items-center gap-2">
                       <DeptIcon department={dept.code} className="w-4 h-4" />

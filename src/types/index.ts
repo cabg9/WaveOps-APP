@@ -370,6 +370,7 @@ export type Permission =
   | 'canReopenTask'
   // Horarios
   | 'canViewTeam'
+  | 'canViewAllDepartmentsInTeam'
   | 'canAssignShifts'
   | 'canModifyShifts'
   | 'canApproveChanges'
@@ -384,7 +385,15 @@ export type Permission =
   | 'canConfirmIncidenciaAsSupervisor'
   | 'canResolveIncidencia'
   | 'canCloseIncidencia'
-  | 'canReopenIncidencia';
+  | 'canReopenIncidencia'
+  // Incapacidades
+  | 'canViewOwnIncapacidades'
+  | 'canViewTeamIncapacidades'
+  | 'canVerifyIncapacidad'
+  | 'canRegisterIncapacidad'
+  | 'canRejectIncapacidad'
+  | 'canRequestIncapacidadDocs'
+  | 'canUploadIncapacidadDocs';
 
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXTOS

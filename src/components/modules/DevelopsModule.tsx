@@ -712,9 +712,10 @@ const PERMISSION_CATEGORIES: PermCat[] = [
     {key:"canBlockTask",label:"Bloquear"},{key:"canUnblockTask",label:"Desbloquear"},{key:"canReopenTask",label:"Reabrir"},
   ]},
   { key: "schedules", label: "Horarios y Turnos", icon: <CalendarClock size={16} />, perms: [
-    {key:"canViewTeam",label:"Ver equipo"},{key:"canAssignShifts",label:"Asignar turnos"},
-    {key:"canModifyShifts",label:"Modificar turnos"},{key:"canApproveChanges",label:"Aprobar cambios"},
-    {key:"canRejectChanges",label:"Rechazar cambios"},{key:"canRequestChange",label:"Solicitar cambios"},
+    {key:"canViewTeam",label:"Ver equipo"},{key:"canViewAllDepartmentsInTeam",label:"Ver todos los deptos. en Equipo"},
+    {key:"canAssignShifts",label:"Asignar turnos"},{key:"canModifyShifts",label:"Modificar turnos"},
+    {key:"canApproveChanges",label:"Aprobar cambios"},{key:"canRejectChanges",label:"Rechazar cambios"},
+    {key:"canRequestChange",label:"Solicitar cambios"},
   ]},
   { key: "incapacidades", label: "Incapacidades", icon: <HeartPulse size={16} />, perms: [
     {key:"canViewOwnIncapacidades",label:"Ver propias"},{key:"canViewTeamIncapacidades",label:"Ver del equipo"},
@@ -743,7 +744,7 @@ const PERM_DESCRIPTIONS: Record<string, string> = {
   "canEditAllTasks":"editar todas las tareas","canDeleteAllTasks":"eliminar todas las tareas",
   "canVerifyTask":"verificar tareas","canRateTask":"calificar tareas","canBlockTask":"bloquear tareas",
   "canUnblockTask":"desbloquear tareas","canReopenTask":"reabrir tareas",
-  "canViewTeam":"ver el equipo","canAssignShifts":"asignar turnos","canModifyShifts":"modificar turnos",
+  "canViewTeam":"ver el equipo","canViewAllDepartmentsInTeam":"ver todos los departamentos en Equipo","canAssignShifts":"asignar turnos","canModifyShifts":"modificar turnos",
   "canApproveChanges":"aprobar cambios","canRejectChanges":"rechazar cambios","canRequestChange":"solicitar cambios",
   "canViewOwnIncapacidades":"ver incapacidades propias","canViewTeamIncapacidades":"ver incapacidades del equipo",
   "canVerifyIncapacidad":"verificar incapacidades","canRegisterIncapacidad":"registrar incapacidades",
