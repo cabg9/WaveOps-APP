@@ -2575,10 +2575,10 @@ function EquipoTab({
               getTasksByUser(memberId).filter(
                 (t) =>
                   belongsToTargetDept(t) &&
-                  t.dueDate &&
-                  t.dueDate < referenceDate &&
-                  t.status !== 'COMPLETED' &&
-                  t.status !== 'VERIFIED'
+                  (
+                    (t.dueDate && t.dueDate < referenceDate && t.status !== 'COMPLETED' && t.status !== 'VERIFIED') ||
+                    (t.dueDate === referenceDate && t.status === 'OVERDUE')
+                  )
               )
             );
             const uniqueOverdueTasks = [...new Map(overdueDeptTasks.map((t) => [t.id, t])).values()] as Task[];

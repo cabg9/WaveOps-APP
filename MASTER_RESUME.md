@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de Dashboard, subtareas en tareas específicas, TurnosTab detallado y resumen de Equipo)
+> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de atrasados, alcance por rol y crear tarea específica desde Turnos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -406,7 +406,18 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Al hacer click en una tarjeta se abre un modal con dos secciones:
     - **Tareas específicas vinculadas**: tabla con título, inicio, duración, supervisor, cantidad de asignados y botones **Editar** / **Eliminar**.
     - **Personas asignadas recientemente**: lista de usuarios con avatar, nombre y fechas de asignación publicadas.
-  - El modal de edición reutiliza `SpecificTaskForm` con supervisor y observadores calculados automáticamente.
+  - Botón **Agregar** en el detalle del turno para crear una nueva tarea específica vinculada directamente a ese turno y departamento.
+  - El modal de edición/creación reutiliza `SpecificTaskForm` con supervisor y observadores calculados automáticamente.
+- **Cálculo de atrasados corregido**:
+  - En **Dashboard → Resumen del Equipo** y **Horarios → Equipo**, el contador **Atrasados** ahora suma:
+    - Tareas con `dueDate < hoy` y estado distinto a COMPLETED/VERIFIED.
+    - Tareas de **hoy** con estado `OVERDUE`.
+  - Esto refleja el total real de tareas atrasadas del equipo, incluyendo las de fechas anteriores y las marcadas como atrasadas el día actual.
+- **Alcance del Resumen del Equipo por rol**:
+  - Director General y Director: ven todos los departamentos.
+  - RRHH: ve todos los departamentos.
+  - Gerente de Operaciones: ve solo los departamentos marcados como operativos en Develops.
+  - Resto de roles: sigue viendo solo su departamento.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

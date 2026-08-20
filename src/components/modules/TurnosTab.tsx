@@ -7,6 +7,7 @@ import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useTasks } from '@/hooks/useTasks';
+import { useAuth } from '@/hooks/useFirestoreAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,9 +50,10 @@ function calculateDueTime(startTime: string, estimatedMinutes: number): string {
 export function TurnosTab() {
   const { departmentOptions } = useDynamicDepartments();
   const { shifts: firestoreShifts, assignments } = useFirestoreShifts();
-  const { templates, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
+  const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
   const { users } = useFirestoreUsers();
   const { tasks } = useTasks();
+  const { user: currentUser } = useAuth();
 
   const [firestoreShiftsLocal, setFirestoreShiftsLocal] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
@@ -288,8 +290,25 @@ export function TurnosTab() {
     });
   };
 
+  const openCreateTemplateForShift = (shift: Shift) => {
+    setEditingTemplate(null);
+    setTemplateForm({
+      title: '',
+      description: '',
+      department: shift.department,
+      shiftIds: [shift.id],
+      startTime: shift.startTime || '08:00',
+      estimatedMinutes: 60,
+      priority: TaskPriority.MEDIUM,
+      requiresPhoto: false,
+      vigenciaDays: TaskVigencia.INDEFINIDO,
+      subtasks: [],
+    });
+    setShowEditModal(true);
+  };
+
   const handleSaveTemplate = async () => {
-    if (!editingTemplate) return;
+    if (!currentUser?.id) return;
     if (!templateForm.title.trim() || templateForm.shiftIds.length === 0) {
       toast.error('Completa el título y selecciona al menos un turno');
       return;
@@ -314,11 +333,16 @@ export function TurnosTab() {
     };
     setSavingTemplate(true);
     try {
-      await updateTemplate(editingTemplate.id, payload);
-      toast.success('Plantilla actualizada');
+      if (editingTemplate) {
+        await updateTemplate(editingTemplate.id, payload);
+        toast.success('Plantilla actualizada');
+      } else {
+        await createTemplate({ ...payload, createdBy: currentUser.id });
+        toast.success('Plantilla creada');
+      }
       closeEditTemplate();
     } catch (err: any) {
-      toast.error('Error al actualizar: ' + err.message);
+      toast.error('Error al guardar: ' + err.message);
     } finally {
       setSavingTemplate(false);
     }
@@ -468,10 +492,19 @@ export function TurnosTab() {
             <div className="space-y-6">
               {/* Tareas específicas */}
               <div>
-                <h4 className="text-sm font-medium text-[#1D1D1F] mb-3 flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4 text-corporate" />
-                  Tareas específicas vinculadas
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-[#1D1D1F] flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4 text-corporate" />
+                    Tareas específicas vinculadas
+                  </h4>
+                  <Button
+                    size="sm"
+                    onClick={() => selectedShift && openCreateTemplateForShift(selectedShift)}
+                    className="bg-corporate hover:bg-corporate/90 text-white flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar
+                  </Button>
+                </div>
                 {(() => {
                   const shiftTemplates = getTemplatesForShift(selectedShift);
                   if (shiftTemplates.length === 0) {
@@ -557,7 +590,7 @@ export function TurnosTab() {
       <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Editar plantilla de tarea específica</DialogTitle>
+            <DialogTitle>{editingTemplate ? 'Editar plantilla de tarea específica' : 'Nueva tarea específica para este turno'}</DialogTitle>
           </DialogHeader>
           <SpecificTaskForm
             form={templateForm}

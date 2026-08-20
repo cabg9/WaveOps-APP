@@ -28,6 +28,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
 import { useShifts } from '@/hooks/useShifts';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { db } from '@/firebase-config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -134,6 +135,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
   const { getUserShifts } = useShifts();
+  const { operationalDepartmentCodes } = useDynamicDepartments();
 
   const taskCounts = getTaskCounts();
 
@@ -146,15 +148,22 @@ export default function Dashboard() {
 
   // ─── CONTEOS DEL DEPARTAMENTO DEL USUARIO (Resumen de Equipo) ───
   const userDept = user?.department;
-  const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL;
+  const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.RRHH;
+  const isGerenteOperaciones = user?.role === Role.GERENTE_OPERACIONES;
+
   const deptTasks = canViewAllDepartments
     ? tasks
-    : userDept
-      ? tasks.filter((t) => t.department === userDept)
-      : [];
+    : isGerenteOperaciones
+      ? tasks.filter((t) => operationalDepartmentCodes.includes(t.department))
+      : userDept
+        ? tasks.filter((t) => t.department === userDept)
+        : [];
+
   const deptTodayTasks = deptTasks.filter((t) => t.dueDate === todayStr);
   const deptOverdue = deptTasks.filter(
-    (t) => t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED'
+    (t) =>
+      (t.dueDate && t.dueDate < todayStr && t.status !== 'COMPLETED' && t.status !== 'VERIFIED') ||
+      (t.dueDate === todayStr && t.status === 'OVERDUE')
   );
   const deptCompletedToday = deptTodayTasks.filter((t) => t.status === 'COMPLETED' || t.status === 'VERIFIED');
   const teamTotalTasks = deptTodayTasks.length + deptOverdue.length;
@@ -449,7 +458,11 @@ export default function Dashboard() {
               <h3 className="font-semibold text-[#1D1D1F]">Resumen del Equipo</h3>
             </div>
             <p className="text-sm text-[#86868B] mb-4">
-              {canViewAllDepartments ? 'Todos los departamentos' : (user?.department?.replace(/_/g, ' ') || 'Dive Shop')}
+              {canViewAllDepartments
+                ? 'Todos los departamentos'
+                : isGerenteOperaciones
+                  ? 'Departamentos operativos'
+                  : (user?.department?.replace(/_/g, ' ') || 'Dive Shop')}
             </p>
             
             <div className="space-y-3">
