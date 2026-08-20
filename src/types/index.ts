@@ -128,6 +128,7 @@ export interface User {
   certificationExpiry?: string;
   apneaCert?: string;
   joinDate?: string;
+  visibleDepartments?: string[]; // Departamentos adicionales que el usuario puede ver
   displayName?: string;
   nationality?: string;
   passport?: string;

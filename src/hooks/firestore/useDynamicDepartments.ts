@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/firebase-config';
+import { Role } from '@/types';
 
 // Mapeo de fallback: nombre legible → código del enum (para compatibilidad con datos existentes)
 const DEPT_NAME_TO_CODE: Record<string, string> = {
@@ -111,6 +112,21 @@ export function useDynamicDepartments() {
     return operationalDepartmentCodes.includes(code);
   }, [operationalDepartmentCodes]);
 
+  // Departamentos que un usuario específico puede ver además del propio.
+  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve operativos;
+  // otros usuarios ven su departamento + visibleDepartments configurado manualmente.
+  const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[] } | null): string[] => {
+    if (!user) return [];
+    if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) {
+      return departmentCodes;
+    }
+    if (user.role === Role.GERENTE_OPERACIONES) {
+      return operationalDepartmentCodes;
+    }
+    const extra = (user.visibleDepartments || []).filter(d => d && d !== user.department);
+    return Array.from(new Set([user.department, ...extra].filter(Boolean)));
+  }, [departmentCodes, operationalDepartmentCodes]);
+
   return {
     departments,
     departmentCodes,
@@ -119,6 +135,7 @@ export function useDynamicDepartments() {
     defaultDepartment,
     operationalDepartmentCodes,
     isOperationalDepartment,
+    getVisibleDepartmentCodes,
     getDeptName,
     getDeptCode,
     getDeptIcon,

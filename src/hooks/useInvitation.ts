@@ -15,7 +15,7 @@ export function useInvitation() {
       const res = await fetch(SEND_INVITATION_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, origin: window.location.origin }),
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || 'Error al enviar invitacion');

@@ -247,6 +247,7 @@ function UsuariosTab() {
     name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
     position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
+    visibleDepartments: [] as string[],
   });
 
   const roleLabels: Record<string, string> = {};
@@ -302,14 +303,14 @@ function UsuariosTab() {
       setShowForm(false);
       setEditingUser(null);
       setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
+    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] });
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
 
   const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setShowForm(true); };
+    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] }); setCreatedPassword(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
@@ -317,6 +318,7 @@ function UsuariosTab() {
       name: u.name?.split(' ')[0] || '', lastName: u.name?.split(' ').slice(1).join(' ') || '', email: u.email || '', role: u.role || 'STAFF',
       department: u.department || 'DIVE_SHOP', joinDate: u.joinDate || '', position: u.position || '',
       level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
+      visibleDepartments: u.visibleDepartments || [],
     });
     setShowForm(true);
   };
@@ -506,6 +508,31 @@ function UsuariosTab() {
                   <option key={opt.code} value={opt.code}>{opt.name}</option>
                 ))}
               </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs font-medium text-[#86868B] mb-1">Departamentos visibles adicionales</label>
+              <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-[#E5E5E7]">
+                {departmentOptions.map(opt => (
+                  <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={formData.visibleDepartments.includes(opt.code)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setFormData(prev => ({
+                          ...prev,
+                          visibleDepartments: checked
+                            ? [...prev.visibleDepartments, opt.code]
+                            : prev.visibleDepartments.filter(d => d !== opt.code)
+                        }));
+                      }}
+                      className="w-3.5 h-3.5 rounded border-[#E5E5E7]"
+                    />
+                    {opt.name}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-[#86868B] mt-1">El usuario siempre ve su departamento. Aquí se seleccionan departamentos adicionales que puede visualizar.</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
@@ -1114,9 +1141,7 @@ function SeguridadTab() {
             dgUsers.map((u) => (
               <div key={u.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl border border-[#E5E5E7] gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-corporate/10 flex items-center justify-center text-xs font-semibold text-corporate shrink-0">
-                    {u.name?.split(' ').map((n: string) => n[0]).join('').slice(0,2).toUpperCase()}
-                  </div>
+                  <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" fallbackClassName="bg-corporate/10 text-corporate text-xs" />
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-[#1D1D1F] truncate">{u.name}</p>
                     <p className="text-xs text-[#86868B] truncate">{u.email} &middot; {u.role}</p>
@@ -1286,7 +1311,7 @@ function PapeleraTab() {
           {trashedUsers.map((u: any) => (
             <div key={u.id} className="bg-white rounded-xl border border-[#E5E5E7] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs font-semibold">{(u.name || "?").charAt(0).toUpperCase()}</div>
+                <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" fallbackClassName="bg-gray-100 text-gray-400 text-xs" />
                 <div>
                   <div className="font-medium text-[#1D1D1F] text-sm">{u.name}</div>
                   <div className="text-xs text-[#86868B]">{u.email} &middot; Eliminado {u.deletedAt ? new Date(u.deletedAt).toLocaleDateString() : "recientemente"}</div>

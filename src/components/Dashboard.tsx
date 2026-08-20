@@ -135,7 +135,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
   const { getUserShifts } = useShifts();
-  const { operationalDepartmentCodes } = useDynamicDepartments();
+  const { operationalDepartmentCodes, getDeptName } = useDynamicDepartments();
 
   const taskCounts = getTaskCounts();
 
@@ -285,8 +285,8 @@ export default function Dashboard() {
         stat2: { label: 'Solicitudes', value: receivedChangeRequests },
         bottomText: relevantShift
           ? activeShift
-            ? `Activo · ${relevantShift.startTime}-${relevantShift.endTime} · ${relevantShift.department?.replace(/_/g, ' ') || 'Dive Shop'}`
-            : `${relevantShift.startTime}-${relevantShift.endTime} · ${relevantShift.department?.replace(/_/g, ' ') || 'Dive Shop'}`
+            ? `Activo · ${relevantShift.startTime}-${relevantShift.endTime} · ${getDeptName(relevantShift.department || '') || 'Dive Shop'}`
+            : `${relevantShift.startTime}-${relevantShift.endTime} · ${getDeptName(relevantShift.department || '') || 'Dive Shop'}`
           : 'Stand By',
         bottomStatus: relevantShift ? (activeShift ? 'active' : 'inactive') : 'progress',
       },

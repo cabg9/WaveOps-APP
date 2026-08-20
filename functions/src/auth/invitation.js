@@ -15,7 +15,7 @@ const sendInvitationEmail = onRequest(
     sgMail.setApiKey(sendgridKey);
 
     try {
-      const { email, name, role, department, userId } = req.body;
+      const { email, name, role, department, userId, origin } = req.body;
       if (!email || !name || !userId) {
         res.status(400).json({ error: "Faltan datos obligatorios" });
         return;
@@ -27,10 +27,21 @@ const sendInvitationEmail = onRequest(
       const expiresAt = new Date();
       expiresAt.setHours(expiresAt.getHours() + 72);
 
-      await db.collection("users").doc(userId).update({
+      await db.collection("users").doc(userId).set({
         invitationPending: true,
         invitedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      // Invalidar invitaciones anteriores pendientes para este usuario/email
+      const oldInvitations = await db.collection("invitations")
+        .where("userId", "==", userId)
+        .where("status", "==", "PENDING")
+        .get();
+      const batch = db.batch();
+      oldInvitations.docs.forEach((doc) => {
+        if (doc.id !== token) batch.update(doc.ref, { status: "SUPERSEDED", supersededAt: new Date().toISOString() });
       });
+      await batch.commit();
 
       await db.collection("invitations").doc(token).set({
         email, name, role, department, userId, token,
@@ -40,7 +51,8 @@ const sendInvitationEmail = onRequest(
         acceptedAt: null,
       });
 
-      const invitationLink = `https://my.waveops.app/invitation?token=${token}`;
+      const baseUrl = origin || `https://wve-b3db5.web.app`;
+      const invitationLink = `${baseUrl}/invitation?token=${token}`;
 
       try {
         const template = invitationEmailTemplate(name, invitationLink, "Dive X Surf");
@@ -109,7 +121,9 @@ const acceptInvitation = onRequest(
         console.log(`[acceptInvitation] Created new user: ${authUser.uid}`);
       }
 
-      await db.collection("users").doc(invData.userId).update({
+      const userRef = db.collection("users").doc(invData.userId);
+      const userSnap = await userRef.get();
+      const userUpdate = {
         authUid: authUser.uid,
         authCreated: true,
         authCreatedAt: new Date().toISOString(),
@@ -117,7 +131,22 @@ const acceptInvitation = onRequest(
         mustChangePassword: false,
         profileComplete: false,
         invitationPending: false,
-      });
+      };
+      if (userSnap.exists) {
+        await userRef.update(userUpdate);
+      } else {
+        await userRef.set({
+          id: invData.userId,
+          email: invData.email,
+          name: invData.name,
+          role: invData.role || 'STAFF',
+          department: invData.department || 'DIVE_SHOP',
+          level: 7,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          ...userUpdate,
+        });
+      }
       await invRef.update({
         status: "ACCEPTED",
         acceptedAt: new Date().toISOString(),

@@ -111,6 +111,7 @@ import {
   doc, 
   getDoc, 
   updateDoc,
+  deleteDoc,
   addDoc,
   setDoc,
   serverTimestamp,
@@ -182,7 +183,7 @@ interface IncapacidadesTabProps {
 
 export default function HorariosModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, operationalDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
@@ -198,37 +199,23 @@ export default function HorariosModule() {
     }
   }, [activeTab, hasPermission]);
 
-  // Forzar departamento permitido en Equipo/Asignar según permisos y rol
+  // Forzar departamento permitido en Equipo/Asignar según permisos, rol y departamentos visibles
   useEffect(() => {
     if (!user) return;
-    const canViewAll = hasPermission('canViewAllDepartmentsInTeam');
-    if (!canViewAll) {
-      if (selectedDepartment === 'ALL' || selectedDepartment !== user.department) {
-        setSelectedDepartment(user.department || departmentCodes[0] || '');
-      }
-      return;
+    if (hasPermission('canViewAllDepartmentsInTeam')) return;
+    const allowed = getVisibleDepartmentCodes(user);
+    if (selectedDepartment === 'ALL' || !allowed.includes(selectedDepartment)) {
+      setSelectedDepartment(allowed.includes(user.department) ? user.department : allowed[0] || departmentCodes[0] || '');
     }
-    // Gerente de Operaciones en Asignar: solo departamentos operativos
-    if (activeTab === 'asignar' && user.role === Role.GERENTE_OPERACIONES) {
-      if (selectedDepartment === 'ALL' || !operationalDepartmentCodes.includes(selectedDepartment)) {
-        setSelectedDepartment(user.department && operationalDepartmentCodes.includes(user.department)
-          ? user.department
-          : operationalDepartmentCodes[0] || departmentCodes[0] || '');
-      }
-    }
-  }, [user, hasPermission, selectedDepartment, departmentCodes, activeTab, operationalDepartmentCodes]);
+  }, [user, hasPermission, selectedDepartment, departmentCodes, getVisibleDepartmentCodes]);
 
-  // Opciones de departamento para el filtro móvil de Equipo/Asignar
-  const mobileDeptOptions = useMemo(() => {
+  // Opciones de departamento visibles para el usuario actual en Equipo/Asignar
+  const visibleDeptOptions = useMemo(() => {
     if (!user) return departmentOptions;
-    if (!hasPermission('canViewAllDepartmentsInTeam')) {
-      return departmentOptions.filter(d => d.code === user.department);
-    }
-    if (activeTab === 'asignar' && user.role === Role.GERENTE_OPERACIONES) {
-      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
-    }
-    return departmentOptions;
-  }, [departmentOptions, user, hasPermission, activeTab, operationalDepartmentCodes]);
+    if (hasPermission('canViewAllDepartmentsInTeam')) return departmentOptions;
+    const allowed = getVisibleDepartmentCodes(user);
+    return departmentOptions.filter(d => allowed.includes(d.code));
+  }, [departmentOptions, user, hasPermission, getVisibleDepartmentCodes]);
 
   // Estado compartido para navegación de semana en Equipo (controlado desde header principal)
   const [equipoWeekOffset, setEquipoWeekOffset] = useState(0);
@@ -301,6 +288,8 @@ export default function HorariosModule() {
         position: '',
         level: 7,
         isActive: true,
+        avatar: '',
+        photoURL: '',
       };
     }
     
@@ -315,6 +304,8 @@ export default function HorariosModule() {
         position: user.position || '',
         level: user.level || 7,
         isActive: true,
+        avatar: user.avatar || '',
+        photoURL: user.photoURL || '',
       };
     }
     
@@ -334,7 +325,7 @@ export default function HorariosModule() {
       await createIncapacidad({
         userId,
         userName: userInfo.name,
-        userAvatar: userInfo.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+        userAvatar: userInfo.photoURL || userInfo.avatar || '',
         userDepartment: userInfo.department,
         type,
         startDate: dates[0],
@@ -428,7 +419,7 @@ export default function HorariosModule() {
 
             {/* Mobile: filtro de departamento para Equipo/Asignar */}
             {(activeTab === 'equipo' || activeTab === 'asignar') && (
-              mobileDeptOptions.length > 1 ? (
+              visibleDeptOptions.length > 1 ? (
                 <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
                   <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                     <SelectValue>
@@ -446,7 +437,7 @@ export default function HorariosModule() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {hasPermission('canViewAllDepartmentsInTeam') && !(activeTab === 'asignar' && user?.role === Role.GERENTE_OPERACIONES) && (
+                    {hasPermission('canViewAllDepartmentsInTeam') && (
                       <SelectItem value="ALL">
                         <div className="flex items-center gap-2">
                           <LayoutGrid className="w-4 h-4" />
@@ -454,7 +445,7 @@ export default function HorariosModule() {
                         </div>
                       </SelectItem>
                     )}
-                    {mobileDeptOptions.map((dept) => (
+                    {visibleDeptOptions.map((dept) => (
                       <SelectItem key={dept.code} value={dept.code}>
                         <div className="flex items-center gap-2">
                           <DeptIcon department={dept.code} className="w-4 h-4" />
@@ -466,8 +457,8 @@ export default function HorariosModule() {
                 </Select>
               ) : (
                 <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
-                  <DeptIcon department={mobileDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
-                  <span className="truncate max-w-[120px]">{getDeptName(mobileDeptOptions[0]?.code || user?.department || '')}</span>
+                  <DeptIcon department={visibleDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
+                  <span className="truncate max-w-[120px]">{getDeptName(visibleDeptOptions[0]?.code || user?.department || '')}</span>
                 </div>
               )
             )}
@@ -750,7 +741,7 @@ export default function HorariosModule() {
           {/* Desktop: controles de Equipo en header principal */}
           {activeTab === 'equipo' && (
             <div className="hidden md:flex items-center gap-2">
-              {hasPermission('canViewAllDepartmentsInTeam') ? (
+              {visibleDeptOptions.length > 1 ? (
                 <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
                   <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                     <SelectValue>
@@ -768,13 +759,15 @@ export default function HorariosModule() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">
-                      <div className="flex items-center gap-2">
-                        <LayoutGrid className="w-4 h-4" />
-                        <span>Todos</span>
-                      </div>
-                    </SelectItem>
-                    {departmentOptions.map((dept) => (
+                    {hasPermission('canViewAllDepartmentsInTeam') && (
+                      <SelectItem value="ALL">
+                        <div className="flex items-center gap-2">
+                          <LayoutGrid className="w-4 h-4" />
+                          <span>Todos</span>
+                        </div>
+                      </SelectItem>
+                    )}
+                    {visibleDeptOptions.map((dept) => (
                       <SelectItem key={dept.code} value={dept.code}>
                         <div className="flex items-center gap-2">
                           <DeptIcon department={dept.code} className="w-4 h-4" />
@@ -786,8 +779,8 @@ export default function HorariosModule() {
                 </Select>
               ) : (
                 <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
-                  <DeptIcon department={user?.department || ''} className="w-4 h-4" />
-                  <span className="truncate max-w-[120px]">{getDeptName(user?.department || '')}</span>
+                  <DeptIcon department={visibleDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
+                  <span className="truncate max-w-[120px]">{getDeptName(visibleDeptOptions[0]?.code || user?.department || '')}</span>
                 </div>
               )}
 
@@ -2243,7 +2236,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         fechaSolicitud: now,
                         estado: 'pendiente',
                         motivo: changeReason || 'Sin motivo especificado',
-                        avatar: getInitials(user?.name || 'U'),
+                        avatar: user?.photoURL || user?.avatar || '',
                         historial: [
                           { fecha: now, accion: 'Solicitud creada', usuario: user?.name || 'Tú' }
                         ]
@@ -3917,25 +3910,21 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     cleanupSpecificTasksForRemovedAssignment,
     shifts,
   } = useShifts();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, operationalDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  // Restricciones de asignación por rol
+  // Restricciones de asignación por rol + departamentos visibles configurados por usuario
   const canAssignAllDepartments = hasPermission('canViewAllDepartmentsInTeam');
-  const canAssignOperationalDepartments = user?.role === Role.GERENTE_OPERACIONES;
 
-  // Departamentos visibles en el selector de Asignar según rol
+  // Departamentos visibles en el selector de Asignar según rol y configuración de usuario
   const visibleDepartmentOptions = useMemo(() => {
     if (canAssignAllDepartments) return departmentOptions;
-    if (canAssignOperationalDepartments) {
-      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
-    }
-    // Gerente de departamento / Supervisor / Staff: solo su departamento
-    return departmentOptions.filter(d => d.code === user?.department);
-  }, [departmentOptions, canAssignAllDepartments, canAssignOperationalDepartments, operationalDepartmentCodes, user?.department]);
+    const allowed = user ? getVisibleDepartmentCodes(user) : [user?.department].filter(Boolean) as string[];
+    return departmentOptions.filter(d => allowed.includes(d.code));
+  }, [departmentOptions, canAssignAllDepartments, user, getVisibleDepartmentCodes]);
 
   // Solicitudes de tiempo libre aprobadas para bloquear asignaciones
   const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
@@ -4009,7 +3998,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   }, [users, getUsersByDepartment, selectedDepartment]);
 
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
-  const canViewCrossDepartment = canAssignAllDepartments || canAssignOperationalDepartments;
+  const allowedForCrossDept = user ? getVisibleDepartmentCodes(user) : [];
+  const canViewCrossDepartment = canAssignAllDepartments || allowedForCrossDept.length > 1;
   
   // Obtener usuarios de otros departamentos que tienen turnos asignados aquí
   const crossDeptUsers = useMemo(() => {
@@ -6122,6 +6112,7 @@ interface TimeOffRequestsPanelProps {
   onReject: (req: TimeOffRequest) => void;
   onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string }) => void;
   onCancel: (req: TimeOffRequest) => void;
+  onDelete: (req: TimeOffRequest) => void;
   view?: 'mias' | 'equipo';
   onViewChange?: (view: 'mias' | 'equipo') => void;
   filter?: 'todas' | TimeOffRequest['status'];
@@ -6139,6 +6130,7 @@ function TimeOffRequestsPanel({
   onReject,
   onEdit,
   onCancel,
+  onDelete,
   view: controlledView,
   onViewChange,
   filter: controlledFilter,
@@ -6164,6 +6156,9 @@ function TimeOffRequestsPanel({
   const [editType, setEditType] = useState<TimeOffRequest['type']>('dia_libre');
   const [editStartDate, setEditStartDate] = useState('');
   const [editEndDate, setEditEndDate] = useState('');
+
+  // Modal de eliminación
+  const [deletingRequest, setDeletingRequest] = useState<TimeOffRequest | null>(null);
 
   const activeView = canApprove ? view : 'mias';
   const requests = activeView === 'mias' ? myRequests : teamRequests;
@@ -6317,6 +6312,15 @@ function TimeOffRequestsPanel({
                     Cancelar
                   </button>
                 )}
+                {(canApprove || (req.userId === user?.id && req.status !== 'aprobada')) && (
+                  <button
+                    onClick={() => setDeletingRequest(req)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Eliminar
+                  </button>
+                )}
               </div>
             </div>
           ))
@@ -6385,6 +6389,43 @@ function TimeOffRequestsPanel({
               className="flex-1 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Guardar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de confirmación para eliminar solicitud */}
+      <Dialog open={!!deletingRequest} onOpenChange={(open) => !open && setDeletingRequest(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Eliminar solicitud</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-[#1D1D1F]">
+              ¿Estás seguro de que querés eliminar la solicitud de{' '}
+              <span className="font-medium">{TIME_OFF_LABELS[deletingRequest?.type || 'dia_libre']}</span>{' '}
+              de <span className="font-medium">{deletingRequest?.userName}</span>?
+            </p>
+            <p className="text-xs text-[#86868B] mt-2">
+              Esta acción no se puede deshacer y el historial se perderá.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setDeletingRequest(null)}
+              className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                if (!deletingRequest) return;
+                onDelete(deletingRequest);
+                setDeletingRequest(null);
+              }}
+              className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
+            >
+              Eliminar
             </button>
           </div>
         </DialogContent>
@@ -6670,6 +6711,30 @@ function SolicitudesTab() {
     } catch (error) {
       console.error('Error al cancelar solicitud:', error);
       toast.error('No se pudo cancelar la solicitud');
+    }
+  };
+
+  const handleDeleteTimeOff = async (req: TimeOffRequest) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'timeOffRequests', req.id));
+      if (req.userId !== user.id) {
+        await addDoc(collection(db, 'notifications'), {
+          userId: req.userId,
+          type: NotificationType.VACATION_REJECTED,
+          title: 'Solicitud eliminada',
+          body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue eliminada.`,
+          data: { link: '/horarios' },
+          read: false,
+          createdAt: serverTimestamp(),
+          createdBy: user.id,
+          priority: 'normal',
+        });
+      }
+      toast.success('Solicitud eliminada');
+    } catch (error) {
+      console.error('Error al eliminar solicitud:', error);
+      toast.error('No se pudo eliminar la solicitud');
     }
   };
 
@@ -7294,6 +7359,7 @@ function SolicitudesTab() {
           onReject={handleRejectTimeOff}
           onEdit={handleEditTimeOff}
           onCancel={handleCancelTimeOff}
+          onDelete={handleDeleteTimeOff}
           view={timeOffView}
           onViewChange={setTimeOffView}
           filter={timeOffFilter}
