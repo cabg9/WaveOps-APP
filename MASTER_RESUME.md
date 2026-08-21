@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-20 (FASE 7.4 en progreso: jerarquía padre/hijo de departamentos, eliminación de campo `type`)
+> Última actualización: 2026-08-21 (FASE 7.4 en progreso: ajuste de permisos para Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -488,6 +488,24 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (alcance real del Gerente de Operaciones)
+- **Problema**: el Gerente de Operaciones seguía viendo departamentos administrativos y no operativos en **Horarios → Equipo/Asignar**, y en **Tasks** el dropdown de incidencias mostraba todos los departamentos.
+- **Causa**: los permisos estáticos de fallback (`permissions-config.ts` y `useFirestoreAuth.tsx`) otorgaban `canViewAllDepartmentsInTeam` y `canViewAllDepartments` al nivel 4 (Gerente de Operaciones), anulando la lógica de jerarquía operacional.
+- **Correcciones**:
+  - Se quitó `canViewAllDepartmentsInTeam` y `canViewAllDepartments` del nivel 4 en `src/lib/permissions-config.ts`.
+  - Se ajustó `canViewAllDepartments` en `src/hooks/useFirestoreAuth.tsx` de `level <= 4` a `level <= 3` (solo DG, Director y RRHH por defecto).
+  - En `src/components/modules/TasksModule.tsx` se creó `incidenciaDeptOptions`:
+    - **Director General / Director / RRHH**: ven todos los departamentos.
+    - **Gerente de Operaciones**: ve solo `OPERACIONES` y sus departamentos hijos (operacionales).
+    - El dropdown de incidencias muestra "Todos (operacionales)" para el Gerente de Operaciones.
+  - La pestaña **Tasks → Todas** ya no aparece para el Gerente de Operaciones al no tener `canViewAllDepartments`.
+- **Comportamiento ahora esperado**:
+  - **Horarios → Equipo/Asignar**: Gerente de Operaciones ve solo `OPERACIONES` + hijos operacionales.
+  - **Tasks → Incidencias**: Gerente de Operaciones filtra solo entre operacionales.
+  - **Develops → Roles**: si se activa manualmente el toggle `canViewAllDepartmentsInTeam` o `canViewAllDepartments` para el rol de Gerente de Operaciones, el permiso dinámico sigue respetándose.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
@@ -496,7 +514,7 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - Validar requisitos para completar tarea específica (subtareas/foto).
 - Validar resúmenes de tasks en Dashboard, Mi Horario y Equipo con el departamento seleccionado.
 - Validar que Resolver en incidencias exija verificación de supervisor Y gerente.
-- Validar que el Gerente de Operaciones vea su departamento (`OPERACIONES`) y todos sus departamentos hijos en Equipo, Asignar y Tasks.
+- Validar que el Gerente de Operaciones vea solo `OPERACIONES` y sus departamentos hijos en Equipo, Asignar y Tasks.
 
 ### Contenido tentativo adicional
 - Ajustes de espaciado, alineación y comportamiento de dropdowns en móvil.
