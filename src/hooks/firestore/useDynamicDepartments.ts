@@ -17,6 +17,9 @@ const DEPT_NAME_TO_CODE: Record<string, string> = {
   'Vessels': 'VESSELS',
 };
 
+const OPERATIONS_CODE = 'OPERACIONES';
+const ADMIN_CODE = 'ADMINISTRATIVO';
+
 export interface DynamicDepartment {
   id: string;
   name: string;
@@ -27,7 +30,6 @@ export interface DynamicDepartment {
   isActive: boolean;
   isOperational?: boolean;
   parentId?: string | null;
-  type?: 'parent' | 'child';
   createdAt?: string;
   updatedAt?: string;
 }
@@ -59,9 +61,7 @@ export function useDynamicDepartments() {
           shortName: data.shortName || name,
           order: data.order ?? 999,
           isActive: data.isActive !== false,
-          isOperational: data.isOperational === true,
           parentId: data.parentId || null,
-          type: data.type,
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
         });
@@ -84,6 +84,25 @@ export function useDynamicDepartments() {
   const departmentOptions = activeDepartments.map(d => ({ code: d.code, name: d.name }));
   const defaultDepartment = departmentNames[0] || '';
 
+  const operationsDept = useMemo(() => {
+    return activeDepartments.find(d => d.code === OPERATIONS_CODE);
+  }, [activeDepartments]);
+
+  const operationsDeptId = operationsDept?.id;
+
+  // A partir de ahora un departamento es "operacional" si:
+  // - Su código es OPERACIONES (el departamento padre), o
+  // - Su parentId apunta al departamento OPERACIONES.
+  // Esto reemplaza el campo manual `isOperational`.
+  const departmentsWithOperational = useMemo(() => {
+    return departments.map(d => ({
+      ...d,
+      isOperational: d.code === OPERATIONS_CODE || d.parentId === operationsDeptId,
+    }));
+  }, [departments, operationsDeptId]);
+
+  const activeDepartmentsWithOperational = departmentsWithOperational.filter(d => d.isActive);
+
   const getDeptName = (code: string): string => {
     const dept = departments.find(d => d.code === code);
     return dept?.name || code;
@@ -105,15 +124,17 @@ export function useDynamicDepartments() {
   };
 
   const operationalDepartmentCodes = useMemo(() => {
-    return activeDepartments.filter(d => d.isOperational).map(d => d.code);
-  }, [activeDepartments]);
+    return activeDepartmentsWithOperational
+      .filter(d => d.isOperational)
+      .map(d => d.code);
+  }, [activeDepartmentsWithOperational]);
 
   const isOperationalDepartment = useCallback((code: string): boolean => {
     return operationalDepartmentCodes.includes(code);
   }, [operationalDepartmentCodes]);
 
   // Departamentos que un usuario específico puede ver además del propio.
-  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve operativos;
+  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve su departamento + hijos operacionales;
   // otros usuarios ven su departamento + visibleDepartments configurado manualmente.
   const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[] } | null): string[] => {
     if (!user) return [];
@@ -127,8 +148,12 @@ export function useDynamicDepartments() {
     return Array.from(new Set([user.department, ...extra].filter(Boolean)));
   }, [departmentCodes, operationalDepartmentCodes]);
 
+  const isProtectedDepartment = useCallback((code: string): boolean => {
+    return code === OPERATIONS_CODE || code === ADMIN_CODE;
+  }, []);
+
   return {
-    departments,
+    departments: departmentsWithOperational,
     departmentCodes,
     departmentNames,
     departmentOptions,
@@ -140,6 +165,7 @@ export function useDynamicDepartments() {
     getDeptCode,
     getDeptIcon,
     getDeptShortName,
+    isProtectedDepartment,
     loading,
   };
 }

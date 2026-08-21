@@ -18,7 +18,6 @@ function docToDepartment(id: string, data: any): Department {
     icon: data.icon || 'building',
     isActive: data.isActive !== false,
     parentId: data.parentId || null,
-    type: data.type || 'otro',
     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt?.toDate?.().toISOString() || data.updatedAt || new Date().toISOString(),
   };

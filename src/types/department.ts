@@ -7,7 +7,6 @@ export interface Department {
   icon: string;
   isActive: boolean;
   parentId: string | null;
-  type: 'administrativo' | 'operativo' | 'otro';
   createdAt: string;
   updatedAt: string;
 }

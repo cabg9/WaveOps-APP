@@ -8,6 +8,7 @@ import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartmen
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
 import { useFirestoreShifts } from "@/hooks/firestore/useFirestoreShifts";
 import { useSpecificTaskTemplates, CreateSpecificTaskTemplateData } from "@/hooks/firestore/useSpecificTaskTemplates";
+import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 import { useAuth } from "@/hooks/useFirestoreAuth";
 import { useAudit } from "@/hooks/useAudit";
 import { executeWithConfirm } from "@/lib/confirm-action";
@@ -81,6 +82,7 @@ export function DepartamentosTab() {
   const { user: currentUser } = useAuth();
   const { shifts } = useFirestoreShifts();
   const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
+  const { isOperationalDepartment } = useDynamicDepartments();
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -89,7 +91,7 @@ export function DepartamentosTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
-    code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo",
+    code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null,
   });
   const [saving, setSaving] = useState(false);
 
@@ -120,8 +122,8 @@ export function DepartamentosTab() {
   const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
   const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
 
-  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null, type: "operativo" }); setShowFormModal(true); };
-  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId, type: dept.type || "otro" }); setShowFormModal(true); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
+  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true); };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
   const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
@@ -149,6 +151,8 @@ export function DepartamentosTab() {
   };
 
   const handleDelete = async (dept: any) => {
+    const PROTECTED_CODES = ["OPERACIONES", "ADMINISTRATIVO"];
+    if (PROTECTED_CODES.includes(dept.code)) { alert("No se puede eliminar el departamento " + dept.name + " por seguridad."); return; }
     const hasChildren = childDepts.some((c: any) => c.parentId === dept.id);
     if (hasChildren) { alert("No se puede eliminar porque tiene sub-departamentos."); return; }
     const count = await checkUsersInDepartment(dept.name);
@@ -361,22 +365,15 @@ export function DepartamentosTab() {
               <Label className="text-slate-300">Descripcion</Label>
               <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-slate-600 bg-slate-700 text-slate-100" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Tipo</Label>
-                <select value={form.type} onChange={(e) => setForm(f => ({ ...f, type: e.target.value as any }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
-                  <option value="administrativo">Administrativo</option>
-                  <option value="operativo">Operativo</option>
-                  <option value="otro">Otro</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Departamento Padre</Label>
-                <select value={form.parentId || ""} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
-                  <option value="">Ninguno (raiz)</option>
-                  {departments.filter((d: any) => d.id !== editingId).map((d: any) => (<option key={d.id} value={d.id}>{d.name}</option>))}
-                </select>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-300">Departamento Padre</Label>
+              <select value={form.parentId || ""} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
+                <option value="">Ninguno (departamento raíz)</option>
+                {rootDepts.filter((d: any) => d.id !== editingId).map((d: any) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-slate-400">Si es hijo de Operaciones, se considerará operacional automáticamente.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-300">Color</Label>
@@ -410,7 +407,7 @@ export function DepartamentosTab() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-semibold text-slate-100">{selectedDept.name}</h3>
-              <p className="text-xs text-slate-400">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {selectedDept.type}</p>
+              <p className="text-xs text-slate-400">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {isOperationalDepartment(selectedDept.code) ? "Operacional" : "No operacional"}</p>
             </div>
             <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
           </div>
@@ -626,10 +623,15 @@ export function DepartamentosTab() {
                 {!dept.isActive && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">INACTIVO</span>}
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                <span className="uppercase tracking-wide text-[10px]">{dept.type || "otro"}</span>
+                {isParent ? (
+                  <span className="uppercase tracking-wide text-[10px]">Departamento padre</span>
+                ) : isChild ? (
+                  <span className="text-slate-400">Hijo de {deptsById.get(dept.parentId)?.name || "?"}</span>
+                ) : (
+                  <span className="uppercase tracking-wide text-[10px]">Departamento raíz</span>
+                )}
                 <span>·</span>
                 <span>{userCount} usuarios</span>
-                {isChild && <><span>·</span><span className="text-slate-400">hijo de {deptsById.get(dept.parentId)?.name || "?"}</span></>}
               </div>
             </div>
           </div>
