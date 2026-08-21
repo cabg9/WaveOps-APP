@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-19 (FASE 7.4 en progreso: fixes de atrasados, alcance por rol y crear tarea específica desde Turnos)
+> Última actualización: 2026-08-20 (FASE 7.4 en progreso: jerarquía padre/hijo de departamentos, eliminación de campo `type`)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -469,6 +469,25 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio, deploy de **functions** y **hosting** a Firebase realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (jerarquía padre/hijo de departamentos)
+- **Modelo de departamentos simplificado**:
+  - Se eliminó el campo `type` (`administrativo` / `operativo` / `otro`) del tipo `Department`, del formulario de creación/edición y de la lectura/escritura en Firestore.
+  - La relación padre/hijo ahora es la única fuente de verdad; se determina por el campo `parentId`.
+- **Departamento OPERACIONES como padre de operacionales**:
+  - En `useDynamicDepartments`, un departamento se considera **operacional** si su código es `OPERACIONES` o si su `parentId` apunta al departamento `OPERACIONES`.
+  - `operationalDepartmentCodes` incluye `OPERACIONES` y todos sus hijos activos.
+  - `getVisibleDepartmentCodes` devuelve `OPERACIONES` + hijos operacionales para el rol `GERENTE_OPERACIONES`.
+- **Protección de departamentos críticos**:
+  - En `DepartamentosTab`, los departamentos con código `OPERACIONES` y `ADMINISTRATIVO` no pueden eliminarse.
+  - Tampoco se puede eliminar un departamento que tenga sub-departamentos o usuarios activos.
+- **Formulario de departamentos mejorado**:
+  - Se quitó el selector de "Tipo".
+  - El selector de "Departamento Padre" solo muestra departamentos raíz (evita ciclos y mantiene una jerarquía de un solo nivel).
+  - Se agregó ayuda visual indicando que los hijos de Operaciones se consideran operacionales automáticamente.
+  - Las tarjetas de departamento muestran "Departamento padre", "Hijo de X" o "Departamento raíz" en lugar del antiguo `type`.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
@@ -477,6 +496,7 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - Validar requisitos para completar tarea específica (subtareas/foto).
 - Validar resúmenes de tasks en Dashboard, Mi Horario y Equipo con el departamento seleccionado.
 - Validar que Resolver en incidencias exija verificación de supervisor Y gerente.
+- Validar que el Gerente de Operaciones vea su departamento (`OPERACIONES`) y todos sus departamentos hijos en Equipo, Asignar y Tasks.
 
 ### Contenido tentativo adicional
 - Ajustes de espaciado, alineación y comportamiento de dropdowns en móvil.
