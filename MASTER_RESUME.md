@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-21 (FASE 7.4 en progreso: ajuste de permisos para Gerente de Operaciones)
+> Última actualización: 2026-08-21 (FASE 7.4 en progreso: dropdown 'Todos (operacionales)' para Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -503,6 +503,18 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - **Horarios → Equipo/Asignar**: Gerente de Operaciones ve solo `OPERACIONES` + hijos operacionales.
   - **Tasks → Incidencias**: Gerente de Operaciones filtra solo entre operacionales.
   - **Develops → Roles**: si se activa manualmente el toggle `canViewAllDepartmentsInTeam` o `canViewAllDepartments` para el rol de Gerente de Operaciones, el permiso dinámico sigue respetándose.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (dropdown "Todos (operacionales)")
+- **Problema**: el Gerente de Operaciones no veía la opción **"Todos"** en el dropdown de **Horarios → Equipo/Asignar**; solo podía elegir departamentos operacionales uno por uno.
+- **Causa**: la opción "Todos" solo se mostraba cuando `hasPermission('canViewAllDepartmentsInTeam')` era true, pero ese permiso fue quitado del fallback estático del Gerente de Operaciones.
+- **Corrección**:
+  - Se agregó `showAllDeptOption` en `HorariosModule.tsx` (componente principal, `EquipoTab` y `AsignarTab`):
+    - **Gerente de Operaciones**: muestra "Todos (operacionales)" si hay más de un departamento operacional disponible.
+    - **Otros roles**: respeta el toggle `canViewAllDepartmentsInTeam` de Develops → Roles.
+  - Para el Gerente de Operaciones, **"Todos" nunca incluye departamentos administrativos**; siempre se filtra a `OPERACIONES` + hijos operacionales.
+  - El label cambia a **"Todos (operacionales)"** cuando el usuario es Gerente de Operaciones, para dejar claro el alcance.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
