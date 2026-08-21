@@ -64,7 +64,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentNames, departmentOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
@@ -85,6 +85,23 @@ export default function TasksModule() {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
 
   const allDepartments = departmentOptions;
+
+  // Opciones de departamento disponibles en Tasks según rol/jerarquía
+  const visibleTaskDeptOptions = useMemo(() => {
+    if (!user) return departmentOptions;
+    const allowed = getVisibleDepartmentCodes(user);
+    return departmentOptions.filter(d => allowed.includes(d.code));
+  }, [departmentOptions, user, getVisibleDepartmentCodes]);
+
+  // Opciones para el dropdown de incidencias: DG/RRHH ven todos; Gerente de Operaciones ve operacionales
+  const incidenciaDeptOptions = useMemo(() => {
+    if (!user) return departmentOptions;
+    if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) return departmentOptions;
+    if (user.role === Role.GERENTE_OPERACIONES) {
+      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
+    }
+    return departmentOptions.filter(d => d.code === user.department);
+  }, [departmentOptions, user, operationalDepartmentCodes]);
 
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', department: defaultDepartment,
@@ -604,8 +621,8 @@ export default function TasksModule() {
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los departamentos</SelectItem>
-                {allDepartments.map((dept) => (
+                <SelectItem value="all">{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
+                {incidenciaDeptOptions.map((dept) => (
                   <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
                     {dept.name}{dept.name === user?.department ? ' (tú)' : ''}
                   </SelectItem>
@@ -654,8 +671,8 @@ export default function TasksModule() {
                     <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
                       <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos</SelectItem>
-                        {allDepartments.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
+                        <SelectItem value="all">{user.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
+                        {incidenciaDeptOptions.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   )}

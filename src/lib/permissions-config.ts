@@ -177,11 +177,9 @@ const LEVEL_4_PERMISSIONS: Permission[] = [
   'canRateTask',
   'canBlockTask',
   'canUnblockTask',
-  'canViewAllDepartments',
   'canReopenTask',
   // Horarios
   'canViewTeam',
-  'canViewAllDepartmentsInTeam',
   'canAssignShifts',
   'canModifyShifts',
   'canApproveChanges',
