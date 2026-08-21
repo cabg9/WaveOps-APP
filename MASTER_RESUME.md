@@ -464,7 +464,8 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - **Gerente de Operaciones**: solo departamentos marcados como `isOperational`.
     - **RRHH / Director / Director General**: todos los departamentos.
     - Cualquier rol puede sumar departamentos adicionales mediante `visibleDepartments` configurado manualmente en Develops.
-  - En **Horarios → Equipo/Asignar**, los dropdowns de departamento ahora respetan la jerarquía de rol + `visibleDepartments`; se eliminó la dependencia del toggle `canViewAllDepartmentsInTeam` para estos dropdowns.
+  - En **Horarios → Equipo/Asignar**, los dropdowns de departamento respetan el toggle `canViewAllDepartmentsInTeam` de Develops → Roles. Si el usuario tiene el permiso activo, ve todos los departamentos; si no, ve su departamento + `visibleDepartments`.
+  - Se corrigió el uso de `hasPermission` en `HorariosModule`: ahora se usa el de `useAppConfig` (que lee los toggles de role templates en Firestore) en lugar del de `useAuth` (que solo tenía un switch estático y no reconocía `canViewTeam` ni `canViewAllDepartmentsInTeam`).
 - **Build + Deploy**: `npm run build` limpio, deploy de **functions** y **hosting** a Firebase realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
