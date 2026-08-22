@@ -426,7 +426,7 @@ export default function HorariosModule() {
 
             {/* Mobile: filtro de departamento para Equipo/Asignar */}
             {(activeTab === 'equipo' || activeTab === 'asignar') && (
-              visibleDeptOptions.length > 1 ? (
+              visibleDeptOptions.length > 0 ? (
                 <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
                   <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                     <SelectValue>
@@ -748,7 +748,7 @@ export default function HorariosModule() {
           {/* Desktop: controles de Equipo en header principal */}
           {activeTab === 'equipo' && (
             <div className="hidden md:flex items-center gap-2">
-              {visibleDeptOptions.length > 1 ? (
+              {visibleDeptOptions.length > 0 ? (
                 <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
                   <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
                     <SelectValue>
@@ -2549,54 +2549,8 @@ function EquipoTab({
 
   return (
     <div className="space-y-4">
-      {/* Header: visible solo en móvil, en desktop se mueve a HorariosModule */}
+      {/* Header móvil de Equipo: navegación de semana (el filtro de departamento va en el header principal) */}
       <div className="flex flex-row flex-wrap items-center justify-between gap-2 md:hidden">
-        {/* Filtro de departamento */}
-        <div className="block">
-          {visibleDeptOptions.length > 1 ? (
-            <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                <SelectValue>
-                  {selectedDepartment === 'ALL' ? (
-                    <div className="flex items-center gap-2 text-[#86868B]">
-                      <LayoutGrid className="w-4 h-4" />
-                      <span>Todos</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-[#86868B]">
-                      <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                      <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                    </div>
-                  )}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {showAllDeptOption && (
-                  <SelectItem value="ALL">
-                    <div className="flex items-center gap-2">
-                      <LayoutGrid className="w-4 h-4" />
-                      <span>{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos los departamentos'}</span>
-                    </div>
-                  </SelectItem>
-                )}
-                {visibleDeptOptions.map(dept => (
-                  <SelectItem key={dept.code} value={dept.code}>
-                    <div className="flex items-center gap-2">
-                      <DeptIcon department={dept.code} className="w-4 h-4" />
-                      <span>{dept.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
-              <DeptIcon department={visibleDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
-              <span className="truncate max-w-[120px]">{getDeptName(visibleDeptOptions[0]?.code || user?.department || '')}</span>
-            </div>
-          )}
-        </div>
-
         <div className="flex items-center gap-2">
           <button
             onClick={() => setWeekOffset(prev => prev - 1)}
