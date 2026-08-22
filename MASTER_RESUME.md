@@ -626,6 +626,7 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - `incidenciaDeptOptions` usa `departmentTreeOptions` filtrado por `getVisibleDepartmentCodes`.
     - El selector de departamento de **Incidencias** (móvil y desktop) muestra la jerarquía con `└─ ` e indentación.
     - El selector de departamento de la pestaña **Todas** también muestra jerarquía.
+    - Nuevo selector de departamento en **Mi Depto** (móvil y desktop) cuando el usuario puede ver más de un departamento por jerarquía; filtra el subárbol completo en "Todos (mi jerarquía)" o por departamento específico.
   - `DevelopsModule.tsx`:
     - Selector de **Departamento** y checkboxes de **Departamentos visibles adicionales** en el formulario de usuario muestran la jerarquía completa con indentación.
   - `TurnosTab.tsx`:
