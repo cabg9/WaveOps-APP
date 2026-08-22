@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: fixes de fotos, dropdowns y permisos)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: race condition en cálculo de departamentos operacionales)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -515,6 +515,16 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - **Otros roles**: respeta el toggle `canViewAllDepartmentsInTeam` de Develops → Roles.
   - Para el Gerente de Operaciones, **"Todos" nunca incluye departamentos administrativos**; siempre se filtra a `OPERACIONES` + hijos operacionales.
   - El label cambia a **"Todos (operacionales)"** cuando el usuario es Gerente de Operaciones, para dejar claro el alcance.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (race condition en departamentos operacionales)
+- **Problema**: el Gerente de Operaciones a veces veía el dropdown vacío y a veces veía los departamentos operacionales. El log mostraba que `operationalDepartmentCodes` alternaba entre `[]` y la lista correcta.
+- **Causa**: `getVisibleDepartmentCodes` e `isOperationalDepartment` dependían de `operationalDepartmentCodes`, un `useMemo` que inicialmente se calculaba antes de que `departments` cargara desde Firestore, causando una race condition.
+- **Corrección**:
+  - Se reescribió `getVisibleDepartmentCodes` para que, en el caso del rol `GERENTE_OPERACIONES`, calcule los códigos operacionales directamente sobre el array `departments` en tiempo real.
+  - Se reescribió `isOperationalDepartment` para buscar el departamento y evaluar su condición operacional directamente, sin depender de `operationalDepartmentCodes`.
+  - Esto elimina la race condition: aunque en el primer render `departments` esté vacío, cuando lleguen los datos el cálculo se actualiza inmediatamente.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
