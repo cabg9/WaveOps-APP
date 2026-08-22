@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-21 (FASE 7.4 en progreso: dropdown 'Todos (operacionales)' para Gerente de Operaciones)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: fixes de fotos, dropdowns y permisos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -515,6 +515,22 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - **Otros roles**: respeta el toggle `canViewAllDepartmentsInTeam` de Develops → Roles.
   - Para el Gerente de Operaciones, **"Todos" nunca incluye departamentos administrativos**; siempre se filtra a `OPERACIONES` + hijos operacionales.
   - El label cambia a **"Todos (operacionales)"** cuando el usuario es Gerente de Operaciones, para dejar claro el alcance.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (fotos, dropdowns y permisos)
+- **Fotos / Firebase Storage**:
+  - Se creó `storage.rules` con permisos para usuarios autenticados.
+  - Se actualizó `firebase.json` para incluir la configuración de Storage.
+  - Se desplegaron las reglas a Firebase (`npx firebase deploy --only storage`).
+  - Esto debería resolver el error al subir fotos en tareas, incidencias, perfil y onboarding.
+- **Dropdown duplicado en Horarios → Equipo**:
+  - Se corrigió el header móvil de `EquipoTab` que tenía `hidden sm:block` dentro de un `md:hidden`, causando que en tablets (sm-md) se mostrara junto al dropdown desktop.
+  - Se cambió a `block` para que solo aparezca en el header móvil.
+- **Detección de departamentos operacionales más robusta**:
+  - En `useDynamicDepartments.ts`, la búsqueda del departamento `OPERACIONES` ahora es case-insensitive.
+  - Se mantiene compatibilidad legacy con el campo `isOperational` de Firestore durante la transición.
+  - Esto ayuda a que el Gerente de Operaciones vea correctamente `OPERACIONES` + hijos operacionales.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
