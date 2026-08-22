@@ -128,14 +128,23 @@ export function useDynamicDepartments() {
   };
 
   const operationalDepartmentCodes = useMemo(() => {
-    return activeDepartmentsWithOperational
+    const codes = activeDepartmentsWithOperational
       .filter(d => d.isOperational)
       .map(d => d.code);
-  }, [activeDepartmentsWithOperational]);
+    console.log('[useDynamicDepartments] operationalDepartmentCodes:', codes, 'operationsDeptId:', operationsDeptId, 'activeDepartmentsWithOperational:', activeDepartmentsWithOperational.map(d => ({ id: d.id, code: d.code, name: d.name, parentId: d.parentId, isOperational: d.isOperational })));
+    return codes;
+  }, [activeDepartmentsWithOperational, operationsDeptId]);
 
   const isOperationalDepartment = useCallback((code: string): boolean => {
-    return operationalDepartmentCodes.includes(code);
-  }, [operationalDepartmentCodes]);
+    const dept = departments.find(d => d.code === code);
+    if (!dept) return false;
+    const opsDept = departments.find(d => d.code?.toUpperCase() === OPERATIONS_CODE && d.isActive !== false);
+    return dept.isActive !== false && (
+      dept.code?.toUpperCase() === OPERATIONS_CODE ||
+      dept.parentId === opsDept?.id ||
+      dept.isOperational === true
+    );
+  }, [departments]);
 
   // Departamentos que un usuario específico puede ver además del propio.
   // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve su departamento + hijos operacionales;
@@ -146,11 +155,20 @@ export function useDynamicDepartments() {
       return departmentCodes;
     }
     if (user.role === Role.GERENTE_OPERACIONES) {
-      return operationalDepartmentCodes;
+      // Calcular directamente sobre departments para evitar race condition con operationalDepartmentCodes
+      const opsDept = departments.find(d => d.code?.toUpperCase() === OPERATIONS_CODE && d.isActive !== false);
+      const opsDeptId = opsDept?.id;
+      const codes = departments
+        .filter(d => d.isActive !== false)
+        .filter(d => d.code?.toUpperCase() === OPERATIONS_CODE || d.parentId === opsDeptId || d.isOperational === true)
+        .map(d => d.code);
+      const unique = Array.from(new Set(codes));
+      console.log('[useDynamicDepartments] Gerente de Operaciones - codes:', unique, 'opsDeptId:', opsDeptId, 'user.department:', user.department);
+      return unique;
     }
     const extra = (user.visibleDepartments || []).filter(d => d && d !== user.department);
     return Array.from(new Set([user.department, ...extra].filter(Boolean)));
-  }, [departmentCodes, operationalDepartmentCodes]);
+  }, [departmentCodes, departments]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
     return code === OPERATIONS_CODE || code === ADMIN_CODE;
