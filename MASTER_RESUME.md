@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: filas expandibles en Asignar)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: botón Guardar de notas en tareas e incidencias)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -687,6 +687,17 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Se cambió la altura fija de las filas de la columna de colaboradores y de la grilla de días a `min-h-[72px] sm:min-h-[88px]`.
   - Se agregó `h-full` a las celdas individuales para que se estiren con el contenido.
   - Ahora las filas crecen verticalmente según la cantidad de turnos asignados, evitando la superposición.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (botón Guardar de notas en tareas e incidencias)
+- **Problema**: en las tarjetas de **Tareas** y **Incidencias**, el botón **Guardar** de las notas no respondía al click; solo funcionaba presionando `Enter`. Además, para roles no-staff el botón no agregaba la nota.
+- **Causa**: aunque el formulario usaba `onSubmit` y el botón `type="submit"`, el evento de submit no se disparaba consistentemente en todos los navegadores/roles, posiblemente por la manera en que el `Button` de shadcn manejaba el click dentro de tarjetas colapsables.
+- **Corrección en `src/components/modules/TasksModule.tsx`**:
+  - Se extrajo la lógica de guardado a funciones `handleNoteSubmit` en `TaskCard` e `IncidenciaCard`.
+  - El botón **Guardar** ahora tiene un `onClick` explícito que llama a `handleNoteSubmit` y previene el comportamiento por defecto (`e.preventDefault()`), funcionando como respaldo del submit del formulario.
+  - Se mantuvo el `onSubmit` del formulario y el `onKeyDown` del input para que `Enter` siga funcionando.
+  - Se unificó la validación: solo guarda si hay texto y un `currentUserId` válido.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
