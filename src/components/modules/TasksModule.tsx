@@ -86,12 +86,12 @@ export default function TasksModule() {
 
   const allDepartments = departmentOptions;
 
-  // Opciones de departamento disponibles en Tasks según rol/jerarquía
-  const visibleTaskDeptOptions = useMemo(() => {
-    if (!user) return departmentOptions;
+  // Opciones jerárquicas de departamento disponibles en Tasks según rol/jerarquía
+  const visibleTaskDeptTreeOptions = useMemo(() => {
+    if (!user) return departmentTreeOptions;
     const allowed = getVisibleDepartmentCodes(user);
-    return departmentOptions.filter(d => allowed.includes(d.code));
-  }, [departmentOptions, user, getVisibleDepartmentCodes]);
+    return departmentTreeOptions.filter(d => allowed.includes(d.code));
+  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
 
   // Opciones jerárquicas para el dropdown de incidencias
   const incidenciaDeptOptions = useMemo(() => {
@@ -336,7 +336,9 @@ export default function TasksModule() {
     if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED)) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
     else if (mainTab === 'my-department' && user) {
       // Jerarquía pura: usuario ve su departamento + todos sus descendientes
-      const allowed = getVisibleDepartmentCodes(user);
+      const allowed = selectedDepartment === 'all'
+        ? getVisibleDepartmentCodes(user)
+        : [selectedDepartment];
       result = result.filter((t) => allowed.includes(t.department));
     }
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
@@ -603,6 +605,25 @@ export default function TasksModule() {
           </Select>
         </div>
 
+        {/* MÓVIL: selector de departamento para Mi Depto (jerarquía) */}
+        {!isIncidenciasTab && mainTab === 'my-department' && user && visibleTaskDeptTreeOptions.length > 1 && (
+          <div className="md:hidden">
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos (mi jerarquía)</SelectItem>
+                {visibleTaskDeptTreeOptions.map((dept) => (
+                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                    <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {/* MÓVIL: selector de departamento para incidencias (jerarquía) */}
         {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
           <div className="md:hidden">
@@ -642,12 +663,12 @@ export default function TasksModule() {
                   {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }, { id: TimeFilter.TOMORROW, label: 'Mañana' }, { id: TimeFilter.UPCOMING, label: 'Próximas' }].map((filter) => (
                     <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
                   ))}
-                  {mainTab === 'all' && hasPermission('canViewAllDepartments') && (
+                  {((mainTab === 'all' && hasPermission('canViewAllDepartments')) || (mainTab === 'my-department' && visibleTaskDeptTreeOptions.length > 1)) && (
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                       <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todos los departamentos</SelectItem>
-                        {departmentTreeOptions.map((dept) => (
+                        <SelectItem value="all">{mainTab === 'my-department' ? 'Todos (mi jerarquía)' : 'Todos los departamentos'}</SelectItem>
+                        {(mainTab === 'all' ? departmentTreeOptions : visibleTaskDeptTreeOptions).map((dept) => (
                           <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
                             <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
                           </SelectItem>
