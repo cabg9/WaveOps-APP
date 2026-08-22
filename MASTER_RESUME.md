@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: pestañas Mis solicitudes/Equipo visibles para Gerente de Operaciones)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: fix fecha popup de Equipo)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -670,6 +670,14 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - `canViewAllTimeOff` simplificado a `user?.level <= 4` como fallback.
   - La pestaña **Mis solicitudes** ahora se muestra **siempre**; la pestaña **Equipo** se muestra solo para aprobadores.
   - En móvil, el dropdown de vista solo permite cambiar a **Equipo** si el usuario es aprobador.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (fecha un día después en popup de Equipo)
+- **Problema**: al presionar una fecha del header en **Horarios → Equipo**, el popup mostraba la información del día siguiente para gerentes/supervisores.
+- **Causa**: en el modal de día del header se usaba `selectedHeaderDay.toISOString().split('T')[0]`, que convierte la fecha a UTC. Si la hora local era tarde (zona UTC-6), el día UTC era el siguiente.
+- **Corrección en `src/components/modules/HorariosModule.tsx`**:
+  - Se reemplazó `selectedHeaderDay.toISOString().split('T')[0]` por `toLocalISODate(selectedHeaderDay)`, que ya existía como helper local y extrae año/mes/día usando la hora local.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

@@ -3618,7 +3618,7 @@ function EquipoTab({
           {selectedHeaderDay && (
             <div className="space-y-6">
               {(() => {
-                const dateStr = selectedHeaderDay.toISOString().split('T')[0];
+                const dateStr = toLocalISODate(selectedHeaderDay);
                 
                 // Obtener usuarios según el departamento seleccionado
                 const relevantUsers = selectedDepartment === 'ALL' 
