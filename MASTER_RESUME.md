@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: jerarquía recursiva de departamentos)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: visibilidad jerárquica pura de departamentos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -568,6 +568,45 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Cualquier departamento bajo `OPERACIONES` (hijo, nieto o más profundo) se considera operacional automáticamente.
   - El Gerente de Operaciones ve `OPERACIONES` y todo su subárbol en **Equipo**, **Asignar** e **Incidencias**.
   - **Develops → Departamentos** muestra la jerarquía completa con indentación visual.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (visibilidad jerárquica pura de departamentos)
+- **Problema**: los filtros de **Equipo**, **Asignar** e **Incidencias** no respetaban una jerarquía departamental real. El Gerente de Operaciones seguía viendo departamentos administrativos, y un gerente de departamento no veía a sus sub-departamentos.
+- **Causa**: la lógica de visibilidad mezclaba roles fijos (`GERENTE_OPERACIONES` ve operacionales) con permisos estáticos, sin usar el árbol de `parentId` de Firestore.
+- **Datos corregidos en Firestore**:
+  - Se limpió el `code` de `ADMINISTRATIVO` (tenía un tab inicial `\tADMINISTRATIVO`).
+  - Se estableció `parentId` de `OPERACIONES` al id de `ADMINISTRATIVO`, formando la jerarquía: `ADMINISTRATIVO → OPERACIONES → DIVE_SHOP/GUIANZA/MOVILIDAD/VESSELS/WAREHOUSE`.
+- **Cambios en `src/hooks/firestore/useDynamicDepartments.ts`**:
+  - `normalizeDeptCode` ahora hace `trim()` y convierte espacios/tabs a `_`, evitando códigos corruptos.
+  - Nuevo `getDepartmentSubtreeCodes(rootCode)` que devuelve un departamento + todos sus descendientes.
+  - `getOperationalSubtreeCodes` reescrito sobre `getDepartmentSubtreeCodes(OPERATIONS_CODE)`.
+  - `getVisibleDepartmentCodes` reescrito con jerarquía pura:
+    - DG/Director/RRHH ven todos los departamentos.
+    - Cualquier otro usuario ve su departamento + todos sus descendientes.
+    - No ve padres, abuelos ni hermanos.
+    - `visibleDepartments` sigue funcionando como override manual.
+    - Fallback legacy: un `GERENTE_OPERACIONES` cuyo departamento no esté en el subárbol operacional usa `OPERACIONES` como raíz.
+- **Cambios en `src/components/modules/HorariosModule.tsx`**:
+  - Equipo, Asignar y el componente principal usan `getVisibleDepartmentCodes` para `visibleDeptOptions`.
+  - La opción **"Todos"** aparece cuando el usuario puede ver más de un departamento por jerarquía.
+  - El label cambia a **"Todos (operacionales)"** solo cuando todos los departamentos visibles son operacionales.
+  - Se eliminó la lógica especial `user.role === Role.GERENTE_OPERACIONES` de los filtros.
+- **Cambios en `src/components/modules/TasksModule.tsx`**:
+  - `incidenciaDeptOptions` ahora usa `getVisibleDepartmentCodes`.
+  - El filtro de incidencias muestra **"Todos"** cuando el usuario ve más de un departamento.
+  - `incidenciasByDept` filtra por el subárbol visible del usuario.
+  - **Mi Departamento** muestra tareas del departamento del usuario + descendientes.
+- **Cambios en `src/components/modules/DepartamentosTab.tsx`**:
+  - El selector de **Departamento Padre** ahora permite elegir cualquier departamento, no solo raíces.
+  - Se bloquea elegir como padre al propio departamento o a cualquiera de sus descendientes, evitando ciclos.
+  - Se agregó helper local `getDescendantIds` para la validación.
+- **Comportamiento esperado**:
+  - Director General (rol con `canViewAllDepartments`) ve todos los departamentos.
+  - Gerente de Operaciones con departamento `OPERACIONES` ve `OPERACIONES` y todos sus hijos/nietos.
+  - Gerente de `ADMINISTRATIVO` vería `ADMINISTRATIVO`, `OPERACIONES`, `MARKETING` y todo el subárbol operacional.
+  - Gerente de `MARKETING` (hijo de ADMINISTRATIVO) ve solo `MARKETING`.
+  - Supervisor de `DIVE_SHOP` ve solo `DIVE_SHOP`.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
