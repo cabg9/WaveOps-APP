@@ -64,7 +64,7 @@ type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
   const { user, hasPermission } = useAuth();
-  const { departmentCodes, departmentNames, departmentOptions, departmentTreeOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentNames, departmentOptions, departmentTreeOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName, getDeptCode, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
@@ -96,9 +96,13 @@ export default function TasksModule() {
   // Opciones jerárquicas para el dropdown de incidencias
   const incidenciaDeptOptions = useMemo(() => {
     if (!user) return departmentTreeOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    let allowed = getVisibleDepartmentCodes(user);
+    // Fallback robusto para Gerente de Operaciones: si la jerarquía no devuelve nada, usar operacionales
+    if (allowed.length === 0 && user.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
+      allowed = operationalDepartmentCodes;
+    }
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
-  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentTreeOptions, user, getVisibleDepartmentCodes, operationalDepartmentCodes]);
 
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', department: defaultDepartment,
@@ -414,7 +418,11 @@ export default function TasksModule() {
   // PASO 1: Filtrar por departamento según jerarquía pura
   const incidenciasByDept = useMemo(() => {
     if (!user) return incidencias;
-    const allowed = getVisibleDepartmentCodes(user);
+    let allowed = getVisibleDepartmentCodes(user);
+    // Fallback robusto para Gerente de Operaciones
+    if (allowed.length === 0 && user.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
+      allowed = operationalDepartmentCodes;
+    }
     if (incidenciaDepartmentFilter === 'all') {
       return incidencias.filter((i) =>
         allowed.some((d) => i.targetDepartments?.includes(d) || i.targetDepartment === d)
@@ -423,7 +431,7 @@ export default function TasksModule() {
     return incidencias.filter((i) =>
       i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter
     );
-  }, [incidencias, user, incidenciaDepartmentFilter, getVisibleDepartmentCodes]);
+  }, [incidencias, user, incidenciaDepartmentFilter, getVisibleDepartmentCodes, operationalDepartmentCodes]);
 
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {
@@ -874,7 +882,24 @@ export default function TasksModule() {
                         <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto">Cancelar</Button>
                         <Button
                           className="bg-[#FF3B30] hover:bg-[#FF3B30]/90 text-white w-full sm:w-auto"
-                          onClick={() => { if (!user || incidenciaForm.targetDepartments.length === 0) return; createIncidencia({ title: incidenciaForm.title, description: incidenciaForm.description, targetDepartment: user.department || defaultDepartment, targetDepartments: incidenciaForm.targetDepartments, priority: incidenciaForm.priority, reportedBy: user.id, photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() })) }).then((id) => { console.log('Incidencia creada:', id); setIsCreateModalOpen(false); setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH }); }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); }); }}
+                          onClick={() => {
+                            if (!user || incidenciaForm.targetDepartments.length === 0) return;
+                            const normalizedTarget = getDeptCode(user.department || defaultDepartment);
+                            const normalizedTargets = Array.from(new Set([...incidenciaForm.targetDepartments.map(getDeptCode), normalizedTarget].filter(Boolean)));
+                            createIncidencia({
+                              title: incidenciaForm.title,
+                              description: incidenciaForm.description,
+                              targetDepartment: normalizedTarget,
+                              targetDepartments: normalizedTargets,
+                              priority: incidenciaForm.priority,
+                              reportedBy: user.id,
+                              photos: incidenciaPhotos.map(url => ({ url, uploadedBy: user?.id || '', uploadedAt: new Date().toISOString() }))
+                            }).then((id) => {
+                              console.log('Incidencia creada:', id);
+                              setIsCreateModalOpen(false);
+                              setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH });
+                            }).catch((err) => { console.error('Error:', err); alert('Error: ' + err.message); });
+                          }}
                           disabled={!incidenciaForm.title || !incidenciaForm.description || incidenciaForm.targetDepartments.length === 0}
                         >
                           Reportar Incidencia

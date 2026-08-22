@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: botón Guardar de notas en tareas e incidencias)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: incidencias visibles para Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -698,6 +698,22 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - El botón **Guardar** ahora tiene un `onClick` explícito que llama a `handleNoteSubmit` y previene el comportamiento por defecto (`e.preventDefault()`), funcionando como respaldo del submit del formulario.
   - Se mantuvo el `onSubmit` del formulario y el `onKeyDown` del input para que `Enter` siga funcionando.
   - Se unificó la validación: solo guarda si hay texto y un `currentUserId` válido.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (incidencias visibles para Gerente de Operaciones)
+- **Problema**: al crear una incidencia en un departamento operativo, el **Gerente de Operaciones** no la veía en **Tasks → Incidencias**, y el dropdown de departamentos no mostraba los departamentos operacionales.
+- **Causas posibles**:
+  - `targetDepartment` se guardaba tal cual `user.department`, que podía venir como nombre legible en lugar de código.
+  - `targetDepartments` podía quedar vacío o con códigos no normalizados, haciendo que el filtro por jerarquía no coincidiera.
+  - Si `getVisibleDepartmentCodes` devolvía un array vacío por alguna race condition, el Gerente de Operaciones se quedaba sin opciones visibles.
+- **Correcciones**:
+  - En `src/hooks/firestore/useFirestoreIncidencias.ts`:
+    - Se agregó `normalizeDeptCode` para normalizar códigos al leer y al crear incidencias.
+    - `targetDepartment` y `targetDepartments` se guardan y leen siempre como códigos normalizados.
+  - En `src/components/modules/TasksModule.tsx`:
+    - Al crear una incidencia se normaliza `targetDepartment` con `getDeptCode` y se asegura que `targetDepartments` incluya al menos ese código.
+    - `incidenciaDeptOptions` y `incidenciasByDept` ahora tienen un fallback: si el usuario es **Gerente de Operaciones** y la jerarquía no devuelve departamentos, se usa `operationalDepartmentCodes`.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

@@ -19,6 +19,28 @@ import { db } from '@/firebase-config';
 import { Incidencia, IncidenciaStatus, TaskPriority, PhotoItem } from '@/types';
 import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
 
+// Normaliza códigos de departamento para comparaciones robustas
+function normalizeDeptCode(name: string): string {
+  if (!name) return '';
+  const cleaned = name.trim().replace(/\s+/g, '_').toUpperCase();
+  const map: Record<string, string> = {
+    'ADMINISTRATIVO': 'ADMINISTRATIVO',
+    'FINANCIERO': 'FINANCIERO',
+    'VENTAS': 'VENTAS',
+    'MARKETING': 'MARKETING',
+    'DIVE_SHOP': 'DIVE_SHOP',
+    'DIVE': 'DIVE_SHOP',
+    'GUIADO_DE_BUCEO': 'GUIANZA',
+    'GUIANZA': 'GUIANZA',
+    'COCINA': 'COCINA',
+    'MOVILIDAD': 'MOVILIDAD',
+    'WAREHOUSE': 'WAREHOUSE',
+    'VESSELS': 'VESSELS',
+    'OPERACIONES': 'OPERACIONES',
+  };
+  return map[cleaned] || cleaned;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // UTILS
 // ═══════════════════════════════════════════════════════════════════
@@ -60,12 +82,12 @@ export function useFirestoreIncidencias() {
             priority: data.priority || TaskPriority.MEDIUM,
             reportedBy: data.reportedBy || '',
             reportedFor: data.reportedFor || undefined,
-            targetDepartment: data.targetDepartment || defaultDepartment,
+            targetDepartment: normalizeDeptCode(data.targetDepartment || defaultDepartment),
             confirmedBy: data.confirmedBy || undefined,
             confirmedAt: data.confirmedAt ? timestampToISO(data.confirmedAt) : undefined,
             verifiedByList: data.verifiedByList || [],
             viewers: data.viewers || [],
-            targetDepartments: data.targetDepartments || [data.targetDepartment],
+            targetDepartments: (data.targetDepartments || [data.targetDepartment]).map(normalizeDeptCode).filter(Boolean),
             resolvedBy: data.resolvedBy || undefined,
             resolvedAt: data.resolvedAt ? timestampToISO(data.resolvedAt) : undefined,
             closedBy: data.closedBy || undefined,
@@ -121,8 +143,8 @@ export function useFirestoreIncidencias() {
         status: IncidenciaStatus.NEW,
         priority: data.priority || TaskPriority.MEDIUM,
         reportedBy: data.reportedBy,
-        targetDepartment: data.targetDepartment,
-        targetDepartments: data.targetDepartments || [data.targetDepartment],
+        targetDepartment: normalizeDeptCode(data.targetDepartment),
+        targetDepartments: (data.targetDepartments || [data.targetDepartment]).map(normalizeDeptCode).filter(Boolean),
         photos: data.photos || [],
         notes: [],
         history: [
