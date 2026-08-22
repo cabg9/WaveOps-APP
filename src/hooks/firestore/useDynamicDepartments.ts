@@ -35,17 +35,19 @@ export interface DynamicDepartment {
   updatedAt?: string;
 }
 
-function normalizeDeptCode(name: string): string {
-  if (DEPT_NAME_TO_CODE[name]) return DEPT_NAME_TO_CODE[name];
-  return name.toUpperCase().replace(/ /g, '_');
-}
-
 // Devuelve todos los ids descendientes de un departamento (recursivo, N niveles)
 function getDescendantIds(parentId: string | null | undefined, depts: DynamicDepartment[]): string[] {
   if (!parentId) return [];
   const direct = depts.filter(d => d.parentId === parentId).map(d => d.id);
   const indirect = direct.flatMap(childId => getDescendantIds(childId, depts));
   return Array.from(new Set([...direct, ...indirect]));
+}
+
+// Normaliza un código de departamento: mayúsculas, sin espacios/tab iniciales/finales y espacios → _
+function normalizeDeptCode(name: string): string {
+  const cleaned = name.trim().replace(/\s+/g, '_');
+  if (DEPT_NAME_TO_CODE[cleaned]) return DEPT_NAME_TO_CODE[cleaned];
+  return cleaned.toUpperCase();
 }
 
 export function useDynamicDepartments() {
@@ -61,7 +63,7 @@ export function useDynamicDepartments() {
       snapshot.forEach((doc) => {
         const data = doc.data();
         const name = data.name || doc.id;
-        const code = data.code || normalizeDeptCode(name);
+        const code = normalizeDeptCode(data.code || name);
         depts.push({
           id: doc.id,
           name,
@@ -156,31 +158,61 @@ export function useDynamicDepartments() {
     );
   }, [departments, operationsDescendantIds]);
 
-  // Devuelve todos los códigos del subárbol de OPERACIONES (incluido él mismo)
-  const getOperationalSubtreeCodes = useCallback((): string[] => {
-    if (!operationsDeptId) return [];
-    const subtreeIds = [operationsDeptId, ...getDescendantIds(operationsDeptId, activeDepartments)];
+  // Devuelve todos los códigos del subárbol de un departamento dado su código (incluido él mismo)
+  const getDepartmentSubtreeCodes = useCallback((rootCode: string): string[] => {
+    const root = activeDepartments.find(d => d.code === rootCode);
+    if (!root) return [];
+    const subtreeIds = [root.id, ...getDescendantIds(root.id, activeDepartments)];
     return Array.from(new Set(
       activeDepartments
         .filter(d => subtreeIds.includes(d.id))
         .map(d => d.code)
     ));
-  }, [operationsDeptId, activeDepartments]);
+  }, [activeDepartments]);
 
-  // Departamentos que un usuario específico puede ver además del propio.
-  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve todo el subárbol de OPERACIONES;
-  // otros usuarios ven su departamento + visibleDepartments configurado manualmente.
+  // Devuelve todos los códigos del subárbol de OPERACIONES (incluido él mismo)
+  const getOperationalSubtreeCodes = useCallback((): string[] => {
+    return getDepartmentSubtreeCodes(OPERATIONS_CODE);
+  }, [getDepartmentSubtreeCodes]);
+
+  // Departamentos que un usuario específico puede ver.
+  // Regla jerárquica pura:
+  // - Roles con visión total (DG/Director/RRHH) ven todos los departamentos.
+  // - Cualquier otro usuario ve su propio departamento + todos sus descendientes (hijos, nietos, etc.).
+  // - NO ve padres, abuelos ni hermanos.
+  // - visibleDepartments actúa como override manual para casos especiales.
   const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[] } | null): string[] => {
     if (!user) return [];
+
+    // Roles con visión total por defecto
     if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) {
       return departmentCodes;
     }
-    if (user.role === Role.GERENTE_OPERACIONES) {
-      return getOperationalSubtreeCodes();
+
+    // Encontrar el departamento del usuario por código o por nombre
+    const userDeptCode = normalizeDeptCode(user.department || '');
+    let userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
+
+    // Legacy fallback: Gerente de Operaciones sin departamento OPERACIONES asignado usa OPERACIONES como raíz
+    if (user.role === Role.GERENTE_OPERACIONES && (!userDept || !getOperationalSubtreeCodes().includes(userDept.code))) {
+      userDept = operationsDept;
     }
-    const extra = (user.visibleDepartments || []).filter(d => d && d !== user.department);
-    return Array.from(new Set([user.department, ...extra].filter(Boolean)));
-  }, [departmentCodes, getOperationalSubtreeCodes]);
+
+    if (!userDept) {
+      const extra = (user.visibleDepartments || []).filter(Boolean);
+      return Array.from(new Set([user.department, ...extra].filter(Boolean)));
+    }
+
+    // Subárbol del departamento del usuario (él + descendientes)
+    const visibleCodes = getDepartmentSubtreeCodes(userDept.code);
+
+    // Departamentos adicionales configurados manualmente
+    const extraCodes = (user.visibleDepartments || [])
+      .map(code => normalizeDeptCode(code))
+      .filter(code => code && code !== userDept?.code);
+
+    return Array.from(new Set([...visibleCodes, ...extraCodes]));
+  }, [departmentCodes, activeDepartments, operationsDept, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
     return code === OPERATIONS_CODE || code === ADMIN_CODE;
@@ -207,6 +239,7 @@ export function useDynamicDepartments() {
     operationalDepartmentCodes,
     isOperationalDepartment,
     getVisibleDepartmentCodes,
+    getDepartmentSubtreeCodes,
     getDeptName,
     getDeptCode,
     getDeptIcon,

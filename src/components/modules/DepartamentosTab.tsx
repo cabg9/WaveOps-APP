@@ -121,6 +121,12 @@ export function DepartamentosTab() {
   const childDepts = useMemo(() => departments.filter((d: any) => d.parentId), [departments]);
   const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
   const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
+  const getDescendantIds = (parentId: string | null, depts: any[]): string[] => {
+    if (!parentId) return [];
+    const direct = depts.filter(d => d.parentId === parentId).map(d => d.id);
+    const indirect = direct.flatMap(childId => getDescendantIds(childId, depts));
+    return Array.from(new Set([...direct, ...indirect]));
+  };
 
   const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
   const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true); };
@@ -131,6 +137,7 @@ export function DepartamentosTab() {
   const handleSave = async () => {
     if (!form.name.trim()) { alert("El nombre es obligatorio"); return; }
     if (editingId && form.parentId === editingId) { alert("Un departamento no puede ser padre de si mismo"); return; }
+    if (editingId && form.parentId && getDescendantIds(editingId, departments).includes(form.parentId)) { alert("Un departamento no puede ser padre de sus propios descendientes"); return; }
     setSaving(true);
     try {
       if (editingId) {
@@ -369,11 +376,15 @@ export function DepartamentosTab() {
               <Label className="text-slate-300">Departamento Padre</Label>
               <select value={form.parentId || ""} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
                 <option value="">Ninguno (departamento raíz)</option>
-                {rootDepts.filter((d: any) => d.id !== editingId).map((d: any) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
+                {departments
+                  .filter((d: any) => d.id !== editingId)
+                  .filter((d: any) => !editingId || !getDescendantIds(editingId, departments).includes(d.id))
+                  .sort((a: any, b: any) => a.name.localeCompare(b.name))
+                  .map((d: any) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
               </select>
-              <p className="text-[11px] text-slate-400">Si es hijo de Operaciones, se considerará operacional automáticamente.</p>
+              <p className="text-[11px] text-slate-400">Si está en el subárbol de Operaciones, se considerará operacional automáticamente.</p>
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-300">Color</Label>

@@ -200,17 +200,17 @@ export default function HorariosModule() {
     }
   }, [activeTab, hasPermission]);
 
-  // Forzar departamento permitido en Equipo/Asignar según toggles de Develops + departamentos visibles
+  // Forzar departamento permitido en Equipo/Asignar según jerarquía departamental
   useEffect(() => {
     if (!user) return;
     const allowed = getVisibleDepartmentCodes(user);
-    const canSelectAll = user.role === Role.GERENTE_OPERACIONES ? operationalDepartmentCodes.length > 1 : hasPermission('canViewAllDepartmentsInTeam');
+    const canSelectAll = allowed.length > 1;
     if ((selectedDepartment === 'ALL' && !canSelectAll) || !allowed.includes(selectedDepartment)) {
       setSelectedDepartment(allowed.includes(user.department) ? user.department : allowed[0] || departmentCodes[0] || '');
     }
-  }, [user, hasPermission, selectedDepartment, departmentCodes, getVisibleDepartmentCodes, operationalDepartmentCodes]);
+  }, [user, selectedDepartment, departmentCodes, getVisibleDepartmentCodes]);
 
-  // Opciones de departamento visibles para el usuario actual en Equipo/Asignar (toggles de Develops + visibles adicionales)
+  // Opciones de departamento visibles para el usuario actual en Equipo/Asignar (jerarquía pura)
   const visibleDeptOptions = useMemo(() => {
     if (!user) return departmentOptions;
     const allowed = getVisibleDepartmentCodes(user);
@@ -220,9 +220,8 @@ export default function HorariosModule() {
   // Determina si se muestra la opción "Todos" en el selector de departamento
   const showAllDeptOption = useMemo(() => {
     if (!user) return false;
-    if (user.role === Role.GERENTE_OPERACIONES) return visibleDeptOptions.length > 1;
-    return hasPermission('canViewAllDepartmentsInTeam');
-  }, [user, visibleDeptOptions, hasPermission]);
+    return visibleDeptOptions.length > 1;
+  }, [user, visibleDeptOptions]);
 
   // Estado compartido para navegación de semana en Equipo (controlado desde header principal)
   const [equipoWeekOffset, setEquipoWeekOffset] = useState(0);
@@ -448,7 +447,7 @@ export default function HorariosModule() {
                       <SelectItem value="ALL">
                         <div className="flex items-center gap-2">
                           <LayoutGrid className="w-4 h-4" />
-                          <span>{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos'}</span>
+                          <span>{visibleDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</span>
                         </div>
                       </SelectItem>
                     )}
@@ -770,7 +769,7 @@ export default function HorariosModule() {
                       <SelectItem value="ALL">
                         <div className="flex items-center gap-2">
                           <LayoutGrid className="w-4 h-4" />
-                          <span>{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos'}</span>
+                          <span>{visibleDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</span>
                         </div>
                       </SelectItem>
                     )}
@@ -2378,9 +2377,8 @@ function EquipoTab({
 
   const showAllDeptOption = useMemo(() => {
     if (!user) return false;
-    if (user.role === Role.GERENTE_OPERACIONES) return visibleDeptOptions.length > 1;
-    return hasPermission('canViewAllDepartmentsInTeam');
-  }, [user, visibleDeptOptions, hasPermission]);
+    return visibleDeptOptions.length > 1;
+  }, [user, visibleDeptOptions]);
 
   // Modales
   const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
@@ -3895,9 +3893,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
   const showAllDeptOption = useMemo(() => {
     if (!user) return false;
-    if (user.role === Role.GERENTE_OPERACIONES) return visibleDepartmentOptions.length > 1;
-    return hasPermission('canViewAllDepartmentsInTeam');
-  }, [user, visibleDepartmentOptions, hasPermission]);
+    return visibleDepartmentOptions.length > 1;
+  }, [user, visibleDepartmentOptions]);
 
   // Solicitudes de tiempo libre aprobadas para bloquear asignaciones
   const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
@@ -4103,7 +4100,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   <SelectItem value="ALL">
                     <div className="flex items-center gap-2">
                       <LayoutGrid className="w-4 h-4" />
-                      <span>{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos los departamentos'}</span>
+                      <span>{visibleDepartmentOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</span>
                     </div>
                   </SelectItem>
                 )}

@@ -74,7 +74,7 @@ export default function TasksModule() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>(TimeFilter.TODAY);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | IncidenciaStatus | 'all'>(TaskStatus.PENDING);
   const [viewType, setViewType] = useState<ViewType>('list');
-  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState(user?.role === Role.GERENTE_OPERACIONES ? 'all' : (user?.department || 'all'));
+  const [incidenciaDepartmentFilter, setIncidenciaDepartmentFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
@@ -93,15 +93,12 @@ export default function TasksModule() {
     return departmentOptions.filter(d => allowed.includes(d.code));
   }, [departmentOptions, user, getVisibleDepartmentCodes]);
 
-  // Opciones para el dropdown de incidencias: DG/RRHH ven todos; Gerente de Operaciones ve operacionales
+  // Opciones para el dropdown de incidencias: respeta la jerarquía departamental pura
   const incidenciaDeptOptions = useMemo(() => {
     if (!user) return departmentOptions;
-    if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) return departmentOptions;
-    if (user.role === Role.GERENTE_OPERACIONES) {
-      return departmentOptions.filter(d => operationalDepartmentCodes.includes(d.code));
-    }
-    return departmentOptions.filter(d => d.code === user.department);
-  }, [departmentOptions, user, operationalDepartmentCodes]);
+    const allowed = getVisibleDepartmentCodes(user);
+    return departmentOptions.filter(d => allowed.includes(d.code));
+  }, [departmentOptions, user, getVisibleDepartmentCodes]);
 
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', department: defaultDepartment,
@@ -338,13 +335,9 @@ export default function TasksModule() {
     let result = [...tasks];
     if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED)) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
     else if (mainTab === 'my-department' && user) {
-      // Gerente de Operaciones ve tareas de todos los departamentos operativos
-      if (user.role === Role.GERENTE_OPERACIONES) {
-        const allowed = operationalDepartmentCodes.length > 0 ? operationalDepartmentCodes : [user.department];
-        result = result.filter((t) => allowed.includes(t.department));
-      } else {
-        result = result.filter((t) => t.department && t.department === user.department);
-      }
+      // Jerarquía pura: usuario ve su departamento + todos sus descendientes
+      const allowed = getVisibleDepartmentCodes(user);
+      result = result.filter((t) => allowed.includes(t.department));
     }
     else if (mainTab === 'all' && selectedDepartment !== 'all') result = result.filter((t) => t.department === selectedDepartment);
 
@@ -410,22 +403,19 @@ export default function TasksModule() {
     return result;
   }, [tasksByTabAndTime, statusFilter, searchQuery, user]);
 
-  // PASO 1: Filtrar por departamento
+  // PASO 1: Filtrar por departamento según jerarquía pura
   const incidenciasByDept = useMemo(() => {
-    let result = [...incidencias];
-    if (user && !(user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH)) {
-      result = result.filter((i) => i.targetDepartments?.includes(user.department) || i.targetDepartment === user.department);
-    } else if (user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && incidenciaDepartmentFilter !== 'all') {
-      // Gerente de Operaciones: al seleccionar su propio departamento u otro operativo, muestra incidencias de todos los departamentos operativos
-      if (user.role === Role.GERENTE_OPERACIONES && (incidenciaDepartmentFilter === user.department || isOperationalDepartment(incidenciaDepartmentFilter))) {
-        const allowed = operationalDepartmentCodes.length > 0 ? operationalDepartmentCodes : [user.department];
-        result = result.filter((i) => allowed.some((d) => i.targetDepartments?.includes(d) || i.targetDepartment === d));
-      } else {
-        result = result.filter((i) => i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter);
-      }
+    if (!user) return incidencias;
+    const allowed = getVisibleDepartmentCodes(user);
+    if (incidenciaDepartmentFilter === 'all') {
+      return incidencias.filter((i) =>
+        allowed.some((d) => i.targetDepartments?.includes(d) || i.targetDepartment === d)
+      );
     }
-    return result;
-  }, [incidencias, user, incidenciaDepartmentFilter, operationalDepartmentCodes, isOperationalDepartment]);
+    return incidencias.filter((i) =>
+      i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter
+    );
+  }, [incidencias, user, incidenciaDepartmentFilter, getVisibleDepartmentCodes]);
 
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {
@@ -613,15 +603,15 @@ export default function TasksModule() {
           </Select>
         </div>
 
-        {/* MÓVIL: selector de departamento para incidencias (autorizados) */}
-        {isIncidenciasTab && user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
+        {/* MÓVIL: selector de departamento para incidencias (jerarquía) */}
+        {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
           <div className="md:hidden">
             <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
               <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{user?.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
+                <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
                 {incidenciaDeptOptions.map((dept) => (
                   <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
                     {dept.name}{dept.name === user?.department ? ' (tú)' : ''}
@@ -667,11 +657,11 @@ export default function TasksModule() {
                   {[{ id: TimeFilter.PAST_WEEKS, label: 'Anteriores' }, { id: TimeFilter.YESTERDAY, label: 'Ayer' }, { id: TimeFilter.TODAY, label: 'Hoy' }].map((filter) => (
                     <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
                   ))}
-                  {user && (user.role === Role.DIRECTOR_GENERAL || user.role === Role.GERENTE_OPERACIONES || user.role === Role.RRHH) && (
+                  {user && incidenciaDeptOptions.length > 1 && (
                     <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
                       <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{user.role === Role.GERENTE_OPERACIONES ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
+                        <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
                         {incidenciaDeptOptions.map((dept) => (<SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</SelectItem>))}
                       </SelectContent>
                     </Select>
