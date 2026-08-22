@@ -184,7 +184,7 @@ interface IncapacidadesTabProps {
 export default function HorariosModule() {
   const { user } = useAuth();
   const { hasPermission } = useAppConfig();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
@@ -216,6 +216,13 @@ export default function HorariosModule() {
     const allowed = getVisibleDepartmentCodes(user);
     return departmentOptions.filter(d => allowed.includes(d.code));
   }, [departmentOptions, user, getVisibleDepartmentCodes]);
+
+  // Opciones jerárquicas visibles para selects
+  const visibleDeptTreeOptions = useMemo(() => {
+    if (!user) return departmentTreeOptions;
+    const allowed = getVisibleDepartmentCodes(user);
+    return departmentTreeOptions.filter(d => allowed.includes(d.code));
+  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
 
   // Determina si se muestra la opción "Todos" en el selector de departamento
   const showAllDeptOption = useMemo(() => {
@@ -451,11 +458,11 @@ export default function HorariosModule() {
                         </div>
                       </SelectItem>
                     )}
-                    {visibleDeptOptions.map((dept) => (
+                    {visibleDeptTreeOptions.map((dept) => (
                       <SelectItem key={dept.code} value={dept.code}>
                         <div className="flex items-center gap-2">
                           <DeptIcon department={dept.code} className="w-4 h-4" />
-                          <span>{dept.name}</span>
+                          <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -463,8 +470,8 @@ export default function HorariosModule() {
                 </Select>
               ) : (
                 <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
-                  <DeptIcon department={visibleDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
-                  <span className="truncate max-w-[120px]">{getDeptName(visibleDeptOptions[0]?.code || user?.department || '')}</span>
+                  <DeptIcon department={visibleDeptTreeOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
+                  <span className="truncate max-w-[120px]">{getDeptName(visibleDeptTreeOptions[0]?.code || user?.department || '')}</span>
                 </div>
               )
             )}
@@ -538,11 +545,11 @@ export default function HorariosModule() {
                             <span>Todos</span>
                           </div>
                         </SelectItem>
-                        {departmentOptions.map((dept) => (
+                        {departmentTreeOptions.map((dept) => (
                           <SelectItem key={dept.code} value={dept.code}>
                             <div className="flex items-center gap-2">
                               <DeptIcon department={dept.code} className="w-4 h-4" />
-                              <span>{dept.name}</span>
+                              <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -621,6 +628,83 @@ export default function HorariosModule() {
                 <HeartPulse className="w-4 h-4" />
                 Incapacidades
               </button>
+            )}
+
+            {/* Desktop: selector de departamento para Equipo/Asignar al lado de las pestañas */}
+            {(activeTab === 'equipo' || activeTab === 'asignar') && visibleDeptOptions.length > 0 && (
+              <div className="hidden md:flex items-center">
+                <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
+                {visibleDeptOptions.length > 1 ? (
+                  <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
+                      <SelectValue>
+                        {selectedDepartment === 'ALL' ? (
+                          <div className="flex items-center gap-2 text-[#86868B]">
+                            <LayoutGrid className="w-4 h-4" />
+                            <span>{visibleDeptTreeOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-[#86868B]">
+                            <DeptIcon department={selectedDepartment} className="w-4 h-4" />
+                            <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
+                          </div>
+                        )}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {showAllDeptOption && (
+                        <SelectItem value="ALL">
+                          <div className="flex items-center gap-2">
+                            <LayoutGrid className="w-4 h-4" />
+                            <span>{visibleDeptTreeOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</span>
+                          </div>
+                        </SelectItem>
+                      )}
+                      {visibleDeptTreeOptions.map((dept) => (
+                        <SelectItem key={dept.code} value={dept.code}>
+                          <div className="flex items-center gap-2">
+                            <DeptIcon department={dept.code} className="w-4 h-4" />
+                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
+                    <DeptIcon department={visibleDeptTreeOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
+                    <span className="truncate max-w-[120px]">{getDeptName(visibleDeptTreeOptions[0]?.code || user?.department || '')}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Desktop: navegación de semana para Equipo al lado de las pestañas */}
+            {activeTab === 'equipo' && (
+              <div className="hidden md:flex items-center gap-1">
+                <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
+                <button
+                  onClick={() => setEquipoWeekOffset(prev => prev - 1)}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setEquipoWeekOffset(0)}
+                  className="px-3 py-1.5 text-sm font-medium text-corporate hover:bg-corporate/5 rounded-lg"
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={() => setEquipoWeekOffset(prev => prev + 1)}
+                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <span className="text-sm text-[#86868B] whitespace-nowrap">
+                  {formatWeekRange(equipoWeekStart, addDays(equipoWeekStart, 6))}
+                </span>
+              </div>
             )}
           </div>
 
@@ -706,11 +790,11 @@ export default function HorariosModule() {
                           <span>Todos</span>
                         </div>
                       </SelectItem>
-                      {departmentOptions.map((dept) => (
+                      {departmentTreeOptions.map((dept) => (
                         <SelectItem key={dept.code} value={dept.code}>
                           <div className="flex items-center gap-2">
                             <DeptIcon department={dept.code} className="w-4 h-4" />
-                            <span>{dept.name}</span>
+                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -741,78 +825,6 @@ export default function HorariosModule() {
                   </div>
                 </>
               )}
-            </div>
-          )}
-
-          {/* Desktop: controles de Equipo en header principal */}
-          {activeTab === 'equipo' && (
-            <div className="hidden md:flex items-center gap-2">
-              {visibleDeptOptions.length > 0 ? (
-                <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
-                  <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">
-                    <SelectValue>
-                      {selectedDepartment === 'ALL' ? (
-                        <div className="flex items-center gap-2 text-[#86868B]">
-                          <LayoutGrid className="w-4 h-4" />
-                          <span>Todos</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2 text-[#86868B]">
-                          <DeptIcon department={selectedDepartment} className="w-4 h-4" />
-                          <span className="truncate max-w-[120px]">{selectedDepartment.replace(/_/g, ' ')}</span>
-                        </div>
-                      )}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {showAllDeptOption && (
-                      <SelectItem value="ALL">
-                        <div className="flex items-center gap-2">
-                          <LayoutGrid className="w-4 h-4" />
-                          <span>{visibleDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</span>
-                        </div>
-                      </SelectItem>
-                    )}
-                    {visibleDeptOptions.map((dept) => (
-                      <SelectItem key={dept.code} value={dept.code}>
-                        <div className="flex items-center gap-2">
-                          <DeptIcon department={dept.code} className="w-4 h-4" />
-                          <span>{dept.name}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="h-10 px-3 bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl flex items-center gap-2 text-sm text-[#86868B]">
-                  <DeptIcon department={visibleDeptOptions[0]?.code || user?.department || ''} className="w-4 h-4" />
-                  <span className="truncate max-w-[120px]">{getDeptName(visibleDeptOptions[0]?.code || user?.department || '')}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setEquipoWeekOffset(prev => prev - 1)}
-                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setEquipoWeekOffset(0)}
-                  className="px-3 py-1.5 text-sm font-medium text-corporate hover:bg-corporate/5 rounded-lg"
-                >
-                  Hoy
-                </button>
-                <button
-                  onClick={() => setEquipoWeekOffset(prev => prev + 1)}
-                  className="w-8 h-8 rounded-lg hover:bg-[#F5F5F7] flex items-center justify-center"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              <span className="text-sm text-[#86868B] whitespace-nowrap">
-                {formatWeekRange(equipoWeekStart, addDays(equipoWeekStart, 6))}
-              </span>
             </div>
           )}
 
@@ -3878,7 +3890,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     cleanupSpecificTasksForRemovedAssignment,
     shifts,
   } = useShifts();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
   const [weekOffset, setWeekOffset] = useState(0);
@@ -3890,6 +3902,12 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     const allowed = getVisibleDepartmentCodes(user);
     return departmentOptions.filter(d => allowed.includes(d.code));
   }, [departmentOptions, user, getVisibleDepartmentCodes]);
+
+  const visibleDepartmentTreeOptions = useMemo(() => {
+    if (!user) return departmentTreeOptions;
+    const allowed = getVisibleDepartmentCodes(user);
+    return departmentTreeOptions.filter(d => allowed.includes(d.code));
+  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
 
   const showAllDeptOption = useMemo(() => {
     if (!user) return false;
@@ -4100,15 +4118,15 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   <SelectItem value="ALL">
                     <div className="flex items-center gap-2">
                       <LayoutGrid className="w-4 h-4" />
-                      <span>{visibleDepartmentOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</span>
+                      <span>{visibleDepartmentTreeOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</span>
                     </div>
                   </SelectItem>
                 )}
-                {visibleDepartmentOptions.map(dept => (
+                {visibleDepartmentTreeOptions.map(dept => (
                   <SelectItem key={dept.code} value={dept.code}>
                     <div className="flex items-center gap-2">
                       <DeptIcon department={dept.code} className="w-4 h-4" />
-                      <span>{dept.name}</span>
+                      <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -6102,7 +6120,7 @@ function TimeOffRequestsPanel({
   onDeptFilterChange,
 }: TimeOffRequestsPanelProps) {
   const { user } = useAuth();
-  const { departmentOptions } = useDynamicDepartments();
+  const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const [internalView, setInternalView] = useState<'mias' | 'equipo'>('mias');
   const [internalFilter, setInternalFilter] = useState<'todas' | TimeOffRequest['status']>('todas');
   const [internalDeptFilter, setInternalDeptFilter] = useState<string | 'ALL'>('ALL');
@@ -6403,7 +6421,7 @@ function TimeOffRequestsPanel({
 
 function SolicitudesTab() {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'mis-solicitudes' | 'equipo'>('mis-cambios');
@@ -7067,9 +7085,9 @@ function SolicitudesTab() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ALL">Todos</SelectItem>
-                      {departmentOptions.map((opt) => (
+                      {departmentTreeOptions.map((opt) => (
                         <SelectItem key={opt.code} value={opt.code}>
-                          {opt.name}
+                          <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -7223,9 +7241,9 @@ function SolicitudesTab() {
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-50">
                     <SelectItem value="ALL">Todos</SelectItem>
-                    {departmentOptions.map((opt) => (
+                    {departmentTreeOptions.map((opt) => (
                       <SelectItem key={opt.code} value={opt.code}>
-                        {opt.name}
+                        <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

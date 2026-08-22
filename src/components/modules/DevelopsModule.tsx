@@ -233,7 +233,7 @@ function UsuariosTab() {
   const { sendInvitation } = useInvitation();
   const [sendInvite, setSendInvite] = useState(true);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
-  const { departmentOptions } = useDynamicDepartments();
+  const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
   const [search, setSearch] = useState('');
@@ -504,16 +504,18 @@ function UsuariosTab() {
               <select required value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
                 className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 ${formData.department ? 'border-[#E5E5E7]' : 'border-red-300 bg-red-50'}`}>
                 <option value="" disabled>Seleccionar departamento</option>
-                {departmentOptions.map(opt => (
-                  <option key={opt.code} value={opt.code}>{opt.name}</option>
+                {departmentTreeOptions.map(opt => (
+                  <option key={opt.code} value={opt.code}>
+                    {'\u00A0\u00A0'.repeat(opt.level)}{opt.level > 0 ? '└─ ' : ''}{opt.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-xs font-medium text-[#86868B] mb-1">Departamentos visibles adicionales</label>
               <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-[#E5E5E7]">
-                {departmentOptions.map(opt => (
-                  <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer">
+                {departmentTreeOptions.map(opt => (
+                  <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer" style={{ marginLeft: `${opt.level * 12}px` }}>
                     <input
                       type="checkbox"
                       checked={formData.visibleDepartments.includes(opt.code)}
@@ -528,7 +530,7 @@ function UsuariosTab() {
                       }}
                       className="w-3.5 h-3.5 rounded border-[#E5E5E7]"
                     />
-                    {opt.name}
+                    {opt.level > 0 ? '└─ ' : ''}{opt.name}
                   </label>
                 ))}
               </div>
@@ -1020,7 +1022,7 @@ function AuditoriaTab() {
 function SeguridadTab() {
   const { settings, roleTemplates } = useAppConfig();
   const { users } = useFirestoreUsers();
-  const { departmentOptions } = useDynamicDepartments();
+  const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const { logAction } = useAudit();
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);

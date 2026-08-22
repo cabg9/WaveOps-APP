@@ -40,7 +40,7 @@ const priorityConfig: Record<string, { label: string; color: string }> = {
 const timeButtons = [5, 10, 15, 20, 30, 40, 50, 60];
 
 export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: EditTaskModalProps) {
-  const { departmentNames, defaultDepartment } = useDynamicDepartments();
+  const { departmentTreeOptions, defaultDepartment } = useDynamicDepartments();
   const { users: allUsers } = useFirestoreUsers();
 
   // === ESTADOS ===
@@ -202,10 +202,11 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
             <div className="space-y-2">
               <Label>Departamento</Label>
               <div className="flex flex-wrap gap-2">
-                {departmentNames.map((dept) => (
-                  <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setDepartment(dept); setAssignedTo([]); setSupervisorId(""); }}
-                    className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", department === dept ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}>
-                    {dept.replace(/_/g, " ").toLowerCase()}
+                {departmentTreeOptions.map((dept) => (
+                  <button key={dept.code} type="button" disabled={!canEditAll} onClick={() => { setDepartment(dept.code); setAssignedTo([]); setSupervisorId(""); }}
+                    className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", department === dept.code ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}
+                    style={{ marginLeft: `${dept.level * 16}px` }}>
+                    {dept.level > 0 ? '└─ ' : ''}{dept.name.replace(/_/g, " ").toLowerCase()}
                   </button>
                 ))}
               </div>
@@ -318,10 +319,11 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
                 <div className="space-y-2">
                   <Label>Departamento de apoyo</Label>
                   <div className="flex flex-wrap gap-2">
-                    {departmentNames.filter((d) => d !== department).map((dept) => (
-                      <button key={dept} type="button" disabled={!canEditAll} onClick={() => { setSupportDepartment(dept); setSupportUserIds([]); }}
-                        className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", supportDepartment === dept ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}>
-                        {dept.replace(/_/g, " ").toLowerCase()}
+                    {departmentTreeOptions.filter((d) => d.code !== department).map((dept) => (
+                      <button key={dept.code} type="button" disabled={!canEditAll} onClick={() => { setSupportDepartment(dept.code); setSupportUserIds([]); }}
+                        className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", supportDepartment === dept.code ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}
+                        style={{ marginLeft: `${dept.level * 16}px` }}>
+                        {dept.level > 0 ? '└─ ' : ''}{dept.name.replace(/_/g, " ").toLowerCase()}
                       </button>
                     ))}
                   </div>

@@ -48,7 +48,7 @@ function calculateDueTime(startTime: string, estimatedMinutes: number): string {
 }
 
 export function TurnosTab() {
-  const { departmentOptions } = useDynamicDepartments();
+  const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const { shifts: firestoreShifts, assignments } = useFirestoreShifts();
   const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
   const { users } = useFirestoreUsers();
@@ -378,8 +378,8 @@ export function TurnosTab() {
       {/* Filtro por departamento */}
       <div className="flex gap-2 overflow-x-auto pb-2">
         <button onClick={() => setFilterDept('all')} className={cn('px-3 py-1.5 rounded-full text-sm whitespace-nowrap', filterDept === 'all' ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B]')}>Todos</button>
-        {departmentOptions.map(d => (
-          <button key={d.code} onClick={() => setFilterDept(d.code)} className={cn('px-3 py-1.5 rounded-full text-sm whitespace-nowrap', filterDept === d.code ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B]')}>{d.name}</button>
+        {departmentTreeOptions.map(d => (
+          <button key={d.code} onClick={() => setFilterDept(d.code)} className={cn('px-3 py-1.5 rounded-full text-sm whitespace-nowrap', filterDept === d.code ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B]')} style={{ marginLeft: `${d.level * 12}px` }}>{d.level > 0 ? '└─ ' : ''}{d.name}</button>
         ))}
       </div>
 
@@ -441,7 +441,7 @@ export function TurnosTab() {
             <div className="space-y-2">
               <Label>Departamento</Label>
               <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="w-full h-10 rounded-lg border border-[#E5E5E7] px-3 text-sm">
-                {departmentOptions.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+                {departmentTreeOptions.map(d => <option key={d.code} value={d.code}>{'\u00A0\u00A0'.repeat(d.level)}{d.level > 0 ? '└─ ' : ''}{d.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">

@@ -189,14 +189,20 @@ export function useDynamicDepartments() {
       return departmentCodes;
     }
 
+    // Fallback explícito para Gerente de Operaciones: siempre ve el subárbol operacional
+    if (user.role === Role.GERENTE_OPERACIONES) {
+      const opsCode = getOperationalSubtreeCodes();
+      if (opsCode.length > 0) {
+        const extra = (user.visibleDepartments || [])
+          .map(code => normalizeDeptCode(code))
+          .filter(code => code && !opsCode.includes(code));
+        return Array.from(new Set([...opsCode, ...extra]));
+      }
+    }
+
     // Encontrar el departamento del usuario por código o por nombre
     const userDeptCode = normalizeDeptCode(user.department || '');
-    let userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
-
-    // Legacy fallback: Gerente de Operaciones sin departamento OPERACIONES asignado usa OPERACIONES como raíz
-    if (user.role === Role.GERENTE_OPERACIONES && (!userDept || !getOperationalSubtreeCodes().includes(userDept.code))) {
-      userDept = operationsDept;
-    }
+    const userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
 
     if (!userDept) {
       const extra = (user.visibleDepartments || []).filter(Boolean);
@@ -209,10 +215,10 @@ export function useDynamicDepartments() {
     // Departamentos adicionales configurados manualmente
     const extraCodes = (user.visibleDepartments || [])
       .map(code => normalizeDeptCode(code))
-      .filter(code => code && code !== userDept?.code);
+      .filter(code => code && code !== userDept.code);
 
     return Array.from(new Set([...visibleCodes, ...extraCodes]));
-  }, [departmentCodes, activeDepartments, operationsDept, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
+  }, [departmentCodes, activeDepartments, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
     return code === OPERATIONS_CODE || code === ADMIN_CODE;
@@ -229,12 +235,28 @@ export function useDynamicDepartments() {
     return buildTree(null);
   }, [activeDepartments]);
 
+  // Opciones planas con nivel jerárquico para selects (ej: ── Hijo)
+  const departmentTreeOptions = useMemo(() => {
+    const flat: { code: string; name: string; level: number }[] = [];
+    const walk = (nodes: DynamicDepartment[], level: number) => {
+      nodes.forEach(node => {
+        flat.push({ code: node.code, name: node.name, level });
+        if (node.children && node.children.length > 0) {
+          walk(node.children, level + 1);
+        }
+      });
+    };
+    walk(departmentTree, 0);
+    return flat;
+  }, [departmentTree]);
+
   return {
     departments: departmentsWithOperational,
     departmentCodes,
     departmentNames,
     departmentOptions,
     departmentTree,
+    departmentTreeOptions,
     defaultDepartment,
     operationalDepartmentCodes,
     isOperationalDepartment,
