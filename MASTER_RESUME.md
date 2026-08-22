@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.5 en progreso: invitaciones y permisos por usuario en Develops)
+> Última actualización: 2026-08-22 (FASE 7.5 completada: invitaciones y permisos por usuario en Develops)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
