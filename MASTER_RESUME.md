@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: visibilidad jerárquica pura de departamentos)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: Tasks Mi Depto / Mi Jerarquía)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -633,6 +633,17 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - Botones de filtro por departamento y select del modal de turno muestran la jerarquía.
   - `EditTaskModal.tsx`:
     - Botones de selección de departamento y departamento de apoyo muestran la jerarquía con `└─ ` e indentación.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (Tasks: Mi Depto y Mi Jerarquía)
+- **Problema**: tras el cambio a jerarquía pura, la pestaña **Mi Depto** de Tasks mostraba el subárbol completo del usuario en lugar de solo su departamento propio, y la pestaña **Todas** no aparecía para el Gerente de Operaciones.
+- **Correcciones en `src/components/modules/TasksModule.tsx`**:
+  - **Mi Depto** vuelve a filtrar exclusivamente por `user.department`.
+  - La pestaña **Todas** ahora se renombra a **Mi Jerarquía** cuando el usuario no tiene permiso global (`canViewAllDepartments`) pero puede ver más de un departamento por jerarquía.
+  - El dropdown de departamento en **Mi Jerarquía** (desktop y móvil) muestra solo los departamentos visibles según `getVisibleDepartmentCodes`, con indentación jerárquica.
+  - Se quitó el selector de departamento que se había agregado en **Mi Depto**; ahora solo existe en **Mi Jerarquía**.
+  - El selector móvil de vista incluye **Mi Jerarquía** con la misma regla de visualización.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
