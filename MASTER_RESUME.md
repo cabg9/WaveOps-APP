@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: incidencias visibles para Gerente de Operaciones)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: Dashboard resumen de equipo para Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -714,6 +714,22 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - En `src/components/modules/TasksModule.tsx`:
     - Al crear una incidencia se normaliza `targetDepartment` con `getDeptCode` y se asegura que `targetDepartments` incluya al menos ese código.
     - `incidenciaDeptOptions` y `incidenciasByDept` ahora tienen un fallback: si el usuario es **Gerente de Operaciones** y la jerarquía no devuelve departamentos, se usa `operationalDepartmentCodes`.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (Dashboard resumen de equipo para Gerente de Operaciones)
+- **Problema**: en el **Dashboard**, la tarjeta **Resumen del Equipo** para el **Gerente de Operaciones** no sumaba los tasks de todos los departamentos operativos; los contadores aparecían en 0 o incompletos.
+- **Causa**: las tareas se guardaban en Firestore con `department` como **nombre legible** (ej. `Dive Shop`) en algunos flujos (tareas extra), mientras que `operationalDepartmentCodes` de `useDynamicDepartments` usa **códigos** (`DIVE_SHOP`). Al filtrar con `operationalDepartmentCodes.includes(t.department)`, nunca coincidían nombre vs. código.
+- **Correcciones**:
+  - En `src/hooks/firestore/useFirestoreTasks.ts`:
+    - Se agregó `normalizeDeptCode` y se normaliza `department` al leer tareas desde Firestore.
+  - En `src/hooks/useTasks.tsx`:
+    - Se normaliza `department` al crear tareas a través del wrapper.
+  - En `src/hooks/firestore/useSpecificTaskTemplates.ts`:
+    - Se normaliza `department` al crear y actualizar plantillas de tareas específicas.
+  - En `src/hooks/firestore/useFirestoreShifts.ts`:
+    - Se normaliza `department` al generar tareas específicas desde asignaciones publicadas.
+- **Resultado**: ahora todos los flujos de creación/lectura de tareas usan códigos de departamento normalizados, por lo que el filtro `operationalDepartmentCodes.includes(t.department)` del Dashboard funciona correctamente para el Gerente de Operaciones.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

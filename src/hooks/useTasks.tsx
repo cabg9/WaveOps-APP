@@ -8,6 +8,27 @@ import { useFirestoreIncidencias } from './firestore/useFirestoreIncidencias';
 import { TaskStatus, TaskType, TaskPriority } from '@/types';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 
+function normalizeDeptCode(name: string): string {
+  if (!name) return '';
+  const cleaned = name.trim().replace(/\s+/g, '_').toUpperCase();
+  const map: Record<string, string> = {
+    'ADMINISTRATIVO': 'ADMINISTRATIVO',
+    'FINANCIERO': 'FINANCIERO',
+    'VENTAS': 'VENTAS',
+    'MARKETING': 'MARKETING',
+    'DIVE_SHOP': 'DIVE_SHOP',
+    'DIVE': 'DIVE_SHOP',
+    'GUIADO_DE_BUCEO': 'GUIANZA',
+    'GUIANZA': 'GUIANZA',
+    'COCINA': 'COCINA',
+    'MOVILIDAD': 'MOVILIDAD',
+    'WAREHOUSE': 'WAREHOUSE',
+    'VESSELS': 'VESSELS',
+    'OPERACIONES': 'OPERACIONES',
+  };
+  return map[cleaned] || cleaned;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXT
 // ═══════════════════════════════════════════════════════════════════
@@ -69,7 +90,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
         status: TaskStatus.PENDING,
         priority: task.priority || TaskPriority.MEDIUM,
         assignedTo: Array.isArray(task.assignedTo) ? task.assignedTo : (task.assignedTo || []),
-        department: task.department || defaultDepartment,
+        department: normalizeDeptCode(task.department || defaultDepartment),
         dueDate: task.dueDate || new Date().toISOString(),
         dueTime: task.dueTime || '',
         createdBy: task.createdBy || '',

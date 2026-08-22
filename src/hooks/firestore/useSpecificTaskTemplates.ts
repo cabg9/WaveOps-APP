@@ -20,6 +20,27 @@ import { db } from '@/firebase-config';
 import { SpecificTaskTemplate, TaskStatus } from '@/types';
 
 const TEMPLATES_COLLECTION = 'specificTaskTemplates';
+
+function normalizeDeptCode(name: string): string {
+  if (!name) return '';
+  const cleaned = name.trim().replace(/\s+/g, '_').toUpperCase();
+  const map: Record<string, string> = {
+    'ADMINISTRATIVO': 'ADMINISTRATIVO',
+    'FINANCIERO': 'FINANCIERO',
+    'VENTAS': 'VENTAS',
+    'MARKETING': 'MARKETING',
+    'DIVE_SHOP': 'DIVE_SHOP',
+    'DIVE': 'DIVE_SHOP',
+    'GUIADO_DE_BUCEO': 'GUIANZA',
+    'GUIANZA': 'GUIANZA',
+    'COCINA': 'COCINA',
+    'MOVILIDAD': 'MOVILIDAD',
+    'WAREHOUSE': 'WAREHOUSE',
+    'VESSELS': 'VESSELS',
+    'OPERACIONES': 'OPERACIONES',
+  };
+  return map[cleaned] || cleaned;
+}
 const TASKS_COLLECTION = 'tasks';
 
 export interface CreateSpecificTaskTemplateData {
@@ -87,6 +108,7 @@ export function useSpecificTaskTemplates() {
     try {
       const payload: any = {
         ...data,
+        department: normalizeDeptCode(data.department),
         isActive: true,
         createdAt: new Date().toISOString(),
       };
@@ -111,7 +133,11 @@ export function useSpecificTaskTemplates() {
   ): Promise<void> => {
     try {
       const templateRef = doc(db, TEMPLATES_COLLECTION, id);
-      await updateDoc(templateRef, { ...updates, updatedAt: new Date().toISOString() } as DocumentData);
+      const normalizedUpdates: any = { ...updates };
+      if (normalizedUpdates.department) {
+        normalizedUpdates.department = normalizeDeptCode(normalizedUpdates.department);
+      }
+      await updateDoc(templateRef, { ...normalizedUpdates, updatedAt: new Date().toISOString() } as DocumentData);
 
       if (affectOnlyFuture) {
         const today = new Date().toISOString().split('T')[0];

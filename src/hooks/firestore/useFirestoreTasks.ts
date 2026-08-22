@@ -19,6 +19,28 @@ import {
 import { db } from '@/firebase-config';
 import { TaskStatus, TaskPriority, Note, Subtask } from '@/types';
 
+// Normaliza códigos de departamento para comparaciones robustas
+function normalizeDeptCode(name: string): string {
+  if (!name) return '';
+  const cleaned = name.trim().replace(/\s+/g, '_').toUpperCase();
+  const map: Record<string, string> = {
+    'ADMINISTRATIVO': 'ADMINISTRATIVO',
+    'FINANCIERO': 'FINANCIERO',
+    'VENTAS': 'VENTAS',
+    'MARKETING': 'MARKETING',
+    'DIVE_SHOP': 'DIVE_SHOP',
+    'DIVE': 'DIVE_SHOP',
+    'GUIADO_DE_BUCEO': 'GUIANZA',
+    'GUIANZA': 'GUIANZA',
+    'COCINA': 'COCINA',
+    'MOVILIDAD': 'MOVILIDAD',
+    'WAREHOUSE': 'WAREHOUSE',
+    'VESSELS': 'VESSELS',
+    'OPERACIONES': 'OPERACIONES',
+  };
+  return map[cleaned] || cleaned;
+}
+
 export interface FirestoreTask {
   id: string;
   title: string;
@@ -95,6 +117,7 @@ export function useFirestoreTasks() {
               dueDate: docData.dueDate?.toDate?.() 
                 ? docData.dueDate.toDate().toISOString() 
                 : docData.dueDate || new Date().toISOString(),
+              department: normalizeDeptCode(docData.department || ''),
               history: rawHistory.map((h: any) => ({
                 id: h.id || Math.random().toString(36).substr(2, 9),
                 performedBy: h.userId || h.performedBy || '',

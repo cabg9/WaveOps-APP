@@ -19,6 +19,27 @@ import {
 import { db } from '@/firebase-config';
 import { AssignmentStatus, TaskStatus, TaskPriority } from '@/types';
 
+function normalizeDeptCode(name: string): string {
+  if (!name) return '';
+  const cleaned = name.trim().replace(/\s+/g, '_').toUpperCase();
+  const map: Record<string, string> = {
+    'ADMINISTRATIVO': 'ADMINISTRATIVO',
+    'FINANCIERO': 'FINANCIERO',
+    'VENTAS': 'VENTAS',
+    'MARKETING': 'MARKETING',
+    'DIVE_SHOP': 'DIVE_SHOP',
+    'DIVE': 'DIVE_SHOP',
+    'GUIADO_DE_BUCEO': 'GUIANZA',
+    'GUIANZA': 'GUIANZA',
+    'COCINA': 'COCINA',
+    'MOVILIDAD': 'MOVILIDAD',
+    'WAREHOUSE': 'WAREHOUSE',
+    'VESSELS': 'VESSELS',
+    'OPERACIONES': 'OPERACIONES',
+  };
+  return map[cleaned] || cleaned;
+}
+
 export interface FirestoreShift {
   id: string;
   name: string;
@@ -319,7 +340,7 @@ export function useFirestoreShifts() {
               assignedTo,
               supervisorId: template.supervisorId || '',
               notifyOnDelay: template.notifyOnDelay || [],
-              department: template.department || '',
+              department: normalizeDeptCode(template.department || ''),
               dueDate: date,
               startTime: template.startTime || '',
               dueTime: calculateDueTime(template.startTime || '00:00', template.estimatedMinutes || 0),
