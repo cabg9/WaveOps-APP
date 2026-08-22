@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: solicitudes de cambio de turno)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: notificaciones por incapacidades)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -758,6 +758,19 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - **Mi Horario**: tarjeta de HOY, calendario mensual y popup del día.
     - **Equipo**: celdas de turnos.
     - **Asignar**: celdas de turnos publicados.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (notificaciones por incapacidades)
+- **Problema**: al registrar una incapacidad, los responsables (supervisor/gerente de turno, gerente de departamento, gerente de operaciones o RRHH/Director/DG) no recibían notificación para gestionar el reemplazo.
+- **Corrección**:
+  - Se agregó el tipo `INCAPACITY_REGISTERED` a `NotificationType` en `src/types/index.ts`.
+  - En `src/components/modules/HorariosModule.tsx`, la función `addIncapacity` ahora envía notificaciones en Firestore (`notifications`) después de crear la incapacidad.
+  - Jerarquía de notificación:
+    1. Supervisores y gerentes de departamento del usuario incapacitado.
+    2. Si no hay responsables del departamento y el departamento es operativo, notifica al **Gerente de Operaciones**.
+    3. Si aún no hay responsables, notifica a **RRHH / Director / Director General**.
+  - Se evita notificar al propio usuario incapacitado y se evitan duplicados.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

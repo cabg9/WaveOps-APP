@@ -356,7 +356,54 @@ export default function HorariosModule() {
         documents: [],
         createdAt: new Date().toISOString()
       });
-      
+
+      // Notificar a supervisores/gerentes responsables
+      const userDeptCode = getDeptCode(userInfo.department || '');
+      const isOperational = operationalDepartmentCodes.includes(userDeptCode);
+      const notifiedUserIds = new Set<string>();
+      const notifyUser = async (targetUserId: string) => {
+        if (!targetUserId || notifiedUserIds.has(targetUserId) || targetUserId === userId) return;
+        notifiedUserIds.add(targetUserId);
+        try {
+          await addDoc(collection(db, 'notifications'), {
+            userId: targetUserId,
+            type: NotificationType.INCAPACITY_REGISTERED,
+            title: 'Incapacidad registrada',
+            body: `${userInfo.name} registró una incapacidad (${type}) del ${dates[0]} al ${dates[dates.length - 1]}. Revisa el reemplazo.`,
+            data: { link: '/horarios', incapacityUserId: userId },
+            read: false,
+            createdAt: serverTimestamp(),
+            createdBy: user?.id || userId,
+            priority: 'high',
+          });
+        } catch (err) {
+          console.error('Error al notificar incapacidad a', targetUserId, err);
+        }
+      };
+
+      // 1. Supervisores y gerentes del departamento
+      const deptManagers = firestoreUsers.filter(u =>
+        u.isActive !== false &&
+        getDeptCode(u.department || '') === userDeptCode &&
+        (u.role === Role.SUPERVISOR || u.role === Role.GERENTE_DEPARTAMENTO)
+      );
+      for (const u of deptManagers) await notifyUser(u.id);
+
+      // 2. Si no hay responsables del departamento, gerente de operaciones (solo departamentos operativos)
+      if (notifiedUserIds.size === 0 && isOperational) {
+        const opsManager = firestoreUsers.find(u => u.role === Role.GERENTE_OPERACIONES && u.isActive !== false);
+        if (opsManager) await notifyUser(opsManager.id);
+      }
+
+      // 3. Fallback RRHH / Director / Director General
+      if (notifiedUserIds.size === 0) {
+        const topManagers = firestoreUsers.filter(u =>
+          u.isActive !== false &&
+          (u.role === Role.RRHH || u.role === Role.DIRECTOR || u.role === Role.DIRECTOR_GENERAL)
+        );
+        for (const u of topManagers) await notifyUser(u.id);
+      }
+
       toast.success(`Incapacidad registrada para ${userInfo.name}`, {
         description: `Del ${dates[0]} al ${dates[dates.length - 1]}`,
       });
