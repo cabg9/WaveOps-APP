@@ -610,6 +610,31 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (dropdowns alineados y jerárquicos)
+- **Problema**: el usuario reportó tres cosas:
+  1. En **Horarios → Equipo** el dropdown de departamento no estaba alineado junto a las pestañas principales y ocupaba espacio extra.
+  2. En **Tasks** el Gerente de Operaciones no veía el selector de departamentos para filtrar sus hijos operacionales.
+  3. En los perfiles/formularios de usuario no se mostraban todos los departamentos con su jerarquía completa (hijos de hijos, etc.).
+- **Correcciones**:
+  - `useDynamicDepartments.ts`:
+    - Fallback más robusto para `GERENTE_OPERACIONES`: siempre devuelve el subárbol operacional completo, independientemente del `department` asignado al usuario.
+    - Nuevas `departmentTreeOptions`: lista plana de departamentos con `level` para poder renderizar indentación visual en selects y botones.
+  - `HorariosModule.tsx`:
+    - El selector de departamento de **Equipo/Asignar** y la navegación de semana de **Equipo** ahora se renderizan dentro del mismo contenedor de las pestañas principales en desktop, ahorrando espacio.
+    - Todos los selectores de departamento del módulo (Equipo, Asignar, Incapacidades, Solicitudes → Cambios/Equipo, Solicitudes → Solicitudes/Equipo) usan `departmentTreeOptions` con indentación jerárquica.
+  - `TasksModule.tsx`:
+    - `incidenciaDeptOptions` usa `departmentTreeOptions` filtrado por `getVisibleDepartmentCodes`.
+    - El selector de departamento de **Incidencias** (móvil y desktop) muestra la jerarquía con `└─ ` e indentación.
+    - El selector de departamento de la pestaña **Todas** también muestra jerarquía.
+  - `DevelopsModule.tsx`:
+    - Selector de **Departamento** y checkboxes de **Departamentos visibles adicionales** en el formulario de usuario muestran la jerarquía completa con indentación.
+  - `TurnosTab.tsx`:
+    - Botones de filtro por departamento y select del modal de turno muestran la jerarquía.
+  - `EditTaskModal.tsx`:
+    - Botones de selección de departamento y departamento de apoyo muestran la jerarquía con `└─ ` e indentación.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
