@@ -522,39 +522,41 @@ export default function HorariosModule() {
                         <SelectItem value="rechazada">Rechazadas</SelectItem>
                       </SelectContent>
                     </Select>
-                    <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-                        <SelectValue>
-                          {incapacidadesDeptFilter === 'ALL' ? (
-                            <div className="flex items-center gap-2 text-[#86868B]">
-                              <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                    {visibleDeptTreeOptions.length > 1 && (
+                      <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                        <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                          <SelectValue>
+                            {incapacidadesDeptFilter === 'ALL' ? (
+                              <div className="flex items-center gap-2 text-[#86868B]">
+                                <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                                <span>Todos</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-[#86868B]">
+                                <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4 flex-shrink-0" />
+                                <span className="truncate max-w-[100px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                              </div>
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent position="popper" className="z-50">
+                          <SelectItem value="ALL">
+                            <div className="flex items-center gap-2">
+                              <LayoutGrid className="w-4 h-4" />
                               <span>Todos</span>
                             </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-[#86868B]">
-                              <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4 flex-shrink-0" />
-                              <span className="truncate max-w-[100px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
-                            </div>
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-50">
-                        <SelectItem value="ALL">
-                          <div className="flex items-center gap-2">
-                            <LayoutGrid className="w-4 h-4" />
-                            <span>Todos</span>
-                          </div>
-                        </SelectItem>
-                        {departmentTreeOptions.map((dept) => (
-                          <SelectItem key={dept.code} value={dept.code}>
-                            <div className="flex items-center gap-2">
-                              <DeptIcon department={dept.code} className="w-4 h-4" />
-                              <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
-                            </div>
                           </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                          {visibleDeptTreeOptions.map((dept) => (
+                            <SelectItem key={dept.code} value={dept.code}>
+                              <div className="flex items-center gap-2">
+                                <DeptIcon department={dept.code} className="w-4 h-4" />
+                                <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </>
                 )}
               </div>
@@ -767,39 +769,41 @@ export default function HorariosModule() {
               {/* Filtros Equipo */}
               {incapacidadesSubTab === 'equipo' && (
                 <>
-                  <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
-                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-                      <SelectValue>
-                        {incapacidadesDeptFilter === 'ALL' ? (
-                          <div className="flex items-center gap-2 text-[#86868B]">
-                            <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                  {visibleDeptTreeOptions.length > 1 && (
+                    <Select value={incapacidadesDeptFilter} onValueChange={(v) => setIncapacidadesDeptFilter(v as string | 'ALL')}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                        <SelectValue>
+                          {incapacidadesDeptFilter === 'ALL' ? (
+                            <div className="flex items-center gap-2 text-[#86868B]">
+                              <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                              <span>Todos</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 text-[#86868B]">
+                              <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4 flex-shrink-0" />
+                              <span className="truncate max-w-[120px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
+                            </div>
+                          )}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent position="popper" className="z-50">
+                        <SelectItem value="ALL">
+                          <div className="flex items-center gap-2">
+                            <LayoutGrid className="w-4 h-4" />
                             <span>Todos</span>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-2 text-[#86868B]">
-                            <DeptIcon department={incapacidadesDeptFilter} className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate max-w-[120px]">{incapacidadesDeptFilter.replace(/_/g, ' ')}</span>
-                          </div>
-                        )}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent position="popper" className="z-50">
-                      <SelectItem value="ALL">
-                        <div className="flex items-center gap-2">
-                          <LayoutGrid className="w-4 h-4" />
-                          <span>Todos</span>
-                        </div>
-                      </SelectItem>
-                      {departmentTreeOptions.map((dept) => (
-                        <SelectItem key={dept.code} value={dept.code}>
-                          <div className="flex items-center gap-2">
-                            <DeptIcon department={dept.code} className="w-4 h-4" />
-                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
-                          </div>
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        {visibleDeptTreeOptions.map((dept) => (
+                          <SelectItem key={dept.code} value={dept.code}>
+                            <div className="flex items-center gap-2">
+                              <DeptIcon department={dept.code} className="w-4 h-4" />
+                              <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
                     {[
@@ -4548,10 +4552,16 @@ function IncapacidadesTab({
   onStatusFilterChange,
 }: IncapacidadesTabProps) {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const { hasPermission } = useAppConfig();
   const users = firestoreUsers2;
+
+  // Códigos de departamentos visibles según jerarquía y permisos del usuario
+  const visibleDeptCodes = useMemo(() => {
+    if (!user) return [];
+    return getVisibleDepartmentCodes(user);
+  }, [user, getVisibleDepartmentCodes]);
 
   // Permisos de incapacidades (fallback a roles para compatibilidad con datos existentes)
   const canVerifyIncapacidad = hasPermission('canVerifyIncapacidad') ||
@@ -4621,17 +4631,19 @@ function IncapacidadesTab({
   const filteredIncapacidades = useMemo(() => {
     return incapacidades.filter(inc => {
       if (selectedDepartment !== 'ALL' && inc.userDepartment !== selectedDepartment) return false;
+      if (selectedDepartment === 'ALL' && visibleDeptCodes.length > 0 && !visibleDeptCodes.includes(inc.userDepartment || '')) return false;
       if (statusFilter !== 'todas' && inc.status !== statusFilter) return false;
       return true;
     });
-  }, [incapacidades, selectedDepartment, statusFilter]);
+  }, [incapacidades, selectedDepartment, statusFilter, visibleDeptCodes]);
 
   // Contadores por estado - filtrados por departamento seleccionado
   const counts = useMemo(() => {
-    // Filtrar incapacidades por departamento seleccionado
-    const filteredByDept = selectedDepartment === 'ALL' 
-      ? incapacidades 
-      : incapacidades.filter(i => i.userDepartment === selectedDepartment);
+    // Filtrar incapacidades por departamento seleccionado (o visibles si es ALL)
+    const filteredByDept = incapacidades.filter(i => {
+      if (selectedDepartment !== 'ALL') return i.userDepartment === selectedDepartment;
+      return visibleDeptCodes.length === 0 || visibleDeptCodes.includes(i.userDepartment || '');
+    });
     
     return {
       todas: filteredByDept.length,
@@ -4640,7 +4652,7 @@ function IncapacidadesTab({
       registrada: filteredByDept.filter(i => i.status === 'registrada').length,
       rechazada: filteredByDept.filter(i => i.status === 'rechazada').length,
     };
-  }, [incapacidades, selectedDepartment]);
+  }, [incapacidades, selectedDepartment, visibleDeptCodes]);
 
   // Obtener usuarios disponibles para reemplazo (mismo departamento u otros)
   const getReplacementUsers = (incapacity: Incapacidad, external: boolean = false) => {
@@ -6421,9 +6433,28 @@ function TimeOffRequestsPanel({
 
 function SolicitudesTab() {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const users = firestoreUsers2;
+
+  // Departamentos visibles según jerarquía y permisos del usuario
+  const visibleDeptCodes = useMemo(() => {
+    if (!user) return [];
+    return getVisibleDepartmentCodes(user);
+  }, [user, getVisibleDepartmentCodes]);
+
+  const visibleDeptOptions = useMemo(() => {
+    return departmentOptions.filter(d => visibleDeptCodes.includes(d.code));
+  }, [departmentOptions, visibleDeptCodes]);
+
+  const visibleDeptTreeOptions = useMemo(() => {
+    return departmentTreeOptions.filter(d => visibleDeptCodes.includes(d.code));
+  }, [departmentTreeOptions, visibleDeptCodes]);
+
+  const canViewAllDepartments = useMemo(() => {
+    return visibleDeptCodes.length === departmentCodes.length && departmentCodes.length > 0;
+  }, [visibleDeptCodes, departmentCodes]);
+
   const [activeSubTab, setActiveSubTab] = useState<'mis-cambios' | 'mis-solicitudes' | 'equipo'>('mis-cambios');
   const [misCambiosFilter, setMisCambiosFilter] = useState<'recibidas' | 'enviadas' | 'historial' | 'equipo'>('recibidas');
   const [equipoFilter, setEquipoFilter] = useState<'todas' | 'aceptadas' | 'rechazadas' | 'deshechas'>('todas');
@@ -6580,9 +6611,9 @@ function SolicitudesTab() {
 
   const teamTimeOffRequests = useMemo(() => {
     if (!canApproveTimeOff) return [];
-    if (canViewAllTimeOff) return timeOffRequests;
-    return timeOffRequests.filter((r) => r.department === user?.department);
-  }, [timeOffRequests, canApproveTimeOff, canViewAllTimeOff, user?.department]);
+    // Filtrar por los departamentos visibles según jerarquía/permisos del usuario
+    return timeOffRequests.filter((r) => visibleDeptCodes.includes(r.department));
+  }, [timeOffRequests, canApproveTimeOff, visibleDeptCodes]);
 
   const handleApproveTimeOff = async (req: TimeOffRequest) => {
     if (!user) return;
@@ -6773,7 +6804,6 @@ function SolicitudesTab() {
   const getFilteredEquipo = () => {
     const currentUser = user?.name || 'Usuario';
     const currentUserId = user?.id || 'current-user';
-    const userDept = user?.department;
 
     let filtered = todasSolicitudes.filter(s =>
       s.de !== currentUser && s.a !== currentUser &&
@@ -6781,11 +6811,11 @@ function SolicitudesTab() {
       s.de !== 'Tú' && s.a !== 'Tú'
     );
 
-    // Filtrar por departamento
+    // Filtrar por departamento: visibleDeptCodes respeta jerarquía y permisos
     if (equipoDeptFilter !== 'ALL') {
       filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
-    } else if (userDept) {
-      filtered = filtered.filter(s => s.deDept === userDept || s.aDept === userDept);
+    } else if (visibleDeptCodes.length > 0) {
+      filtered = filtered.filter(s => visibleDeptCodes.includes(s.deDept || '') || visibleDeptCodes.includes(s.aDept || ''));
     }
 
     // Filtrar por estado
@@ -6931,8 +6961,8 @@ function SolicitudesTab() {
     );
     if (equipoDeptFilter !== 'ALL') {
       filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
-    } else if (userDept) {
-      filtered = filtered.filter(s => s.deDept === userDept || s.aDept === userDept);
+    } else if (visibleDeptCodes.length > 0) {
+      filtered = filtered.filter(s => visibleDeptCodes.includes(s.deDept || '') || visibleDeptCodes.includes(s.aDept || ''));
     }
     return {
       todas: filtered.length,
@@ -6940,7 +6970,7 @@ function SolicitudesTab() {
       rechazadas: filtered.filter(s => s.estado === 'rechazada').length,
       deshechas: filtered.filter(s => s.estado === 'deshecha').length,
     };
-  }, [todasSolicitudes, currentUser, currentUserId, equipoDeptFilter, userDept]);
+  }, [todasSolicitudes, currentUser, currentUserId, equipoDeptFilter, visibleDeptCodes]);
 
   return (
     <div className="space-y-4">
@@ -7078,20 +7108,22 @@ function SolicitudesTab() {
 
               {misCambiosFilter === 'equipo' && (
                 <>
-                  <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
-                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-fit min-w-0">
-                      <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
-                      <SelectValue placeholder="Departamento" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Todos</SelectItem>
-                      {departmentTreeOptions.map((opt) => (
-                        <SelectItem key={opt.code} value={opt.code}>
-                          <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {visibleDeptTreeOptions.length > 1 && (
+                    <Select value={equipoDeptFilter} onValueChange={(v) => setEquipoDeptFilter(v as string | 'ALL')}>
+                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-fit min-w-0">
+                        <Building2 className="w-4 h-4 text-[#86868B] mr-1" />
+                        <SelectValue placeholder="Departamento" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">Todos</SelectItem>
+                        {visibleDeptTreeOptions.map((opt) => (
+                          <SelectItem key={opt.code} value={opt.code}>
+                            <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
 
                   {/* Mobile: dropdown de estado del equipo */}
                   <div className="md:hidden min-w-0">
@@ -7233,7 +7265,7 @@ function SolicitudesTab() {
                 </>
               )}
 
-              {timeOffView === 'equipo' && canApproveTimeOff && (
+              {timeOffView === 'equipo' && canApproveTimeOff && visibleDeptTreeOptions.length > 1 && (
                 <Select value={timeOffDeptFilter} onValueChange={(v) => setTimeOffDeptFilter(v as string | 'ALL')}>
                   <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors shrink-0 text-[#86868B] w-fit min-w-0">
                     <Building2 className="w-4 h-4 text-[#86868B] mr-1 flex-shrink-0" />
@@ -7241,7 +7273,7 @@ function SolicitudesTab() {
                   </SelectTrigger>
                   <SelectContent position="popper" className="z-50">
                     <SelectItem value="ALL">Todos</SelectItem>
-                    {departmentTreeOptions.map((opt) => (
+                    {visibleDeptTreeOptions.map((opt) => (
                       <SelectItem key={opt.code} value={opt.code}>
                         <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
                       </SelectItem>

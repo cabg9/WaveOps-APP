@@ -339,7 +339,7 @@ export default function TasksModule() {
       result = result.filter((t) => t.department && t.department === user.department);
     }
     else if (mainTab === 'all' && user) {
-      // Todas/Mi Jerarquía: respeta lo que el usuario puede ver
+      // Todas: respeta lo que el usuario puede ver (jerarquía + permisos)
       const canViewAll = hasPermission('canViewAllDepartments');
       const allowed = canViewAll ? departmentCodes : getVisibleDepartmentCodes(user);
       if (selectedDepartment !== 'all') {
@@ -532,7 +532,7 @@ export default function TasksModule() {
               <SelectItem value="my-tasks">Mis Tareas</SelectItem>
               <SelectItem value="my-department">Mi Depto</SelectItem>
               {(hasPermission('canViewAllDepartments') || visibleTaskDeptTreeOptions.length > 1) && (
-                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todas' : 'Mi Jerarquía'}</SelectItem>
+                <SelectItem value="all">Todas</SelectItem>
               )}
               <SelectItem value="incidencias">Incidencias</SelectItem>
             </SelectContent>
@@ -613,7 +613,7 @@ export default function TasksModule() {
           </Select>
         </div>
 
-        {/* MÓVIL: selector de departamento para Mi Jerarquía */}
+        {/* MÓVIL: selector de departamento para Todas */}
         {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
           <div className="md:hidden">
             <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
@@ -621,7 +621,7 @@ export default function TasksModule() {
                 <SelectValue placeholder="Departamento" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos (mi jerarquía)'}</SelectItem>
+                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
                 {visibleTaskDeptTreeOptions.map((dept) => (
                   <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
                     <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
@@ -659,7 +659,7 @@ export default function TasksModule() {
               <button onClick={() => { setMainTab('my-tasks'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-tasks' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><User className="w-4 h-4" />Mis Tareas</button>
               <button onClick={() => { setMainTab('my-department'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'my-department' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><Users className="w-4 h-4" />Mi Depto</button>
               {(hasPermission('canViewAllDepartments') || visibleTaskDeptTreeOptions.length > 1) && (
-                <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />{hasPermission('canViewAllDepartments') ? 'Todas' : 'Mi Jerarquía'}</button>
+                <button onClick={() => { setMainTab('all'); setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'all' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><LayoutGrid className="w-4 h-4" />Todas</button>
               )}
               <div className="w-px h-6 bg-[#C7C7CC] mx-1 shrink-0" />
               <button onClick={() => { setMainTab('incidencias'); setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }} className={cn('flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', mainTab === 'incidencias' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B] hover:text-[#1D1D1F]')}><AlertTriangle className="w-4 h-4" />Incidencias</button>
@@ -675,7 +675,7 @@ export default function TasksModule() {
                     <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
                       <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos (mi jerarquía)'}</SelectItem>
+                        <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
                         {visibleTaskDeptTreeOptions.map((dept) => (
                           <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
                             <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>

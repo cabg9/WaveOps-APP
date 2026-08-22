@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: Tasks Mi Depto / Mi Jerarquía)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: filtro de equipo por jerarquía en Horarios)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -644,6 +644,21 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - El dropdown de departamento en **Mi Jerarquía** (desktop y móvil) muestra solo los departamentos visibles según `getVisibleDepartmentCodes`, con indentación jerárquica.
   - Se quitó el selector de departamento que se había agregado en **Mi Depto**; ahora solo existe en **Mi Jerarquía**.
   - El selector móvil de vista incluye **Mi Jerarquía** con la misma regla de visualización.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (jerarquía en Equipo de Solicitudes e Incapacidades)
+- **Problema**: el usuario pidió renombrar **Mi Jerarquía** a **Todas** en Tasks, y que las pestañas **Equipo** de **Horarios → Solicitudes** (cambios de turno, solicitudes de tiempo libre) e **Incapacidades** respeten la jerarquía de departamentos y los permisos del usuario.
+- **Correcciones en `src/components/modules/TasksModule.tsx`**:
+  - La pestaña y el selector móvil que mostraban **Mi Jerarquía** ahora muestran **Todas**.
+  - La opción "Todos (mi jerarquía)" del dropdown de departamento ahora dice **Todos**.
+- **Correcciones en `src/components/modules/HorariosModule.tsx`**:
+  - `SolicitudesTab` ahora importa `getVisibleDepartmentCodes` y calcula `visibleDeptCodes`, `visibleDeptOptions` y `visibleDeptTreeOptions`.
+  - **Solicitudes → Cambios → Equipo**: `getFilteredEquipo` y `equipoCounts` filtran por los departamentos visibles cuando el filtro es **Todos**.
+  - **Solicitudes → Solicitudes → Equipo**: `teamTimeOffRequests` filtra por departamentos visibles; el dropdown de departamento usa `visibleDeptTreeOptions`.
+  - **Incapacidades → Equipo**: el dropdown de departamento (móvil y desktop) usa `visibleDeptTreeOptions`.
+  - `IncapacidadesTab` filtra las incapacidades por departamentos visibles cuando el filtro es **Todos**.
+  - Los dropdowns de departamento solo se muestran cuando el usuario puede ver más de un departamento.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
