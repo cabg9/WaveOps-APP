@@ -181,8 +181,13 @@ export function useDynamicDepartments() {
   // - Cualquier otro usuario ve su propio departamento + todos sus descendientes (hijos, nietos, etc.).
   // - NO ve padres, abuelos ni hermanos.
   // - visibleDepartments actúa como override manual para casos especiales.
-  const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[] } | null): string[] => {
+  const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[]; permissions?: string[] } | null): string[] => {
     if (!user) return [];
+
+    // Permiso de roleTemplate para ver todos los departamentos (override)
+    if (user.permissions?.includes('canViewAllDepartments')) {
+      return departmentCodes;
+    }
 
     // Roles con visión total por defecto
     if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) {

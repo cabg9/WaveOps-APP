@@ -129,6 +129,7 @@ export interface User {
   apneaCert?: string;
   joinDate?: string;
   visibleDepartments?: string[]; // Departamentos adicionales que el usuario puede ver
+  permissions?: string[]; // Permisos efectivos del roleTemplate (opcional, para overrides)
   displayName?: string;
   nationality?: string;
   passport?: string;

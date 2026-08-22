@@ -53,6 +53,7 @@ export interface FirestoreUser {
   profileComplete?: boolean;
   invitationPending?: boolean;
   invitedAt?: string;
+  visibleDepartments?: string[];
   updatedAt?: string;
   joinDate?: string;
   displayName?: string;

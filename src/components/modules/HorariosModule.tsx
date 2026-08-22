@@ -185,7 +185,7 @@ interface IncapacidadesTabProps {
 
 export default function HorariosModule() {
   const { user } = useAuth();
-  const { hasPermission } = useAppConfig();
+  const { effectiveUser, hasPermission } = useAppConfig();
   const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptShortName, getDeptCode, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
@@ -204,33 +204,33 @@ export default function HorariosModule() {
 
   // Forzar departamento permitido en Equipo/Asignar según jerarquía departamental
   useEffect(() => {
-    if (!user) return;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     const canSelectAll = allowed.length > 1;
     if ((selectedDepartment === 'ALL' && !canSelectAll) || !allowed.includes(selectedDepartment)) {
-      setSelectedDepartment(allowed.includes(user.department) ? user.department : allowed[0] || departmentCodes[0] || '');
+      setSelectedDepartment(allowed.includes(effectiveUser.department) ? effectiveUser.department : allowed[0] || departmentCodes[0] || '');
     }
-  }, [user, selectedDepartment, departmentCodes, getVisibleDepartmentCodes]);
+  }, [effectiveUser, selectedDepartment, departmentCodes, getVisibleDepartmentCodes]);
 
   // Opciones de departamento visibles para el usuario actual en Equipo/Asignar (jerarquía pura)
   const visibleDeptOptions = useMemo(() => {
-    if (!user) return departmentOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentOptions.filter(d => allowed.includes(d.code));
-  }, [departmentOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   // Opciones jerárquicas visibles para selects
   const visibleDeptTreeOptions = useMemo(() => {
-    if (!user) return departmentTreeOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentTreeOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
-  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   // Determina si se muestra la opción "Todos" en el selector de departamento
   const showAllDeptOption = useMemo(() => {
-    if (!user) return false;
+    if (!effectiveUser) return false;
     return visibleDeptOptions.length > 1;
-  }, [user, visibleDeptOptions]);
+  }, [effectiveUser, visibleDeptOptions]);
 
   // Estado compartido para navegación de semana en Equipo (controlado desde header principal)
   const [equipoWeekOffset, setEquipoWeekOffset] = useState(0);
@@ -2419,7 +2419,7 @@ function EquipoTab({
   weekDays: propWeekDays,
 }: EquipoTabProps) {
   const { user } = useAuth();
-  const { hasPermission } = useAppConfig();
+  const { effectiveUser, hasPermission } = useAppConfig();
   const { getUsersByDepartment, getWeekAssignments, getShiftById, getUserShifts } = useShifts();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
@@ -2446,15 +2446,15 @@ function EquipoTab({
 
   // Departamentos visibles en Equipo según jerarquía + toggles de Develops
   const visibleDeptOptions = useMemo(() => {
-    if (!user) return departmentOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentOptions.filter(d => allowed.includes(d.code));
-  }, [departmentOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   const showAllDeptOption = useMemo(() => {
-    if (!user) return false;
+    if (!effectiveUser) return false;
     return visibleDeptOptions.length > 1;
-  }, [user, visibleDeptOptions]);
+  }, [effectiveUser, visibleDeptOptions]);
 
   // Modales
   const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null);
@@ -3942,7 +3942,7 @@ interface AsignarTabProps {
 
 function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _getIncapacityForDate, selectedDepartment, setSelectedDepartment }: AsignarTabProps) {
   const { user } = useAuth();
-  const { hasPermission } = useAppConfig();
+  const { effectiveUser, hasPermission } = useAppConfig();
   const { 
     assignments: allAssignments,
     getShiftsByDepartment, 
@@ -3965,21 +3965,21 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
   // Departamentos visibles en el selector de Asignar según jerarquía + toggles de Develops
   const visibleDepartmentOptions = useMemo(() => {
-    if (!user) return departmentOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentOptions.filter(d => allowed.includes(d.code));
-  }, [departmentOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   const visibleDepartmentTreeOptions = useMemo(() => {
-    if (!user) return departmentTreeOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentTreeOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
-  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   const showAllDeptOption = useMemo(() => {
-    if (!user) return false;
+    if (!effectiveUser) return false;
     return visibleDepartmentOptions.length > 1;
-  }, [user, visibleDepartmentOptions]);
+  }, [effectiveUser, visibleDepartmentOptions]);
 
   // Solicitudes de tiempo libre aprobadas para bloquear asignaciones
   const [approvedTimeOff, setApprovedTimeOff] = useState<TimeOffRequest[]>([]);
@@ -4053,7 +4053,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   }, [users, getUsersByDepartment, selectedDepartment]);
 
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
-  const allowedForCrossDept = user ? getVisibleDepartmentCodes(user) : [];
+  const allowedForCrossDept = effectiveUser ? getVisibleDepartmentCodes(effectiveUser) : [];
   const canViewCrossDepartment = showAllDeptOption || allowedForCrossDept.length > 1;
   
   // Obtener usuarios de otros departamentos que tienen turnos asignados aquí
@@ -4620,14 +4620,14 @@ function IncapacidadesTab({
   const { user } = useAuth();
   const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
-  const { hasPermission } = useAppConfig();
+  const { effectiveUser, hasPermission } = useAppConfig();
   const users = firestoreUsers2;
 
   // Códigos de departamentos visibles según jerarquía y permisos del usuario
   const visibleDeptCodes = useMemo(() => {
-    if (!user) return [];
-    return getVisibleDepartmentCodes(user);
-  }, [user, getVisibleDepartmentCodes]);
+    if (!effectiveUser) return [];
+    return getVisibleDepartmentCodes(effectiveUser);
+  }, [effectiveUser, getVisibleDepartmentCodes]);
 
   // Permisos de incapacidades (fallback a roles para compatibilidad con datos existentes)
   const canVerifyIncapacidad = hasPermission('canVerifyIncapacidad') ||
@@ -6499,6 +6499,7 @@ function TimeOffRequestsPanel({
 
 function SolicitudesTab() {
   const { user } = useAuth();
+  const { effectiveUser } = useAppConfig();
   const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptCode, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
   const { executeShiftSwap } = useFirestoreShifts();
@@ -6506,9 +6507,9 @@ function SolicitudesTab() {
 
   // Departamentos visibles según jerarquía y permisos del usuario
   const visibleDeptCodes = useMemo(() => {
-    if (!user) return [];
-    return getVisibleDepartmentCodes(user);
-  }, [user, getVisibleDepartmentCodes]);
+    if (!effectiveUser) return [];
+    return getVisibleDepartmentCodes(effectiveUser);
+  }, [effectiveUser, getVisibleDepartmentCodes]);
 
   const visibleDeptOptions = useMemo(() => {
     return departmentOptions.filter(d => visibleDeptCodes.includes(d.code));

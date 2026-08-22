@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 completada: notificaciones por incapacidades)
+> Última actualización: 2026-08-22 (FASE 7.5 en progreso: invitaciones y permisos por usuario en Develops)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -771,6 +771,36 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     2. Si no hay responsables del departamento y el departamento es operativo, notifica al **Gerente de Operaciones**.
     3. Si aún no hay responsables, notifica a **RRHH / Director / Director General**.
   - Se evita notificar al propio usuario incapacitado y se evitan duplicados.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (invitaciones y permisos por usuario en Develops)
+- **Problema 1**: no se podía reenviar una invitación a un usuario que había sido eliminado o estaba inactivo.
+- **Corrección**:
+  - En `src/components/modules/DevelopsModule.tsx`, el botón de reenviar invitación ahora aparece también en la pestaña **Inactivos**.
+  - Al reenviar, si el usuario está inactivo o tiene `deletedAt`, se restaura primero (`isActive: true`, `deletedAt: null`, `invitationPending: true`, `invitedAt: now`) y luego se llama a `sendInvitation`.
+  - En usuarios activos sin `authUid` se mantiene el botón existente.
+- **Problema 2**: al crear un nuevo usuario con invitación, el formulario mostraba el selector de "Departamentos visibles adicionales", que el usuario considera que debe vivir en Roles.
+- **Corrección**:
+  - En `src/components/modules/DevelopsModule.tsx`, el bloque de `visibleDepartments` solo se muestra en modo edición (`editingUser`).
+  - En modo creación los permisos de visualización los define el rol seleccionado.
+- **Problema 3**: las invitaciones tardaban en llegar y no había feedback claro cuando el email fallaba.
+- **Corrección**:
+  - Se agregó estado `invitationLink` en `UsuariosTab` para guardar el link devuelto por la Cloud Function.
+  - Se mejoró el mensaje de éxito indicando que el envío puede tardar unos minutos.
+  - Si el envío de email falla, se muestra un campo con el enlace de invitación y un botón para copiarlo al portapapeles.
+- **Problema 4**: los toggles de permisos en **Develops → Roles y Permisos** tenían descripciones confusas y no siempre causaban efecto visible.
+- **Corrección**:
+  - Se reescribió `PERM_DESCRIPTIONS` en `DevelopsModule.tsx` para que cada permiso tenga dos descripciones claras: una cuando está activado y otra cuando está desactivado.
+  - Se agregó un mensaje explicativo indicando que los cambios deben guardarse y se aplican a los usuarios con ese rol.
+  - Se agregó un badge en la tabla de usuarios que muestra cuántos departamentos adicionales (`visibleDepartments`) tiene configurados.
+- **Problema 5**: el permiso `canViewAllDepartments` del `roleTemplate` no afectaba la visibilidad real de departamentos en la app.
+- **Corrección**:
+  - Se agregó `permissions?: string[]` al type `User` en `src/types/index.ts`.
+  - Se agregó `visibleDepartments` al usuario devuelto por `useFirestoreAuth.tsx`.
+  - En `src/hooks/useAppConfig.ts` se creó `effectiveUser`, que combina el usuario autenticado con los permisos de su `roleTemplate`.
+  - En `src/hooks/firestore/useDynamicDepartments.ts`, `getVisibleDepartmentCodes` ahora devuelve todos los departamentos si `user.permissions` incluye `canViewAllDepartments`.
+  - Se actualizaron `TasksModule.tsx` y `HorariosModule.tsx` para usar `effectiveUser` en todos los llamados a `getVisibleDepartmentCodes`.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

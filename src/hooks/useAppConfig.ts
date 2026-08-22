@@ -195,6 +195,15 @@ export function useAppConfig() {
     return roleTemplates.find((r) => r.baseRole === user.role || r.id === user.role);
   }, [roleTemplates, user]);
 
+  // Usuario efectivo: combina datos de auth con permisos del roleTemplate
+  const effectiveUser = useMemo(() => {
+    if (!user) return null;
+    return {
+      ...user,
+      permissions: userRoleTemplate?.permissions || [],
+    };
+  }, [user, userRoleTemplate]);
+
   // Verificar si el usuario actual tiene un permiso específico
   const hasPermission = useCallback(
     (perm: string): boolean => {
@@ -225,6 +234,7 @@ export function useAppConfig() {
     getRoleTemplate,
     userRoleTemplate,
     hasPermission,
+    effectiveUser,
     // Acceso
     hasDevelopAccess,
     // Funciones

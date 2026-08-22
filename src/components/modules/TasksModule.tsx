@@ -17,6 +17,7 @@ import { EditTaskModal } from '@/components/EditTaskModal';
 import { SpecificTaskForm } from '@/components/SpecificTaskForm';
 
 import { useAuth } from '@/hooks/useFirestoreAuth';
+import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
 import {
   Task, TaskStatus, TaskPriority, TaskType, TimeFilter,
@@ -63,7 +64,8 @@ type ViewType = 'list' | 'grid';
 type MainTab = 'my-tasks' | 'my-department' | 'all' | 'incidencias';
 
 export default function TasksModule() {
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
+  const { effectiveUser, hasPermission } = useAppConfig();
   const { departmentCodes, departmentNames, departmentOptions, departmentTreeOptions, defaultDepartment, operationalDepartmentCodes, isOperationalDepartment, getDeptName, getDeptCode, getVisibleDepartmentCodes } = useDynamicDepartments();
   const { tasks, incidencias, getIncidenciaCounts, createTask, rateTask, createIncidencia, changeTaskStatus, reopenTask, addNote, addIncidenciaNote, addIncidenciaViewer, addIncidenciaPhoto, confirmIncidencia, resolveIncidencia, closeIncidencia, reopenIncidencia, toggleSubtask, addPhoto, deleteTask, updateTask } = useTasks();
   const { users } = useFirestoreUsers();
@@ -88,21 +90,21 @@ export default function TasksModule() {
 
   // Opciones jerárquicas de departamento disponibles en Tasks según rol/jerarquía
   const visibleTaskDeptTreeOptions = useMemo(() => {
-    if (!user) return departmentTreeOptions;
-    const allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentTreeOptions;
+    const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
-  }, [departmentTreeOptions, user, getVisibleDepartmentCodes]);
+  }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   // Opciones jerárquicas para el dropdown de incidencias
   const incidenciaDeptOptions = useMemo(() => {
-    if (!user) return departmentTreeOptions;
-    let allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return departmentTreeOptions;
+    let allowed = getVisibleDepartmentCodes(effectiveUser);
     // Fallback robusto para Gerente de Operaciones: si la jerarquía no devuelve nada, usar operacionales
-    if (allowed.length === 0 && user.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
+    if (allowed.length === 0 && effectiveUser.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
       allowed = operationalDepartmentCodes;
     }
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
-  }, [departmentTreeOptions, user, getVisibleDepartmentCodes, operationalDepartmentCodes]);
+  }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes, operationalDepartmentCodes]);
 
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', department: defaultDepartment,
@@ -345,7 +347,7 @@ export default function TasksModule() {
     else if (mainTab === 'all' && user) {
       // Todas: respeta lo que el usuario puede ver (jerarquía + permisos)
       const canViewAll = hasPermission('canViewAllDepartments');
-      const allowed = canViewAll ? departmentCodes : getVisibleDepartmentCodes(user);
+      const allowed = canViewAll ? departmentCodes : getVisibleDepartmentCodes(effectiveUser);
       if (selectedDepartment !== 'all') {
         result = result.filter((t) => t.department === selectedDepartment);
       } else {
@@ -417,10 +419,10 @@ export default function TasksModule() {
 
   // PASO 1: Filtrar por departamento según jerarquía pura
   const incidenciasByDept = useMemo(() => {
-    if (!user) return incidencias;
-    let allowed = getVisibleDepartmentCodes(user);
+    if (!effectiveUser) return incidencias;
+    let allowed = getVisibleDepartmentCodes(effectiveUser);
     // Fallback robusto para Gerente de Operaciones
-    if (allowed.length === 0 && user.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
+    if (allowed.length === 0 && effectiveUser.role === Role.GERENTE_OPERACIONES && operationalDepartmentCodes.length > 0) {
       allowed = operationalDepartmentCodes;
     }
     if (incidenciaDepartmentFilter === 'all') {
@@ -431,7 +433,7 @@ export default function TasksModule() {
     return incidencias.filter((i) =>
       i.targetDepartments?.includes(incidenciaDepartmentFilter) || i.targetDepartment === incidenciaDepartmentFilter
     );
-  }, [incidencias, user, incidenciaDepartmentFilter, getVisibleDepartmentCodes, operationalDepartmentCodes]);
+  }, [incidencias, effectiveUser, incidenciaDepartmentFilter, getVisibleDepartmentCodes, operationalDepartmentCodes]);
 
   // PASO 2: Filtrar por tiempo (base para contadores Y tarjetas)
   const incidenciasByTime = useMemo(() => {

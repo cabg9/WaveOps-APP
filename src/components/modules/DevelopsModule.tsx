@@ -230,6 +230,7 @@ function generateTempPassword(): string {
 
 function UsuariosTab() {
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
+  const [invitationLink, setInvitationLink] = useState<string | null>(null);
   const { sendInvitation } = useInvitation();
   const [sendInvite, setSendInvite] = useState(true);
   const { users, loading, createUser, updateUser, softDeleteUser, restoreUser, trashedUsers } = useFirestoreUsers();
@@ -296,8 +297,9 @@ function UsuariosTab() {
           try {
             const ir = await sendInvitation({email: formData.email, name: formData.name, role: formData.role, department: formData.department, userId: result.id});
             setCreatedPassword(ir.emailSent ? 'INVITACION_ENVIADA' : 'EMAIL_FALLIDO');
-          } catch { setCreatedPassword('INVITACION_ERROR'); }
-        } else { setCreatedPassword(result.password); }
+            setInvitationLink(ir.link || null);
+          } catch { setCreatedPassword('INVITACION_ERROR'); setInvitationLink(null); }
+        } else { setCreatedPassword(result.password); setInvitationLink(null); }
         await logAction({action: 'USER_CREATED', targetType: 'user', targetId: result.id, targetName: formData.name, impactLevel: 'sensitive', description: sendInvite ? `Usuario "${formData.name}" invitado` : `Usuario "${formData.name}" creado`});
       }
       setShowForm(false);
@@ -310,7 +312,7 @@ function UsuariosTab() {
   };
 
   const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] }); setCreatedPassword(null); setShowForm(true); };
+    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] }); setCreatedPassword(null); setInvitationLink(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
@@ -349,6 +351,15 @@ function UsuariosTab() {
     if (!u.email || !u.name) { alert('Faltan datos del usuario'); return; }
     setResendingId(u.id);
     try {
+      // Si el usuario está inactivo o eliminado, restaurarlo antes de reenviar
+      if (u.isActive === false || u.deletedAt) {
+        await updateUser(u.id, {
+          isActive: true,
+          deletedAt: null,
+          invitationPending: true,
+          invitedAt: new Date().toISOString(),
+        });
+      }
       const result = await sendInvitation({
         email: u.email, name: u.name, role: u.role || 'STAFF',
         department: u.department || 'DIVE_SHOP', userId: u.id
@@ -511,31 +522,33 @@ function UsuariosTab() {
                 ))}
               </select>
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-[#86868B] mb-1">Departamentos visibles adicionales</label>
-              <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-[#E5E5E7]">
-                {departmentTreeOptions.map(opt => (
-                  <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer" style={{ marginLeft: `${opt.level * 12}px` }}>
-                    <input
-                      type="checkbox"
-                      checked={formData.visibleDepartments.includes(opt.code)}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setFormData(prev => ({
-                          ...prev,
-                          visibleDepartments: checked
-                            ? [...prev.visibleDepartments, opt.code]
-                            : prev.visibleDepartments.filter(d => d !== opt.code)
-                        }));
-                      }}
-                      className="w-3.5 h-3.5 rounded border-[#E5E5E7]"
-                    />
-                    {opt.level > 0 ? '└─ ' : ''}{opt.name}
-                  </label>
-                ))}
+            {editingUser && (
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-[#86868B] mb-1">Departamentos visibles adicionales</label>
+                <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-[#E5E5E7]">
+                  {departmentTreeOptions.map(opt => (
+                    <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer" style={{ marginLeft: `${opt.level * 12}px` }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.visibleDepartments.includes(opt.code)}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => ({
+                            ...prev,
+                            visibleDepartments: checked
+                              ? [...prev.visibleDepartments, opt.code]
+                              : prev.visibleDepartments.filter(d => d !== opt.code)
+                          }));
+                        }}
+                        className="w-3.5 h-3.5 rounded border-[#E5E5E7]"
+                      />
+                      {opt.level > 0 ? '└─ ' : ''}{opt.name}
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[10px] text-[#86868B] mt-1">El usuario siempre ve su departamento. Aquí se seleccionan departamentos adicionales que puede visualizar.</p>
               </div>
-              <p className="text-[10px] text-[#86868B] mt-1">El usuario siempre ve su departamento. Aquí se seleccionan departamentos adicionales que puede visualizar.</p>
-            </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
               <input value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}
@@ -578,10 +591,31 @@ function UsuariosTab() {
             </div>
           </form>
           {createdPassword && (
-            <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
-              <div className="text-sm font-medium text-emerald-700 mb-1">Usuario creado exitosamente</div>
-              {createdPassword === 'INVITACION_ENVIADA' ? (<><div className="text-xs text-emerald-600">Invitacion enviada por email.</div><div className="text-[10px] text-emerald-500 mt-1">El usuario recibira un email para configurar su cuenta.</div></>) : createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? (<><div className="text-xs text-amber-600">No se pudo enviar el email.</div><div className="text-[10px] text-amber-500 mt-1">Envia el enlace de invitacion manualmente.</div></>) : (<><div className="text-xs text-emerald-600">Contraseña temporal: <span className="font-mono font-bold">{createdPassword}</span></div><div className="text-[10px] text-emerald-500 mt-1">Guarde esta contraseña.</div></>)}
-              <button onClick={() => setCreatedPassword(null)} className="mt-2 text-xs text-emerald-600 hover:text-emerald-800 underline">Cerrar</button>
+            <div className={`mt-4 p-4 rounded-xl border ${createdPassword === 'INVITACION_ENVIADA' ? 'bg-emerald-50 border-emerald-200' : createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'}`}>
+              <div className={`text-sm font-medium mb-1 ${createdPassword === 'INVITACION_ENVIADA' ? 'text-emerald-700' : createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? 'text-amber-700' : 'text-emerald-700'}`}>Usuario creado exitosamente</div>
+              {createdPassword === 'INVITACION_ENVIADA' ? (
+                <>
+                  <div className="text-xs text-emerald-600">Invitacion enviada por email.</div>
+                  <div className="text-[10px] text-emerald-500 mt-1">El usuario recibira un email para configurar su cuenta. El envio puede tardar unos minutos.</div>
+                </>
+              ) : createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? (
+                <>
+                  <div className="text-xs text-amber-600">No se pudo enviar el email automaticamente.</div>
+                  <div className="text-[10px] text-amber-500 mt-1">Copia el enlace de invitacion y envialo manualmente.</div>
+                  {invitationLink && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <input type="text" value={invitationLink} readOnly className="flex-1 px-2 py-1.5 rounded-lg border border-amber-200 bg-white text-[10px] text-amber-700" />
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(invitationLink); alert('Enlace copiado'); }} className="px-3 py-1.5 rounded-lg bg-amber-100 text-amber-700 text-xs font-medium hover:bg-amber-200">Copiar</button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="text-xs text-emerald-600">Contraseña temporal: <span className="font-mono font-bold">{createdPassword}</span></div>
+                  <div className="text-[10px] text-emerald-500 mt-1">Guarde esta contraseña.</div>
+                </>
+              )}
+              <button onClick={() => { setCreatedPassword(null); setInvitationLink(null); }} className={`mt-2 text-xs underline ${createdPassword === 'EMAIL_FALLIDO' || createdPassword === 'INVITACION_ERROR' ? 'text-amber-600 hover:text-amber-800' : 'text-emerald-600 hover:text-emerald-800'}`}>Cerrar</button>
             </div>
           )}
           </div>
@@ -615,12 +649,21 @@ function UsuariosTab() {
                     </td>
                     <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
                     <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
-                    <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</span>
+                        {(u.visibleDepartments?.length || 0) > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-corporate/10 text-corporate w-fit" title={u.visibleDepartments?.join(', ')}>
+                            +{u.visibleDepartments?.length} deptos.
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => window.location.href = "/perfil?userId=" + u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><Eye className="w-4 h-4" /></button><button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
-                        {/* @ts-ignore */}
-                        {(u.invitationPending || (!u.authUid && u.isActive)) && !showInactive && (
+                        {/* Reenviar invitación: disponible para inactivos/eliminados o activos sin authUid */}
+                        {(showInactive || u.invitationPending || (!u.authUid && u.isActive)) && (
                           <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
                             {resendingId === u.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
                           </button>
@@ -763,27 +806,59 @@ const PERMISSION_CATEGORIES: PermCat[] = [
   ]},
 ];
 
-const PERM_DESCRIPTIONS: Record<string, string> = {
-  "canViewDashboard":"ver el Dashboard","canViewModuleTasks":"ver Tasks","canViewModuleHorarios":"ver Horarios",
-  "canViewModuleDiveOps":"ver DiveOps","canViewModuleVessels":"ver Vessels","canViewModuleMovilidad":"ver Movilidad",
-  "canViewModuleRequisiciones":"ver Requisiciones","canViewModuleOrdenesPago":"ver Ordenes de Pago",
-  "canViewModuleReportes":"ver Reportes","canViewModuleDevelops":"ver Develops",
-  "canCreateSpecificTask":"crear tareas especificas","canCreateExtraTask":"crear tareas extra",
-  "canEditOwnTasks":"editar tareas propias","canDeleteOwnTasks":"eliminar tareas propias",
-  "canEditAllTasks":"editar todas las tareas","canDeleteAllTasks":"eliminar todas las tareas",
-  "canVerifyTask":"verificar tareas","canRateTask":"calificar tareas","canBlockTask":"bloquear tareas",
-  "canUnblockTask":"desbloquear tareas","canReopenTask":"reabrir tareas",
-  "canViewTeam":"ver el equipo","canViewAllDepartmentsInTeam":"ver todos los departamentos en Equipo","canAssignShifts":"asignar turnos","canModifyShifts":"modificar turnos",
-  "canApproveChanges":"aprobar cambios","canRejectChanges":"rechazar cambios","canRequestChange":"solicitar cambios",
-  "canViewOwnIncapacidades":"ver incapacidades propias","canViewTeamIncapacidades":"ver incapacidades del equipo",
-  "canVerifyIncapacidad":"verificar incapacidades","canRegisterIncapacidad":"registrar incapacidades",
-  "canRejectIncapacidad":"rechazar incapacidades","canRequestIncapacidadDocs":"solicitar documentos de incapacidad",
-  "canUploadIncapacidadDocs":"subir documentos de incapacidad",
-  "canCreateIncidencia":"crear incidencias","canViewAllIncidencias":"ver todas las incidencias",
-  "canViewOperationalIncidencias":"ver incidencias operativas","canViewOwnDepartmentIncidencias":"ver incidencias de mi departamento",
-  "canConfirmIncidenciaAsManager":"confirmar incidencias como gerente","canConfirmIncidenciaAsSupervisor":"confirmar incidencias como supervisor",
-  "canResolveIncidencia":"resolver incidencias","canCloseIncidencia":"cerrar incidencias","canReopenIncidencia":"reabrir incidencias",
-  "canViewAllDepartments":"ver todos los departamentos","canViewOwnDepartment":"ver mi departamento",
+const PERM_DESCRIPTIONS: Record<string, { on: string; off: string }> = {
+  // Modulos
+  "canViewDashboard": { on: "Puede ver el Dashboard y sus resumenes.", off: "No puede ver el Dashboard." },
+  "canViewModuleTasks": { on: "Puede acceder al modulo Tasks.", off: "No tiene acceso al modulo Tasks." },
+  "canViewModuleHorarios": { on: "Puede acceder al modulo Horarios.", off: "No tiene acceso al modulo Horarios." },
+  "canViewModuleDiveOps": { on: "Puede acceder al modulo DiveOps.", off: "No tiene acceso al modulo DiveOps." },
+  "canViewModuleVessels": { on: "Puede acceder al modulo Vessels.", off: "No tiene acceso al modulo Vessels." },
+  "canViewModuleMovilidad": { on: "Puede acceder al modulo Movilidad.", off: "No tiene acceso al modulo Movilidad." },
+  "canViewModuleRequisiciones": { on: "Puede acceder al modulo Requisiciones.", off: "No tiene acceso al modulo Requisiciones." },
+  "canViewModuleOrdenesPago": { on: "Puede acceder al modulo Ordenes de Pago.", off: "No tiene acceso al modulo Ordenes de Pago." },
+  "canViewModuleReportes": { on: "Puede acceder al modulo Reportes.", off: "No tiene acceso al modulo Reportes." },
+  "canViewModuleDevelops": { on: "Puede acceder al modulo Develops.", off: "No tiene acceso al modulo Develops." },
+  // Tasks
+  "canCreateSpecificTask": { on: "Puede crear tareas especificas vinculadas a turnos.", off: "No puede crear tareas especificas." },
+  "canCreateExtraTask": { on: "Puede crear tareas extra.", off: "No puede crear tareas extra." },
+  "canEditOwnTasks": { on: "Puede editar las tareas que el creo.", off: "No puede editar sus propias tareas." },
+  "canDeleteOwnTasks": { on: "Puede eliminar las tareas que el creo.", off: "No puede eliminar sus propias tareas." },
+  "canEditAllTasks": { on: "Puede editar cualquier tarea de cualquier usuario.", off: "Solo puede editar tareas propias (si tiene ese permiso)." },
+  "canDeleteAllTasks": { on: "Puede eliminar cualquier tarea.", off: "No puede eliminar tareas de otros usuarios." },
+  "canVerifyTask": { on: "Puede verificar tareas completadas.", off: "No puede verificar tareas." },
+  "canRateTask": { on: "Puede calificar tareas finalizadas.", off: "No puede calificar tareas." },
+  "canBlockTask": { on: "Puede bloquear una tarea para que no avance.", off: "No puede bloquear tareas." },
+  "canUnblockTask": { on: "Puede desbloquear tareas bloqueadas.", off: "No puede desbloquear tareas." },
+  "canReopenTask": { on: "Puede reabrir tareas ya finalizadas.", off: "No puede reabrir tareas finalizadas." },
+  // Horarios
+  "canViewTeam": { on: "Puede ver la pestana Equipo en Horarios.", off: "No puede ver la pestana Equipo." },
+  "canViewAllDepartmentsInTeam": { on: "En Equipo puede ver usuarios de todos los departamentos permitidos.", off: "En Equipo solo ve su propio departamento y sub-departamentos." },
+  "canAssignShifts": { on: "Puede asignar turnos a usuarios en Horarios → Asignar.", off: "No puede asignar turnos." },
+  "canModifyShifts": { on: "Puede modificar turnos ya asignados.", off: "No puede modificar turnos asignados." },
+  "canApproveChanges": { on: "Puede aprobar solicitudes de cambio de turno.", off: "No puede aprobar cambios de turno." },
+  "canRejectChanges": { on: "Puede rechazar solicitudes de cambio de turno.", off: "No puede rechazar cambios de turno." },
+  "canRequestChange": { on: "Puede solicitar cambios de turno con otros usuarios.", off: "No puede solicitar cambios de turno." },
+  // Incapacidades
+  "canViewOwnIncapacidades": { on: "Puede ver sus propias incapacidades.", off: "No puede ver incapacidades propias." },
+  "canViewTeamIncapacidades": { on: "Puede ver las incapacidades de su equipo.", off: "No puede ver incapacidades del equipo." },
+  "canVerifyIncapacidad": { on: "Puede verificar incapacidades registradas.", off: "No puede verificar incapacidades." },
+  "canRegisterIncapacidad": { on: "Puede registrar incapacidades para usuarios.", off: "No puede registrar incapacidades." },
+  "canRejectIncapacidad": { on: "Puede rechazar incapacidades.", off: "No puede rechazar incapacidades." },
+  "canRequestIncapacidadDocs": { on: "Puede solicitar documentos de soporte para incapacidades.", off: "No puede solicitar documentos de incapacidad." },
+  "canUploadIncapacidadDocs": { on: "Puede subir documentos de incapacidad.", off: "No puede subir documentos de incapacidad." },
+  // Incidencias
+  "canCreateIncidencia": { on: "Puede crear nuevas incidencias.", off: "No puede crear incidencias." },
+  "canViewAllIncidencias": { on: "Puede ver incidencias de todos los departamentos.", off: "Solo ve incidencias de su alcance departamental." },
+  "canViewOperationalIncidencias": { on: "Puede ver incidencias de departamentos operativos.", off: "No ve incidencias operativas adicionales." },
+  "canViewOwnDepartmentIncidencias": { on: "Puede ver incidencias de su departamento.", off: "No ve incidencias de su departamento." },
+  "canConfirmIncidenciaAsManager": { on: "Puede confirmar incidencias en rol de gerente.", off: "No puede confirmar incidencias como gerente." },
+  "canConfirmIncidenciaAsSupervisor": { on: "Puede confirmar incidencias en rol de supervisor.", off: "No puede confirmar incidencias como supervisor." },
+  "canResolveIncidencia": { on: "Puede marcar incidencias como resueltas.", off: "No puede resolver incidencias." },
+  "canCloseIncidencia": { on: "Puede cerrar incidencias definitivamente.", off: "No puede cerrar incidencias." },
+  "canReopenIncidencia": { on: "Puede reabrir incidencias cerradas.", off: "No puede reabrir incidencias." },
+  // Departamentos
+  "canViewAllDepartments": { on: "Puede ver todos los departamentos en Tasks, Horarios y Dashboard.", off: "Solo ve su departamento y sus sub-departamentos segun la jerarquia." },
+  "canViewOwnDepartment": { on: "Puede ver informacion de su propio departamento.", off: "No puede ver informacion de departamentos." },
 };
 
 function RoleIcon({ name }: { name: string }) {
@@ -791,8 +866,9 @@ function RoleIcon({ name }: { name: string }) {
 }
 
 function PermDescription({ permKey, checked }: { permKey: string; checked: boolean }) {
-  const desc = PERM_DESCRIPTIONS[permKey] || permKey;
-  return <span className="text-[10px] text-gray-400 mt-0.5 block leading-tight">{checked ? "Permite " : "Bloquea "}{desc}</span>;
+  const desc = PERM_DESCRIPTIONS[permKey];
+  if (!desc) return null;
+  return <span className="text-[10px] text-gray-400 mt-0.5 block leading-tight">{checked ? desc.on : desc.off}</span>;
 }
 
 function useRolePermissions(roleTemplates: any[]) {
@@ -849,6 +925,7 @@ function RolesTab() {
         <h3 className="text-lg font-semibold text-[#1D1D1F]">Roles y Permisos</h3>
         <span className="text-sm text-[#86868B]">{roleTemplates.length} roles configurados</span>
       </div>
+      <p className="text-xs text-[#86868B]">Activa o desactiva cada permiso y presiona Guardar cambios. Los cambios se aplican inmediatamente a los usuarios que tengan este rol asignado.</p>
       <div className="space-y-3">
         {roleTemplates.map((role: any) => {
           const isOpen = openRole === role.id;
