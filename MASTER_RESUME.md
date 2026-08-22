@@ -527,6 +527,9 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Dropdown duplicado en Horarios → Equipo**:
   - Se corrigió el header móvil de `EquipoTab` que tenía `hidden sm:block` dentro de un `md:hidden`, causando que en tablets (sm-md) se mostrara junto al dropdown desktop.
   - Se cambió a `block` para que solo aparezca en el header móvil.
+- **Dropdown duplicado en Horarios → Equipo (corrección adicional)**:
+  - Se eliminó el select de departamento del header móvil de `EquipoTab`; ahora el único select está en el header principal, al lado del selector de pestañas, tanto en móvil como en desktop.
+  - Se cambió la condición para mostrar el select: ahora aparece siempre que haya al menos una opción visible (`visibleDeptOptions.length > 0`), en lugar de requerir dos o más.
 - **Detección de departamentos operacionales más robusta**:
   - En `useDynamicDepartments.ts`, la búsqueda del departamento `OPERACIONES` ahora es case-insensitive.
   - Se mantiene compatibilidad legacy con el campo `isOperational` de Firestore durante la transición.
