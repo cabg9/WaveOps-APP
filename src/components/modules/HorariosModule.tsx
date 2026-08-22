@@ -60,6 +60,8 @@ import {
   Trash2,
   RotateCcw,
   ChevronDown,
+  ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -184,7 +186,7 @@ interface IncapacidadesTabProps {
 export default function HorariosModule() {
   const { user } = useAuth();
   const { hasPermission } = useAppConfig();
-  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptShortName, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptShortName, getDeptCode, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers } = useFirestoreUsers();
   const [activeTab, setActiveTab] = useState<TabType>('mi-horario');
   const [selectedDepartment, setSelectedDepartment] = useState<string | 'ALL'>(user?.department || departmentCodes[0] || '');
@@ -878,7 +880,7 @@ interface MiHorarioTabProps {
 
 function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _getIncapacityForDate }: MiHorarioTabProps) {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, defaultDepartment, getDeptName, getDeptShortName, getDeptCode } = useDynamicDepartments();
   const { getUserShifts, getUsersByDepartment } = useShifts();
   const { users: firestoreUsers } = useFirestoreUsers();
   // Encontrar el usuario en Firestore por email para obtener su ID correcto
@@ -1134,6 +1136,11 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: shift.color }} />
                       <span className="text-sm font-medium" style={{ color: shift.color }}>{shift.name}</span>
                       <span className="text-xs text-[#86868B]">({shift.startTime}-{shift.endTime})</span>
+                      {shift.swapRequestId && (
+                        <span title="Turno cambiado" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                          <RefreshCw className="w-3 h-3 mr-0.5" />Cambiado
+                        </span>
+                      )}
                       {shift.department !== user?.department && (
                         <DeptIcon department={shift.department} className="w-3 h-3 text-amber-500" />
                       )}
@@ -1360,6 +1367,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                   style={{ backgroundColor: `${shift.color}20`, color: shift.color }}
                                 >
                                   <span className="font-bold">{shift.name}</span>
+                                  {shift.swapRequestId && <RefreshCw className="w-2.5 h-2.5 inline ml-0.5" />}
                                   <span className="opacity-80 ml-0.5">{shift.startTime}</span>
                                   <span className="opacity-60 ml-0.5">· {getDeptShortName(shift.department)}</span>
                                 </div>
@@ -1453,6 +1461,11 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                                     >
                                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: shift.color }} />
                                       <span className="text-sm font-medium" style={{ color: shift.color }}>{shift.name}</span>
+                                      {shift.swapRequestId && (
+                                        <span title="Turno cambiado" className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                                          <RefreshCw className="w-3 h-3 mr-0.5" />Cambiado
+                                        </span>
+                                      )}
                                       <span className="text-xs text-[#86868B]">{shift.startTime} - {shift.endTime}</span>
                                       <div className="flex items-center gap-1 ml-auto px-1.5 py-0.5 bg-[#F5F5F7] rounded">
                                         <DeptIcon department={shift.department} className="w-3 h-3 text-[#86868B]" />
@@ -2237,8 +2250,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                         a: swapUser?.name || 'Usuario',
                         deCargo: user?.position || 'Voluntario',
                         aCargo: swapUser?.position || 'Voluntario',
-                        deDept: user?.department || departmentCodes[0] || '',
-                        aDept: swapUser?.department || defaultDepartment,
+                        deDept: getDeptCode(user?.department || departmentCodes[0] || ''),
+                        aDept: getDeptCode(swapUser?.department || defaultDepartment),
                         // Turnos del usuario que solicita (de)
                         deTurnoActual: requestType === 'change' ? selectedShift?.name : dayShifts.map(s => s.name).join(', '),
                         deTurnoNuevo: requestType === 'change' ? targetShift?.name : swapUserShifts.map(s => s.name).join(', '),
@@ -2809,10 +2822,13 @@ function EquipoTab({
                                           backgroundColor: `${shift.color}20`,
                                           color: shift.color,
                                         }}
-                                        title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}`}
+                                        title={`${shift.name} (${shift.startTime} - ${shift.endTime})${isCrossDept ? ' - ' + shift.department.replace(/_/g, ' ') : ''}${shift.swapRequestId ? ' - Cambiado' : ''}`}
                                       >
                                         <div className="flex flex-wrap items-center justify-center gap-1">
                                           <span className="break-words leading-tight">{shift.name}</span>
+                                          {shift.swapRequestId && (
+                                            <RefreshCw className="w-3 h-3 flex-shrink-0 text-amber-600" />
+                                          )}
                                           {isCrossDept && (
                                             <DeptIcon department={shift.department} className="w-3 h-3 flex-shrink-0" />
                                           )}
@@ -4387,6 +4403,9 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                         <div className="flex flex-wrap items-center justify-center gap-1">
                                           {assignment.status === AssignmentStatus.ELIMINADO && (
                                             <Trash2 className="w-3 h-3 mr-0.5 flex-shrink-0" />
+                                          )}
+                                          {assignment.swapRequestId && (
+                                            <span title="Turno cambiado"><RefreshCw className="w-3 h-3 mr-0.5 flex-shrink-0 text-amber-600" /></span>
                                           )}
                                           <span className="break-words leading-tight">{shift.name}</span>
                                           {(isCrossDepartment || selectedDepartment === 'ALL') && assignment.status !== AssignmentStatus.ELIMINADO && (
@@ -6433,8 +6452,9 @@ function TimeOffRequestsPanel({
 
 function SolicitudesTab() {
   const { user } = useAuth();
-  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getVisibleDepartmentCodes } = useDynamicDepartments();
+  const { departmentCodes, departmentOptions, departmentTreeOptions, defaultDepartment, getDeptName, getDeptCode, getVisibleDepartmentCodes, operationalDepartmentCodes } = useDynamicDepartments();
   const { users: firestoreUsers2 } = useFirestoreUsers();
+  const { executeShiftSwap } = useFirestoreShifts();
   const users = firestoreUsers2;
 
   // Departamentos visibles según jerarquía y permisos del usuario
@@ -6812,9 +6832,9 @@ function SolicitudesTab() {
 
     // Filtrar por departamento: visibleDeptCodes respeta jerarquía y permisos
     if (equipoDeptFilter !== 'ALL') {
-      filtered = filtered.filter(s => s.deDept === equipoDeptFilter || s.aDept === equipoDeptFilter);
+      filtered = filtered.filter(s => getDeptCode(s.deDept || '') === equipoDeptFilter || getDeptCode(s.aDept || '') === equipoDeptFilter);
     } else if (visibleDeptCodes.length > 0) {
-      filtered = filtered.filter(s => visibleDeptCodes.includes(s.deDept || '') || visibleDeptCodes.includes(s.aDept || ''));
+      filtered = filtered.filter(s => visibleDeptCodes.includes(getDeptCode(s.deDept || '')) || visibleDeptCodes.includes(getDeptCode(s.aDept || '')));
     }
 
     // Filtrar por estado
@@ -6876,6 +6896,21 @@ function SolicitudesTab() {
         fechaRespuesta: now,
         historial: updatedSolicitud.historial
       });
+
+      // Ejecutar el cambio real de turnos en las asignaciones
+      await executeShiftSwap({
+        requestId: solicitud.id as string,
+        type: solicitud.tipo,
+        deId: solicitud.deId || '',
+        aId: solicitud.aId || '',
+        date: solicitud.fecha || '',
+        deTurnoActual: solicitud.deTurnoActual,
+        deTurnoNuevo: solicitud.deTurnoNuevo,
+        deHorarioActual: solicitud.deHorarioActual,
+        deHorarioNuevo: solicitud.deHorarioNuevo,
+      });
+
+      toast.success('Cambio de turno aplicado');
     } catch (error) {
       console.error('Error al aceptar solicitud en Firestore:', error);
       toast.error('No se pudo aceptar la solicitud');
@@ -7429,7 +7464,18 @@ function SolicitudesTab() {
                       </div>
                       {getStatusBadge(solicitud.estado)}
                     </div>
-                    
+
+                    {/* Quién envía y quién recibe */}
+                    <div className="mt-2 flex items-center gap-2 text-sm">
+                      <span className="text-[#86868B]">De:</span>
+                      <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span>
+                      <span className="text-xs text-[#86868B]">({solicitud.deCargo})</span>
+                      <ArrowRight className="w-4 h-4 text-[#C7C7CC]" />
+                      <span className="text-[#86868B]">Para:</span>
+                      <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span>
+                      <span className="text-xs text-[#86868B]">({solicitud.aCargo})</span>
+                    </div>
+
                     {/* Tipo de solicitud */}
                     <div className="mt-3">
                       <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">

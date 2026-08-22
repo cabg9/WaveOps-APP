@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: Dashboard resumen de equipo para Gerente de Operaciones)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: solicitudes de cambio de turno)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -730,6 +730,34 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - En `src/hooks/firestore/useFirestoreShifts.ts`:
     - Se normaliza `department` al generar tareas específicas desde asignaciones publicadas.
 - **Resultado**: ahora todos los flujos de creación/lectura de tareas usan códigos de departamento normalizados, por lo que el filtro `operationalDepartmentCodes.includes(t.department)` del Dashboard funciona correctamente para el Gerente de Operaciones.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (solicitudes de cambio de turno)
+- **Problema 1**: en **Horarios → Solicitudes → Cambios → Equipo**, al seleccionar **Todos** en el dropdown de departamentos no se mostraban todas las solicitudes; solo aparecían al filtrar por un departamento específico.
+- **Causa**: `deDept` y `aDept` de las solicitudes se guardaban como **nombre legible** (ej. `Dive Shop`), mientras que los filtros usan **códigos** (`DIVE_SHOP`).
+- **Corrección**:
+  - En `src/components/modules/HorariosModule.tsx`, al crear una solicitud se normalizan `deDept` y `aDept` con `getDeptCode`.
+  - En `getFilteredEquipo` se normalizan `deDept`/`aDept` antes de comparar con `visibleDeptCodes`, para que las solicitudes antiguas también se filtren correctamente.
+- **Problema 2**: las tarjetas de solicitud no mostraban explícitamente quién envía y quién recibe la solicitud.
+- **Corrección**: se agregó una línea **De: [nombre] ([cargo]) → Para: [nombre] ([cargo])** en el header de cada tarjeta de cambio de turno.
+- **Problema 3**: al aceptar una solicitud de cambio/intercambio, solo cambiaba el estado de la solicitud; los turnos no se intercambiaban en el sistema.
+- **Corrección**:
+  - En `src/hooks/firestore/useFirestoreShifts.ts` se agregó `executeShiftSwap`:
+    - Para **intercambio**: intercambia **todas** las asignaciones del día entre los dos usuarios.
+    - Para **cambio**: intercambia las asignaciones específicas identificadas por nombre y horario.
+    - Marca las asignaciones con `swapRequestId` y `swappedAt`.
+    - Actualiza las tareas específicas vinculadas (`assignedTo`) para reflejar el nuevo usuario.
+  - En `src/hooks/useShifts.tsx` se expuso `executeShiftSwap` en el contexto.
+  - En `src/components/modules/HorariosModule.tsx`, `handleAcceptSolicitud` ahora llama a `executeShiftSwap` después de actualizar el estado de la solicitud.
+- **Problema 4**: no había distintivo visual para saber que un turno fue modificado por un cambio aceptado.
+- **Corrección**:
+  - Se agregaron campos `swapRequestId` y `swappedAt` a los tipos `Shift` y `ShiftAssignment`.
+  - `getUserShifts` ahora propaga `swapRequestId`/`swappedAt` desde la asignación al turno.
+  - Se muestra un badge/icono **Cambiado** en:
+    - **Mi Horario**: tarjeta de HOY, calendario mensual y popup del día.
+    - **Equipo**: celdas de turnos.
+    - **Asignar**: celdas de turnos publicados.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

@@ -260,6 +260,8 @@ export interface Shift {
   endTime: string; // HH:MM
   color?: string; // hex color
   requirements?: ShiftRequirement[]; // Roles necesarios para el turno
+  swapRequestId?: string; // ID de la solicitud de cambio que generó este turno
+  swappedAt?: string; // ISO date
 }
 
 export interface ShiftRequirement {
@@ -283,6 +285,8 @@ export interface ShiftAssignment {
   previousStatus?: AssignmentStatus; // Estado previo antes de marcar como ELIMINADO
   publishedAt?: string; // ISO date - cuando se publicó
   publishedBy?: string; // userId - quién publicó
+  swapRequestId?: string; // ID de la solicitud de cambio que generó este turno
+  swappedAt?: string; // ISO date
 }
 
 // Validaciones de límites por departamento
@@ -460,6 +464,17 @@ export interface ShiftsContextType {
   removeShift: (assignmentId: string) => void;
   getShiftById: (id: string) => Shift | undefined;
   getAssignmentById: (id: string) => ShiftAssignment | undefined;
+  executeShiftSwap: (args: {
+    requestId: string;
+    type: 'cambio' | 'intercambio';
+    deId: string;
+    aId: string;
+    date: string;
+    deTurnoActual?: string;
+    deTurnoNuevo?: string;
+    deHorarioActual?: string;
+    deHorarioNuevo?: string;
+  }) => Promise<void>;
 }
 
 

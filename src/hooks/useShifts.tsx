@@ -59,7 +59,15 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       }
       );
       return userAssignments
-        .map((a: any) => shifts.find((s: any) => s.id === a.shiftId))
+        .map((a: any) => {
+          const shift = shifts.find((s: any) => s.id === a.shiftId);
+          if (!shift) return undefined;
+          return {
+            ...shift,
+            swapRequestId: a.swapRequestId,
+            swappedAt: a.swappedAt,
+          };
+        })
         .filter((s: any) => s !== undefined)
         .sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
     },
@@ -105,6 +113,20 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
 
     getAssignmentById: (id: string) => {
       return shiftsHook.assignments.find((a: any) => a.id === id);
+    },
+
+    executeShiftSwap: (args: {
+      requestId: string;
+      type: 'cambio' | 'intercambio';
+      deId: string;
+      aId: string;
+      date: string;
+      deTurnoActual?: string;
+      deTurnoNuevo?: string;
+      deHorarioActual?: string;
+      deHorarioNuevo?: string;
+    }) => {
+      return shiftsHook.executeShiftSwap(args);
     },
 
     getUsersByDepartment: (department: string) => {

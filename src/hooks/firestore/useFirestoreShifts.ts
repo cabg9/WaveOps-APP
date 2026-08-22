@@ -14,6 +14,7 @@ import {
   orderBy,
   where,
   getDocs,
+  writeBatch,
   DocumentData,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
@@ -464,6 +465,115 @@ export function useFirestoreShifts() {
     }
   }, []);
 
+  // Ejecutar intercambio/cambio de turno aceptado desde una solicitud
+  const executeShiftSwap = useCallback(async ({
+    requestId,
+    type,
+    deId,
+    aId,
+    date,
+    deTurnoActual,
+    deTurnoNuevo,
+    deHorarioActual,
+    deHorarioNuevo,
+  }: {
+    requestId: string;
+    type: 'cambio' | 'intercambio';
+    deId: string;
+    aId: string;
+    date: string;
+    deTurnoActual?: string;
+    deTurnoNuevo?: string;
+    deHorarioActual?: string;
+    deHorarioNuevo?: string;
+  }): Promise<void> => {
+    try {
+      const batch = writeBatch(db);
+      const dateAssignments = assignments.filter(a => a.date === date && a.status !== AssignmentStatus.ELIMINADO);
+      const deAssignments = dateAssignments.filter(a => a.userId === deId);
+      const aAssignments = dateAssignments.filter(a => a.userId === aId);
+
+      const findShiftId = (name?: string, timeRange?: string): string | null => {
+        if (!name || !timeRange) return null;
+        const [start, end] = timeRange.split('-');
+        const shift = shifts.find(s =>
+          s.name === name &&
+          s.startTime === start &&
+          s.endTime === end
+        );
+        return shift?.id || null;
+      };
+
+      let assignmentsToSwap: FirestoreAssignment[] = [];
+
+      if (type === 'intercambio') {
+        // Intercambiar TODAS las asignaciones del día entre los dos usuarios
+        assignmentsToSwap = [...deAssignments, ...aAssignments];
+      } else {
+        // Cambio de un turno específico: deTurnoActual <-> deTurnoNuevo
+        const deShiftId = findShiftId(deTurnoActual, deHorarioActual);
+        const aShiftId = findShiftId(deTurnoNuevo, deHorarioNuevo);
+        if (deShiftId) {
+          const deAssignment = deAssignments.find(a => a.shiftId === deShiftId);
+          if (deAssignment) assignmentsToSwap.push(deAssignment);
+        }
+        if (aShiftId) {
+          const aAssignment = aAssignments.find(a => a.shiftId === aShiftId);
+          if (aAssignment) assignmentsToSwap.push(aAssignment);
+        }
+      }
+
+      if (assignmentsToSwap.length === 0) {
+        throw new Error('No se encontraron asignaciones para realizar el cambio');
+      }
+
+      // Intercambiar userId en las asignaciones encontradas
+      assignmentsToSwap.forEach(assignment => {
+        const newUserId = assignment.userId === deId ? aId : deId;
+        const ref = doc(db, ASSIGNMENTS_COLLECTION, assignment.id);
+        batch.update(ref, {
+          userId: newUserId,
+          swapRequestId: requestId,
+          swappedAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+      });
+
+      // Actualizar tareas específicas vinculadas a esas asignaciones
+      const affectedShiftIds = [...new Set(assignmentsToSwap.map(a => a.shiftId))];
+      if (affectedShiftIds.length > 0) {
+        const tasksQuery = query(
+          collection(db, 'tasks'),
+          where('dueDate', '==', date),
+          where('source', '==', 'specific-task-template')
+        );
+        const tasksSnapshot = await getDocs(tasksQuery);
+        tasksSnapshot.docs.forEach(taskDoc => {
+          const taskData = taskDoc.data();
+          const taskShiftIds: string[] = taskData.shiftIds || [];
+          const assignedTo: string[] = taskData.assignedTo || [];
+          if (taskShiftIds.some(id => affectedShiftIds.includes(id)) && (assignedTo.includes(deId) || assignedTo.includes(aId))) {
+            const newAssignedTo = assignedTo.map(uid => {
+              if (uid === deId) return aId;
+              if (uid === aId) return deId;
+              return uid;
+            });
+            batch.update(taskDoc.ref, {
+              assignedTo: newAssignedTo,
+              swapRequestId: requestId,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
+      }
+
+      await batch.commit();
+    } catch (err: any) {
+      console.error('Error al ejecutar el cambio de turno:', err);
+      throw err;
+    }
+  }, [assignments, shifts]);
+
   return {
     shifts,
     assignments,
@@ -483,6 +593,7 @@ export function useFirestoreShifts() {
     createShift,
     updateShift,
     deleteShift,
+    executeShiftSwap,
   };
 }
 
