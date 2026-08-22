@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: race condition en cálculo de departamentos operacionales)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: jerarquía recursiva de departamentos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -544,6 +544,30 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - En `useDynamicDepartments.ts`, la búsqueda del departamento `OPERACIONES` ahora es case-insensitive.
   - Se mantiene compatibilidad legacy con el campo `isOperational` de Firestore durante la transición.
   - Esto ayuda a que el Gerente de Operaciones vea correctamente `OPERACIONES` + hijos operacionales.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (jerarquía recursiva de departamentos)
+- **Problema**: aunque los departamentos hijos de `OPERACIONES` tenían `parentId` configurado, el Gerente de Operaciones no los veía en el dropdown de **Horarios → Equipo/Asignar**; solo veía `OPERACIONES` o, a veces, nada. Además, el usuario pidió soportar nietos y niveles sucesivos.
+- **Causa**: la lógica operacional solo consideraba hijos directos (`parentId === operationsDeptId`), no descendientes a N niveles, y `operationalDepartmentCodes` sufría una race condition previa.
+- **Correcciones**:
+  - En `src/hooks/firestore/useDynamicDepartments.ts`:
+    - Nueva función `getDescendantIds(parentId, depts)` recursiva que devuelve hijos, nietos, etc.
+    - `operationsDescendantIds` calcula todos los descendientes del departamento `OPERACIONES`.
+    - `isOperational` ahora usa `operationsDescendantIds.includes(d.id)`, soportando cualquier profundidad.
+    - `getOperationalSubtreeCodes()` devuelve `OPERACIONES` + todo su subárbol en códigos.
+    - `getVisibleDepartmentCodes` para `GERENTE_OPERACIONES` usa `getOperationalSubtreeCodes()` directamente, evitando la race condition.
+    - Nuevo `departmentTree` para renderizar la jerarquía recursiva en UI.
+  - En `src/components/modules/DepartamentosTab.tsx`:
+    - Importa `departmentTree` y `ReactNode`.
+    - `renderCard` acepta `level` para aplicar indentación (`ml-4`, `ml-8`, `ml-12`).
+    - Nueva función `renderDepartmentTree` recursiva.
+    - Se reemplazó el grid plano de padres/hijos por el árbol recursivo.
+    - Se agregó badge **OPERACIONAL** en las tarjetas de departamento.
+- **Comportamiento esperado**:
+  - Cualquier departamento bajo `OPERACIONES` (hijo, nieto o más profundo) se considera operacional automáticamente.
+  - El Gerente de Operaciones ve `OPERACIONES` y todo su subárbol en **Equipo**, **Asignar** e **Incidencias**.
+  - **Develops → Departamentos** muestra la jerarquía completa con indentación visual.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
