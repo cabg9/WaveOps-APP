@@ -30,6 +30,7 @@ export interface DynamicDepartment {
   isActive: boolean;
   isOperational?: boolean;
   parentId?: string | null;
+  children?: DynamicDepartment[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -37,6 +38,14 @@ export interface DynamicDepartment {
 function normalizeDeptCode(name: string): string {
   if (DEPT_NAME_TO_CODE[name]) return DEPT_NAME_TO_CODE[name];
   return name.toUpperCase().replace(/ /g, '_');
+}
+
+// Devuelve todos los ids descendientes de un departamento (recursivo, N niveles)
+function getDescendantIds(parentId: string | null | undefined, depts: DynamicDepartment[]): string[] {
+  if (!parentId) return [];
+  const direct = depts.filter(d => d.parentId === parentId).map(d => d.id);
+  const indirect = direct.flatMap(childId => getDescendantIds(childId, depts));
+  return Array.from(new Set([...direct, ...indirect]));
 }
 
 export function useDynamicDepartments() {
@@ -90,20 +99,24 @@ export function useDynamicDepartments() {
 
   const operationsDeptId = operationsDept?.id;
 
-  // A partir de ahora un departamento es "operacional" si:
+  // IDs de todos los descendientes de OPERACIONES (hijos, nietos, etc.)
+  const operationsDescendantIds = useMemo(() => {
+    return getDescendantIds(operationsDeptId, activeDepartments);
+  }, [operationsDeptId, activeDepartments]);
+
+  // Un departamento es "operacional" si:
   // - Su código es OPERACIONES (el departamento padre), o
-  // - Su parentId apunta al departamento OPERACIONES.
+  // - Está en el subárbol de OPERACIONES (hijos/nietos/etc.), o
   // - Legacy: tenía `isOperational: true` en Firestore (transición).
-  // Esto reemplaza el campo manual `isOperational`.
   const departmentsWithOperational = useMemo(() => {
     return departments.map(d => ({
       ...d,
       isOperational:
         d.code?.toUpperCase() === OPERATIONS_CODE ||
-        d.parentId === operationsDeptId ||
+        operationsDescendantIds.includes(d.id) ||
         d.isOperational === true,
     }));
-  }, [departments, operationsDeptId]);
+  }, [departments, operationsDescendantIds]);
 
   const activeDepartmentsWithOperational = departmentsWithOperational.filter(d => d.isActive);
 
@@ -128,26 +141,34 @@ export function useDynamicDepartments() {
   };
 
   const operationalDepartmentCodes = useMemo(() => {
-    const codes = activeDepartmentsWithOperational
+    return activeDepartmentsWithOperational
       .filter(d => d.isOperational)
       .map(d => d.code);
-    console.log('[useDynamicDepartments] operationalDepartmentCodes:', codes, 'operationsDeptId:', operationsDeptId, 'activeDepartmentsWithOperational:', activeDepartmentsWithOperational.map(d => ({ id: d.id, code: d.code, name: d.name, parentId: d.parentId, isOperational: d.isOperational })));
-    return codes;
-  }, [activeDepartmentsWithOperational, operationsDeptId]);
+  }, [activeDepartmentsWithOperational]);
 
   const isOperationalDepartment = useCallback((code: string): boolean => {
     const dept = departments.find(d => d.code === code);
     if (!dept) return false;
-    const opsDept = departments.find(d => d.code?.toUpperCase() === OPERATIONS_CODE && d.isActive !== false);
     return dept.isActive !== false && (
       dept.code?.toUpperCase() === OPERATIONS_CODE ||
-      dept.parentId === opsDept?.id ||
+      operationsDescendantIds.includes(dept.id) ||
       dept.isOperational === true
     );
-  }, [departments]);
+  }, [departments, operationsDescendantIds]);
+
+  // Devuelve todos los códigos del subárbol de OPERACIONES (incluido él mismo)
+  const getOperationalSubtreeCodes = useCallback((): string[] => {
+    if (!operationsDeptId) return [];
+    const subtreeIds = [operationsDeptId, ...getDescendantIds(operationsDeptId, activeDepartments)];
+    return Array.from(new Set(
+      activeDepartments
+        .filter(d => subtreeIds.includes(d.id))
+        .map(d => d.code)
+    ));
+  }, [operationsDeptId, activeDepartments]);
 
   // Departamentos que un usuario específico puede ver además del propio.
-  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve su departamento + hijos operacionales;
+  // Respeta roles: DG/Director/RRHH ven todos; Gerente de Operaciones ve todo el subárbol de OPERACIONES;
   // otros usuarios ven su departamento + visibleDepartments configurado manualmente.
   const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[] } | null): string[] => {
     if (!user) return [];
@@ -155,30 +176,33 @@ export function useDynamicDepartments() {
       return departmentCodes;
     }
     if (user.role === Role.GERENTE_OPERACIONES) {
-      // Calcular directamente sobre departments para evitar race condition con operationalDepartmentCodes
-      const opsDept = departments.find(d => d.code?.toUpperCase() === OPERATIONS_CODE && d.isActive !== false);
-      const opsDeptId = opsDept?.id;
-      const codes = departments
-        .filter(d => d.isActive !== false)
-        .filter(d => d.code?.toUpperCase() === OPERATIONS_CODE || d.parentId === opsDeptId || d.isOperational === true)
-        .map(d => d.code);
-      const unique = Array.from(new Set(codes));
-      console.log('[useDynamicDepartments] Gerente de Operaciones - codes:', unique, 'opsDeptId:', opsDeptId, 'user.department:', user.department);
-      return unique;
+      return getOperationalSubtreeCodes();
     }
     const extra = (user.visibleDepartments || []).filter(d => d && d !== user.department);
     return Array.from(new Set([user.department, ...extra].filter(Boolean)));
-  }, [departmentCodes, departments]);
+  }, [departmentCodes, getOperationalSubtreeCodes]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
     return code === OPERATIONS_CODE || code === ADMIN_CODE;
   }, []);
+
+  // Árbol de departamentos para mostrar en UI (padres con sus hijos recursivamente)
+  const departmentTree = useMemo(() => {
+    const buildTree = (parentId: string | null): DynamicDepartment[] => {
+      return activeDepartments
+        .filter(d => d.parentId === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(d => ({ ...d, children: buildTree(d.id) }));
+    };
+    return buildTree(null);
+  }, [activeDepartments]);
 
   return {
     departments: departmentsWithOperational,
     departmentCodes,
     departmentNames,
     departmentOptions,
+    departmentTree,
     defaultDepartment,
     operationalDepartmentCodes,
     isOperationalDepartment,

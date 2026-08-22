@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, ReactNode } from "react";
 import {
   Pencil, Trash2, Plus, Building2, X, GitBranch,
   Shield, Crown, HardHat, Users, Briefcase, Save, UserCog,
@@ -82,7 +82,7 @@ export function DepartamentosTab() {
   const { user: currentUser } = useAuth();
   const { shifts } = useFirestoreShifts();
   const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
-  const { isOperationalDepartment } = useDynamicDepartments();
+  const { isOperationalDepartment, departmentTree } = useDynamicDepartments();
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
@@ -598,19 +598,19 @@ export function DepartamentosTab() {
     );
   };
 
-  const renderCard = (dept: any) => {
+  const renderCard = (dept: any, level: number = 0) => {
     const deptUsers = getDeptUsers(dept);
     const userCount = deptUsers.length;
     const myChildren = childrenOf(dept.id);
     const isParent = myChildren.length > 0;
     const isChild = !!dept.parentId;
+    const indentClass = level === 0 ? "" : level === 1 ? "ml-4" : level === 2 ? "ml-8" : "ml-12";
 
     return (
       <div
         onClick={() => openTeam(dept)}
-        className={`rounded-xl border transition cursor-pointer select-none hover:shadow-md ${isParent ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white shadow-sm"} ${isChild ? "relative ml-3" : ""}`}
+        className={`rounded-xl border transition cursor-pointer select-none hover:shadow-md ${isParent ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white shadow-sm"} ${indentClass}`}
       >
-        {isChild && <div className="absolute -left-3 top-0 bottom-0 w-0.5 bg-slate-200" />}
         <div className="p-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
@@ -620,6 +620,7 @@ export function DepartamentosTab() {
               <div className="flex items-center gap-1.5 flex-wrap">
                 <h4 className="text-sm font-semibold text-slate-800 truncate">{dept.name}</h4>
                 {isParent && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">PADRE</span>}
+                {dept.isOperational && <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 border border-sky-200">OPERACIONAL</span>}
                 {!dept.isActive && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">INACTIVO</span>}
               </div>
               <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
@@ -647,6 +648,13 @@ export function DepartamentosTab() {
     );
   };
 
+  const renderDepartmentTree = (nodes: any[], level: number = 0): ReactNode[] => {
+    return nodes.flatMap((node) => [
+      <div key={node.id}>{renderCard(node, level)}</div>,
+      ...(node.children?.length > 0 ? renderDepartmentTree(node.children, level + 1) : []),
+    ]);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -667,17 +675,7 @@ export function DepartamentosTab() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {rootDepts.map((parent: any) => (
-            <div key={parent.id} className="contents">
-              {renderCard(parent)}
-              {childrenOf(parent.id).map((child: any) => (
-                <div key={child.id}>{renderCard(child)}</div>
-              ))}
-            </div>
-          ))}
-          {childDepts.filter((c: any) => !rootDepts.find((r: any) => r.id === c.parentId)).map((orphan: any) => (
-            <div key={orphan.id}>{renderCard(orphan)}</div>
-          ))}
+          {renderDepartmentTree(departmentTree)}
         </div>
       )}
 
