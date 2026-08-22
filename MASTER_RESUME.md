@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.5 completada: invitaciones y permisos por usuario en Develops)
+> Última actualización: 2026-08-22 (FASE 8 completada: clean login + forgot password)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -841,24 +841,56 @@ Cada módulo nuevo que se defina para WaveOps ocupará su propia sub-fase numera
 
 ## FASE 7.6: Cierre y validación de la FASE 7
 
-**Estado:** PENDIENTE
+**Estado:** COMPLETADA
 
 ### Objetivo
 Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados antes de pasar a la FASE 8.
 
 ### Checklist
-- Build limpio sin errores de TypeScript.
-- Deploy a Firebase Hosting funcionando.
-- `MASTER_RESUME.md` actualizado con todas las sub-fases.
-- Push a GitHub en `fix-horarios-provider`.
+- [x] Build limpio sin errores de TypeScript.
+- [x] Deploy a Firebase Hosting funcionando.
+- [x] `MASTER_RESUME.md` actualizado con todas las sub-fases.
+- [x] Push a GitHub en `fix-horarios-provider`.
+
+---
+
+## FASE 8: Clean login + forgot password
+
+**Estado:** COMPLETADA
+
+### Funcionalidades entregadas
+- **Quitar texto demo del login**:
+  - Se cambió el placeholder del campo email de `usuario@galapagosdiveandsurf.com` a `correo@empresa.com` para evitar datos de ejemplo.
+- **Recuperación de contraseña funcional**:
+  - En `src/components/LoginScreen.tsx`, el botón "¿Olvidaste tu contraseña?" ahora abre un modal.
+  - El modal solicita el correo electrónico y utiliza `sendPasswordResetEmail` de Firebase Auth.
+  - Manejo de errores: usuario no encontrado, errores genéricos.
+  - Mensaje de éxito indicando que se envió el correo.
+  - El modal precarga el email ingresado en el formulario de login.
+  - Opción para volver al login.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
 
 ---
 
 ## Roadmap de fases pendientes
 
-### FASE 8: Clean login + forgot password
-- Quitar texto demo del login.
-- Implementar recuperación de contraseña funcional.
+### FASE 9: Recordar usuario
+- Hacer funcional el checkbox "Recordar usuario".
+
+### FASE 10: 2 módulos reales para Dive X Surf
+- Inventario de equipos.
+- Certificaciones/buceo.
+
+### FASE 11: Toggle idioma (ES/EN)
+
+### FASE 12: Dark mode
+
+### FASE 13: Landing page waveops.app
+
+### FASE 14: Dominio wveops.app
+
+### FASE 15: Integración IA (futuro)
 
 ### FASE 9: Recordar usuario
 - Hacer funcional el checkbox "Recordar usuario".

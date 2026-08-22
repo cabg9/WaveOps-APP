@@ -4,8 +4,10 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Anchor, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Anchor, Mail, Lock, Eye, EyeOff, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
+import { auth } from '@/firebase-config';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +24,13 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Recuperacion de contraseña
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetSuccess, setResetSuccess] = useState<string | null>(null);
+
   // Si ya está autenticado, redirigir al dashboard o onboarding
   if (isAuthenticated && user) {
     if (user.profileComplete === false) {
@@ -31,6 +40,31 @@ export default function LoginScreen() {
     }
     return null;
   }
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetError(null);
+    setResetSuccess(null);
+
+    if (!resetEmail.trim()) {
+      setResetError('Ingresa tu correo electronico');
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetSuccess('Te enviamos un correo para restablecer tu contrasena. Revisa tu bandeja de entrada.');
+      setResetEmail('');
+    } catch (err: any) {
+      const msg = err.code === 'auth/user-not-found'
+        ? 'No encontramos una cuenta con ese correo.'
+        : 'No se pudo enviar el correo. Intenta nuevamente.';
+      setResetError(msg);
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,7 +136,7 @@ export default function LoginScreen() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="usuario@galapagosdiveandsurf.com"
+                  placeholder="correo@empresa.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 h-12 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate"
@@ -182,11 +216,60 @@ export default function LoginScreen() {
 
           {/* Footer */}
           <div className="mt-6 text-center">
-            <button className="text-sm text-corporate hover:underline">
+            <button
+              type="button"
+              onClick={() => { setShowReset(true); setResetError(null); setResetSuccess(null); setResetEmail(email); }}
+              className="text-sm text-corporate hover:underline"
+            >
               ¿Olvidaste tu contraseña?
             </button>
           </div>
         </div>
+
+        {/* Modal de recuperacion de contraseña */}
+        {showReset && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setShowReset(false)}>
+            <div className="bg-white rounded-[20px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-[#1D1D1F]">Recuperar contraseña</h3>
+                <button onClick={() => setShowReset(false)} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
+              </div>
+              <p className="text-sm text-[#86868B] mb-4">Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
+              <form onSubmit={handlePasswordReset} className="space-y-4">
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#86868B]" />
+                  <Input
+                    type="email"
+                    placeholder="correo@empresa.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className="pl-10 h-12 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate"
+                    disabled={resetLoading}
+                  />
+                </div>
+                {resetError && <div className="p-3 rounded-xl bg-[#FF3B30]/10 text-[#FF3B30] text-sm">{resetError}</div>}
+                {resetSuccess && <div className="p-3 rounded-xl bg-[#34C759]/10 text-[#34C759] text-sm">{resetSuccess}</div>}
+                <Button type="submit" className="w-full h-12 bg-corporate hover:bg-corporate/90 text-white rounded-xl font-medium" disabled={resetLoading}>
+                  {resetLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Enviando...</span>
+                    </div>
+                  ) : (
+                    'Enviar enlace'
+                  )}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => setShowReset(false)}
+                  className="w-full text-sm text-[#86868B] hover:text-[#1D1D1F] flex items-center justify-center gap-1"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Volver al login
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
 
 
       </div>
