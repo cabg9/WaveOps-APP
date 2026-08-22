@@ -2552,7 +2552,7 @@ function EquipoTab({
       {/* Header: visible solo en móvil, en desktop se mueve a HorariosModule */}
       <div className="flex flex-row flex-wrap items-center justify-between gap-2 md:hidden">
         {/* Filtro de departamento */}
-        <div className="hidden sm:block">
+        <div className="block">
           {visibleDeptOptions.length > 1 ? (
             <Select value={selectedDepartment} onValueChange={(v) => setSelectedDepartment(v as string | 'ALL')}>
               <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B]">

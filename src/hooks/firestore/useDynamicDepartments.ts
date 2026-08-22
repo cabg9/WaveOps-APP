@@ -85,7 +85,7 @@ export function useDynamicDepartments() {
   const defaultDepartment = departmentNames[0] || '';
 
   const operationsDept = useMemo(() => {
-    return activeDepartments.find(d => d.code === OPERATIONS_CODE);
+    return activeDepartments.find(d => d.code?.toUpperCase() === OPERATIONS_CODE);
   }, [activeDepartments]);
 
   const operationsDeptId = operationsDept?.id;
@@ -93,11 +93,15 @@ export function useDynamicDepartments() {
   // A partir de ahora un departamento es "operacional" si:
   // - Su código es OPERACIONES (el departamento padre), o
   // - Su parentId apunta al departamento OPERACIONES.
+  // - Legacy: tenía `isOperational: true` en Firestore (transición).
   // Esto reemplaza el campo manual `isOperational`.
   const departmentsWithOperational = useMemo(() => {
     return departments.map(d => ({
       ...d,
-      isOperational: d.code === OPERATIONS_CODE || d.parentId === operationsDeptId,
+      isOperational:
+        d.code?.toUpperCase() === OPERATIONS_CODE ||
+        d.parentId === operationsDeptId ||
+        d.isOperational === true,
     }));
   }, [departments, operationsDeptId]);
 
