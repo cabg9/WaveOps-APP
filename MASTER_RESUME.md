@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: fix fecha popup de Equipo)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: filas expandibles en Asignar)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -678,6 +678,15 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Causa**: en el modal de día del header se usaba `selectedHeaderDay.toISOString().split('T')[0]`, que convierte la fecha a UTC. Si la hora local era tarde (zona UTC-6), el día UTC era el siguiente.
 - **Corrección en `src/components/modules/HorariosModule.tsx`**:
   - Se reemplazó `selectedHeaderDay.toISOString().split('T')[0]` por `toLocalISODate(selectedHeaderDay)`, que ya existía como helper local y extrae año/mes/día usando la hora local.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (filas expandibles en Asignar)
+- **Problema**: en **Horarios → Asignar**, las filas de usuarios tenían altura fija (`h-[72px] sm:h-[88px]`). Cuando un usuario tenía más de 2 asignaciones, los turnos se superponían y se veían sobre otros usuarios.
+- **Corrección en `src/components/modules/HorariosModule.tsx`**:
+  - Se cambió la altura fija de las filas de la columna de colaboradores y de la grilla de días a `min-h-[72px] sm:min-h-[88px]`.
+  - Se agregó `h-full` a las celdas individuales para que se estiren con el contenido.
+  - Ahora las filas crecen verticalmente según la cantidad de turnos asignados, evitando la superposición.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

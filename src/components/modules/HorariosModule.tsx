@@ -4238,7 +4238,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   const isLastRow = rowIdx === allVisibleUsers.length - 1;
                   const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                   return (
-                    <div key={u.id} className={cn("h-[72px] sm:h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
+                    <div key={u.id} className={cn("min-h-[72px] sm:min-h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
                       <div className="flex flex-col items-center gap-1 w-full sm:flex-row sm:items-center sm:gap-3">
                         <UserAvatar
                           name={u.name}
@@ -4294,7 +4294,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                     const isLastRow = rowIdx === allVisibleUsers.length - 1;
                     const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                     return (
-                      <div key={u.id} className={cn("h-[72px] sm:h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
+                      <div key={u.id} className={cn("min-h-[72px] sm:min-h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0", rowBg)}>
                         {weekDays.map((day, i) => {
                           const dayAssignments = getUserAssignmentsForDay(u.id, day);
                           const dropId = `${u.id}|${toLocalISODate(day)}`;
@@ -4317,7 +4317,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                           const timeOffStyle = timeOffInfo ? TIME_OFF_VISUAL[timeOffInfo.type] : null;
 
                           return (
-                            <div key={i} className={cn("p-1 sm:p-2 text-center align-middle min-w-0", isLastRow ? "" : "border-b border-[#E5E5E7]")}>
+                            <div key={i} className={cn("h-full p-1 sm:p-2 text-center align-middle min-w-0", isLastRow ? "" : "border-b border-[#E5E5E7]")}>
                               <DroppableCell id={dropId} disabled={isBlocked} className="h-full flex flex-col justify-center">
                                 <div className="space-y-1 w-full min-w-0">
                                   {hasTimeOff && timeOffStyle && (
