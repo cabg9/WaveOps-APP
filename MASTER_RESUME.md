@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.4 en progreso: filtro de equipo por jerarquía en Horarios)
+> Última actualización: 2026-08-22 (FASE 7.4 en progreso: pestañas Mis solicitudes/Equipo visibles para Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -659,6 +659,17 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - **Incapacidades → Equipo**: el dropdown de departamento (móvil y desktop) usa `visibleDeptTreeOptions`.
   - `IncapacidadesTab` filtra las incapacidades por departamentos visibles cuando el filtro es **Todos**.
   - Los dropdowns de departamento solo se muestran cuando el usuario puede ver más de un departamento.
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (pestañas Mis solicitudes/Equipo para Gerente de Operaciones)
+- **Problema**: en **Horarios → Solicitudes → Solicitudes** no se mostraban las pestañas **Mis solicitudes** ni **Equipo** para el rol **Gerente de Operaciones**.
+- **Causa**: `canApproveTimeOff` solo comparaba `user?.role` contra los valores exactos del enum; si el `level` del usuario estaba presente pero el string del rol no coincidía exactamente, el permiso fallaba.
+- **Correcciones en `src/components/modules/HorariosModule.tsx`**:
+  - `canApproveTimeOff` ahora también acepta `user?.level <= 6` como fallback (supervisor y superiores).
+  - `canViewAllTimeOff` simplificado a `user?.level <= 4` como fallback.
+  - La pestaña **Mis solicitudes** ahora se muestra **siempre**; la pestaña **Equipo** se muestra solo para aprobadores.
+  - En móvil, el dropdown de vista solo permite cambiar a **Equipo** si el usuario es aprobador.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 

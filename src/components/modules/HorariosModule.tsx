@@ -6586,23 +6586,22 @@ function SolicitudesTab() {
   }, []);
 
   // Permisos para aprobar/rechazar solicitudes de tiempo libre
+  // Se incluye level <= 6 como fallback robusto por si el rol string no coincide exactamente
   const canApproveTimeOff =
     user?.role === Role.SUPERVISOR ||
     user?.role === Role.GERENTE_DEPARTAMENTO ||
     user?.role === Role.GERENTE_OPERACIONES ||
     user?.role === Role.RRHH ||
     user?.role === Role.DIRECTOR ||
-    user?.role === Role.DIRECTOR_GENERAL;
+    user?.role === Role.DIRECTOR_GENERAL ||
+    (typeof user?.level === 'number' && user.level <= 6);
 
   const canViewAllTimeOff =
     user?.role === Role.RRHH ||
     user?.role === Role.DIRECTOR ||
     user?.role === Role.DIRECTOR_GENERAL ||
     user?.role === Role.GERENTE_OPERACIONES ||
-    user?.level === 1 ||
-    user?.level === 2 ||
-    user?.level === 3 ||
-    user?.level === 4;
+    (typeof user?.level === 'number' && user.level <= 4);
 
   const myTimeOffRequests = useMemo(
     () => timeOffRequests.filter((r) => r.userId === user?.id),
@@ -7207,22 +7206,22 @@ function SolicitudesTab() {
 
           {activeSubTab === 'mis-solicitudes' && (
             <>
-              {canApproveTimeOff && (
-                <>
-                  {/* Desktop: botones Mis solicitudes/Equipo */}
-                  <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
-                    <button
-                      onClick={() => setTimeOffView('mias')}
-                      className={cn(
-                        'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-                        timeOffView === 'mias'
-                          ? 'bg-white text-corporate shadow-sm'
-                          : 'text-[#86868B] hover:text-[#1D1D1F]'
-                      )}
-                    >
-                      <User className="w-4 h-4" />
-                      Mis solicitudes
-                    </button>
+              <>
+                {/* Desktop: botones Mis solicitudes/Equipo */}
+                <div className="hidden md:flex gap-2 p-1 bg-[#F5F5F7] rounded-xl w-fit">
+                  <button
+                    onClick={() => setTimeOffView('mias')}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                      timeOffView === 'mias'
+                        ? 'bg-white text-corporate shadow-sm'
+                        : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    <User className="w-4 h-4" />
+                    Mis solicitudes
+                  </button>
+                  {canApproveTimeOff && (
                     <button
                       onClick={() => setTimeOffView('equipo')}
                       className={cn(
@@ -7235,35 +7234,37 @@ function SolicitudesTab() {
                       <Users className="w-4 h-4" />
                       Equipo
                     </button>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Mobile: dropdown Mis solicitudes/Equipo */}
-                  <div className="md:hidden min-w-0">
-                    <Select value={timeOffView} onValueChange={(v) => setTimeOffView(v as 'mias' | 'equipo')}>
-                      <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-                        <span className="flex items-center gap-2 text-[#86868B] truncate">
-                          {timeOffView === 'mias' ? <User className="w-4 h-4 flex-shrink-0" /> : <Users className="w-4 h-4 flex-shrink-0" />}
-                          <span className="truncate">{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
+                {/* Mobile: dropdown Mis solicitudes/Equipo */}
+                <div className="md:hidden min-w-0">
+                  <Select value={canApproveTimeOff ? timeOffView : 'mias'} onValueChange={(v) => canApproveTimeOff && setTimeOffView(v as 'mias' | 'equipo')}>
+                    <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
+                      <span className="flex items-center gap-2 text-[#86868B] truncate">
+                        {timeOffView === 'mias' ? <User className="w-4 h-4 flex-shrink-0" /> : <Users className="w-4 h-4 flex-shrink-0" />}
+                        <span className="truncate">{timeOffView === 'mias' ? 'Mis solicitudes' : 'Equipo'}</span>
+                      </span>
+                    </SelectTrigger>
+                    <SelectContent position="popper" className="z-50">
+                      <SelectItem value="mias">
+                        <span className="flex items-center gap-2">
+                          <User className="w-4 h-4" />
+                          <span>Mis solicitudes</span>
                         </span>
-                      </SelectTrigger>
-                      <SelectContent position="popper" className="z-50">
-                        <SelectItem value="mias">
-                          <span className="flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            <span>Mis solicitudes</span>
-                          </span>
-                        </SelectItem>
+                      </SelectItem>
+                      {canApproveTimeOff && (
                         <SelectItem value="equipo">
                           <span className="flex items-center gap-2">
                             <Users className="w-4 h-4" />
                             <span>Equipo</span>
                           </span>
                         </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
 
               {timeOffView === 'equipo' && canApproveTimeOff && visibleDeptTreeOptions.length > 1 && (
                 <Select value={timeOffDeptFilter} onValueChange={(v) => setTimeOffDeptFilter(v as string | 'ALL')}>
