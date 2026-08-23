@@ -8,6 +8,11 @@ import { useFirestoreUsers } from './firestore/useFirestoreUsers';
 import { AssignmentStatus } from '@/types';
 import { addDaysToDate, format } from '@/lib/utils';
 
+// Normaliza códigos de departamento para comparaciones robustas
+function normalizeDeptCode(name: string): string {
+  return name?.trim().replace(/\s+/g, '_').toUpperCase() || '';
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXT
 // ═══════════════════════════════════════════════════════════════════
@@ -130,7 +135,12 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     },
 
     getUsersByDepartment: (department: string) => {
-      return usersHook.users.filter((u: any) => u.department === department && u.isActive);
+      const targetCode = normalizeDeptCode(department);
+      return usersHook.users.filter((u: any) => {
+        if (!u.isActive) return false;
+        const userCode = normalizeDeptCode(u.department || '');
+        return userCode === targetCode;
+      });
     },
 
     isUserOnShift: (userId: string, date: string) => {

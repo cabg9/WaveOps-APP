@@ -2454,6 +2454,7 @@ function EquipoTab({
   }, [departmentOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   const visibleDeptNames = useMemo(() => visibleDeptOptions.map(d => d.name), [visibleDeptOptions]);
+  const visibleDeptCodes = useMemo(() => visibleDeptOptions.map(d => d.code), [visibleDeptOptions]);
 
   const showAllDeptOption = useMemo(() => {
     if (!effectiveUser) return false;
@@ -2522,14 +2523,14 @@ function EquipoTab({
     if (selectedDepartment === 'ALL') {
       return Array.from(
         new Map(
-          visibleDeptNames
-            .flatMap(name => getUsersByDepartment(name))
+          visibleDeptCodes
+            .flatMap(code => getUsersByDepartment(code))
             .map(u => [u.id, u])
         ).values()
       );
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptNames]);
+  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptCodes]);
 
   // Obtener asignaciones (solo departamentos visibles en modo ALL)
   const assignments = useMemo(() => {
@@ -2668,8 +2669,8 @@ function EquipoTab({
             const deptUsersList = isAllDepartments
               ? Array.from(
                   new Map(
-                    visibleDeptNames
-                      .flatMap(name => getUsersByDepartment(name))
+                    visibleDeptCodes
+                      .flatMap(code => getUsersByDepartment(code))
                       .map(u => [u.id, u])
                   ).values()
                 )
@@ -3704,8 +3705,8 @@ function EquipoTab({
                 const relevantUsers = selectedDepartment === 'ALL'
                   ? Array.from(
                       new Map(
-                        visibleDeptNames
-                          .flatMap(name => getUsersByDepartment(name))
+                        visibleDeptCodes
+                          .flatMap(code => getUsersByDepartment(code))
                           .map(u => [u.id, u])
                       ).values()
                     )
@@ -4000,6 +4001,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes]);
 
   const visibleDeptNames = useMemo(() => visibleDepartmentOptions.map(d => d.name), [visibleDepartmentOptions]);
+  const visibleDeptCodes = useMemo(() => visibleDepartmentOptions.map(d => d.code), [visibleDepartmentOptions]);
 
   const showAllDeptOption = useMemo(() => {
     if (!effectiveUser) return false;
@@ -4063,25 +4065,25 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const availableShifts = useMemo(() => {
     if (selectedDepartment === 'ALL') {
       return sortShiftsByTime(
-        shifts.filter(s => s.name !== 'Libre' && visibleDeptNames.includes(s.department))
+        shifts.filter(s => s.name !== 'Libre' && visibleDeptCodes.includes(s.department))
       );
     }
     return sortShiftsByTime(getShiftsByDepartment(selectedDepartment));
-  }, [getShiftsByDepartment, selectedDepartment, shifts, visibleDeptNames]);
+  }, [getShiftsByDepartment, selectedDepartment, shifts, visibleDeptCodes]);
 
   // Obtener usuarios del departamento seleccionado (o departamentos visibles si es 'ALL')
   const deptUsers = useMemo(() => {
     if (selectedDepartment === 'ALL') {
       return Array.from(
         new Map(
-          visibleDeptNames
-            .flatMap(name => getUsersByDepartment(name))
+          visibleDeptCodes
+            .flatMap(code => getUsersByDepartment(code))
             .map(u => [u.id, u])
         ).values()
       );
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptNames]);
+  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptCodes]);
 
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
   const allowedForCrossDept = effectiveUser ? getVisibleDepartmentCodes(effectiveUser) : [];

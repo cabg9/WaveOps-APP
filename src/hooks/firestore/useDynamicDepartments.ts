@@ -184,42 +184,36 @@ export function useDynamicDepartments() {
   const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string } | null): string[] => {
     if (!user) return [];
 
-    console.log('[getVisibleDepartmentCodes] input:', { role: user.role, department: user.department });
+    const userDeptCode = normalizeDeptCode(user.department || '');
+
+    // Si aún no cargan los departamentos, devolver al menos el propio departamento
+    // del usuario normalizado para evitar parpadeos del selector.
+    if (activeDepartments.length === 0) {
+      return userDeptCode ? [userDeptCode] : [];
+    }
 
     // Roles con visión total por defecto
     if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) {
-      console.log('[getVisibleDepartmentCodes] visión total:', departmentCodes);
-      return departmentCodes;
+      return departmentCodes.length > 0 ? departmentCodes : (userDeptCode ? [userDeptCode] : []);
     }
 
     // Fallback explícito para Gerente de Operaciones: siempre ve el subárbol operacional
     if (user.role === Role.GERENTE_OPERACIONES) {
       const opsCode = getOperationalSubtreeCodes();
-      if (opsCode.length > 0) {
-        console.log('[getVisibleDepartmentCodes] gerente op subárbol:', opsCode);
-        return opsCode;
-      }
+      if (opsCode.length > 0) return opsCode;
       // Fallback de última instancia: cualquier departamento marcado como operacional
-      if (operationalDepartmentCodes.length > 0) {
-        console.log('[getVisibleDepartmentCodes] gerente op fallback:', operationalDepartmentCodes);
-        return operationalDepartmentCodes;
-      }
+      if (operationalDepartmentCodes.length > 0) return operationalDepartmentCodes;
     }
 
     // Encontrar el departamento del usuario por código o por nombre
-    const userDeptCode = normalizeDeptCode(user.department || '');
     const userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
-    console.log('[getVisibleDepartmentCodes] userDeptCode:', userDeptCode, 'userDept:', userDept ? { code: userDept.code, name: userDept.name, parentId: userDept.parentId } : null);
 
     if (!userDept) {
-      console.log('[getVisibleDepartmentCodes] dept no encontrado, devolviendo:', [user.department].filter(Boolean));
-      return [user.department].filter(Boolean);
+      return [userDeptCode].filter(Boolean);
     }
 
     // Subárbol del departamento del usuario (él + descendientes)
-    const visibleCodes = getDepartmentSubtreeCodes(userDept.code);
-    console.log('[getVisibleDepartmentCodes] subárbol usuario:', visibleCodes);
-    return visibleCodes;
+    return getDepartmentSubtreeCodes(userDept.code);
   }, [departmentCodes, activeDepartments, operationalDepartmentCodes, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
@@ -236,12 +230,6 @@ export function useDynamicDepartments() {
     };
     return buildTree(null);
   }, [activeDepartments]);
-
-  // Log de diagnóstico para jerarquía (temporal)
-  useMemo(() => {
-    console.log('[useDynamicDepartments] activeDepartments:', activeDepartments.map(d => ({ code: d.code, name: d.name, parentId: d.parentId })));
-    console.log('[useDynamicDepartments] departmentTree:', departmentTree.map(d => ({ code: d.code, name: d.name, children: d.children?.map(c => c.code) })));
-  }, [activeDepartments, departmentTree]);
 
   // Opciones planas con nivel jerárquico para selects (ej: ── Hijo)
   const departmentTreeOptions = useMemo(() => {
