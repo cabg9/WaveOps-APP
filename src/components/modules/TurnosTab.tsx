@@ -375,8 +375,6 @@ export function TurnosTab() {
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-[#86868B]">Cargando turnos...</div>;
-
   const groupedShifts = useMemo(() => {
     const map = new Map<string, Shift[]>();
     filteredShifts.forEach(shift => {
@@ -388,6 +386,8 @@ export function TurnosTab() {
   }, [filteredShifts]);
 
   const departmentName = (code: string) => departmentOptions.find(d => d.code === code)?.name || code.replace(/_/g, ' ');
+
+  if (loading) return <div className="p-8 text-center text-[#86868B]">Cargando turnos...</div>;
 
   return (
     <div className="space-y-5">
