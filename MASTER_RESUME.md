@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de resúmenes y permisos)
+> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de alcance de Gerente de Operaciones)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -878,6 +878,14 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Mi Horario**: el resumen de tasks usa `getTasksByUser(user.id)`, que filtra por `assignedTo` y ya funciona correctamente; no requirió cambios.
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `58d38a6a` en `fix-horarios-provider`.
+
+### Fixes de esta ronda (Resolver incidencias: supervisor Y gerente)
+- **Problema**: se necesitaba validar que el botón **Resolver** en incidencias solo aparezca cuando el supervisor **Y** el gerente del departamento involucrado hayan verificado la incidencia.
+- **Verificación**: en `src/components/modules/TasksModule.tsx`, `IncidenciaCard` ya implementa `todosVerificaron`: para cada departamento en `targetDepartments` se exige verificación de gerente y supervisor, permitiendo que un superior (RRHH, Director, Director General o Gerente de Operaciones si es operativo) cubra un rol faltante. `canResolve` solo es `true` cuando `incidencia.status === VERIFIED && todosVerificaron`.
+- **Bug encontrado y corregido**: las comparaciones de departamento dentro de `todosVerificaron` (`v?.department === dept`, `u.department === dept`) no estaban normalizadas. Si los usuarios tenían `department` como nombre legible y `targetDepartments` como código, el sistema podía creer que faltaban verificadores y bloquear el botón **Resolver**.
+- **Corrección**: se normalizan todas las comparaciones de departamento dentro de `todosVerificaron` usando `normalizeDeptCode`.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `821eb891` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
