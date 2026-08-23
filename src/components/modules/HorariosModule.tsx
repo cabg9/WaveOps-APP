@@ -6561,23 +6561,18 @@ function TimeOffRequestsPanel({
 
                 {canActOnTimeOff(req, 'view') && (req.history || []).length > 0 && (
                   <div className="mt-4 pt-3 border-t border-[#E5E5E7]">
-                    <p className="text-xs font-medium text-[#86868B] mb-2 flex items-center gap-1.5">
-                      <History className="w-3.5 h-3.5" /> Historial
+                    <p className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
+                      <History className="w-4 h-4" /> Historial de acciones
                     </p>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {req.history!.map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs">
-                          <div className="w-1.5 h-1.5 rounded-full bg-corporate/60 mt-1.5 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <span className="text-[#86868B] whitespace-nowrap">
-                              {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
-                              {new Date(item.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {' · '}
-                            <span className="text-[#1D1D1F]">
-                              <span className="font-medium">{item.by || 'Sistema'}</span> {item.action}
-                            </span>
-                            {item.note && <span className="text-[#86868B]"> · {item.note}</span>}
+                        <div key={idx} className="flex items-start gap-3 text-sm">
+                          <div className="w-2 h-2 bg-corporate rounded-full mt-1.5 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-[#1D1D1F]">{item.action}{item.note ? ` · ${item.note}` : ''}</p>
+                            <p className="text-xs text-[#86868B]">
+                              {item.by || 'Sistema'} • {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
                         </div>
                       ))}

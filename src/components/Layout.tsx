@@ -144,7 +144,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
       <aside className="hidden lg:flex fixed left-0 top-0 h-screen w-16 bg-white border-r border-[#E5E5E7] flex-col items-center pt-4 pb-6 z-50">
         {/* Logo */}
         <div className="mb-6">
-          <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
+          <img
+            src="/logo-icon.png"
+            alt="WaveOps"
+            className="w-10 h-10 rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigate('/')}
+          />
         </div>
 
         {/* Navigation */}
@@ -259,7 +264,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
           <div className="flex items-center justify-between px-4 py-3">
             {/* Left: Logo & Title */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl shrink-0" />
+              <img
+                src="/logo-icon.png"
+                alt="WaveOps"
+                className="w-10 h-10 rounded-xl shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate('/')}
+              />
               <div className="min-w-0 flex-1">
                 {title && (
                   <h1 className="text-lg font-semibold text-[#1D1D1F] truncate">{title}</h1>
@@ -298,7 +308,12 @@ export function Layout({ children, title, showDate = true }: LayoutProps) {
                   {/* Sheet Header */}
                   <SheetHeader className="p-4 border-b border-[#E5E5E7]">
                     <div className="flex items-center justify-between">
-                      <img src="/logo-icon.png" alt="WaveOps" className="w-10 h-10 rounded-xl" />
+                      <img
+                        src="/logo-icon.png"
+                        alt="WaveOps"
+                        className="w-10 h-10 rounded-xl cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => navigate('/')}
+                      />
 
                     </div>
                   </SheetHeader>
