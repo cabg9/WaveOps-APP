@@ -9,7 +9,7 @@ function toLocalISODate(date: Date): string {
 // HORARIOS MODULE - GALAPAGOS TASKS
 // ═══════════════════════════════════════════════════════════════════
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import {
   User,
@@ -960,7 +960,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
     const endDate = timeOffEnd || timeOffStart;
     try {
       await addDoc(collection(db, 'timeOffRequests'), {
-        userId: user?.id || user?.id || '',
+        userId: user?.id || '',
         userName: user?.name || '',
         department: user?.department || '',
         type: timeOffType,
@@ -973,6 +973,19 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
         reviewedAt: null,
         response: null
       });
+      const newReq: TimeOffRequest = {
+        id: '',
+        userId: user?.id || '',
+        userName: user?.name || '',
+        department: user?.department || '',
+        type: timeOffType,
+        startDate: timeOffStart,
+        endDate,
+        reason: timeOffMotivo,
+        status: 'pendiente',
+        createdAt: new Date().toISOString(),
+      };
+      await notifyTimeOffStakeholders(newReq, user, firestoreUsers, 'created');
       toast.success('Solicitud enviada correctamente');
       setTimeOffStart('');
       setTimeOffEnd('');
@@ -989,9 +1002,10 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startDayOfWeek = firstDay.getDay();
+    // Calendario empieza en lunes (igual que Mi Horario)
+    const leadingNulls = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
     const days = [];
-    for (let i = 0; i < startDayOfWeek; i++) days.push(null);
+    for (let i = 0; i < leadingNulls; i++) days.push(null);
     for (let i = 1; i <= daysInMonth; i++) days.push(i);
     return days;
   };
@@ -1212,6 +1226,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg border', style.bgColor, style.borderColor)}>
                         <Icon className={cn('w-4 h-4', style.color)} />
                         <span className={cn('text-sm font-medium', style.color)}>{TIME_OFF_LABELS[todayTimeOff.type]}</span>
+                        <TimeOffEditedIndicator req={todayTimeOff} />
                         <span className="text-xs text-[#86868B]">({formatTimeOffRange(todayTimeOff.startDate, todayTimeOff.endDate)})</span>
                       </div>
                     );
@@ -1399,6 +1414,9 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                           {!hasIncapacity && hasTimeOff && TimeOffIcon && (
                             <div className={cn("absolute top-1 right-1 w-3.5 h-3.5 sm:w-5 sm:h-5 flex items-center justify-center rounded", timeOffStyle?.bgColor)}>
                               <TimeOffIcon className={cn("w-1.5 h-1.5 sm:w-2.5 sm:h-2.5", timeOffStyle?.color)} />
+                              {timeOffInfo && wasTimeOffEdited(timeOffInfo) && (
+                                <Pencil className="absolute -bottom-0.5 -left-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 text-[#86868B] bg-white rounded-full" />
+                              )}
                             </div>
                           )}
                           <span className={cn(
@@ -1489,6 +1507,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                               <div className={cn('inline-flex items-center gap-2 px-3 py-2 rounded-lg border', timeOffStyle.bgColor, timeOffStyle.borderColor)}>
                                 <timeOffStyle.icon className={cn('w-4 h-4', timeOffStyle.color)} />
                                 <span className={cn('text-sm font-medium', timeOffStyle.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
+                                <TimeOffEditedIndicator req={timeOffInfo} />
                                 <span className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</span>
                                 {timeOffInfo.reason && (
                                   <span className="text-xs text-[#86868B]">· {timeOffInfo.reason}</span>
@@ -1874,7 +1893,7 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
 
               <div className="border border-[#E5E5E7] rounded-xl p-3">
                 <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d) => (
+                  {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
                     <div key={d} className="text-xs text-[#86868B] py-1 font-medium">{d}</div>
                   ))}
                 </div>
@@ -2866,12 +2885,13 @@ function EquipoTab({
                                 </div>
                               ) : hasTimeOff && timeOffStyle ? (
                                 <div className={cn(
-                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words',
+                                  'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border min-w-0 break-words flex items-center justify-center gap-1',
                                   timeOffStyle.bgColor,
                                   timeOffStyle.color,
                                   timeOffStyle.borderColor
                                 )}>
                                   {TIME_OFF_LABELS[timeOffInfo.type]}
+                                  <TimeOffEditedIndicator req={timeOffInfo} />
                                 </div>
                               ) : null}
                               {dayShifts.length > 0 && (
@@ -3133,9 +3153,15 @@ function EquipoTab({
                           >
                             <span className={cn(isToday ? 'text-corporate font-bold' : '', hasIncapacity && incapacityStyle?.color, !hasIncapacity && hasTimeOff && timeOffStyle?.color)}>{date.getDate()}</span>
                             {(hasShifts || hasTasks || hasIncapacity || hasTimeOff) && (
-                              <div className="flex gap-0.5 mt-0.5">
+                              <div className="flex gap-0.5 mt-0.5 items-center">
                                 {hasIncapacity && <span className={cn("w-1.5 h-1.5 rounded-full", incapacityStyle?.bgColor.replace('100', '500'))} />}
-                                {!hasIncapacity && hasTimeOff && <span className={cn("w-1.5 h-1.5 rounded-full", timeOffStyle?.bgColor.replace('100', '500'))} />}
+                                {!hasIncapacity && hasTimeOff && (
+                                  timeOffInfo && wasTimeOffEdited(timeOffInfo) ? (
+                                    <Pencil className="w-2 h-2 text-[#86868B]" />
+                                  ) : (
+                                    <span className={cn("w-1.5 h-1.5 rounded-full", timeOffStyle?.bgColor.replace('100', '500'))} />
+                                  )
+                                )}
                                 {hasShifts && !hasIncapacity && !hasTimeOff && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: dayShifts[0]?.color }} />}
                                 {hasTasks && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                               </div>
@@ -3214,6 +3240,7 @@ function EquipoTab({
                                   <span className={cn("text-sm font-medium", style.color)}>
                                     {TIME_OFF_LABELS[timeOffInfo.type]}
                                   </span>
+                                  <TimeOffEditedIndicator req={timeOffInfo} />
                                   <span className="text-xs text-[#86868B]">
                                     {formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}
                                   </span>
@@ -3376,6 +3403,7 @@ function EquipoTab({
                       <Icon className={cn("w-5 h-5", style.color)} />
                       <div>
                         <span className={cn("font-medium", style.color)}>{TIME_OFF_LABELS[timeOffInfo.type]}</span>
+                        <TimeOffEditedIndicator req={timeOffInfo} className="inline-block ml-1 align-middle" />
                         <p className="text-xs text-[#86868B]">{formatTimeOffRange(timeOffInfo.startDate, timeOffInfo.endDate)}</p>
                       </div>
                     </div>
@@ -4420,12 +4448,13 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                 <div className="space-y-1 w-full min-w-0">
                                   {hasTimeOff && timeOffStyle && (
                                     <div className={cn(
-                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words',
+                                      'px-2 py-1 rounded-lg text-[10px] sm:text-xs font-medium border text-center min-w-0 break-words flex items-center justify-center gap-1',
                                       timeOffStyle.bgColor,
                                       timeOffStyle.color,
                                       timeOffStyle.borderColor
                                     )}>
                                       {TIME_OFF_LABELS[timeOffInfo.type]}
+                                      <TimeOffEditedIndicator req={timeOffInfo} />
                                     </div>
                                   )}
                                   {hasIncapacity && incapacityStyle && (
@@ -6139,11 +6168,13 @@ interface TimeOffRequest {
   startDate: string;
   endDate: string;
   reason?: string;
-  status: 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada';
+  status: 'pendiente' | 'aprobada' | 'rechazada' | 'cancelada' | 'eliminada';
   createdAt: string;
   reviewedBy?: string | null;
   reviewedAt?: string | null;
   response?: string | null;
+  deletedBy?: string | null;
+  deletedAt?: string | null;
   history?: { action: string; by: string; at: string; note?: string }[];
 }
 
@@ -6176,6 +6207,156 @@ function findTimeOffForDate(
   );
 }
 
+function wasTimeOffEdited(req: TimeOffRequest): boolean {
+  return req.history?.some((h) => h.action.includes('editada')) ?? false;
+}
+
+function TimeOffEditedIndicator({ req, className }: { req: TimeOffRequest; className?: string }) {
+  if (!wasTimeOffEdited(req)) return null;
+  return <Pencil className={cn('w-3 h-3 text-[#86868B]', className)} />;
+}
+
+// Determina si el usuario actual puede actuar sobre una solicitud de tiempo libre específica
+function canActOnTimeOff(
+  req: TimeOffRequest,
+  currentUser: { id: string; role: Role; department?: string } | null | undefined,
+  activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[]
+): boolean {
+  if (!currentUser) return false;
+  if (
+    currentUser.role === Role.RRHH ||
+    currentUser.role === Role.DIRECTOR ||
+    currentUser.role === Role.DIRECTOR_GENERAL
+  ) {
+    return true;
+  }
+  const reqDeptCode = normalizeDeptCode(req.department || '');
+  const userDeptCode = normalizeDeptCode(currentUser.department || '');
+
+  const hasDeptManager = activeUsers.some(
+    (u) =>
+      u.isActive !== false &&
+      u.role === Role.GERENTE_DEPARTAMENTO &&
+      normalizeDeptCode(u.department || '') === reqDeptCode
+  );
+  if (hasDeptManager) {
+    return currentUser.role === Role.GERENTE_DEPARTAMENTO && userDeptCode === reqDeptCode;
+  }
+
+  const hasDeptSupervisor = activeUsers.some(
+    (u) =>
+      u.isActive !== false &&
+      u.role === Role.SUPERVISOR &&
+      normalizeDeptCode(u.department || '') === reqDeptCode
+  );
+  if (hasDeptSupervisor) {
+    return currentUser.role === Role.SUPERVISOR && userDeptCode === reqDeptCode;
+  }
+
+  return currentUser.role === Role.GERENTE_OPERACIONES;
+}
+
+async function notifyTimeOffStakeholders(
+  req: TimeOffRequest,
+  currentUser: { id: string; name?: string } | null | undefined,
+  activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[],
+  kind: 'created' | 'approved' | 'rejected' | 'edited' | 'deleted',
+  extra?: { reason?: string }
+) {
+  if (!currentUser) return;
+  const notifiedUserIds = new Set<string>();
+  const actorName = currentUser.name || currentUser.id;
+  const range = formatTimeOffRange(req.startDate, req.endDate);
+  const typeLabel = TIME_OFF_LABELS[req.type];
+
+  const titleMap = {
+    created: 'Nueva solicitud de tiempo libre',
+    approved: 'Solicitud aprobada',
+    rejected: 'Solicitud rechazada',
+    edited: 'Solicitud editada',
+    deleted: 'Solicitud eliminada',
+  };
+
+  const typeMap = {
+    created: NotificationType.VACATION_REQUESTED,
+    approved: NotificationType.VACATION_APPROVED,
+    rejected: NotificationType.VACATION_REJECTED,
+    edited: NotificationType.VACATION_REJECTED,
+    deleted: NotificationType.VACATION_REJECTED,
+  };
+
+  const bodyMap = {
+    created: `${actorName} solicitó ${typeLabel} del ${range}.`,
+    approved: `Tu solicitud de ${typeLabel} del ${range} fue aprobada.`,
+    rejected: `Tu solicitud de ${typeLabel} del ${range} fue rechazada.${extra?.reason ? ` Motivo: ${extra.reason}.` : ''}`,
+    edited: `Tu solicitud de ${typeLabel} del ${range} fue editada.${extra?.reason ? ` Motivo: ${extra.reason}.` : ''}`,
+    deleted: `Tu solicitud de ${typeLabel} del ${range} fue eliminada.${extra?.reason ? ` Motivo: ${extra.reason}.` : ''}`,
+  };
+
+  const addNotification = async (targetUserId: string) => {
+    if (!targetUserId || notifiedUserIds.has(targetUserId)) return;
+    notifiedUserIds.add(targetUserId);
+    try {
+      await addDoc(collection(db, 'notifications'), {
+        userId: targetUserId,
+        type: typeMap[kind],
+        title: titleMap[kind],
+        body: bodyMap[kind],
+        data: { link: '/horarios' },
+        read: false,
+        createdAt: serverTimestamp(),
+        createdBy: currentUser.id,
+        priority: 'normal',
+      });
+    } catch (err) {
+      console.error('Error al notificar a', targetUserId, err);
+    }
+  };
+
+  const reqDeptCode = normalizeDeptCode(req.department || '');
+
+  if (kind === 'created') {
+    const deptManager = activeUsers.find(
+      (u) =>
+        u.isActive !== false &&
+        u.role === Role.GERENTE_DEPARTAMENTO &&
+        normalizeDeptCode(u.department || '') === reqDeptCode
+    );
+    if (deptManager) {
+      await addNotification(deptManager.id);
+    } else {
+      const deptSupervisor = activeUsers.find(
+        (u) =>
+          u.isActive !== false &&
+          u.role === Role.SUPERVISOR &&
+          normalizeDeptCode(u.department || '') === reqDeptCode
+      );
+      if (deptSupervisor) {
+        await addNotification(deptSupervisor.id);
+      } else {
+        const opsManager = activeUsers.find(
+          (u) => u.isActive !== false && u.role === Role.GERENTE_OPERACIONES
+        );
+        if (opsManager) await addNotification(opsManager.id);
+      }
+    }
+  }
+
+  if (kind !== 'created') {
+    await addNotification(req.userId);
+  }
+
+  const rrhhUsers = activeUsers.filter((u) => u.isActive !== false && u.role === Role.RRHH);
+  if (rrhhUsers.length > 0) {
+    for (const u of rrhhUsers) await addNotification(u.id);
+  } else {
+    const topManagers = activeUsers.filter(
+      (u) => u.isActive !== false && (u.role === Role.DIRECTOR || u.role === Role.DIRECTOR_GENERAL)
+    );
+    for (const u of topManagers) await addNotification(u.id);
+  }
+}
+
 const TIME_OFF_VISUAL: Record<
   TimeOffRequest['type'],
   { icon: React.ElementType; color: string; bgColor: string; borderColor: string }
@@ -6192,6 +6373,7 @@ function TimeOffStatusBadge({ status }: { status: TimeOffRequest['status'] }) {
     aprobada: { class: 'bg-green-100 text-green-700', label: 'Aprobada' },
     rechazada: { class: 'bg-red-100 text-red-700', label: 'Rechazada' },
     cancelada: { class: 'bg-gray-100 text-gray-700', label: 'Cancelada' },
+    eliminada: { class: 'bg-red-50 text-red-400', label: 'Eliminada' },
   };
   const { class: className, label } = config[status];
   return <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', className)}>{label}</span>;
@@ -6201,12 +6383,13 @@ interface TimeOffRequestsPanelProps {
   myRequests: TimeOffRequest[];
   teamRequests: TimeOffRequest[];
   canApprove: boolean;
+  canActOnTimeOff: (req: TimeOffRequest) => boolean;
   users: { id: string; name: string; avatar?: string; photoURL?: string }[];
   onApprove: (req: TimeOffRequest) => void;
   onReject: (req: TimeOffRequest) => void;
-  onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string }) => void;
+  onEdit: (req: TimeOffRequest, data: { type: TimeOffRequest['type']; startDate: string; endDate: string; reason?: string }) => void;
   onCancel: (req: TimeOffRequest) => void;
-  onDelete: (req: TimeOffRequest) => void;
+  onDelete: (req: TimeOffRequest, reason?: string) => void;
   view?: 'mias' | 'equipo';
   onViewChange?: (view: 'mias' | 'equipo') => void;
   filter?: 'todas' | TimeOffRequest['status'];
@@ -6219,6 +6402,7 @@ function TimeOffRequestsPanel({
   myRequests,
   teamRequests,
   canApprove,
+  canActOnTimeOff,
   users,
   onApprove,
   onReject,
@@ -6250,9 +6434,12 @@ function TimeOffRequestsPanel({
   const [editType, setEditType] = useState<TimeOffRequest['type']>('dia_libre');
   const [editStartDate, setEditStartDate] = useState('');
   const [editEndDate, setEditEndDate] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [editSaved, setEditSaved] = useState(false);
 
   // Modal de eliminación
   const [deletingRequest, setDeletingRequest] = useState<TimeOffRequest | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   const activeView = canApprove ? view : 'mias';
   const requests = activeView === 'mias' ? myRequests : teamRequests;
@@ -6267,6 +6454,7 @@ function TimeOffRequestsPanel({
     { id: 'aprobada', label: 'Aprobadas' },
     { id: 'rechazada', label: 'Rechazadas' },
     { id: 'cancelada', label: 'Canceladas' },
+    { id: 'eliminada', label: 'Eliminadas' },
   ];
 
   return (
@@ -6343,8 +6531,8 @@ function TimeOffRequestsPanel({
                 )}
               </div>
 
-              {/* Historial: solo visible para aprobadores */}
-              {canApprove && (req.history || []).length > 0 && (
+              {/* Historial: visible para quienes pueden actuar sobre la solicitud */}
+              {canActOnTimeOff(req) && (req.history || []).length > 0 && (
                 <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
                   <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
                   <div className="space-y-1">
@@ -6362,7 +6550,7 @@ function TimeOffRequestsPanel({
                 </div>
               )}
 
-              {canApprove && req.status === 'pendiente' && (
+              {canActOnTimeOff(req) && req.status === 'pendiente' && (
                 <div className="mt-3 flex gap-2 justify-end">
                   <button
                     onClick={() => onApprove(req)}
@@ -6382,13 +6570,14 @@ function TimeOffRequestsPanel({
               )}
 
               <div className="mt-2 flex gap-2 justify-end">
-                {canApprove && req.status !== 'cancelada' && (
+                {canActOnTimeOff(req) && req.status !== 'cancelada' && req.status !== 'eliminada' && (
                   <button
                     onClick={() => {
                       setEditingRequest(req);
                       setEditType(req.type);
                       setEditStartDate(req.startDate);
                       setEditEndDate(req.endDate);
+                      setEditReason('');
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7] rounded-lg text-sm font-medium hover:bg-white transition-colors"
                   >
@@ -6396,7 +6585,7 @@ function TimeOffRequestsPanel({
                     Editar
                   </button>
                 )}
-                {req.userId === user?.id && req.status !== 'cancelada' && (
+                {req.userId === user?.id && req.status !== 'cancelada' && req.status !== 'eliminada' && (
                   <button
                     onClick={() => req.status === 'pendiente' && onCancel(req)}
                     disabled={req.status !== 'pendiente'}
@@ -6406,7 +6595,7 @@ function TimeOffRequestsPanel({
                     Cancelar
                   </button>
                 )}
-                {(canApprove || (req.userId === user?.id && req.status !== 'aprobada')) && (
+                {(canActOnTimeOff(req) || (req.userId === user?.id && req.status !== 'aprobada')) && req.status !== 'eliminada' && (
                   <button
                     onClick={() => setDeletingRequest(req)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -6422,91 +6611,176 @@ function TimeOffRequestsPanel({
       </div>
 
       {/* Modal de edición de solicitud */}
-      <Dialog open={!!editingRequest} onOpenChange={(open) => !open && setEditingRequest(null)}>
+      <Dialog
+        open={!!editingRequest}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingRequest(null);
+            setEditSaved(false);
+            setEditReason('');
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Editar solicitud</DialogTitle>
+            <DialogTitle>{editSaved ? 'Solicitud actualizada' : 'Editar solicitud'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Tipo</label>
-              <select
-                value={editType}
-                onChange={(e) => setEditType(e.target.value as TimeOffRequest['type'])}
-                className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white"
-              >
-                <option value="vacaciones">Vacaciones</option>
-                <option value="cita_medica">Cita médica</option>
-                <option value="dia_libre">Día libre</option>
-                <option value="otro">Otro</option>
-              </select>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Desde</label>
-                <input
-                  type="date"
-                  value={editStartDate}
-                  onChange={(e) => setEditStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                />
+          {!editSaved ? (
+            <>
+              <div className="space-y-4 py-4">
+                <div>
+                  <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Tipo</label>
+                  <select
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value as TimeOffRequest['type'])}
+                    className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20 bg-white"
+                  >
+                    <option value="vacaciones">Vacaciones</option>
+                    <option value="cita_medica">Cita médica</option>
+                    <option value="dia_libre">Día libre</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Desde</label>
+                    <input
+                      type="date"
+                      value={editStartDate}
+                      onChange={(e) => setEditStartDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Hasta</label>
+                    <input
+                      type="date"
+                      value={editEndDate}
+                      onChange={(e) => setEditEndDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Motivo de la edición (opcional)</label>
+                  <textarea
+                    value={editReason}
+                    onChange={(e) => setEditReason(e.target.value)}
+                    className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm min-h-[60px] resize-none focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                    placeholder="Indica por qué se editó la solicitud..."
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Hasta</label>
-                <input
-                  type="date"
-                  value={editEndDate}
-                  onChange={(e) => setEditEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setEditingRequest(null);
+                    setEditSaved(false);
+                    setEditReason('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (!editingRequest) return;
+                    onEdit(editingRequest, {
+                      type: editType,
+                      startDate: editStartDate,
+                      endDate: editEndDate,
+                      reason: editReason,
+                    });
+                    if (editingRequest.status !== 'aprobada' && canActOnTimeOff(editingRequest)) {
+                      setEditSaved(true);
+                    } else {
+                      setEditingRequest(null);
+                      setEditSaved(false);
+                      setEditReason('');
+                    }
+                  }}
+                  disabled={!editStartDate || !editEndDate || editEndDate < editStartDate}
+                  className="flex-1 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Guardar
+                </button>
               </div>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setEditingRequest(null)}
-              className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={() => {
-                if (!editingRequest) return;
-                onEdit(editingRequest, {
-                  type: editType,
-                  startDate: editStartDate,
-                  endDate: editEndDate,
-                });
-                setEditingRequest(null);
-              }}
-              disabled={!editStartDate || !editEndDate || editEndDate < editStartDate}
-              className="flex-1 px-4 py-2 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Guardar
-            </button>
-          </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[#86868B] py-4">
+                La solicitud fue actualizada. ¿Deseás aprobarla o rechazarla ahora?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (!editingRequest) return;
+                    onReject(editingRequest);
+                    setEditingRequest(null);
+                    setEditSaved(false);
+                    setEditReason('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                >
+                  Rechazar
+                </button>
+                <button
+                  onClick={() => {
+                    if (!editingRequest) return;
+                    onApprove(editingRequest);
+                    setEditingRequest(null);
+                    setEditSaved(false);
+                    setEditReason('');
+                  }}
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                >
+                  Aprobar
+                </button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Modal de confirmación para eliminar solicitud */}
-      <Dialog open={!!deletingRequest} onOpenChange={(open) => !open && setDeletingRequest(null)}>
+      <Dialog
+        open={!!deletingRequest}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeletingRequest(null);
+            setDeleteReason('');
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Eliminar solicitud</DialogTitle>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-3">
             <p className="text-sm text-[#1D1D1F]">
               ¿Estás seguro de que querés eliminar la solicitud de{' '}
               <span className="font-medium">{TIME_OFF_LABELS[deletingRequest?.type || 'dia_libre']}</span>{' '}
               de <span className="font-medium">{deletingRequest?.userName}</span>?
             </p>
-            <p className="text-xs text-[#86868B] mt-2">
-              Esta acción no se puede deshacer y el historial se perderá.
+            <p className="text-xs text-[#86868B]">
+              La solicitud se marcará como eliminada y conservará su historial.
             </p>
+            <div>
+              <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Motivo de la eliminación (opcional)</label>
+              <textarea
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm min-h-[60px] resize-none focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                placeholder="Indica por qué se eliminó la solicitud..."
+              />
+            </div>
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setDeletingRequest(null)}
+              onClick={() => {
+                setDeletingRequest(null);
+                setDeleteReason('');
+              }}
               className="flex-1 px-4 py-2 bg-[#F5F5F7] text-[#86868B] rounded-lg text-sm font-medium hover:bg-[#E5E5E7] transition-colors"
             >
               Cancelar
@@ -6514,8 +6788,9 @@ function TimeOffRequestsPanel({
             <button
               onClick={() => {
                 if (!deletingRequest) return;
-                onDelete(deletingRequest);
+                onDelete(deletingRequest, deleteReason);
                 setDeletingRequest(null);
+                setDeleteReason('');
               }}
               className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors"
             >
@@ -6706,6 +6981,11 @@ function SolicitudesTab() {
     user?.role === Role.GERENTE_OPERACIONES ||
     (typeof user?.level === 'number' && user.level <= 4);
 
+  const canActOnTimeOffForReq = useCallback(
+    (req: TimeOffRequest) => canActOnTimeOff(req, user, users),
+    [user, users]
+  );
+
   const myTimeOffRequests = useMemo(
     () => timeOffRequests.filter((r) => r.userId === user?.id),
     [timeOffRequests, user?.id]
@@ -6718,7 +6998,7 @@ function SolicitudesTab() {
   }, [timeOffRequests, canApproveTimeOff, visibleDeptCodes]);
 
   const handleApproveTimeOff = async (req: TimeOffRequest) => {
-    if (!user) return;
+    if (!user || !canActOnTimeOffForReq(req)) return;
     try {
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
         status: 'aprobada',
@@ -6730,17 +7010,7 @@ function SolicitudesTab() {
           at: new Date().toISOString(),
         }),
       });
-      await addDoc(collection(db, 'notifications'), {
-        userId: req.userId,
-        type: NotificationType.VACATION_APPROVED,
-        title: 'Solicitud aprobada',
-        body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue aprobada.`,
-        data: { link: '/horarios' },
-        read: false,
-        createdAt: serverTimestamp(),
-        createdBy: user.id,
-        priority: 'normal',
-      });
+      await notifyTimeOffStakeholders(req, user, users, 'approved');
       toast.success('Solicitud aprobada');
     } catch (error) {
       console.error('Error al aprobar solicitud:', error);
@@ -6749,29 +7019,22 @@ function SolicitudesTab() {
   };
 
   const handleRejectTimeOff = async (req: TimeOffRequest) => {
-    if (!user) return;
+    if (!user || !canActOnTimeOffForReq(req)) return;
+    const reason = window.prompt('Motivo del rechazo (opcional):') || '';
     try {
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
         status: 'rechazada',
         reviewedBy: user.name || user.id,
         reviewedAt: serverTimestamp(),
+        response: reason || null,
         history: arrayUnion({
           action: 'Solicitud rechazada',
           by: user.name || user.id,
           at: new Date().toISOString(),
+          note: reason || undefined,
         }),
       });
-      await addDoc(collection(db, 'notifications'), {
-        userId: req.userId,
-        type: NotificationType.VACATION_REJECTED,
-        title: 'Solicitud rechazada',
-        body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue rechazada.`,
-        data: { link: '/horarios' },
-        read: false,
-        createdAt: serverTimestamp(),
-        createdBy: user.id,
-        priority: 'normal',
-      });
+      await notifyTimeOffStakeholders(req, user, users, 'rejected', { reason });
       toast.success('Solicitud rechazada');
     } catch (error) {
       console.error('Error al rechazar solicitud:', error);
@@ -6781,9 +7044,9 @@ function SolicitudesTab() {
 
   const handleEditTimeOff = async (
     req: TimeOffRequest,
-    data: { type: TimeOffRequest['type']; startDate: string; endDate: string }
+    data: { type: TimeOffRequest['type']; startDate: string; endDate: string; reason?: string }
   ) => {
-    if (!user) return;
+    if (!user || !canActOnTimeOffForReq(req)) return;
     try {
       const changes: string[] = [];
       if (data.type !== req.type) changes.push(`tipo: ${TIME_OFF_LABELS[req.type]} → ${TIME_OFF_LABELS[data.type]}`);
@@ -6799,8 +7062,10 @@ function SolicitudesTab() {
           action: changes.length > 0 ? `Solicitud editada (${changes.join(', ')})` : 'Solicitud editada',
           by: user.name || user.id,
           at: new Date().toISOString(),
+          note: data.reason || undefined,
         }),
       });
+      await notifyTimeOffStakeholders(req, user, users, 'edited', { reason: data.reason });
       toast.success('Solicitud actualizada');
     } catch (error) {
       console.error('Error al editar solicitud:', error);
@@ -6815,6 +7080,8 @@ function SolicitudesTab() {
         status: 'cancelada',
         cancelledBy: user.name || user.id,
         cancelledAt: serverTimestamp(),
+        reviewedBy: user.name || user.id,
+        reviewedAt: serverTimestamp(),
         history: arrayUnion({
           action: 'Solicitud cancelada por el solicitante',
           by: user.name || user.id,
@@ -6828,23 +7095,21 @@ function SolicitudesTab() {
     }
   };
 
-  const handleDeleteTimeOff = async (req: TimeOffRequest) => {
-    if (!user) return;
+  const handleDeleteTimeOff = async (req: TimeOffRequest, reason?: string) => {
+    if (!user || !canActOnTimeOffForReq(req)) return;
     try {
-      await deleteDoc(doc(db, 'timeOffRequests', req.id));
-      if (req.userId !== user.id) {
-        await addDoc(collection(db, 'notifications'), {
-          userId: req.userId,
-          type: NotificationType.VACATION_REJECTED,
-          title: 'Solicitud eliminada',
-          body: `Tu solicitud de ${TIME_OFF_LABELS[req.type]} del ${formatTimeOffRange(req.startDate, req.endDate)} fue eliminada.`,
-          data: { link: '/horarios' },
-          read: false,
-          createdAt: serverTimestamp(),
-          createdBy: user.id,
-          priority: 'normal',
-        });
-      }
+      await updateDoc(doc(db, 'timeOffRequests', req.id), {
+        status: 'eliminada',
+        deletedBy: user.name || user.id,
+        deletedAt: serverTimestamp(),
+        history: arrayUnion({
+          action: 'Solicitud eliminada',
+          by: user.name || user.id,
+          at: new Date().toISOString(),
+          note: reason || undefined,
+        }),
+      });
+      await notifyTimeOffStakeholders(req, user, users, 'deleted', { reason });
       toast.success('Solicitud eliminada');
     } catch (error) {
       console.error('Error al eliminar solicitud:', error);
@@ -7661,6 +7926,7 @@ function SolicitudesTab() {
           myRequests={myTimeOffRequests}
           teamRequests={teamTimeOffRequests}
           canApprove={canApproveTimeOff}
+          canActOnTimeOff={canActOnTimeOffForReq}
           users={users}
           onApprove={handleApproveTimeOff}
           onReject={handleRejectTimeOff}

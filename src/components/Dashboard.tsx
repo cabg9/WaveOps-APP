@@ -29,6 +29,7 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
 import { useShifts } from '@/hooks/useShifts';
 import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
+import { useFirestoreUsers, type FirestoreUser } from '@/hooks/firestore/useFirestoreUsers';
 import { db } from '@/firebase-config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -213,6 +214,72 @@ export default function Dashboard() {
     return () => unsubscribe();
   }, [user]);
 
+  const { users: firestoreUsers } = useFirestoreUsers();
+
+  // ─── SOLICITUDES DE TIEMPO LIBRE PENDIENTES QUE PUEDE APROBAR ───
+  const [pendingTimeOffCount, setPendingTimeOffCount] = React.useState(0);
+  React.useEffect(() => {
+    if (!user) return;
+    const q = query(
+      collection(db, 'timeOffRequests'),
+      where('status', '==', 'pendiente')
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const activeUsers = firestoreUsers.filter((u) => u.isActive !== false);
+      const count = snapshot.docs.filter((doc) => {
+        const data = doc.data();
+        const req = {
+          id: doc.id,
+          userId: data.userId || '',
+          department: data.department || '',
+          status: data.status || 'pendiente',
+        };
+        return canActOnTimeOff(req, user, activeUsers);
+      }).length;
+      setPendingTimeOffCount(count);
+    });
+    return () => unsubscribe();
+  }, [user, firestoreUsers]);
+
+  function canActOnTimeOff(
+    req: { id: string; userId: string; department: string; status: string },
+    currentUser: { id: string; role: Role; department?: string } | null | undefined,
+    activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[]
+  ): boolean {
+    if (!currentUser) return false;
+    if (
+      currentUser.role === Role.RRHH ||
+      currentUser.role === Role.DIRECTOR ||
+      currentUser.role === Role.DIRECTOR_GENERAL
+    ) {
+      return true;
+    }
+    const reqDeptCode = normalizeDeptCode(req.department || '');
+    const userDeptCode = normalizeDeptCode(currentUser.department || '');
+
+    const hasDeptManager = activeUsers.some(
+      (u) =>
+        u.isActive !== false &&
+        u.role === Role.GERENTE_DEPARTAMENTO &&
+        normalizeDeptCode(u.department || '') === reqDeptCode
+    );
+    if (hasDeptManager) {
+      return currentUser.role === Role.GERENTE_DEPARTAMENTO && userDeptCode === reqDeptCode;
+    }
+
+    const hasDeptSupervisor = activeUsers.some(
+      (u) =>
+        u.isActive !== false &&
+        u.role === Role.SUPERVISOR &&
+        normalizeDeptCode(u.department || '') === reqDeptCode
+    );
+    if (hasDeptSupervisor) {
+      return currentUser.role === Role.SUPERVISOR && userDeptCode === reqDeptCode;
+    }
+
+    return currentUser.role === Role.GERENTE_OPERACIONES;
+  }
+
   const myTasks = userId ? tasks.filter((t) =>
     (t.assignedTo?.includes(userId)) ||
     (t.supportUserIds?.includes(userId)) ||
@@ -282,7 +349,7 @@ export default function Dashboard() {
           label: 'Hoy',
           value: relevantShift ? relevantShift.name : 'Stand By',
         },
-        stat2: { label: 'Solicitudes', value: receivedChangeRequests },
+        stat2: { label: 'Solicitudes', value: receivedChangeRequests + pendingTimeOffCount },
         bottomText: relevantShift
           ? activeShift
             ? `Activo · ${relevantShift.startTime}-${relevantShift.endTime} · ${getDeptName(relevantShift.department || '') || 'Dive Shop'}`
