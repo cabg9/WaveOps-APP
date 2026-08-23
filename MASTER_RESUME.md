@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de tareas específicas y plantillas)
+> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de resúmenes y permisos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -866,6 +866,18 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - `DepartamentosTab.tsx` ahora lee `assignments` desde `useFirestoreShifts` para evaluar la prioridad 1.
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `16f46df2` en `fix-horarios-provider`.
+
+### Fixes de esta ronda (resúmenes de tasks en Dashboard, Mi Horario y Equipo)
+- **Problema**: se necesitaba validar que los resúmenes de tasks en **Dashboard → Resumen del Equipo**, **Mi Horario** y **Horarios → Equipo** reflejen correctamente las tareas según el departamento seleccionado.
+- **Bugs encontrados y corregidos**:
+  - En `src/components/Dashboard.tsx`, el filtro por departamento del usuario comparaba `t.department === userDept` sin normalizar. Si `user.department` venía como nombre legible y `t.department` como código, el resumen aparecía en 0.
+  - En `src/components/modules/HorariosModule.tsx` (`EquipoTab`), `belongsToTargetDept` comparaba `t.department === targetDept` sin normalizar, con el mismo riesgo.
+- **Correcciones**:
+  - `Dashboard.tsx` importa `normalizeDeptCode`, normaliza `userDept` y compara `normalizeDeptCode(t.department)` contra `userDept`.
+  - `EquipoTab` usa `normalizeDeptCode` en `belongsToTargetDept` para que el resumen "Tasks del equipo" coincida independientemente de si los datos usan nombre o código.
+- **Mi Horario**: el resumen de tasks usa `getTasksByUser(user.id)`, que filtra por `assignedTo` y ya funciona correctamente; no requirió cambios.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `58d38a6a` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
