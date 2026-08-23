@@ -1030,6 +1030,13 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Corrección**: se movió el `useMemo` antes del retorno condicional.
 - **Commit**: `988b22e0` en `fix-horarios-provider`.
 
+### Fixes de esta ronda (vista de lista expandible en Turnos)
+- **Mejora**: el usuario pidió que **Develops → Turnos** fuera expandible hacia abajo o seleccionable entre lista y tarjetas.
+- **Corrección**: se agregó un toggle **Tarjetas / Lista** en el header de Turnos.
+  - **Tarjetas**: mantiene el diseño agrupado por departamento con tarjetas.
+  - **Lista**: muestra turnos como filas compactas agrupadas por departamento; cada fila se expande al hacer click para mostrar horario, tareas específicas vinculadas y avatares de personas asignadas recientemente.
+- **Commit**: `b3d1ad36` en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
 - Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.
