@@ -1411,9 +1411,53 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             
 
 <div className="space-y-2 pt-2 border-t border-[#E5E5E7]">
-              <div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>
-              {task.notes && task.notes.length > 0 ? (<div className="space-y-2">{task.notes.map((note) => { const noteAuthor = allUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || note.createdBy}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}
-              {currentUserId && (<>{!showNoteInput ? (<Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<form onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }} className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }} /><Button type="submit" size="sm" disabled={!newNote.trim()} onClick={(e) => { e.preventDefault(); handleNoteSubmit(); }}>Guardar</Button><Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></form>)}</>)}
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#86868B]" />
+                <h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5>
+              </div>
+              {task.notes && task.notes.length > 0 ? (
+                <div className="space-y-2">
+                  {task.notes.map((note) => {
+                    const noteAuthor = allUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy);
+                    return (
+                      <div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3">
+                        <p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p>
+                        <div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]">
+                          <span>{noteAuthor?.name || note.createdBy}</span>
+                          <span>•</span>
+                          <span>{formatRelativeTime(note.createdAt)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-[#86868B] italic">No hay notas aún</p>
+              )}
+              {currentUserId && (
+                <>
+                  {!showNoteInput ? (
+                    <Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full">
+                      <Plus className="w-4 h-4 mr-1" /> Agregar nota
+                    </Button>
+                  ) : (
+                    <form
+                      onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}
+                      className="flex gap-2"
+                    >
+                      <Input
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        placeholder="Escribe una nota..."
+                        className="flex-1"
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }}
+                      />
+                      <Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button>
+                    </form>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -1759,7 +1803,57 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
               )}
 
               {incidencia.history?.length > 0 && (<div className="space-y-2"><div className="flex items-center gap-2"><History className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Historial</h5></div><div className="space-y-1 text-sm max-h-40 overflow-y-auto bg-[#F5F5F7] rounded-lg p-3">{incidencia.history.map((h) => { const performer = firestoreUsers.find((u) => u.id === h.performedBy || u.email === h.performedBy); const performerName = performer?.name || h.performedBy; return (<div key={h.id || Math.random()} className="flex items-start gap-2 text-[#86868B]"><span>•</span><div className="flex-1"><span>{h.action}</span>{h.note && <span className="text-xs block text-[#1D1D1F]">{h.note}</span>}<span className="text-xs block">Por: {performerName} • {formatHistoryDateTime(h.performedAt)}</span></div></div>); })}</div></div>)}
-              <div className="space-y-2"><div className="flex items-center gap-2"><MessageSquare className="w-4 h-4 text-[#86868B]" /><h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5></div>{incidencia.notes?.length > 0 ? (<div className="space-y-2">{incidencia.notes.filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:')).map((note) => { const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy); return (<div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3"><p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p><div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]"><span>{noteAuthor?.name || getUserName(note.createdBy)}</span><span>•</span><span>{formatRelativeTime(note.createdAt)}</span></div></div>); })}</div>) : (<p className="text-sm text-[#86868B] italic">No hay notas aún</p>)}{currentUserId && (<>{!showNoteInput ? (<Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full"><Plus className="w-4 h-4 mr-1" />Agregar nota</Button>) : (<form onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }} className="flex gap-2"><Input value={newNote} onChange={(e) => setNewNote(e.target.value)} placeholder="Escribe una nota..." className="flex-1" onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }} /><Button type="submit" size="sm" disabled={!newNote.trim()} onClick={(e) => { e.preventDefault(); handleNoteSubmit(); }}>Guardar</Button><Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button></form>)}</>)}</div>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-[#86868B]" />
+                  <h5 className="text-sm font-medium text-[#1D1D1F]">Notas</h5>
+                </div>
+                {incidencia.notes?.length > 0 ? (
+                  <div className="space-y-2">
+                    {incidencia.notes
+                      .filter((note) => !note.content.startsWith('Resolución:') && !note.content.startsWith('Motivo de cierre:') && !note.content.startsWith('Motivo de reapertura:'))
+                      .map((note) => {
+                        const noteAuthor = firestoreUsers.find((u) => u.id === note.createdBy || u.email === note.createdBy);
+                        return (
+                          <div key={note.id} className="bg-[#F5F5F7] rounded-lg p-3">
+                            <p className="text-sm text-[#1D1D1F] whitespace-pre-wrap">{note.content}</p>
+                            <div className="flex items-center gap-2 mt-2 text-xs text-[#86868B]">
+                              <span>{noteAuthor?.name || getUserName(note.createdBy)}</span>
+                              <span>•</span>
+                              <span>{formatRelativeTime(note.createdAt)}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#86868B] italic">No hay notas aún</p>
+                )}
+                {currentUserId && (
+                  <>
+                    {!showNoteInput ? (
+                      <Button type="button" size="sm" variant="outline" onClick={() => setShowNoteInput(true)} className="w-full">
+                        <Plus className="w-4 h-4 mr-1" /> Agregar nota
+                      </Button>
+                    ) : (
+                      <form
+                        onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}
+                        className="flex gap-2"
+                      >
+                        <Input
+                          value={newNote}
+                          onChange={(e) => setNewNote(e.target.value)}
+                          placeholder="Escribe una nota..."
+                          className="flex-1"
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }}
+                        />
+                        <Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button>
+                      </form>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
               
               <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E7] flex-wrap">

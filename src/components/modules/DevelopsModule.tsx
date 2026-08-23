@@ -248,7 +248,6 @@ function UsuariosTab() {
     name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
     position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
-    visibleDepartments: [] as string[],
   });
 
   const roleLabels: Record<string, string> = {};
@@ -305,14 +304,14 @@ function UsuariosTab() {
       setShowForm(false);
       setEditingUser(null);
       setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] });
+    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
 
   const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(), visibleDepartments: [] }); setCreatedPassword(null); setInvitationLink(null); setShowForm(true); };
+    joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setInvitationLink(null); setShowForm(true); };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
@@ -320,7 +319,6 @@ function UsuariosTab() {
       name: u.name?.split(' ')[0] || '', lastName: u.name?.split(' ').slice(1).join(' ') || '', email: u.email || '', role: u.role || 'STAFF',
       department: u.department || 'DIVE_SHOP', joinDate: u.joinDate || '', position: u.position || '',
       level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
-      visibleDepartments: u.visibleDepartments || [],
     });
     setShowForm(true);
   };
@@ -522,33 +520,6 @@ function UsuariosTab() {
                 ))}
               </select>
             </div>
-            {editingUser && (
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-[#86868B] mb-1">Departamentos visibles adicionales</label>
-                <div className="flex flex-wrap gap-2 p-2 rounded-xl border border-[#E5E5E7]">
-                  {departmentTreeOptions.map(opt => (
-                    <label key={opt.code} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs cursor-pointer" style={{ marginLeft: `${opt.level * 12}px` }}>
-                      <input
-                        type="checkbox"
-                        checked={formData.visibleDepartments.includes(opt.code)}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setFormData(prev => ({
-                            ...prev,
-                            visibleDepartments: checked
-                              ? [...prev.visibleDepartments, opt.code]
-                              : prev.visibleDepartments.filter(d => d !== opt.code)
-                          }));
-                        }}
-                        className="w-3.5 h-3.5 rounded border-[#E5E5E7]"
-                      />
-                      {opt.level > 0 ? '└─ ' : ''}{opt.name}
-                    </label>
-                  ))}
-                </div>
-                <p className="text-[10px] text-[#86868B] mt-1">El usuario siempre ve su departamento. Aquí se seleccionan departamentos adicionales que puede visualizar.</p>
-              </div>
-            )}
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
               <input value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}
@@ -649,16 +620,7 @@ function UsuariosTab() {
                     </td>
                     <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
                     <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</span>
-                        {(u.visibleDepartments?.length || 0) > 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-corporate/10 text-corporate w-fit" title={u.visibleDepartments?.join(', ')}>
-                            +{u.visibleDepartments?.length} deptos.
-                          </span>
-                        )}
-                      </div>
-                    </td>
+                    <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <button onClick={() => window.location.href = "/perfil?userId=" + u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><Eye className="w-4 h-4" /></button><button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
@@ -808,57 +770,195 @@ const PERMISSION_CATEGORIES: PermCat[] = [
 
 const PERM_DESCRIPTIONS: Record<string, { on: string; off: string }> = {
   // Modulos
-  "canViewDashboard": { on: "Puede ver el Dashboard y sus resumenes.", off: "No puede ver el Dashboard." },
-  "canViewModuleTasks": { on: "Puede acceder al modulo Tasks.", off: "No tiene acceso al modulo Tasks." },
-  "canViewModuleHorarios": { on: "Puede acceder al modulo Horarios.", off: "No tiene acceso al modulo Horarios." },
-  "canViewModuleDiveOps": { on: "Puede acceder al modulo DiveOps.", off: "No tiene acceso al modulo DiveOps." },
-  "canViewModuleVessels": { on: "Puede acceder al modulo Vessels.", off: "No tiene acceso al modulo Vessels." },
-  "canViewModuleMovilidad": { on: "Puede acceder al modulo Movilidad.", off: "No tiene acceso al modulo Movilidad." },
-  "canViewModuleRequisiciones": { on: "Puede acceder al modulo Requisiciones.", off: "No tiene acceso al modulo Requisiciones." },
-  "canViewModuleOrdenesPago": { on: "Puede acceder al modulo Ordenes de Pago.", off: "No tiene acceso al modulo Ordenes de Pago." },
-  "canViewModuleReportes": { on: "Puede acceder al modulo Reportes.", off: "No tiene acceso al modulo Reportes." },
-  "canViewModuleDevelops": { on: "Puede acceder al modulo Develops.", off: "No tiene acceso al modulo Develops." },
+  "canViewDashboard": {
+    on: "Activado: el usuario puede entrar al Dashboard y ver los resumenes de su equipo y sus tareas del dia.",
+    off: "Desactivado: el usuario NO ve el icono ni puede entrar al Dashboard."
+  },
+  "canViewModuleTasks": {
+    on: "Activado: el usuario ve el modulo Tasks en el menu y puede trabajar con tareas.",
+    off: "Desactivado: el modulo Tasks esta oculto para este usuario."
+  },
+  "canViewModuleHorarios": {
+    on: "Activado: el usuario ve el modulo Horarios en el menu.",
+    off: "Desactivado: el modulo Horarios esta oculto."
+  },
+  "canViewModuleDiveOps": {
+    on: "Activado: el usuario ve el modulo DiveOps en el menu.",
+    off: "Desactivado: el modulo DiveOps esta oculto."
+  },
+  "canViewModuleVessels": {
+    on: "Activado: el usuario ve el modulo Vessels en el menu.",
+    off: "Desactivado: el modulo Vessels esta oculto."
+  },
+  "canViewModuleMovilidad": {
+    on: "Activado: el usuario ve el modulo Movilidad en el menu.",
+    off: "Desactivado: el modulo Movilidad esta oculto."
+  },
+  "canViewModuleRequisiciones": {
+    on: "Activado: el usuario ve el modulo Requisiciones en el menu.",
+    off: "Desactivado: el modulo Requisiciones esta oculto."
+  },
+  "canViewModuleOrdenesPago": {
+    on: "Activado: el usuario ve el modulo Ordenes de Pago en el menu.",
+    off: "Desactivado: el modulo Ordenes de Pago esta oculto."
+  },
+  "canViewModuleReportes": {
+    on: "Activado: el usuario ve el modulo Reportes en el menu.",
+    off: "Desactivado: el modulo Reportes esta oculto."
+  },
+  "canViewModuleDevelops": {
+    on: "Activado: el usuario ve el modulo Develops (configuracion avanzada) en el menu.",
+    off: "Desactivado: el modulo Develops esta oculto."
+  },
   // Tasks
-  "canCreateSpecificTask": { on: "Puede crear tareas especificas vinculadas a turnos.", off: "No puede crear tareas especificas." },
-  "canCreateExtraTask": { on: "Puede crear tareas extra.", off: "No puede crear tareas extra." },
-  "canEditOwnTasks": { on: "Puede editar las tareas que el creo.", off: "No puede editar sus propias tareas." },
-  "canDeleteOwnTasks": { on: "Puede eliminar las tareas que el creo.", off: "No puede eliminar sus propias tareas." },
-  "canEditAllTasks": { on: "Puede editar cualquier tarea de cualquier usuario.", off: "Solo puede editar tareas propias (si tiene ese permiso)." },
-  "canDeleteAllTasks": { on: "Puede eliminar cualquier tarea.", off: "No puede eliminar tareas de otros usuarios." },
-  "canVerifyTask": { on: "Puede verificar tareas completadas.", off: "No puede verificar tareas." },
-  "canRateTask": { on: "Puede calificar tareas finalizadas.", off: "No puede calificar tareas." },
-  "canBlockTask": { on: "Puede bloquear una tarea para que no avance.", off: "No puede bloquear tareas." },
-  "canUnblockTask": { on: "Puede desbloquear tareas bloqueadas.", off: "No puede desbloquear tareas." },
-  "canReopenTask": { on: "Puede reabrir tareas ya finalizadas.", off: "No puede reabrir tareas finalizadas." },
+  "canCreateSpecificTask": {
+    on: "Activado: puede crear tareas especificas ligadas a turnos y departamentos.",
+    off: "Desactivado: NO puede crear tareas especificas."
+  },
+  "canCreateExtraTask": {
+    on: "Activado: puede crear tareas extra para usuarios o departamentos.",
+    off: "Desactivado: NO puede crear tareas extra."
+  },
+  "canEditOwnTasks": {
+    on: "Activado: puede editar las tareas que el mismo creo.",
+    off: "Desactivado: NO puede editar sus propias tareas."
+  },
+  "canDeleteOwnTasks": {
+    on: "Activado: puede eliminar las tareas que el mismo creo.",
+    off: "Desactivado: NO puede eliminar sus propias tareas."
+  },
+  "canEditAllTasks": {
+    on: "Activado: puede editar CUALQUIER tarea, aunque la haya creado otro usuario.",
+    off: "Desactivado: solo puede editar tareas propias (si tiene ese permiso)."
+  },
+  "canDeleteAllTasks": {
+    on: "Activado: puede eliminar CUALQUIER tarea, aunque la haya creado otro usuario.",
+    off: "Desactivado: NO puede eliminar tareas de otros usuarios."
+  },
+  "canVerifyTask": {
+    on: "Activado: puede verificar que una tarea completada fue hecha correctamente.",
+    off: "Desactivado: NO puede verificar tareas."
+  },
+  "canRateTask": {
+    on: "Activado: puede calificar la calidad de una tarea finalizada.",
+    off: "Desactivado: NO puede calificar tareas."
+  },
+  "canBlockTask": {
+    on: "Activado: puede bloquear una tarea para que nadie la complete hasta que se desbloquee.",
+    off: "Desactivado: NO puede bloquear tareas."
+  },
+  "canUnblockTask": {
+    on: "Activado: puede desbloquear tareas que esten bloqueadas.",
+    off: "Desactivado: NO puede desbloquear tareas."
+  },
+  "canReopenTask": {
+    on: "Activado: puede reabrir tareas ya finalizadas o cerradas.",
+    off: "Desactivado: NO puede reabrir tareas finalizadas."
+  },
   // Horarios
-  "canViewTeam": { on: "Puede ver la pestana Equipo en Horarios.", off: "No puede ver la pestana Equipo." },
-  "canViewAllDepartmentsInTeam": { on: "En Equipo puede ver usuarios de todos los departamentos permitidos.", off: "En Equipo solo ve su propio departamento y sub-departamentos." },
-  "canAssignShifts": { on: "Puede asignar turnos a usuarios en Horarios → Asignar.", off: "No puede asignar turnos." },
-  "canModifyShifts": { on: "Puede modificar turnos ya asignados.", off: "No puede modificar turnos asignados." },
-  "canApproveChanges": { on: "Puede aprobar solicitudes de cambio de turno.", off: "No puede aprobar cambios de turno." },
-  "canRejectChanges": { on: "Puede rechazar solicitudes de cambio de turno.", off: "No puede rechazar cambios de turno." },
-  "canRequestChange": { on: "Puede solicitar cambios de turno con otros usuarios.", off: "No puede solicitar cambios de turno." },
+  "canViewTeam": {
+    on: "Activado: en Horarios ve la pestana Equipo con los turnos del equipo.",
+    off: "Desactivado: NO ve la pestana Equipo en Horarios."
+  },
+  "canViewAllDepartmentsInTeam": {
+    on: "Activado: en Equipo puede ver usuarios de todos los departamentos que su rol le permite ver.",
+    off: "Desactivado: en Equipo solo ve usuarios de su propio departamento y sus sub-departamentos."
+  },
+  "canAssignShifts": {
+    on: "Activado: puede arrastrar y asignar turnos a usuarios en Horarios → Asignar.",
+    off: "Desactivado: NO puede asignar turnos."
+  },
+  "canModifyShifts": {
+    on: "Activado: puede modificar turnos ya publicados en el calendario.",
+    off: "Desactivado: NO puede modificar turnos ya publicados."
+  },
+  "canApproveChanges": {
+    on: "Activado: puede aprobar solicitudes de cambio de turno entre usuarios.",
+    off: "Desactivado: NO puede aprobar cambios de turno."
+  },
+  "canRejectChanges": {
+    on: "Activado: puede rechazar solicitudes de cambio de turno entre usuarios.",
+    off: "Desactivado: NO puede rechazar cambios de turno."
+  },
+  "canRequestChange": {
+    on: "Activado: puede solicitar un cambio de turno con otro usuario.",
+    off: "Desactivado: NO puede solicitar cambios de turno."
+  },
   // Incapacidades
-  "canViewOwnIncapacidades": { on: "Puede ver sus propias incapacidades.", off: "No puede ver incapacidades propias." },
-  "canViewTeamIncapacidades": { on: "Puede ver las incapacidades de su equipo.", off: "No puede ver incapacidades del equipo." },
-  "canVerifyIncapacidad": { on: "Puede verificar incapacidades registradas.", off: "No puede verificar incapacidades." },
-  "canRegisterIncapacidad": { on: "Puede registrar incapacidades para usuarios.", off: "No puede registrar incapacidades." },
-  "canRejectIncapacidad": { on: "Puede rechazar incapacidades.", off: "No puede rechazar incapacidades." },
-  "canRequestIncapacidadDocs": { on: "Puede solicitar documentos de soporte para incapacidades.", off: "No puede solicitar documentos de incapacidad." },
-  "canUploadIncapacidadDocs": { on: "Puede subir documentos de incapacidad.", off: "No puede subir documentos de incapacidad." },
+  "canViewOwnIncapacidades": {
+    on: "Activado: puede ver las incapacidades que el mismo ha registrado.",
+    off: "Desactivado: NO puede ver sus propias incapacidades."
+  },
+  "canViewTeamIncapacidades": {
+    on: "Activado: puede ver las incapacidades de los usuarios de su equipo.",
+    off: "Desactivado: NO puede ver incapacidades del equipo."
+  },
+  "canVerifyIncapacidad": {
+    on: "Activado: puede verificar/confirmar incapacidades registradas.",
+    off: "Desactivado: NO puede verificar incapacidades."
+  },
+  "canRegisterIncapacidad": {
+    on: "Activado: puede registrar una incapacidad para si mismo o para otro usuario.",
+    off: "Desactivado: NO puede registrar incapacidades."
+  },
+  "canRejectIncapacidad": {
+    on: "Activado: puede rechazar una incapacidad registrada.",
+    off: "Desactivado: NO puede rechazar incapacidades."
+  },
+  "canRequestIncapacidadDocs": {
+    on: "Activado: puede pedir documentos de soporte (foto, pdf) para una incapacidad.",
+    off: "Desactivado: NO puede solicitar documentos de incapacidad."
+  },
+  "canUploadIncapacidadDocs": {
+    on: "Activado: puede subir documentos de soporte a una incapacidad.",
+    off: "Desactivado: NO puede subir documentos de incapacidad."
+  },
   // Incidencias
-  "canCreateIncidencia": { on: "Puede crear nuevas incidencias.", off: "No puede crear incidencias." },
-  "canViewAllIncidencias": { on: "Puede ver incidencias de todos los departamentos.", off: "Solo ve incidencias de su alcance departamental." },
-  "canViewOperationalIncidencias": { on: "Puede ver incidencias de departamentos operativos.", off: "No ve incidencias operativas adicionales." },
-  "canViewOwnDepartmentIncidencias": { on: "Puede ver incidencias de su departamento.", off: "No ve incidencias de su departamento." },
-  "canConfirmIncidenciaAsManager": { on: "Puede confirmar incidencias en rol de gerente.", off: "No puede confirmar incidencias como gerente." },
-  "canConfirmIncidenciaAsSupervisor": { on: "Puede confirmar incidencias en rol de supervisor.", off: "No puede confirmar incidencias como supervisor." },
-  "canResolveIncidencia": { on: "Puede marcar incidencias como resueltas.", off: "No puede resolver incidencias." },
-  "canCloseIncidencia": { on: "Puede cerrar incidencias definitivamente.", off: "No puede cerrar incidencias." },
-  "canReopenIncidencia": { on: "Puede reabrir incidencias cerradas.", off: "No puede reabrir incidencias." },
+  "canCreateIncidencia": {
+    on: "Activado: puede crear nuevas incidencias/reportes.",
+    off: "Desactivado: NO puede crear incidencias."
+  },
+  "canViewAllIncidencias": {
+    on: "Activado: puede ver incidencias de TODOS los departamentos.",
+    off: "Desactivado: solo ve incidencias de su propio departamento y sub-departamentos."
+  },
+  "canViewOperationalIncidencias": {
+    on: "Activado: puede ver incidencias de los departamentos operativos (Dive Shop, Guias, Botes, etc.).",
+    off: "Desactivado: NO ve incidencias operativas adicionales."
+  },
+  "canViewOwnDepartmentIncidencias": {
+    on: "Activado: puede ver las incidencias de su propio departamento.",
+    off: "Desactivado: NO ve incidencias de su departamento."
+  },
+  "canConfirmIncidenciaAsManager": {
+    on: "Activado: puede confirmar/verificar incidencias actuando como gerente de departamento.",
+    off: "Desactivado: NO puede confirmar incidencias como gerente."
+  },
+  "canConfirmIncidenciaAsSupervisor": {
+    on: "Activado: puede confirmar/verificar incidencias actuando como supervisor.",
+    off: "Desactivado: NO puede confirmar incidencias como supervisor."
+  },
+  "canResolveIncidencia": {
+    on: "Activado: puede marcar una incidencia como resuelta.",
+    off: "Desactivado: NO puede resolver incidencias."
+  },
+  "canCloseIncidencia": {
+    on: "Activado: puede cerrar una incidencia definitivamente.",
+    off: "Desactivado: NO puede cerrar incidencias."
+  },
+  "canReopenIncidencia": {
+    on: "Activado: puede reabrir incidencias que ya esten cerradas.",
+    off: "Desactivado: NO puede reabrir incidencias cerradas."
+  },
   // Departamentos
-  "canViewAllDepartments": { on: "Puede ver todos los departamentos en Tasks, Horarios y Dashboard.", off: "Solo ve su departamento y sus sub-departamentos segun la jerarquia." },
-  "canViewOwnDepartment": { on: "Puede ver informacion de su propio departamento.", off: "No puede ver informacion de departamentos." },
+  "canViewAllDepartments": {
+    on: "Activado: puede ver TODOS los departamentos en Tasks, Horarios y Dashboard, sin importar cual sea su departamento.",
+    off: "Desactivado: solo ve su departamento y los departamentos que esten bajo el en la jerarquia (hijos y nietos)."
+  },
+  "canViewOwnDepartment": {
+    on: "Activado: puede ver informacion filtrada por su propio departamento.",
+    off: "Desactivado: NO puede ver informacion de departamentos."
+  },
 };
 
 function RoleIcon({ name }: { name: string }) {

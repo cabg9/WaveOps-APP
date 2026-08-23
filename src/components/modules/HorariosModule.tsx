@@ -2444,12 +2444,14 @@ function EquipoTab({
   const weekStart = propWeekStart ?? internalWeekStart;
   const weekDays = propWeekDays ?? internalWeekDays;
 
-  // Departamentos visibles en Equipo según jerarquía + toggles de Develops
+  // Departamentos visibles en Equipo según jerarquía pura
   const visibleDeptOptions = useMemo(() => {
     if (!effectiveUser) return departmentOptions;
     const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentOptions.filter(d => allowed.includes(d.code));
   }, [departmentOptions, effectiveUser, getVisibleDepartmentCodes]);
+
+  const visibleDeptNames = useMemo(() => visibleDeptOptions.map(d => d.name), [visibleDeptOptions]);
 
   const showAllDeptOption = useMemo(() => {
     if (!effectiveUser) return false;
@@ -2513,25 +2515,32 @@ function EquipoTab({
     return approvedTimeOff.find((r) => r.userId === userId && isDateInRange(dateStr, r.startDate, r.endDate));
   };
 
-  // Obtener usuarios según selección
+  // Obtener usuarios según selección (respetando jerarquía de departamentos visibles)
   const deptUsers = useMemo(() => {
     if (selectedDepartment === 'ALL') {
-      return users.filter(u => u.isActive);
+      return Array.from(
+        new Map(
+          visibleDeptNames
+            .flatMap(name => getUsersByDepartment(name))
+            .map(u => [u.id, u])
+        ).values()
+      );
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [users, getUsersByDepartment, selectedDepartment]);
+  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptNames]);
 
-  // Obtener asignaciones
+  // Obtener asignaciones (solo departamentos visibles en modo ALL)
   const assignments = useMemo(() => {
     if (selectedDepartment === 'ALL') {
+      const visibleDeptCodes = visibleDeptOptions.map(d => d.code);
       const allAssignments: ShiftAssignment[] = [];
-      departmentCodes.forEach(dept => {
+      visibleDeptCodes.forEach(dept => {
         allAssignments.push(...getWeekAssignments(dept, weekStart));
       });
       return allAssignments;
     }
     return getWeekAssignments(selectedDepartment, weekStart);
-  }, [getWeekAssignments, selectedDepartment, weekStart]);
+  }, [getWeekAssignments, selectedDepartment, weekStart, visibleDeptOptions]);
 
   const getUserShiftsForDay = (userId: string, date: Date): Shift[] => {
     const dateStr = toLocalISODate(date);
@@ -2655,7 +2664,13 @@ function EquipoTab({
             const isAllDepartments = selectedDepartment === 'ALL';
             const targetDept = isAllDepartments ? undefined : (selectedDepartment || user?.department);
             const deptUsersList = isAllDepartments
-              ? users.filter((u) => u.isActive)
+              ? Array.from(
+                  new Map(
+                    visibleDeptNames
+                      .flatMap(name => getUsersByDepartment(name))
+                      .map(u => [u.id, u])
+                  ).values()
+                )
               : getUsersByDepartment(targetDept as string);
             const deptMemberIds = deptUsersList.map((u) => u.id);
 
@@ -2764,7 +2779,7 @@ function EquipoTab({
             {deptUsers.map((u, rowIdx) => {
               const isLastRow = rowIdx === deptUsers.length - 1;
               return (
-                <div key={u.id} className={cn("h-[72px] sm:h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
+                <div key={u.id} className={cn("min-h-[72px] sm:min-h-[88px] flex items-center p-1 sm:p-4 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
                   <button
                     onClick={() => handleUserClick(u)}
                     className="flex flex-col items-center gap-1 w-full text-left hover:bg-[#F5F5F7] rounded-lg p-1 -m-1 transition-colors sm:flex-row sm:items-center sm:gap-3"
@@ -2806,7 +2821,7 @@ function EquipoTab({
               {deptUsers.map((u, rowIdx) => {
                 const isLastRow = rowIdx === deptUsers.length - 1;
                 return (
-                  <div key={u.id} className={cn("h-[72px] sm:h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
+                  <div key={u.id} className={cn("min-h-[72px] sm:min-h-[88px] grid grid-cols-7 border-b border-[#E5E5E7]", isLastRow && "border-b-0")}>
                     {weekDays.map((day, i) => {
                       const dayShifts = getUserShiftsForDay(u.id, day);
                       const dateStr = toLocalISODate(day);
@@ -3683,9 +3698,15 @@ function EquipoTab({
               {(() => {
                 const dateStr = toLocalISODate(selectedHeaderDay);
                 
-                // Obtener usuarios según el departamento seleccionado
-                const relevantUsers = selectedDepartment === 'ALL' 
-                  ? users.filter(u => u.isActive)
+                // Obtener usuarios según el departamento seleccionado (jerarquía pura en ALL)
+                const relevantUsers = selectedDepartment === 'ALL'
+                  ? Array.from(
+                      new Map(
+                        visibleDeptNames
+                          .flatMap(name => getUsersByDepartment(name))
+                          .map(u => [u.id, u])
+                      ).values()
+                    )
                   : getUsersByDepartment(selectedDepartment);
                 
                 // Obtener turnos de cada usuario para este día
@@ -3963,7 +3984,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
   const [weekOffset, setWeekOffset] = useState(0);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  // Departamentos visibles en el selector de Asignar según jerarquía + toggles de Develops
+  // Departamentos visibles en el selector de Asignar según jerarquía pura
   const visibleDepartmentOptions = useMemo(() => {
     if (!effectiveUser) return departmentOptions;
     const allowed = getVisibleDepartmentCodes(effectiveUser);
@@ -3975,6 +3996,8 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     const allowed = getVisibleDepartmentCodes(effectiveUser);
     return departmentTreeOptions.filter(d => allowed.includes(d.code));
   }, [departmentTreeOptions, effectiveUser, getVisibleDepartmentCodes]);
+
+  const visibleDeptNames = useMemo(() => visibleDepartmentOptions.map(d => d.name), [visibleDepartmentOptions]);
 
   const showAllDeptOption = useMemo(() => {
     if (!effectiveUser) return false;
@@ -4034,23 +4057,29 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   }, [weekStart]);
 
-  // Ordenar turnos cronológicamente
+  // Ordenar turnos cronológicamente (solo departamentos visibles en modo ALL)
   const availableShifts = useMemo(() => {
     if (selectedDepartment === 'ALL') {
-      // Mostrar todos los turnos de todos los departamentos
-      return sortShiftsByTime(shifts.filter(s => s.name !== 'Libre'));
+      return sortShiftsByTime(
+        shifts.filter(s => s.name !== 'Libre' && visibleDeptNames.includes(s.department))
+      );
     }
     return sortShiftsByTime(getShiftsByDepartment(selectedDepartment));
-  }, [getShiftsByDepartment, selectedDepartment, shifts]);
-  
-  // Obtener usuarios del departamento seleccionado (o todos si es 'ALL')
+  }, [getShiftsByDepartment, selectedDepartment, shifts, visibleDeptNames]);
+
+  // Obtener usuarios del departamento seleccionado (o departamentos visibles si es 'ALL')
   const deptUsers = useMemo(() => {
     if (selectedDepartment === 'ALL') {
-      // Cuando es 'ALL', mostrar todos los usuarios activos
-      return users.filter(u => u.isActive);
+      return Array.from(
+        new Map(
+          visibleDeptNames
+            .flatMap(name => getUsersByDepartment(name))
+            .map(u => [u.id, u])
+        ).values()
+      );
     }
     return getUsersByDepartment(selectedDepartment);
-  }, [users, getUsersByDepartment, selectedDepartment]);
+  }, [users, getUsersByDepartment, selectedDepartment, visibleDeptNames]);
 
   // Verificar si el usuario tiene permisos para ver usuarios de otros departamentos
   const allowedForCrossDept = effectiveUser ? getVisibleDepartmentCodes(effectiveUser) : [];
@@ -4086,23 +4115,23 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     return combined;
   }, [deptUsers, crossDeptUsers, selectedDepartment]);
   
-  // Obtener asignaciones (de todos los departamentos si es 'ALL')
+  // Obtener asignaciones (solo departamentos visibles si es 'ALL')
   const assignments = useMemo(() => {
     if (selectedDepartment === 'ALL') {
-      // En modo ALL, obtener todas las asignaciones de la semana
       const weekDates: string[] = [];
       for (let i = 0; i < 7; i++) {
         const date = addDaysToDate(weekStart, i);
         weekDates.push(format(date, 'yyyy-MM-dd'));
       }
-      return weekDates.flatMap(date => 
-        departmentCodes.flatMap(dept => 
+      const visibleDeptCodes = visibleDepartmentOptions.map(d => d.code);
+      return weekDates.flatMap(date =>
+        visibleDeptCodes.flatMap(dept =>
           getWeekAssignments(dept, weekStart).filter(a => a.date === date)
         )
       );
     }
     return getWeekAssignments(selectedDepartment, weekStart);
-  }, [getWeekAssignments, selectedDepartment, weekStart]);
+  }, [getWeekAssignments, selectedDepartment, weekStart, visibleDepartmentOptions]);
 
   const getUserAssignmentsForDay = (userId: string, date: Date): ShiftAssignment[] => {
     const dateStr = toLocalISODate(date);
@@ -7514,14 +7543,16 @@ function SolicitudesTab() {
                     </div>
 
                     {/* Quién envía y quién recibe */}
-                    <div className="mt-2 flex items-center gap-2 text-sm">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                       <span className="text-[#86868B]">De:</span>
+                      <span className="font-medium text-[#1D1D1F]">{solicitud.deCargo || 'Usuario'}</span>
+                      <span className="text-[#86868B]">—</span>
                       <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span>
-                      <span className="text-xs text-[#86868B]">({solicitud.deCargo})</span>
                       <ArrowRight className="w-4 h-4 text-[#C7C7CC]" />
                       <span className="text-[#86868B]">Para:</span>
+                      <span className="font-medium text-[#1D1D1F]">{solicitud.aCargo || 'Usuario'}</span>
+                      <span className="text-[#86868B]">—</span>
                       <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span>
-                      <span className="text-xs text-[#86868B]">({solicitud.aCargo})</span>
                     </div>
 
                     {/* Tipo de solicitud */}
@@ -7736,8 +7767,8 @@ function SolicitudesTab() {
                         );
                       })()}
                       <div>
-                        <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.de}</p>
-                        <p className="text-xs text-[#86868B]">{solicitud.deCargo || 'Voluntario'} • {solicitud.deDept || 'Dive Shop'}</p>
+                        <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.deCargo || 'Usuario'} — {solicitud.de}</p>
+                        <p className="text-xs text-[#86868B]">{solicitud.deDept || 'Dive Shop'}</p>
                       </div>
                     </div>
                     {getStatusBadge(solicitud.estado)}
@@ -7767,9 +7798,9 @@ function SolicitudesTab() {
                         <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
                         <div className="space-y-2">
                           {/* Usuario que solicita (DE) */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                                 {solicitud.deTurnoActual || solicitud.turnoActual || '-'}
                               </span>
@@ -7777,9 +7808,9 @@ function SolicitudesTab() {
                             </div>
                           </div>
                           {/* Usuario destinatario (A) */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
                                 {solicitud.aTurnoActual || '-'}
                               </span>
@@ -7793,9 +7824,9 @@ function SolicitudesTab() {
                         <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
                         <div className="space-y-2">
                           {/* Usuario que solicita (DE) */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
                                 {solicitud.deTurnoNuevo || solicitud.turnoSolicitado || '-'}
                               </span>
@@ -7803,9 +7834,9 @@ function SolicitudesTab() {
                             </div>
                           </div>
                           {/* Usuario destinatario (A) */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
                                 {solicitud.aTurnoNuevo || '-'}
                               </span>
@@ -7822,9 +7853,9 @@ function SolicitudesTab() {
                         <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
                         <div className="space-y-2">
                           {/* Usuario A */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
                                 {solicitud.deTurnoActual || 'AM'}
                               </span>
@@ -7832,9 +7863,9 @@ function SolicitudesTab() {
                             </div>
                           </div>
                           {/* Usuario B */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
                                 {solicitud.aTurnoActual || 'PM'}
                               </span>
@@ -7848,9 +7879,9 @@ function SolicitudesTab() {
                         <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
                         <div className="space-y-2">
                           {/* Usuario A */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
                                 {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
                               </span>
@@ -7858,9 +7889,9 @@ function SolicitudesTab() {
                             </div>
                           </div>
                           {/* Usuario B */}
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
+                            <div className="flex items-center gap-1 shrink-0">
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
                                 {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
                               </span>

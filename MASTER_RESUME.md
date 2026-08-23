@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 8 completada: clean login + forgot password)
+> Última actualización: 2026-08-22 (FASE 7.7 en progreso: pulido de jerarquía de departamentos y filtros ALL)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -822,6 +822,53 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 
 ---
 
+## FASE 7.7: Pulido de jerarquía de departamentos y filtros ALL
+
+**Estado:** EN PROGRESO
+
+### Objetivo
+Corregir que los dropdowns de departamentos muestren el departamento del usuario + hijos + nietos según la jerarquía real de Firestore, y que el modo **Todos** de Equipo/Asignar no muestre toda la empresa sino solo los departamentos visibles para el usuario.
+
+### Fixes de esta ronda
+- **Problema 1**: `getVisibleDepartmentCodes` en `useDynamicDepartments.ts` a veces devolvía solo el departamento propio del usuario en lugar de su subárbol completo.
+- **Corrección**:
+  - Se reescribió `getVisibleDepartmentCodes` para usar exclusivamente la jerarquía de departamentos (sin overrides manuales de `visibleDepartments` ni `permissions`).
+  - Roles con visión total (`DIRECTOR_GENERAL`, `DIRECTOR`, `RRHH`) ven todos los departamentos.
+  - `GERENTE_OPERACIONES` ve `OPERACIONES` + descendientes usando `getOperationalSubtreeCodes()`; si falla, fallback a `operationalDepartmentCodes`.
+  - Cualquier otro usuario ve su departamento + todos sus descendientes recursivos.
+  - Se agregaron logs temporales en consola para diagnosticar qué devuelve la función para cada usuario.
+- **Problema 2**: en **Horarios → Equipo** y **Horarios → Asignar**, al seleccionar **Todos** en el dropdown se mostraban todos los usuarios activos de la empresa, no solo los de los departamentos visibles.
+- **Corrección**:
+  - Se calcula `visibleDeptNames` a partir de `visibleDeptOptions` en `EquipoTab` y `AsignarTab`.
+  - En modo **ALL**, los usuarios se obtienen haciendo `flatMap` de `getUsersByDepartment(name)` sobre los departamentos visibles, eliminando duplicados por `id`.
+  - En **Asignar**, los turnos disponibles en modo **ALL** también se filtran por departamentos visibles.
+  - Las asignaciones cargadas en modo **ALL** ahora iteran solo los códigos de departamentos visibles.
+  - En el modal de día del header de **Equipo**, los usuarios relevantes en modo **ALL** se filtran por jerarquía.
+- **Problema 3**: el botón **Guardar** de notas en incidencias no funcionaba; solo se guardaban con Enter.
+- **Corrección**:
+  - Se reformateó el formulario de notas en `TasksModule.tsx` (`TaskCard` e `IncidenciaCard`) y se eliminó el `onClick` duplicado en el botón `type="submit"`, dejando solo el `onSubmit` del formulario.
+- **Problema 4**: las solicitudes de cambio de turno no mostraban claramente quién enviaba y quién recibía.
+- **Corrección**:
+  - Ahora se muestra `Rol — Nombre completo` tanto en la sección De/Para como en las columnas Antes/Después e Intercambio.
+- **Problema 5**: en **Horarios → Equipo**, las filas no se expandían verticalmente cuando un usuario tenía varios turnos, haciendo que se solaparan.
+- **Corrección**:
+  - Se cambió `h-[72px] sm:h-[88px]` a `min-h-[72px] sm:min-h-[88px]` en la columna de colaboradores y en la fila de días.
+- **Archivos modificados**:
+  - `src/hooks/firestore/useDynamicDepartments.ts`
+  - `src/components/modules/HorariosModule.tsx`
+  - `src/components/modules/TasksModule.tsx`
+  - `src/components/modules/DevelopsModule.tsx`
+- **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
+- **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Pendiente en esta fase
+- Validar que el Gerente de Operaciones vea `OPERACIONES` + hijos en **Equipo**, **Asignar**, **Tasks**, **Solicitudes** e **Incapacidades**.
+- Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos.
+- Validar que el modo **Todos** no muestre usuarios de departamentos fuera de la jerarquía.
+- Quitar logs temporales de `getVisibleDepartmentCodes` una vez validado.
+
+---
+
 ## FASE 7.5: Nuevos módulos operativos
 
 **Estado:** PENDIENTE
@@ -892,22 +939,11 @@ Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados a
 
 ### FASE 15: Integración IA (futuro)
 
-### FASE 9: Recordar usuario
-- Hacer funcional el checkbox "Recordar usuario".
-
-### FASE 10: 2 módulos reales para Dive X Surf
-- Inventario de equipos.
-- Certificaciones/buceo.
-
-### FASE 11: Toggle idioma (ES/EN)
-
-### FASE 12: Dark mode
-
-### FASE 13: Landing page waveops.app
-
-### FASE 14: Dominio wveops.app
-
-### FASE 15: Integración IA (futuro)
+### FASE 16: Revisión profunda de notificaciones
+- Auditar todas las notificaciones de la app.
+- Verificar que cada notificación llegue al usuario correcto.
+- Revisar textos, iconos y acciones de las notificaciones.
+- Validar notificaciones push/email según corresponda.
 
 ---
 

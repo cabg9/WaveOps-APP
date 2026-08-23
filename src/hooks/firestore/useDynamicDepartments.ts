@@ -176,21 +176,19 @@ export function useDynamicDepartments() {
   }, [getDepartmentSubtreeCodes]);
 
   // Departamentos que un usuario específico puede ver.
-  // Regla jerárquica pura:
+  // Regla jerárquica pura (sin overrides manuales):
   // - Roles con visión total (DG/Director/RRHH) ven todos los departamentos.
+  // - Gerente de Operaciones ve OPERACIONES + todos sus descendientes.
   // - Cualquier otro usuario ve su propio departamento + todos sus descendientes (hijos, nietos, etc.).
   // - NO ve padres, abuelos ni hermanos.
-  // - visibleDepartments actúa como override manual para casos especiales.
-  const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string; visibleDepartments?: string[]; permissions?: string[] } | null): string[] => {
+  const getVisibleDepartmentCodes = useCallback((user: { role: string; department: string } | null): string[] => {
     if (!user) return [];
 
-    // Permiso de roleTemplate para ver todos los departamentos (override)
-    if (user.permissions?.includes('canViewAllDepartments')) {
-      return departmentCodes;
-    }
+    console.log('[getVisibleDepartmentCodes] input:', { role: user.role, department: user.department });
 
     // Roles con visión total por defecto
     if (user.role === Role.DIRECTOR_GENERAL || user.role === Role.DIRECTOR || user.role === Role.RRHH) {
+      console.log('[getVisibleDepartmentCodes] visión total:', departmentCodes);
       return departmentCodes;
     }
 
@@ -198,10 +196,13 @@ export function useDynamicDepartments() {
     if (user.role === Role.GERENTE_OPERACIONES) {
       const opsCode = getOperationalSubtreeCodes();
       if (opsCode.length > 0) {
-        const extra = (user.visibleDepartments || [])
-          .map(code => normalizeDeptCode(code))
-          .filter(code => code && !opsCode.includes(code));
-        return Array.from(new Set([...opsCode, ...extra]));
+        console.log('[getVisibleDepartmentCodes] gerente op subárbol:', opsCode);
+        return opsCode;
+      }
+      // Fallback de última instancia: cualquier departamento marcado como operacional
+      if (operationalDepartmentCodes.length > 0) {
+        console.log('[getVisibleDepartmentCodes] gerente op fallback:', operationalDepartmentCodes);
+        return operationalDepartmentCodes;
       }
     }
 
@@ -210,20 +211,15 @@ export function useDynamicDepartments() {
     const userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
 
     if (!userDept) {
-      const extra = (user.visibleDepartments || []).filter(Boolean);
-      return Array.from(new Set([user.department, ...extra].filter(Boolean)));
+      console.log('[getVisibleDepartmentCodes] dept no encontrado, devolviendo:', [user.department].filter(Boolean));
+      return [user.department].filter(Boolean);
     }
 
     // Subárbol del departamento del usuario (él + descendientes)
     const visibleCodes = getDepartmentSubtreeCodes(userDept.code);
-
-    // Departamentos adicionales configurados manualmente
-    const extraCodes = (user.visibleDepartments || [])
-      .map(code => normalizeDeptCode(code))
-      .filter(code => code && code !== userDept.code);
-
-    return Array.from(new Set([...visibleCodes, ...extraCodes]));
-  }, [departmentCodes, activeDepartments, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
+    console.log('[getVisibleDepartmentCodes] subárbol usuario:', visibleCodes);
+    return visibleCodes;
+  }, [departmentCodes, activeDepartments, operationalDepartmentCodes, getOperationalSubtreeCodes, getDepartmentSubtreeCodes]);
 
   const isProtectedDepartment = useCallback((code: string): boolean => {
     return code === OPERATIONS_CODE || code === ADMIN_CODE;
