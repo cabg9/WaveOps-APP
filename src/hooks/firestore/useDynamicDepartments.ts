@@ -209,6 +209,7 @@ export function useDynamicDepartments() {
     // Encontrar el departamento del usuario por código o por nombre
     const userDeptCode = normalizeDeptCode(user.department || '');
     const userDept = activeDepartments.find(d => d.code === userDeptCode || d.name === user.department);
+    console.log('[getVisibleDepartmentCodes] userDeptCode:', userDeptCode, 'userDept:', userDept ? { code: userDept.code, name: userDept.name, parentId: userDept.parentId } : null);
 
     if (!userDept) {
       console.log('[getVisibleDepartmentCodes] dept no encontrado, devolviendo:', [user.department].filter(Boolean));
@@ -235,6 +236,12 @@ export function useDynamicDepartments() {
     };
     return buildTree(null);
   }, [activeDepartments]);
+
+  // Log de diagnóstico para jerarquía (temporal)
+  useMemo(() => {
+    console.log('[useDynamicDepartments] activeDepartments:', activeDepartments.map(d => ({ code: d.code, name: d.name, parentId: d.parentId })));
+    console.log('[useDynamicDepartments] departmentTree:', departmentTree.map(d => ({ code: d.code, name: d.name, children: d.children?.map(c => c.code) })));
+  }, [activeDepartments, departmentTree]);
 
   // Opciones planas con nivel jerárquico para selects (ej: ── Hijo)
   const departmentTreeOptions = useMemo(() => {

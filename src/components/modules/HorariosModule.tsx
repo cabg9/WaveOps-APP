@@ -61,6 +61,7 @@ import {
   RotateCcw,
   ChevronDown,
   ArrowRight,
+  ArrowDown,
   RefreshCw,
 } from 'lucide-react';
 import { Layout } from '@/components/Layout';
@@ -7084,6 +7085,181 @@ function SolicitudesTab() {
     };
   }, [todasSolicitudes, currentUser, currentUserId, equipoDeptFilter, visibleDeptCodes]);
 
+  // Componente reutilizable para tarjetas de solicitudes de cambio de turno
+  const SolicitudCambioCard = ({
+    solicitud,
+    headerUserId,
+    headerName,
+    headerCargo,
+    headerDept,
+    actions,
+  }: {
+    solicitud: Solicitud;
+    headerUserId?: string;
+    headerName: string;
+    headerCargo?: string;
+    headerDept?: string;
+    actions?: React.ReactNode;
+  }) => {
+    const headerUser = users.find((u) => u.id === headerUserId);
+    const deUser = users.find((u) => u.id === solicitud.deId || u.email === solicitud.deId);
+    const aUser = users.find((u) => u.id === solicitud.aId || u.email === solicitud.aId);
+
+    const TurnoInfo = ({
+      label,
+      userName,
+      cargo,
+      turno,
+      horario,
+      color,
+    }: {
+      label: string;
+      userName: string;
+      cargo?: string;
+      turno?: string;
+      horario?: string;
+      color: 'blue' | 'purple' | 'green' | 'amber';
+    }) => {
+      const colorClasses = {
+        blue: 'bg-blue-100 text-blue-700',
+        purple: 'bg-purple-100 text-purple-700',
+        green: 'bg-green-100 text-green-700',
+        amber: 'bg-amber-100 text-amber-700',
+      };
+      return (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-[#86868B]">
+            {label}: <span className="font-medium text-[#1D1D1F]">{userName}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClasses[color]}`}>
+              {turno || '-'}
+            </span>
+            {horario && horario !== '--:--' && (
+              <span className="text-xs text-[#86868B]">{horario}</span>
+            )}
+          </div>
+        </div>
+      );
+    };
+
+    return (
+      <div className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <UserAvatar
+              name={headerName}
+              photoUrl={headerUser?.photoURL || headerUser?.avatar}
+              size="md"
+              fallbackClassName="bg-corporate text-sm"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-[#1D1D1F] truncate">{headerName}</p>
+              <p className="text-xs text-[#86868B] truncate">
+                {headerCargo || 'Usuario'} • {getDeptName(headerDept || '') || 'Departamento no especificado'}
+              </p>
+            </div>
+          </div>
+          {getStatusBadge(solicitud.estado)}
+        </div>
+
+        {/* Solicita / Con */}
+        <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <UserAvatar
+              name={solicitud.de}
+              photoUrl={deUser?.photoURL || deUser?.avatar}
+              size="sm"
+              fallbackClassName="bg-corporate text-xs"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-[#86868B]">Solicita</p>
+              <p className="text-sm font-medium text-[#1D1D1F] truncate">{solicitud.de}</p>
+              <p className="text-xs text-[#86868B] truncate">{solicitud.deCargo} • {getDeptName(solicitud.deDept || '')}</p>
+            </div>
+          </div>
+          <ArrowRight className="w-4 h-4 text-[#C7C7CC] hidden sm:block flex-shrink-0" />
+          <ArrowDown className="w-4 h-4 text-[#C7C7CC] sm:hidden flex-shrink-0 self-center" />
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <UserAvatar
+              name={solicitud.a}
+              photoUrl={aUser?.photoURL || aUser?.avatar}
+              size="sm"
+              fallbackClassName="bg-corporate text-xs"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-[#86868B]">Con</p>
+              <p className="text-sm font-medium text-[#1D1D1F] truncate">{solicitud.a}</p>
+              <p className="text-xs text-[#86868B] truncate">{solicitud.aCargo} • {getDeptName(solicitud.aDept || '')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Fecha y tipo */}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
+            {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-sm text-[#1D1D1F] bg-[#F5F5F7]">
+            <Calendar className="w-3.5 h-3.5 text-[#86868B]" />
+            {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
+          </span>
+        </div>
+
+        {/* Turnos */}
+        {solicitud.tipo === 'cambio' ? (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
+              <p className="text-xs font-medium text-[#86868B] uppercase tracking-wide">Antes</p>
+              <TurnoInfo label="De" userName={solicitud.de} cargo={solicitud.deCargo} turno={solicitud.deTurnoActual || solicitud.turnoActual} horario={solicitud.deHorarioActual || solicitud.horarioActual} color="blue" />
+              <TurnoInfo label="Para" userName={solicitud.a} cargo={solicitud.aCargo} turno={solicitud.aTurnoActual} horario={solicitud.aHorarioActual} color="purple" />
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 border border-green-100 space-y-3">
+              <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Después</p>
+              <TurnoInfo label="De" userName={solicitud.de} cargo={solicitud.deCargo} turno={solicitud.deTurnoNuevo || solicitud.turnoSolicitado} horario={solicitud.deHorarioNuevo || solicitud.horarioSolicitado} color="green" />
+              <TurnoInfo label="Para" userName={solicitud.a} cargo={solicitud.aCargo} turno={solicitud.aTurnoNuevo} horario={solicitud.aHorarioNuevo} color="amber" />
+            </div>
+          </div>
+        ) : solicitud.tipo === 'intercambio' ? (
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="bg-[#F5F5F7] rounded-lg p-3 space-y-3">
+              <p className="text-xs font-medium text-[#86868B] uppercase tracking-wide">Antes</p>
+              <TurnoInfo label="Usuario A" userName={solicitud.de} cargo={solicitud.deCargo} turno={solicitud.deTurnoActual || 'AM'} horario={solicitud.deHorarioActual || '09:00-13:00'} color="blue" />
+              <TurnoInfo label="Usuario B" userName={solicitud.a} cargo={solicitud.aCargo} turno={solicitud.aTurnoActual || 'PM'} horario={solicitud.aHorarioActual || '12:30-20:30'} color="purple" />
+            </div>
+            <div className="bg-green-50 rounded-lg p-3 border border-green-100 space-y-3">
+              <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Después</p>
+              <TurnoInfo label="Usuario A" userName={solicitud.de} cargo={solicitud.deCargo} turno={solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'} horario={solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'} color="green" />
+              <TurnoInfo label="Usuario B" userName={solicitud.a} cargo={solicitud.aCargo} turno={solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'} horario={solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'} color="amber" />
+            </div>
+          </div>
+        ) : null}
+
+        {/* Historial */}
+        {(solicitud.historial && solicitud.historial.length > 0) && (
+          <div className="mt-4 pt-3 border-t border-[#E5E5E7]">
+            <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial</p>
+            <div className="space-y-1 max-h-32 overflow-y-auto bg-[#F5F5F7] rounded-lg p-2">
+              {solicitud.historial.map((item, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs">
+                  <span className="text-[#86868B] whitespace-nowrap">
+                    {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <span className="text-[#1D1D1F]">- {item.accion}</span>
+                  {item.motivo && <span className="text-[#86868B] italic">({item.motivo})</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Acciones */}
+        {actions && <div className="mt-4 flex gap-2 justify-end">{actions}</div>}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4">
       {/* Header con pestañas y filtros */}
@@ -7506,215 +7682,17 @@ function SolicitudesTab() {
                 <p className="text-[#86868B]">No hay solicitudes {misCambiosFilter}</p>
               </div>
             ) : (
-              getFilteredMisCambios().map((solicitud) => {
-                // Determinar el nombre y cargo a mostrar según el filtro
-                const displayName = misCambiosFilter === 'recibidas' ? solicitud.de : 
-                                   misCambiosFilter === 'enviadas' ? solicitud.a : solicitud.de;
-                const displayCargo = misCambiosFilter === 'recibidas' ? solicitud.deCargo : 
-                                    misCambiosFilter === 'enviadas' ? solicitud.aCargo : solicitud.deCargo;
-                const displayDept = misCambiosFilter === 'recibidas' ? solicitud.deDept : 
-                                   misCambiosFilter === 'enviadas' ? solicitud.aDept : solicitud.deDept;
-                
-                return (
-                  <div
-                    key={solicitud.id}
-                    className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
-                  >
-                    {/* Header: Avatar + Nombre + Cargo + Estado */}
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3">
-                        {(() => {
-                          const displayUserId = misCambiosFilter === 'enviadas' ? solicitud.aId : solicitud.deId;
-                          const displayUser = users.find((u) => u.id === displayUserId);
-                          return (
-                            <UserAvatar
-                              name={displayName}
-                              photoUrl={displayUser?.photoURL || displayUser?.avatar}
-                              size="md"
-                              fallbackClassName="bg-corporate text-sm"
-                            />
-                          );
-                        })()}
-                        <div>
-                          <p className="text-sm font-medium text-[#1D1D1F]">{displayName}</p>
-                          <p className="text-xs text-[#86868B]">{displayCargo || 'Voluntario'} • {displayDept || 'Dive Shop'}</p>
-                        </div>
-                      </div>
-                      {getStatusBadge(solicitud.estado)}
-                    </div>
-
-                    {/* Quién envía y quién recibe */}
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                      <span className="text-[#86868B]">De:</span>
-                      <span className="font-medium text-[#1D1D1F]">{solicitud.deCargo || 'Usuario'}</span>
-                      <span className="text-[#86868B]">—</span>
-                      <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span>
-                      <ArrowRight className="w-4 h-4 text-[#C7C7CC]" />
-                      <span className="text-[#86868B]">Para:</span>
-                      <span className="font-medium text-[#1D1D1F]">{solicitud.aCargo || 'Usuario'}</span>
-                      <span className="text-[#86868B]">—</span>
-                      <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span>
-                    </div>
-
-                    {/* Tipo de solicitud */}
-                    <div className="mt-3">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
-                        {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
-                      </span>
-                    </div>
-                    
-                    {/* Fecha del cambio */}
-                    <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
-                      <Calendar className="w-4 h-4 text-[#86868B]" />
-                      <span className="text-[#86868B]">Fecha del cambio:</span>
-                      <span className="font-medium">
-                        {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                      </span>
-                    </div>
-                    
-                    {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
-                    {solicitud.tipo === 'cambio' ? (
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Columna ANTES */}
-                        <div className="bg-[#F5F5F7] rounded-lg p-3">
-                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario que solicita (DE) */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                  {solicitud.deTurnoActual || solicitud.turnoActual || '-'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual || '--:--'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario destinatario (A) */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                  {solicitud.aTurnoActual || '-'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '--:--'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Columna DESPUÉS */}
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario que solicita (DE) */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                  {solicitud.deTurnoNuevo || solicitud.turnoSolicitado || '-'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado || '--:--'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario destinatario (A) */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                                  {solicitud.aTurnoNuevo || '-'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || '--:--'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : solicitud.tipo === 'intercambio' ? (
-                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {/* Columna ANTES */}
-                        <div className="bg-[#F5F5F7] rounded-lg p-3">
-                          <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario A */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                  {solicitud.deTurnoActual || 'AM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario B */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                  {solicitud.aTurnoActual || 'PM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        {/* Columna DESPUÉS */}
-                        <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                          <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                          <div className="space-y-2">
-                            {/* Usuario A */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.de.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                  {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
-                              </div>
-                            </div>
-                            {/* Usuario B */}
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-[#86868B]">{solicitud.a.split(' ')[0]}:</span>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                  {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
-                                </span>
-                                <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : null}
-                    
-                    {/* Footer: Historial completo del cambio */}
-                    <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
-                      <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
-                      <div className="space-y-1">
-                        {(solicitud.historial || []).map((item, idx) => (
-                          <div key={idx} className="flex items-start gap-2 text-xs">
-                            <span className="text-[#86868B] whitespace-nowrap">
-                              {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span className="text-[#1D1D1F]">- {item.accion}</span>
-                            {item.motivo && (
-                              <span className="text-[#86868B] italic">({item.motivo})</span>
-                            )}
-                          </div>
-                        ))}
-                        {/* Fallback si no hay historial */}
-                        {(!solicitud.historial || solicitud.historial.length === 0) && (
-                          <div className="flex items-center justify-between text-xs text-[#86868B]">
-                            <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                            {solicitud.fechaRespuesta && (
-                              <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Botones de acción para recibidas pendientes - MÁS CORTOS */}
-                    {solicitud.estado === 'pendiente' && misCambiosFilter === 'recibidas' && (
-                      <div className="mt-3 flex gap-2 justify-end">
+              getFilteredMisCambios().map((solicitud) => (
+                <SolicitudCambioCard
+                  key={solicitud.id}
+                  solicitud={solicitud}
+                  headerUserId={misCambiosFilter === 'enviadas' ? solicitud.aId : solicitud.deId}
+                  headerName={misCambiosFilter === 'enviadas' ? solicitud.a : misCambiosFilter === 'recibidas' ? solicitud.de : solicitud.de}
+                  headerCargo={misCambiosFilter === 'enviadas' ? solicitud.aCargo : misCambiosFilter === 'recibidas' ? solicitud.deCargo : solicitud.deCargo}
+                  headerDept={misCambiosFilter === 'enviadas' ? solicitud.aDept : misCambiosFilter === 'recibidas' ? solicitud.deDept : solicitud.deDept}
+                  actions={
+                    solicitud.estado === 'pendiente' && misCambiosFilter === 'recibidas' ? (
+                      <>
                         <button
                           onClick={async () => { await handleAcceptSolicitud(solicitud); }}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
@@ -7729,11 +7707,11 @@ function SolicitudesTab() {
                           <X className="w-4 h-4" />
                           Rechazar
                         </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                      </>
+                    ) : undefined
+                  }
+                />
+              ))
             )}
           </div>
       ) : (
@@ -7749,192 +7727,16 @@ function SolicitudesTab() {
               </div>
             ) : (
               getFilteredEquipo().map((solicitud) => (
-                <div
+                <SolicitudCambioCard
                   key={solicitud.id}
-                  className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
-                >
-                  {/* Header: Avatar + Nombre + Cargo + Estado */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      {(() => {
-                        const displayUser = users.find((u) => u.id === solicitud.deId);
-                        return (
-                          <UserAvatar
-                            name={solicitud.de}
-                            photoUrl={displayUser?.photoURL || displayUser?.avatar}
-                            size="md"
-                            fallbackClassName="bg-corporate text-sm"
-                          />
-                        );
-                      })()}
-                      <div>
-                        <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.deCargo || 'Usuario'} — {solicitud.de}</p>
-                        <p className="text-xs text-[#86868B]">{getDeptName(solicitud.deDept || '') || 'Departamento no especificado'}</p>
-                      </div>
-                    </div>
-                    {getStatusBadge(solicitud.estado)}
-                  </div>
-                  
-                  {/* Tipo de solicitud */}
-                  <div className="mt-3">
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
-                      {solicitud.tipo === 'cambio' ? 'Cambio de turno' : 'Intercambio'}
-                    </span>
-                  </div>
-                  
-                  {/* Fecha del cambio */}
-                  <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
-                    <Calendar className="w-4 h-4 text-[#86868B]" />
-                    <span className="text-[#86868B]">Fecha del cambio:</span>
-                    <span className="font-medium">
-                      {new Date(solicitud.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}
-                    </span>
-                  </div>
-                  
-                  {/* Grid de turnos - ANTES vs DESPUÉS - AMBOS USUARIOS */}
-                  {solicitud.tipo === 'cambio' ? (
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Columna ANTES */}
-                      <div className="bg-[#F5F5F7] rounded-lg p-3">
-                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario que solicita (DE) */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                {solicitud.deTurnoActual || solicitud.turnoActual || '-'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || solicitud.horarioActual || '--:--'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario destinatario (A) */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                {solicitud.aTurnoActual || '-'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '--:--'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Columna DESPUÉS */}
-                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario que solicita (DE) */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                {solicitud.deTurnoNuevo || solicitud.turnoSolicitado || '-'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.horarioSolicitado || '--:--'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario destinatario (A) */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
-                                {solicitud.aTurnoNuevo || '-'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || '--:--'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : solicitud.tipo === 'intercambio' ? (
-                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {/* Columna ANTES */}
-                      <div className="bg-[#F5F5F7] rounded-lg p-3">
-                        <p className="text-xs font-medium text-[#86868B] mb-2 uppercase tracking-wide">Antes del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario A */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                {solicitud.deTurnoActual || 'AM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioActual || '09:00-13:00'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario B */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                {solicitud.aTurnoActual || 'PM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioActual || '12:30-20:30'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      {/* Columna DESPUÉS */}
-                      <div className="bg-green-50 rounded-lg p-3 border border-green-100">
-                        <p className="text-xs font-medium text-green-600 mb-2 uppercase tracking-wide">Después del cambio</p>
-                        <div className="space-y-2">
-                          {/* Usuario A */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.deCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.de}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-                                {solicitud.deTurnoNuevo || solicitud.aTurnoActual || 'PM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.deHorarioNuevo || solicitud.aHorarioActual || '12:30-20:30'})</span>
-                            </div>
-                          </div>
-                          {/* Usuario B */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs text-[#86868B] shrink-0">{solicitud.aCargo || 'Usuario'}: <span className="font-medium text-[#1D1D1F]">{solicitud.a}</span></span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
-                                {solicitud.aTurnoNuevo || solicitud.deTurnoActual || 'AM'}
-                              </span>
-                              <span className="text-xs text-[#86868B]">({solicitud.aHorarioNuevo || solicitud.deHorarioActual || '09:00-13:00'})</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : null}
-                  
-                  {/* Footer: Historial completo del cambio */}
-                  <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
-                    <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
-                    <div className="space-y-1">
-                      {(solicitud.historial || []).map((item, idx) => (
-                        <div key={idx} className="flex items-start gap-2 text-xs">
-                          <span className="text-[#86868B] whitespace-nowrap">
-                            {new Date(item.fecha).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(item.fecha).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <span className="text-[#1D1D1F]">- {item.accion}</span>
-                          {item.motivo && (
-                            <span className="text-[#86868B] italic">({item.motivo})</span>
-                          )}
-                        </div>
-                      ))}
-                      {/* Fallback si no hay historial */}
-                      {(!solicitud.historial || solicitud.historial.length === 0) && (
-                        <div className="flex items-center justify-between text-xs text-[#86868B]">
-                          <span>Solicitado: {new Date(solicitud.fechaSolicitud).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaSolicitud).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                          {solicitud.fechaRespuesta && (
-                            <span>{solicitud.estado === 'aceptada' ? 'Aceptado:' : 'Rechazado:'} {new Date(solicitud.fechaRespuesta).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} {new Date(solicitud.fechaRespuesta).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Botón Deshacer cambio - solo para solicitudes aceptadas y usuarios con permisos */}
-                  {solicitud.estado === 'aceptada' && canUndoChanges && (
-                    <div className="mt-3 flex justify-end">
-                      <button 
+                  solicitud={solicitud}
+                  headerUserId={solicitud.deId}
+                  headerName={solicitud.de}
+                  headerCargo={solicitud.deCargo}
+                  headerDept={solicitud.deDept}
+                  actions={
+                    solicitud.estado === 'aceptada' && canUndoChanges ? (
+                      <button
                         onClick={() => {
                           setSelectedSolicitud(solicitud);
                           setShowUndoModal(true);
@@ -7944,9 +7746,9 @@ function SolicitudesTab() {
                         <History className="w-4 h-4" />
                         Deshacer cambio
                       </button>
-                    </div>
-                  )}
-                </div>
+                    ) : undefined
+                  }
+                />
               ))
             )}
           </div>

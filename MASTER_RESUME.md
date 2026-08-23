@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.7 en progreso: fix modo Todos, notas táctiles y nombre de departamento en cambios)
+> Última actualización: 2026-08-22 (FASE 7.7 en progreso: rediseño de tarjetas de cambio de turno y notas con Enter)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -864,6 +864,21 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Problema 8**: en el header de las tarjetas de solicitud de cambio de turno aparecía el código del departamento (ej. `DIVE_SHOP`) en lugar del nombre legible.
 - **Corrección**:
   - Se reemplazó `{solicitud.deDept || 'Dive Shop'}` por `{getDeptName(solicitud.deDept || '') || 'Departamento no especificado'}`.
+- **Problema 9**: los botones **Guardar** y **Cancelar** de notas en tareas e incidencias seguían sin responder bien en touch; el usuario prefirió eliminarlos y guardar solo con Enter.
+- **Corrección**:
+  - Se quitaron los botones **Guardar** y **Cancelar** del formulario de notas en `TaskCard` e `IncidenciaCard`.
+  - Ahora el input de notas se guarda con **Enter** y se cancela con **Escape**; se agregó un hint visual debajo del input.
+- **Problema 10**: las tarjetas de solicitudes de cambio de turno tenían textos, nombres y departamentos que se salían de los bordes; el diseño no era claro.
+- **Corrección**:
+  - Se creó el componente interno `SolicitudCambioCard` dentro de `SolicitudesTab`.
+  - Nuevo diseño:
+    - Header compacto con avatar, nombre, cargo/departamento y badge de estado.
+    - Sección "Solicita / Con" con avatares, nombres, cargos y departamentos en dos columnas (apiladas en móvil).
+    - Fecha y tipo de solicitud como badges separados.
+    - Turnos "Antes" y "Después" en dos cajas, cada una con filas por usuario (nombre, cargo, turno, horario), sin usar `justify-between` para evitar desbordes.
+    - Historial en contenedor scrolleable.
+    - Acciones (Aceptar/Rechazar o Deshacer) al final de la tarjeta.
+  - Se aplicó el mismo componente a **Mis Cambios** (Recibidas, Enviadas, Historial) y a **Equipo**.
 - **Archivos modificados**:
   - `src/hooks/firestore/useDynamicDepartments.ts`
   - `src/components/modules/HorariosModule.tsx`
@@ -874,7 +889,7 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 
 ### Pendiente en esta fase
 - Validar que el Gerente de Operaciones vea `OPERACIONES` + hijos en **Equipo**, **Asignar**, **Tasks**, **Solicitudes** e **Incapacidades**.
-- Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos.
+- Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
 - Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.
 - Quitar logs temporales de `getVisibleDepartmentCodes` una vez validado.
 
