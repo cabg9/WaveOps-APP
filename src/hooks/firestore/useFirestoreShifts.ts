@@ -166,7 +166,8 @@ export function useFirestoreShifts() {
 
   // Obtener turnos por departamento
   const getShiftsByDepartment = useCallback((department: string) => {
-    return allShifts.filter(s => s.department === department);
+    const targetCode = normalizeDeptCode(department);
+    return allShifts.filter(s => normalizeDeptCode(s.department || '') === targetCode);
   }, [allShifts]);
   // Obtener turno por ID
   const getShiftById = useCallback((id: string): any => {

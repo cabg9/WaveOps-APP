@@ -2875,7 +2875,7 @@ function EquipoTab({
                               {dayShifts.length > 0 && (
                                 <div className="space-y-1">
                                   {dayShifts.map((shift, idx) => {
-                                    const isCrossDept = shift.department !== u.department;
+                                    const isCrossDept = normalizeDeptCode(shift.department || '') !== normalizeDeptCode(u.department || '');
                                     return (
                                       <div
                                         key={idx}
@@ -3243,7 +3243,7 @@ function EquipoTab({
                                     <span className="text-xs text-[#86868B]">
                                       {shift.startTime}-{shift.endTime}
                                     </span>
-                                    {shift.department !== selectedUser.department && (
+                                    {normalizeDeptCode(shift.department || '') !== normalizeDeptCode(selectedUser.department || '') && (
                                       <DeptIcon department={shift.department} className="w-3 h-3 text-amber-500" />
                                     )}
                                   </div>
@@ -3393,7 +3393,7 @@ function EquipoTab({
                   return dayShifts.length > 0 ? (
                     <div className="space-y-2">
                       {dayShifts.map((shift, i) => {
-                        const isCrossDept = shift.department !== selectedDayInfo.user.department;
+                        const isCrossDept = normalizeDeptCode(shift.department || '') !== normalizeDeptCode(selectedDayInfo.user.department || '');
                         return (
                           <div 
                             key={i}

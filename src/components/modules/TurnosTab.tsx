@@ -173,7 +173,7 @@ export function TurnosTab() {
 
   const filteredShifts = filterDept === 'all'
     ? allShifts
-    : allShifts.filter(s => s.department === filterDept);
+    : allShifts.filter(s => normalizeDeptCode(s.department || '') === normalizeDeptCode(filterDept || ''));
 
   // ── Detalle del turno ──
   const openDetail = (shift: Shift) => {

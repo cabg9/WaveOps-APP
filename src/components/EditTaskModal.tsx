@@ -17,7 +17,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Section } from "@/components/ui/Section";
 import { Task, TaskPriority, Subtask } from "@/types";
-import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
+import { useDynamicDepartments, normalizeDeptCode } from "@/hooks/firestore/useDynamicDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
 import { cn } from "@/lib/utils";
 
@@ -95,9 +95,9 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
 
   if (!task) return null;
 
-  const deptUsers = allUsers.filter((u) => u.department === department && u.isActive !== false);
+  const deptUsers = allUsers.filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(department || '') && u.isActive !== false);
   const supervisors = deptUsers.filter((u) => u.role === "SUPERVISOR" || u.role === "GERENTE_DEPARTAMENTO");
-  const supportDeptUsers = supportDepartment ? allUsers.filter((u) => u.department === supportDepartment && u.isActive !== false) : [];
+  const supportDeptUsers = supportDepartment ? allUsers.filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(supportDepartment || '') && u.isActive !== false) : [];
 
   const toggleAssigned = (uid: string) => {
     if (!canEditAll) return;

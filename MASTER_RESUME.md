@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de alcance de Gerente de Operaciones)
+> Última actualización: 2026-08-23 (FASE 7.7 en progreso: normalización de comparaciones de departamento completada)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -970,11 +970,38 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
 
+### Fixes de esta ronda (normalización de comparaciones de departamento)
+- **Problema**: aunque `getVisibleDepartmentCodes` ya devolvía el subárbol correcto para cada rol, varias comparaciones de departamento en `TasksModule`, `HorariosModule` y `useShifts` seguían usando comparaciones directas (`===`) sin normalizar. Esto provocaba que, según el formato en que estuviera guardado el departamento en Firestore (código, nombre legible, con/sin espacios, mayúsculas/minúsculas), el Gerente de Operaciones o un gerente de departamento no vieran correctamente sus tareas, usuarios o asignaciones.
+- **Corrección**:
+  - `src/components/modules/TasksModule.tsx`:
+    - Filtrado de **Mi Depto** y **Todas** normalizado con `normalizeDeptCode`.
+    - Listas de supervisores, usuarios asignados y usuarios de apoyo filtradas por departamento normalizado.
+    - Turnos disponibles para tarea específica filtrados por departamento normalizado.
+  - `src/components/modules/HorariosModule.tsx`:
+    - Detección de colaboradores de otros departamentos en **Asignar** normalizada.
+    - Indicadores de cross-department en filas y turnos de **Asignar** normalizados.
+    - Filtros de departamento en **Solicitudes → Cambios** y **Solicitudes → Solicitudes** normalizados.
+  - `src/hooks/useShifts.tsx`:
+    - `getShiftsByDepartment`, `getWeekAssignments`, `getDepartmentShifts` y `getUsersOnShift` ahora usan `normalizeDeptCode` de forma consistente en lugar de reemplazos manuales parciales.
+  - `src/hooks/useTasks.tsx`:
+    - `getTasks` y `getTasksByDepartment` filtran por departamento normalizado.
+  - `src/hooks/firestore/useFirestoreShifts.ts`:
+    - `getShiftsByDepartment` filtra por departamento normalizado.
+  - `src/components/EditTaskModal.tsx`:
+    - Usuarios del departamento y usuarios de apoyo filtrados por departamento normalizado.
+  - `src/components/modules/TurnosTab.tsx`:
+    - Filtro de turnos por departamento normalizado.
+  - `src/components/modules/DepartamentosTab.tsx`:
+    - Usuarios del departamento y plantillas de tareas específicas filtradas por departamento normalizado.
+  - `src/components/modules/HorariosModule.tsx` (adicional):
+    - Indicadores cross-department en modales de **Equipo** (colaborador, día y header) normalizados.
+- **Resultado**: el Gerente de Operaciones ve de forma confiable solo `OPERACIONES` y sus departamentos hijos en **Equipo**, **Asignar** y **Tasks**, independientemente de cómo estén escritos los departamentos en Firestore. Los gerentes de departamento y supervisores también ven correctamente su subárbol jerárquico. El filtrado por departamento es robusto en todo el módulo de Horarios, Tasks, Turnos y Departamentos.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+
 ### Pendiente en esta fase
-- Validar que el Gerente de Operaciones vea `OPERACIONES` + hijos en **Equipo**, **Asignar**, **Tasks**, **Solicitudes** e **Incapacidades**.
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
 - Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.
-- Quitar logs temporales de `getVisibleDepartmentCodes` una vez validado.
+- Logs temporales de `getVisibleDepartmentCodes` ya no están presentes.
 
 ---
 

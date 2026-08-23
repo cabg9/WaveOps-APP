@@ -184,12 +184,12 @@ export function DepartamentosTab() {
   };
 
   const startEditUser = (u: any) => { setEditingUserId(u.id); setEditRole(u.role || ""); setEditLevel(u.level || 7); setEditPosition(u.position || ""); };
-  const getDeptUsers = (dept: any) => users.filter((u: any) => (u.department === dept.code || u.department === dept.name) && u.isActive !== false);
+  const getDeptUsers = (dept: any) => users.filter((u: any) => normalizeDeptCode(u.department || '') === normalizeDeptCode(dept.code || dept.name || '') && u.isActive !== false);
 
   const deptTemplates = useMemo(() => {
     if (!selectedDept) return [];
     return templates
-      .filter((t: any) => t.department === selectedDept.code && t.isActive !== false)
+      .filter((t: any) => normalizeDeptCode(t.department || '') === normalizeDeptCode(selectedDept?.code || '') && t.isActive !== false)
       .sort((a: any, b: any) => (a.title || "").localeCompare(b.title || ""));
   }, [templates, selectedDept]);
 

@@ -57,7 +57,8 @@ export function TasksProvider({ children }: TasksProviderProps) {
     getTasks: (filters?: any) => {
       let result = [...tasksHook.tasks];
       if (filters?.department) {
-        result = result.filter((t: any) => t.department === filters.department);
+        const targetCode = normalizeDeptCode(filters.department);
+        result = result.filter((t: any) => normalizeDeptCode(t.department || '') === targetCode);
       }
       if (filters?.status) {
         result = result.filter((t: any) => t.status === filters.status);
@@ -72,7 +73,10 @@ export function TasksProvider({ children }: TasksProviderProps) {
 
     getTasksByUser: (userId: string) => tasksHook.tasks.filter((t: any) => t.assignedTo?.includes(userId)),
 
-    getTasksByDepartment: (department: string) => tasksHook.tasks.filter((t: any) => t.department === department),
+    getTasksByDepartment: (department: string) => {
+      const targetCode = normalizeDeptCode(department);
+      return tasksHook.tasks.filter((t: any) => normalizeDeptCode(t.department || '') === targetCode);
+    },
 
     getTasksByStatus: (status: TaskStatus) => tasksHook.tasks.filter((t: any) => t.status === status),
 
