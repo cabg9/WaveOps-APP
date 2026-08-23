@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (Notas → Recordatorios Apple Reminders style + integración real con Tasks)
+> Última actualización: 2026-08-23 (ajustes de Recordatorios: diseño minimalista, listas, etiquetas, vista tarjetas/lista)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -32,6 +32,18 @@
   - TasksModule precarga título, descripción, subtareas, fecha y prioridad.
   - Al guardar, el recordatorio se marca como `converted` y desaparece de Recordatorios.
 - **Índice Firestore**: se agregó índice compuesto para `notes` (`userId ASC`, `updatedAt DESC`).
+
+### Ajustes posteriores (diseño minimalista y usabilidad)
+- **Icono**: cambiado a `CheckSquare`.
+- **Categorías**: se eliminó "Personal"; ahora son Hoy, Programados, Todos, Indicador, Urgente, Terminados.
+- **Editor simplificado**: se quitaron URL y Ubicación.
+- **Selector de listas**: botones para elegir entre listas existentes o crear una nueva.
+- **Filtro por lista**: botones arriba del listado para filtrar recordatorios.
+- **Imagen**: se cambió el campo URL por un botón de carga de foto a Firebase Storage.
+- **Etiquetas**: input con chips, se agregan con Enter y se eliminan individualmente.
+- **Vista tarjetas/lista**: toggle para cambiar entre tarjetas expandibles y lista compacta.
+- **Diseño minimalista**: colores corporativos, tarjetas blancas limpias, badges sutiles, progreso discreto.
+- **Renderizado en tiempo real**: se normalizaron `createdAt`/`updatedAt` a strings ISO para evitar problemas de ordenamiento mixto en Firestore.
 
 ### Archivos modificados
 - `src/hooks/firestore/useFirestoreNotes.ts` → eliminado.

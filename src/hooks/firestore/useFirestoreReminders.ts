@@ -182,8 +182,8 @@ export function useFirestoreReminders(userId: string | undefined) {
             at: now,
           },
         ],
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: now,
+        updatedAt: now,
       } as DocumentData);
       return docRef.id;
     } catch (err: any) {

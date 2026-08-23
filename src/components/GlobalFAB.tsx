@@ -8,7 +8,7 @@ import {
   X,
   Lightbulb,
   Flag,
-  StickyNote,
+  CheckSquare,
   ChevronLeft,
   Circle,
   CheckCircle2,
@@ -18,18 +18,18 @@ import {
   Clock,
   Bell,
   Hash,
-  MapPin,
   Image as ImageIcon,
+  Loader2,
   List,
   Info,
   ChevronRight,
   CalendarDays,
   CalendarCheck,
-  CheckSquare,
   LayoutList,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreReminders, ReminderItem, FirestoreReminder } from '@/hooks/firestore/useFirestoreReminders';
+import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { db } from '@/firebase-config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { hasPermission } from '@/lib/permissions-config';
@@ -125,14 +125,235 @@ function formatReminderDate(dueDate?: string, hasTime?: boolean, dueTime?: strin
 }
 
 const CATEGORIES = [
-  { id: 'today', label: 'Hoy', icon: CalendarDays, color: 'bg-[#007AFF]', countKey: 'today' },
-  { id: 'scheduled', label: 'Programados', icon: Calendar, color: 'bg-[#FF9500]', countKey: 'scheduled' },
-  { id: 'all', label: 'Todos', icon: LayoutList, color: 'bg-[#5856D6]', countKey: 'all' },
-  { id: 'flagged', label: 'Indicador', icon: Flag, color: 'bg-[#FF3B30]', countKey: 'flagged' },
-  { id: 'urgent', label: 'Urgente', icon: Bell, color: 'bg-[#FF2D55]', countKey: 'urgent' },
-  { id: 'completed', label: 'Terminados', icon: CheckSquare, color: 'bg-[#34C759]', countKey: 'completed' },
-  { id: 'personal', label: 'Personal', icon: List, color: 'bg-[#8E8E93]', countKey: 'personal' },
+  { id: 'today', label: 'Hoy', icon: CalendarDays, color: 'bg-corporate', countKey: 'today' },
+  { id: 'scheduled', label: 'Programados', icon: Calendar, color: 'bg-amber-500', countKey: 'scheduled' },
+  { id: 'all', label: 'Todos', icon: LayoutList, color: 'bg-slate-600', countKey: 'all' },
+  { id: 'flagged', label: 'Indicador', icon: Flag, color: 'bg-rose-500', countKey: 'flagged' },
+  { id: 'urgent', label: 'Urgente', icon: Bell, color: 'bg-red-500', countKey: 'urgent' },
+  { id: 'completed', label: 'Terminados', icon: CheckSquare, color: 'bg-emerald-500', countKey: 'completed' },
 ] as const;
+
+const DEFAULT_LISTS = ['General', 'Proyectos', 'Seguimiento', 'Urgente'];
+const LIST_COLORS: Record<string, string> = {
+  General: 'bg-corporate',
+  Proyectos: 'bg-amber-500',
+  Seguimiento: 'bg-blue-500',
+  Urgente: 'bg-red-500',
+};
+
+function ReminderImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
+  const { uploadImage, uploading, progress } = useStorageUpload();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const url = await uploadImage(file, 'reminders');
+      onChange(url);
+      toast.success('Imagen cargada');
+    } catch (err) {
+      console.error('Error al subir imagen:', err);
+      toast.error('No se pudo cargar la imagen');
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+      />
+      {imageUrl ? (
+        <div className="relative rounded-xl overflow-hidden border border-[#E5E5E7]">
+          <img src={imageUrl} alt="Recordatorio" className="w-full h-40 object-cover" />
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-full text-[#FF3B30] hover:bg-white transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-dashed border-[#C7C7CC] text-[#007AFF] hover:bg-[#007AFF]/5 transition-colors disabled:opacity-50"
+        >
+          {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+          {uploading ? `Subiendo ${progress}%...` : 'Agregar imagen'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function ReminderCard({
+  reminder,
+  view,
+  onEdit,
+  onToggleItem,
+  onArchive,
+  canConvert,
+}: {
+  reminder: FirestoreReminder;
+  view: 'cards' | 'list';
+  onEdit: () => void;
+  onToggleItem: (itemId: string) => void;
+  onArchive: () => void;
+  canConvert: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const completed = reminder.items.filter((item) => item.completed).length;
+  const total = reminder.items.length;
+  const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const dateLabel = formatReminderDate(reminder.dueDate, reminder.hasTime, reminder.dueTime);
+  const allCompleted = total > 0 && completed === total;
+
+  if (view === 'list') {
+    return (
+      <div className="bg-white rounded-xl border border-[#E5E5E7] p-3 flex items-center gap-3 hover:shadow-sm transition-shadow">
+        {total > 0 ? (
+          <button
+            onClick={() => onToggleItem(reminder.items[0].id)}
+            className={cn('flex-shrink-0 transition-colors', allCompleted ? 'text-corporate' : 'text-[#C7C7CC]')}
+          >
+            {allCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+          </button>
+        ) : (
+          <div className="w-5 h-5 rounded-full border-2 border-[#C7C7CC] flex-shrink-0" />
+        )}
+        <button onClick={onEdit} className="flex-1 text-left min-w-0">
+          <h3 className={cn('font-medium text-[#1D1D1F] truncate', allCompleted && 'line-through text-[#86868B]')}>
+            {reminder.title}
+          </h3>
+          {reminder.notes && <p className="text-xs text-[#86868B] truncate">{reminder.notes}</p>}
+        </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {dateLabel && (
+            <span className={cn('text-xs', reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate')}>
+              {dateLabel}
+            </span>
+          )}
+          {reminder.isUrgent && <Bell className="w-4 h-4 text-red-500" />}
+          {reminder.flagged && <Flag className="w-4 h-4 text-amber-500" />}
+          {canConvert && (
+            <button onClick={onEdit} className="p-1.5 text-[#86868B] hover:text-corporate rounded-full transition-colors" title="Convertir en tarea">
+              <ArrowRightLeft className="w-4 h-4" />
+            </button>
+          )}
+          <button onClick={onArchive} className="p-1.5 text-[#86868B] hover:text-red-500 rounded-full transition-colors" title="Eliminar">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn('bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden transition-shadow hover:shadow-md', allCompleted && 'opacity-75')}>
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <button onClick={onEdit} className="text-left w-full">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full', LIST_COLORS[reminder.list] || 'bg-slate-100 text-slate-600')}>
+                  {reminder.list || 'General'}
+                </span>
+                {reminder.isUrgent && <Bell className="w-3.5 h-3.5 text-red-500" />}
+                {reminder.flagged && <Flag className="w-3.5 h-3.5 text-amber-500" />}
+              </div>
+              <h3 className={cn('font-semibold text-[#1D1D1F]', allCompleted && 'line-through text-[#86868B]')}>
+                {reminder.title}
+              </h3>
+              {reminder.notes && (
+                <p className={cn('text-sm text-[#86868B] mt-1 line-clamp-2', expanded && 'line-clamp-none')}>
+                  {reminder.notes}
+                </p>
+              )}
+            </button>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {dateLabel && (
+                <span className={cn(
+                  'text-xs flex items-center gap-1 font-medium',
+                  reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate'
+                )}>
+                  <Calendar className="w-3 h-3" />
+                  {dateLabel}
+                </span>
+              )}
+              {total > 0 && (
+                <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>
+              )}
+              {reminder.tags.length > 0 && (
+                <span className="text-xs text-[#8E8E93]">
+                  {reminder.tags.slice(0, 2).map((t) => `#${t}`).join(' ')}
+                  {reminder.tags.length > 2 && ` +${reminder.tags.length - 2}`}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            {canConvert && (
+              <button
+                onClick={onEdit}
+                className="p-2 text-[#86868B] hover:text-corporate hover:bg-corporate/5 rounded-full transition-colors"
+                title="Convertir en tarea"
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onArchive}
+              className="p-2 text-[#86868B] hover:text-red-500 hover:bg-red-500/5 rounded-full transition-colors"
+              title="Eliminar"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {total > 0 && (
+          <div className="mt-3">
+            <Progress value={progress} className="h-1.5 bg-[#E5E5E7]" />
+          </div>
+        )}
+
+        {total > 0 && (
+          <div className={cn('mt-3 space-y-1.5', !expanded && 'hidden')}>
+            {reminder.items.map((item) => (
+              <div key={item.id} className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => onToggleItem(item.id)}
+                  className={cn('flex-shrink-0 transition-colors', item.completed ? 'text-corporate' : 'text-[#C7C7CC]')}
+                >
+                  {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                </button>
+                <span className={cn('truncate', item.completed && 'line-through text-[#86868B]')}>
+                  {item.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {total > 0 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="mt-2 text-xs font-medium text-corporate hover:text-corporate/80 transition-colors"
+          >
+            {expanded ? 'Ver menos' : `Ver ${total} pasos`}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export function GlobalFAB() {
   const navigate = useNavigate();
@@ -156,11 +377,12 @@ export function GlobalFAB() {
 
   const [showRemindersPanel, setShowRemindersPanel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedListFilter, setSelectedListFilter] = useState<string>('all');
+  const [reminderView, setReminderView] = useState<'cards' | 'list'>('cards');
 
   const [editingReminder, setEditingReminder] = useState<FirestoreReminder | null>(null);
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
-  const [url, setUrl] = useState('');
   const [items, setItems] = useState<ReminderItem[]>([]);
   const [hasDate, setHasDate] = useState(false);
   const [hasTime, setHasTime] = useState(false);
@@ -171,7 +393,6 @@ export function GlobalFAB() {
   const [tags, setTags] = useState<string[]>([]);
   const [flagged, setFlagged] = useState(false);
   const [priority, setPriority] = useState<FirestoreReminder['priority']>('none');
-  const [reminderLocation, setReminderLocation] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
@@ -352,18 +573,16 @@ export function GlobalFAB() {
     setEditingReminder(null);
     setTitle('');
     setNotes('');
-    setUrl('');
     setItems([]);
     setHasDate(false);
     setHasTime(false);
     setDueDate('');
     setDueTime('');
     setIsUrgent(false);
-    setList('Personal');
+    setList('General');
     setTags([]);
     setFlagged(false);
     setPriority('none');
-    setReminderLocation('');
     setImageUrl('');
   };
 
@@ -376,25 +595,22 @@ export function GlobalFAB() {
     setEditingReminder(reminder);
     setTitle(reminder.title);
     setNotes(reminder.notes || '');
-    setUrl(reminder.url || '');
     setItems(reminder.items.length > 0 ? reminder.items : [{ id: generateId(), text: '', completed: false }]);
     setHasDate(reminder.hasDate);
     setHasTime(reminder.hasTime);
     setDueDate(reminder.dueDate || '');
     setDueTime(reminder.dueTime || '');
     setIsUrgent(reminder.isUrgent);
-    setList(reminder.list || 'Personal');
+    setList(reminder.list || 'General');
     setTags(reminder.tags || []);
     setFlagged(reminder.flagged);
     setPriority(reminder.priority || 'none');
-    setReminderLocation(reminder.location || '');
     setImageUrl(reminder.imageUrl || '');
   };
 
   const buildReminderData = (): Partial<FirestoreReminder> => ({
     title: title.trim() || 'Sin título',
     notes: notes.trim(),
-    url: url.trim(),
     items: items.filter((item) => item.text.trim() !== ''),
     hasDate,
     hasTime,
@@ -405,7 +621,6 @@ export function GlobalFAB() {
     tags,
     flagged,
     priority,
-    location: reminderLocation.trim(),
     imageUrl: imageUrl.trim(),
   });
 
@@ -480,6 +695,12 @@ export function GlobalFAB() {
 
   const activeReminders = reminders.filter((r) => r.status === 'active');
 
+  const availableLists = useMemo(() => {
+    const existing = new Set(activeReminders.map((r) => r.list).filter(Boolean));
+    DEFAULT_LISTS.forEach((l) => existing.add(l));
+    return Array.from(existing).sort();
+  }, [activeReminders]);
+
   const counts = useMemo(() => {
     const today = todayISO();
     return {
@@ -489,7 +710,6 @@ export function GlobalFAB() {
       flagged: activeReminders.filter((r) => r.flagged).length,
       urgent: activeReminders.filter((r) => r.isUrgent).length,
       completed: reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed))).length,
-      personal: activeReminders.filter((r) => r.list === 'Personal' || !r.list).length,
     };
   }, [activeReminders, reminders]);
 
@@ -511,22 +731,17 @@ export function GlobalFAB() {
       case 'completed':
         result = reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed)));
         break;
-      case 'personal':
-        result = result.filter((r) => r.list === 'Personal' || !r.list);
-        break;
     }
     return result;
   }, [activeReminders, reminders, selectedCategory]);
 
-  const groupedReminders = useMemo(() => {
-    const groups: Record<string, FirestoreReminder[]> = {};
-    filteredReminders.forEach((r) => {
-      const key = r.list || 'Personal';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(r);
-    });
-    return groups;
-  }, [filteredReminders]);
+  const filteredDisplayReminders = useMemo(() => {
+    let result = [...filteredReminders];
+    if (selectedListFilter !== 'all') {
+      result = result.filter((r) => r.list === selectedListFilter);
+    }
+    return result;
+  }, [filteredReminders, selectedListFilter]);
 
   const actions: FabAction[] = [
     {
@@ -557,7 +772,7 @@ export function GlobalFAB() {
     {
       id: 'reminders',
       label: 'Recordatorios',
-      icon: StickyNote,
+      icon: CheckSquare,
       color: 'text-[#FF9500]',
       bgColor: 'bg-white',
       onClick: handleOpenReminders,
@@ -757,7 +972,7 @@ export function GlobalFAB() {
 
           <div className="flex-1 overflow-y-auto p-4">
             {/* Categorías */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6 max-w-5xl mx-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4 max-w-5xl mx-auto">
               {CATEGORIES.map((cat) => {
                 const Icon = cat.icon;
                 const count = (counts as any)[cat.countKey] || 0;
@@ -767,12 +982,12 @@ export function GlobalFAB() {
                     key={cat.id}
                     onClick={() => setSelectedCategory(cat.id)}
                     className={cn(
-                      'relative flex flex-col justify-between items-start text-left rounded-2xl p-3 min-h-[80px] transition-transform hover:scale-[1.02]',
+                      'relative flex flex-col justify-between items-start text-left rounded-2xl p-3 min-h-[80px] transition-all hover:scale-[1.02]',
                       cat.color,
-                      active ? 'ring-2 ring-offset-2 ring-corporate' : ''
+                      active ? 'ring-2 ring-offset-2 ring-corporate shadow-md' : 'opacity-90'
                     )}
                   >
-                    <Icon className="w-6 h-6 text-white/90" />
+                    <Icon className="w-5 h-5 text-white/90" />
                     <div className="w-full">
                       <div className="text-2xl font-bold text-white leading-none">{count}</div>
                       <div className="text-xs text-white/90 font-medium mt-0.5">{cat.label}</div>
@@ -782,10 +997,61 @@ export function GlobalFAB() {
               })}
             </div>
 
-            {Object.keys(groupedReminders).length === 0 && (
+            {/* Filtros de lista y vista */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 max-w-2xl mx-auto">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                <button
+                  onClick={() => setSelectedListFilter('all')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                    selectedListFilter === 'all'
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                  )}
+                >
+                  Todas las listas
+                </button>
+                {availableLists.map((listName) => (
+                  <button
+                    key={listName}
+                    onClick={() => setSelectedListFilter(listName)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                      selectedListFilter === listName
+                        ? 'bg-corporate text-white border-corporate'
+                        : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                    )}
+                  >
+                    {listName}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-[#E5E5E7] self-start sm:self-auto">
+                <button
+                  onClick={() => setReminderView('cards')}
+                  className={cn(
+                    'px-2 py-1 rounded text-xs font-medium transition-colors',
+                    reminderView === 'cards' ? 'bg-corporate text-white' : 'text-[#86868B] hover:bg-corporate/5'
+                  )}
+                >
+                  Tarjetas
+                </button>
+                <button
+                  onClick={() => setReminderView('list')}
+                  className={cn(
+                    'px-2 py-1 rounded text-xs font-medium transition-colors',
+                    reminderView === 'list' ? 'bg-corporate text-white' : 'text-[#86868B] hover:bg-corporate/5'
+                  )}
+                >
+                  Lista
+                </button>
+              </div>
+            </div>
+
+            {filteredDisplayReminders.length === 0 && (
               <div className="flex flex-col items-center justify-center h-64 text-[#86868B] space-y-3">
                 <CalendarCheck className="w-12 h-12 opacity-20" />
-                <p className="text-sm">No hay recordatorios en esta categoría</p>
+                <p className="text-sm">No hay recordatorios en esta categoria</p>
                 <button
                   onClick={handleNewReminder}
                   className="text-corporate text-sm font-medium px-4 py-2 rounded-xl bg-corporate/5 hover:bg-corporate/10 transition-colors"
@@ -795,137 +1061,20 @@ export function GlobalFAB() {
               </div>
             )}
 
-            <div className="space-y-4 max-w-2xl mx-auto">
-              {Object.entries(groupedReminders).map(([listName, listReminders]) => (
-                <div key={listName} className="space-y-2">
-                  <h2 className="text-sm font-semibold text-[#8E8E93] uppercase tracking-wide ml-1">{listName}</h2>
-                  <div className="bg-white rounded-2xl shadow-sm border border-[#E5E5E7] overflow-hidden">
-                    {listReminders.map((reminder, idx) => {
-                      const completed = reminder.items.filter((item) => item.completed).length;
-                      const total = reminder.items.length;
-                      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-                      const dateLabel = formatReminderDate(reminder.dueDate, reminder.hasTime, reminder.dueTime);
-                      return (
-                        <div
-                          key={reminder.id}
-                          className={cn(
-                            'p-4 transition-colors hover:bg-[#F9F9FB]',
-                            idx !== listReminders.length - 1 && 'border-b border-[#E5E5E7]'
-                          )}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <button
-                              onClick={() => handleEditReminder(reminder)}
-                              className="text-left flex-1 min-w-0"
-                            >
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {total > 0 && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleReminderItem(reminder.id, reminder.items[0].id);
-                                    }}
-                                    className={cn(
-                                      'flex-shrink-0 transition-colors',
-                                      reminder.items[0].completed ? 'text-corporate' : 'text-[#C7C7CC]'
-                                    )}
-                                  >
-                                    {reminder.items[0].completed ? (
-                                      <CheckCircle2 className="w-5 h-5" />
-                                    ) : (
-                                      <Circle className="w-5 h-5" />
-                                    )}
-                                  </button>
-                                )}
-                                <h3 className={cn('font-semibold text-[#1D1D1F]', completed === total && total > 0 && 'line-through text-[#86868B]')}>
-                                  {reminder.title}
-                                </h3>
-                              </div>
-                              {reminder.notes && (
-                                <p className="text-sm text-[#86868B] mt-0.5 line-clamp-2">{reminder.notes}</p>
-                              )}
-                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {dateLabel && (
-                                  <span className={cn(
-                                    'text-xs flex items-center gap-1',
-                                    reminder.dueDate && reminder.dueDate < todayISO() ? 'text-[#FF3B30]' : 'text-[#007AFF]'
-                                  )}>
-                                    <Calendar className="w-3 h-3" />
-                                    {dateLabel}
-                                  </span>
-                                )}
-                                {reminder.isUrgent && (
-                                  <span className="text-xs text-[#FF2D55] flex items-center gap-1">
-                                    <Bell className="w-3 h-3" />
-                                    Urgente
-                                  </span>
-                                )}
-                                {reminder.flagged && (
-                                  <span className="text-xs text-[#FF9500] flex items-center gap-1">
-                                    <Flag className="w-3 h-3" />
-                                    Indicador
-                                  </span>
-                                )}
-                                {total > 0 && (
-                                  <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>
-                                )}
-                              </div>
-                              {total > 1 && (
-                                <div className="mt-2 space-y-1">
-                                  {reminder.items.slice(1, 4).map((item) => (
-                                    <div key={item.id} className="flex items-center gap-2 text-sm">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          toggleReminderItem(reminder.id, item.id);
-                                        }}
-                                        className={cn(
-                                          'flex-shrink-0 transition-colors',
-                                          item.completed ? 'text-corporate' : 'text-[#C7C7CC]'
-                                        )}
-                                      >
-                                        {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                                      </button>
-                                      <span className={cn('truncate', item.completed && 'line-through text-[#86868B]')}>
-                                        {item.text}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {total > 4 && (
-                                    <p className="text-xs text-[#86868B] pl-6">+{total - 4} más</p>
-                                  )}
-                                </div>
-                              )}
-                              {total > 0 && (
-                                <div className="mt-2">
-                                  <Progress value={progress} className="h-1 bg-[#E5E5E7]" />
-                                </div>
-                              )}
-                            </button>
-                            <div className="flex flex-col items-end gap-1">
-                              {canConvert && (
-                                <button
-                                  onClick={() => handleEditReminder(reminder)}
-                                  className="p-2 text-[#86868B] hover:text-corporate hover:bg-corporate/5 rounded-full transition-colors"
-                                  title="Convertir en tarea"
-                                >
-                                  <ArrowRightLeft className="w-4 h-4" />
-                                </button>
-                              )}
-                              <button
-                                onClick={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
-                                className="p-2 text-[#86868B] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-full transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+            <div className={cn(
+              'max-w-2xl mx-auto',
+              reminderView === 'cards' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : 'space-y-2'
+            )}>
+              {filteredDisplayReminders.map((reminder) => (
+                <ReminderCard
+                  key={reminder.id}
+                  reminder={reminder}
+                  view={reminderView}
+                  onEdit={() => handleEditReminder(reminder)}
+                  onToggleItem={(itemId) => toggleReminderItem(reminder.id, itemId)}
+                  onArchive={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
+                  canConvert={!!canConvert}
+                />
               ))}
             </div>
           </div>
@@ -933,7 +1082,7 @@ export function GlobalFAB() {
       )}
 
       {/* Editor de recordatorio */}
-      {(editingReminder || items.length > 0 || title !== '' || notes !== '' || url !== '') && (
+      {(editingReminder || items.length > 0 || title !== '' || notes !== '') && (
         <div className="fixed inset-0 z-[60] bg-[#F2F2F7] flex flex-col">
           <header className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
             <button
@@ -969,13 +1118,6 @@ export function GlobalFAB() {
                 placeholder="Notas"
                 rows={3}
                 className="border-0 rounded-none resize-none text-[#1D1D1F] placeholder:text-[#C7C7CC] focus-visible:ring-0"
-              />
-              <div className="h-px bg-[#E5E5E7]" />
-              <Input
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                placeholder="URL"
-                className="border-0 rounded-none text-[#1D1D1F] placeholder:text-[#C7C7CC] focus-visible:ring-0 h-12"
               />
             </div>
 
@@ -1027,15 +1169,30 @@ export function GlobalFAB() {
             {/* Lista */}
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
               <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
-                <List className="w-5 h-5 text-[#FF9500]" />
+                <List className="w-5 h-5 text-corporate" />
                 <span className="text-[#1D1D1F]">Lista</span>
               </div>
-              <div className="px-4 py-2">
+              <div className="px-4 py-3 flex flex-wrap gap-2">
+                {availableLists.map((listName) => (
+                  <button
+                    key={listName}
+                    type="button"
+                    onClick={() => setList(listName)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm font-medium transition-colors border',
+                      list === listName
+                        ? 'bg-corporate text-white border-corporate'
+                        : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                    )}
+                  >
+                    {listName}
+                  </button>
+                ))}
                 <Input
-                  value={list}
+                  value={availableLists.includes(list) ? '' : list}
                   onChange={(e) => setList(e.target.value)}
-                  placeholder="Nombre de lista"
-                  className="border-0 rounded-none focus-visible:ring-0"
+                  placeholder="Nueva lista..."
+                  className="w-36 border-0 rounded-none focus-visible:ring-0 text-sm px-0"
                 />
               </div>
             </div>
@@ -1051,12 +1208,37 @@ export function GlobalFAB() {
                   <Hash className="w-5 h-5 text-[#8E8E93]" />
                   <span className="text-[#1D1D1F]">Etiquetas</span>
                 </div>
-                <Input
-                  value={tags.join(', ')}
-                  onChange={(e) => setTags(e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
-                  placeholder="Separadas por coma"
-                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-corporate/10 text-corporate text-xs font-medium"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => setTags((prev) => prev.filter((t) => t !== tag))}
+                        className="hover:text-[#FF3B30]"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  <Input
+                    placeholder="Agregar etiqueta..."
+                    className="flex-1 min-w-[120px] border-0 rounded-none focus-visible:ring-0 text-sm px-0"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const value = e.currentTarget.value.trim();
+                        if (value && !tags.includes(value)) {
+                          setTags([...tags, value]);
+                          e.currentTarget.value = '';
+                        }
+                      }
+                    }}
+                  />
+                </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
@@ -1081,29 +1263,12 @@ export function GlobalFAB() {
                   <option value="high">Alta</option>
                 </select>
               </div>
-              <div className="px-4 py-3 border-b border-[#E5E5E7]">
-                <div className="flex items-center gap-3 mb-2">
-                  <MapPin className="w-5 h-5 text-[#8E8E93]" />
-                  <span className="text-[#1D1D1F]">Ubicación</span>
-                </div>
-                <Input
-                  value={reminderLocation}
-                  onChange={(e) => setReminderLocation(e.target.value)}
-                  placeholder="Agregar ubicación"
-                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
-                />
-              </div>
               <div className="px-4 py-3">
                 <div className="flex items-center gap-3 mb-2">
                   <ImageIcon className="w-5 h-5 text-[#8E8E93]" />
                   <span className="text-[#1D1D1F]">Imagen</span>
                 </div>
-                <Input
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="URL de imagen"
-                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
-                />
+                <ReminderImageUpload imageUrl={imageUrl} onChange={setImageUrl} />
               </div>
             </div>
 
