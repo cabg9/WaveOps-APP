@@ -1022,7 +1022,7 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
   - Cada tarjeta tiene borde izquierdo del color del turno, badge de horario y contadores de tareas/asignados.
   - Estado vacío con ícono y botón de crear turno.
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
-- **Commit**: pendiente de generar.
+- **Commit**: `270df364` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
