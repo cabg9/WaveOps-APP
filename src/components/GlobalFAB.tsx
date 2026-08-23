@@ -26,6 +26,9 @@ import {
   CalendarDays,
   CalendarCheck,
   LayoutList,
+  Search,
+  LayoutGrid,
+  Pencil,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreReminders, ReminderItem, FirestoreReminder } from '@/hooks/firestore/useFirestoreReminders';
@@ -197,6 +200,7 @@ function ReminderCard({
   reminder,
   view,
   onEdit,
+  onConvert,
   onToggleItem,
   onArchive,
   canConvert,
@@ -204,6 +208,7 @@ function ReminderCard({
   reminder: FirestoreReminder;
   view: 'cards' | 'list';
   onEdit: () => void;
+  onConvert: () => void;
   onToggleItem: (itemId: string) => void;
   onArchive: () => void;
   canConvert: boolean;
@@ -217,140 +222,192 @@ function ReminderCard({
 
   if (view === 'list') {
     return (
-      <div className="bg-white rounded-xl border border-[#E5E5E7] p-3 flex items-center gap-3 hover:shadow-sm transition-shadow">
-        {total > 0 ? (
+      <div
+        onClick={() => setExpanded(!expanded)}
+        className="bg-white rounded-xl border border-[#E5E5E7] p-3 hover:shadow-sm transition-shadow cursor-pointer"
+      >
+        <div className="flex items-start gap-3">
           <button
-            onClick={() => onToggleItem(reminder.items[0].id)}
-            className={cn('flex-shrink-0 transition-colors', allCompleted ? 'text-corporate' : 'text-[#C7C7CC]')}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (total > 0) onToggleItem(reminder.items[0].id);
+            }}
+            className={cn('flex-shrink-0 transition-colors mt-0.5', allCompleted ? 'text-corporate' : 'text-[#C7C7CC]')}
           >
-            {allCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+            {total > 0 ? (
+              allCompleted ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />
+            ) : (
+              <Circle className="w-5 h-5" />
+            )}
           </button>
-        ) : (
-          <div className="w-5 h-5 rounded-full border-2 border-[#C7C7CC] flex-shrink-0" />
-        )}
-        <button onClick={onEdit} className="flex-1 text-left min-w-0">
-          <h3 className={cn('font-medium text-[#1D1D1F] truncate', allCompleted && 'line-through text-[#86868B]')}>
-            {reminder.title}
-          </h3>
-          {reminder.notes && <p className="text-xs text-[#86868B] truncate">{reminder.notes}</p>}
-        </button>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {dateLabel && (
-            <span className={cn('text-xs', reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate')}>
-              {dateLabel}
-            </span>
-          )}
-          {reminder.isUrgent && <Bell className="w-4 h-4 text-red-500" />}
-          {reminder.flagged && <Flag className="w-4 h-4 text-amber-500" />}
-          {canConvert && (
-            <button onClick={onEdit} className="p-1.5 text-[#86868B] hover:text-corporate rounded-full transition-colors" title="Convertir en tarea">
-              <ArrowRightLeft className="w-4 h-4" />
-            </button>
-          )}
-          <button onClick={onArchive} className="p-1.5 text-[#86868B] hover:text-red-500 rounded-full transition-colors" title="Eliminar">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className={cn('font-medium text-[#1D1D1F] truncate', allCompleted && 'line-through text-[#86868B]')}>
+                {reminder.title}
+              </h3>
+              {reminder.isUrgent && <Bell className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />}
+              {reminder.flagged && <Flag className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+            </div>
+            {reminder.notes && (
+              <p className={cn('text-xs text-[#86868B] mt-0.5', expanded ? '' : 'line-clamp-1')}>
+                {reminder.notes}
+              </p>
+            )}
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {dateLabel && (
+                <span className={cn('text-xs', reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate')}>
+                  {dateLabel}
+                </span>
+              )}
+              {total > 0 && <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>}
+              {reminder.tags.length > 0 && (
+                <span className="text-xs text-[#8E8E93]">{reminder.tags.map((t) => `#${t}`).join(' ')}</span>
+              )}
+            </div>
+
+            {expanded && total > 0 && (
+              <div className="mt-3 space-y-1.5">
+                {reminder.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 text-sm">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onToggleItem(item.id); }}
+                      className={cn('flex-shrink-0 transition-colors', item.completed ? 'text-corporate' : 'text-[#C7C7CC]')}
+                    >
+                      {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                    </button>
+                    <span className={cn(item.completed && 'line-through text-[#86868B]')}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {expanded && (
+              <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#E5E5E7]">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Editar
+                </button>
+                {canConvert && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onConvert(); }}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 transition-colors"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5" />
+                    Convertir
+                  </button>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onArchive(); }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn('bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden transition-shadow hover:shadow-md', allCompleted && 'opacity-75')}>
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <button onClick={onEdit} className="text-left w-full">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full', LIST_COLORS[reminder.list] || 'bg-slate-100 text-slate-600')}>
-                  {reminder.list || 'General'}
-                </span>
-                {reminder.isUrgent && <Bell className="w-3.5 h-3.5 text-red-500" />}
-                {reminder.flagged && <Flag className="w-3.5 h-3.5 text-amber-500" />}
-              </div>
-              <h3 className={cn('font-semibold text-[#1D1D1F]', allCompleted && 'line-through text-[#86868B]')}>
-                {reminder.title}
-              </h3>
-              {reminder.notes && (
-                <p className={cn('text-sm text-[#86868B] mt-1 line-clamp-2', expanded && 'line-clamp-none')}>
-                  {reminder.notes}
-                </p>
-              )}
-            </button>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              {dateLabel && (
-                <span className={cn(
-                  'text-xs flex items-center gap-1 font-medium',
-                  reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate'
-                )}>
-                  <Calendar className="w-3 h-3" />
-                  {dateLabel}
-                </span>
-              )}
-              {total > 0 && (
-                <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>
-              )}
-              {reminder.tags.length > 0 && (
-                <span className="text-xs text-[#8E8E93]">
-                  {reminder.tags.slice(0, 2).map((t) => `#${t}`).join(' ')}
-                  {reminder.tags.length > 2 && ` +${reminder.tags.length - 2}`}
-                </span>
-              )}
-            </div>
+    <div
+      onClick={() => setExpanded(!expanded)}
+      className={cn(
+        'bg-white rounded-2xl border border-[#E5E5E7] p-4 transition-all cursor-pointer hover:shadow-md',
+        allCompleted && 'opacity-75'
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full text-white', LIST_COLORS[reminder.list] || 'bg-slate-400')}>
+              {reminder.list || 'General'}
+            </span>
+            {reminder.isUrgent && <Bell className="w-3.5 h-3.5 text-red-500" />}
+            {reminder.flagged && <Flag className="w-3.5 h-3.5 text-amber-500" />}
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {canConvert && (
-              <button
-                onClick={onEdit}
-                className="p-2 text-[#86868B] hover:text-corporate hover:bg-corporate/5 rounded-full transition-colors"
-                title="Convertir en tarea"
-              >
-                <ArrowRightLeft className="w-4 h-4" />
-              </button>
+          <h3 className={cn('font-semibold text-[#1D1D1F]', allCompleted && 'line-through text-[#86868B]')}>
+            {reminder.title}
+          </h3>
+          {reminder.notes && (
+            <p className={cn('text-sm text-[#86868B] mt-1', expanded ? '' : 'line-clamp-2')}>
+              {reminder.notes}
+            </p>
+          )}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            {dateLabel && (
+              <span className={cn(
+                'text-xs flex items-center gap-1 font-medium',
+                reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate'
+              )}>
+                <Calendar className="w-3 h-3" />
+                {dateLabel}
+              </span>
             )}
-            <button
-              onClick={onArchive}
-              className="p-2 text-[#86868B] hover:text-red-500 hover:bg-red-500/5 rounded-full transition-colors"
-              title="Eliminar"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            {total > 0 && <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>}
+            {reminder.tags.length > 0 && (
+              <span className="text-xs text-[#8E8E93]">
+                {reminder.tags.map((t) => `#${t}`).join(' ')}
+              </span>
+            )}
           </div>
         </div>
-
-        {total > 0 && (
-          <div className="mt-3">
-            <Progress value={progress} className="h-1.5 bg-[#E5E5E7]" />
-          </div>
-        )}
-
-        {total > 0 && (
-          <div className={cn('mt-3 space-y-1.5', !expanded && 'hidden')}>
-            {reminder.items.map((item) => (
-              <div key={item.id} className="flex items-center gap-2 text-sm">
-                <button
-                  onClick={() => onToggleItem(item.id)}
-                  className={cn('flex-shrink-0 transition-colors', item.completed ? 'text-corporate' : 'text-[#C7C7CC]')}
-                >
-                  {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
-                </button>
-                <span className={cn('truncate', item.completed && 'line-through text-[#86868B]')}>
-                  {item.text}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {total > 0 && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="mt-2 text-xs font-medium text-corporate hover:text-corporate/80 transition-colors"
-          >
-            {expanded ? 'Ver menos' : `Ver ${total} pasos`}
-          </button>
-        )}
       </div>
+
+      {total > 0 && (
+        <div className="mt-3">
+          <Progress value={progress} className="h-1.5 bg-[#E5E5E7]" />
+        </div>
+      )}
+
+      {expanded && total > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {reminder.items.map((item) => (
+            <div key={item.id} className="flex items-center gap-2 text-sm">
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggleItem(item.id); }}
+                className={cn('flex-shrink-0 transition-colors', item.completed ? 'text-corporate' : 'text-[#C7C7CC]')}
+              >
+                {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+              </button>
+              <span className={cn(item.completed && 'line-through text-[#86868B]')}>{item.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[#E5E5E7]">
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Editar
+          </button>
+          {canConvert && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onConvert(); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 transition-colors"
+            >
+              <ArrowRightLeft className="w-3.5 h-3.5" />
+              Convertir
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onArchive(); }}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Eliminar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -379,6 +436,7 @@ export function GlobalFAB() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedListFilter, setSelectedListFilter] = useState<string>('all');
   const [reminderView, setReminderView] = useState<'cards' | 'list'>('cards');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [editingReminder, setEditingReminder] = useState<FirestoreReminder | null>(null);
   const [title, setTitle] = useState('');
@@ -396,7 +454,7 @@ export function GlobalFAB() {
   const [imageUrl, setImageUrl] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
-  const [convertType, setConvertType] = useState<'specific' | 'extra' | null>(null);
+  const [convertingReminder, setConvertingReminder] = useState<FirestoreReminder | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseInHotCornerRef = useRef(false);
@@ -617,7 +675,7 @@ export function GlobalFAB() {
     dueDate: hasDate ? dueDate || todayISO() : '',
     dueTime: hasDate && hasTime ? dueTime || '09:00' : '',
     isUrgent,
-    list: list.trim() || 'Personal',
+    list: list.trim() || 'General',
     tags,
     flagged,
     priority,
@@ -670,14 +728,16 @@ export function GlobalFAB() {
 
   const canConvert = user && (hasPermission(user, 'canCreateSpecificTask') || hasPermission(user, 'canCreateExtraTask'));
 
-  const startConvert = () => {
-    if (!editingReminder) return;
+  const startConvert = (reminder?: FirestoreReminder) => {
+    const target = reminder || editingReminder;
+    if (!target) return;
     const canSpecific = user && hasPermission(user, 'canCreateSpecificTask');
     const canExtra = user && hasPermission(user, 'canCreateExtraTask');
     if (!canSpecific && !canExtra) {
       toast.error('No tienes permiso para crear tareas');
       return;
     }
+    setConvertingReminder(target);
     if (canSpecific && canExtra) {
       setShowConvertDialog(true);
       return;
@@ -686,11 +746,11 @@ export function GlobalFAB() {
   };
 
   const doConvert = (type: 'specific' | 'extra') => {
-    if (!editingReminder) return;
+    if (!convertingReminder) return;
     setShowConvertDialog(false);
     setShowRemindersPanel(false);
     resetReminderEditor();
-    navigate(`/tasks?create=${type}&reminderId=${editingReminder.id}`);
+    navigate(`/tasks?create=${type}&reminderId=${convertingReminder.id}`);
   };
 
   const activeReminders = reminders.filter((r) => r.status === 'active');
@@ -740,8 +800,18 @@ export function GlobalFAB() {
     if (selectedListFilter !== 'all') {
       result = result.filter((r) => r.list === selectedListFilter);
     }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(
+        (r) =>
+          r.title.toLowerCase().includes(q) ||
+          (r.notes || '').toLowerCase().includes(q) ||
+          r.tags.some((t) => t.toLowerCase().includes(q)) ||
+          r.items.some((i) => i.text.toLowerCase().includes(q))
+      );
+    }
     return result;
-  }, [filteredReminders, selectedListFilter]);
+  }, [filteredReminders, selectedListFilter, searchQuery]);
 
   const actions: FabAction[] = [
     {
@@ -948,8 +1018,8 @@ export function GlobalFAB() {
 
       {/* Panel de Recordatorios a pantalla completa */}
       {showRemindersPanel && (
-        <div className="fixed inset-0 z-50 bg-[#F2F2F7] flex flex-col">
-          <header className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <header className="sticky top-0 z-10 bg-white border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
             <button
               onClick={() => {
                 setShowRemindersPanel(false);
@@ -963,53 +1033,157 @@ export function GlobalFAB() {
             <h1 className="text-lg font-semibold text-[#1D1D1F]">Recordatorios</h1>
             <button
               onClick={handleNewReminder}
-              className="flex items-center gap-1 text-corporate font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-corporate/5 transition-colors"
+              className="flex items-center gap-1 text-white bg-corporate font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-corporate/90 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Nuevo
             </button>
           </header>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            {/* Categorías */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4 max-w-5xl mx-auto">
-              {CATEGORIES.map((cat) => {
-                const Icon = cat.icon;
-                const count = (counts as any)[cat.countKey] || 0;
-                const active = selectedCategory === cat.id;
-                return (
+          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            {/* Sidebar / filtros */}
+            <aside className="lg:w-64 lg:border-r border-[#E5E5E7] bg-[#FAFAFA] lg:bg-white flex flex-col">
+              {/* Mobile: filtros horizontales */}
+              <div className="lg:hidden p-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  {CATEGORIES.map((cat) => {
+                    const Icon = cat.icon;
+                    const count = (counts as any)[cat.countKey] || 0;
+                    const active = selectedCategory === cat.id;
+                    return (
+                      <button
+                        key={cat.id}
+                        onClick={() => setSelectedCategory(cat.id)}
+                        className={cn(
+                          'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                          active
+                            ? 'bg-corporate text-white border-corporate'
+                            : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                        )}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {cat.label}
+                        <span className={cn('ml-0.5', active ? 'text-white/80' : 'text-[#86868B]')}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Desktop: sidebar vertical */}
+              <div className="hidden lg:flex flex-col p-4 space-y-1">
+                <h2 className="text-xs font-semibold text-[#86868B] uppercase tracking-wider mb-2 px-2">Filtros</h2>
+                {CATEGORIES.map((cat) => {
+                  const Icon = cat.icon;
+                  const count = (counts as any)[cat.countKey] || 0;
+                  const active = selectedCategory === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setSelectedCategory(cat.id)}
+                      className={cn(
+                        'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
+                        active
+                          ? 'bg-corporate/10 text-corporate'
+                          : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                      )}
+                    >
+                      <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-white', cat.color)}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="flex-1 text-left">{cat.label}</span>
+                      <span className={cn('text-xs', active ? 'text-corporate' : 'text-[#86868B]')}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Buscador y vista */}
+              <div className="p-3 lg:p-4 border-t border-[#E5E5E7] space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar recordatorio..."
+                    className="pl-9 rounded-xl border-[#E5E5E7] text-sm"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-[#86868B]">Vista</span>
+                  <div className="flex items-center gap-1 bg-[#F2F2F7] rounded-lg p-1">
+                    <button
+                      onClick={() => setReminderView('cards')}
+                      className={cn(
+                        'px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        reminderView === 'cards' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      <LayoutGrid className="w-3.5 h-3.5" />
+                      Tarjetas
+                    </button>
+                    <button
+                      onClick={() => setReminderView('list')}
+                      className={cn(
+                        'px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        reminderView === 'list' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      <List className="w-3.5 h-3.5" />
+                      Lista
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtro de listas */}
+              <div className="hidden lg:block p-4 border-t border-[#E5E5E7] flex-1 overflow-y-auto">
+                <h2 className="text-xs font-semibold text-[#86868B] uppercase tracking-wider mb-2 px-2">Listas</h2>
+                <div className="space-y-1">
                   <button
-                    key={cat.id}
-                    onClick={() => setSelectedCategory(cat.id)}
+                    onClick={() => setSelectedListFilter('all')}
                     className={cn(
-                      'relative flex flex-col justify-between items-start text-left rounded-2xl p-3 min-h-[80px] transition-all hover:scale-[1.02]',
-                      cat.color,
-                      active ? 'ring-2 ring-offset-2 ring-corporate shadow-md' : 'opacity-90'
+                      'flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm transition-colors',
+                      selectedListFilter === 'all' ? 'bg-corporate/10 text-corporate font-medium' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
                     )}
                   >
-                    <Icon className="w-5 h-5 text-white/90" />
-                    <div className="w-full">
-                      <div className="text-2xl font-bold text-white leading-none">{count}</div>
-                      <div className="text-xs text-white/90 font-medium mt-0.5">{cat.label}</div>
-                    </div>
+                    <List className="w-4 h-4" />
+                    <span className="flex-1 text-left">Todas las listas</span>
                   </button>
-                );
-              })}
-            </div>
+                  {availableLists.map((listName) => (
+                    <button
+                      key={listName}
+                      onClick={() => setSelectedListFilter(listName)}
+                      className={cn(
+                        'flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm transition-colors',
+                        selectedListFilter === listName ? 'bg-corporate/10 text-corporate font-medium' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                      )}
+                    >
+                      <div className={cn('w-2 h-2 rounded-full', LIST_COLORS[listName] || 'bg-slate-400')} />
+                      <span className="flex-1 text-left">{listName}</span>
+                      <span className="text-xs text-[#86868B]">
+                        {activeReminders.filter((r) => r.list === listName).length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </aside>
 
-            {/* Filtros de lista y vista */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 max-w-2xl mx-auto">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+            {/* Contenido */}
+            <main className="flex-1 overflow-y-auto p-4 bg-[#FAFAFA]">
+              {/* Mobile: filtros de lista */}
+              <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-3 scrollbar-hide">
                 <button
                   onClick={() => setSelectedListFilter('all')}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
                     selectedListFilter === 'all'
                       ? 'bg-corporate text-white border-corporate'
-                      : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                      : 'bg-white text-[#1D1D1F] border-[#E5E5E7]'
                   )}
                 >
-                  Todas las listas
+                  Todas
                 </button>
                 {availableLists.map((listName) => (
                   <button
@@ -1019,64 +1193,44 @@ export function GlobalFAB() {
                       'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
                       selectedListFilter === listName
                         ? 'bg-corporate text-white border-corporate'
-                        : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                        : 'bg-white text-[#1D1D1F] border-[#E5E5E7]'
                     )}
                   >
                     {listName}
                   </button>
                 ))}
               </div>
-              <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-[#E5E5E7] self-start sm:self-auto">
-                <button
-                  onClick={() => setReminderView('cards')}
-                  className={cn(
-                    'px-2 py-1 rounded text-xs font-medium transition-colors',
-                    reminderView === 'cards' ? 'bg-corporate text-white' : 'text-[#86868B] hover:bg-corporate/5'
-                  )}
-                >
-                  Tarjetas
-                </button>
-                <button
-                  onClick={() => setReminderView('list')}
-                  className={cn(
-                    'px-2 py-1 rounded text-xs font-medium transition-colors',
-                    reminderView === 'list' ? 'bg-corporate text-white' : 'text-[#86868B] hover:bg-corporate/5'
-                  )}
-                >
-                  Lista
-                </button>
-              </div>
-            </div>
 
-            {filteredDisplayReminders.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-64 text-[#86868B] space-y-3">
-                <CalendarCheck className="w-12 h-12 opacity-20" />
-                <p className="text-sm">No hay recordatorios en esta categoria</p>
-                <button
-                  onClick={handleNewReminder}
-                  className="text-corporate text-sm font-medium px-4 py-2 rounded-xl bg-corporate/5 hover:bg-corporate/10 transition-colors"
-                >
-                  Crear un recordatorio
-                </button>
-              </div>
-            )}
+              {filteredDisplayReminders.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-64 text-[#86868B] space-y-3">
+                  <CalendarCheck className="w-12 h-12 opacity-20" />
+                  <p className="text-sm">No hay recordatorios en esta categoria</p>
+                  <button
+                    onClick={handleNewReminder}
+                    className="text-corporate text-sm font-medium px-4 py-2 rounded-xl bg-corporate/5 hover:bg-corporate/10 transition-colors"
+                  >
+                    Crear un recordatorio
+                  </button>
+                </div>
+              )}
 
-            <div className={cn(
-              'max-w-2xl mx-auto',
-              reminderView === 'cards' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : 'space-y-2'
-            )}>
-              {filteredDisplayReminders.map((reminder) => (
-                <ReminderCard
-                  key={reminder.id}
-                  reminder={reminder}
-                  view={reminderView}
-                  onEdit={() => handleEditReminder(reminder)}
-                  onToggleItem={(itemId) => toggleReminderItem(reminder.id, itemId)}
-                  onArchive={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
-                  canConvert={!!canConvert}
-                />
-              ))}
-            </div>
+              <div className={cn(
+                reminderView === 'cards' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-2'
+              )}>
+                {filteredDisplayReminders.map((reminder) => (
+                  <ReminderCard
+                    key={reminder.id}
+                    reminder={reminder}
+                    view={reminderView}
+                    onEdit={() => handleEditReminder(reminder)}
+                    onConvert={() => startConvert(reminder)}
+                    onToggleItem={(itemId) => toggleReminderItem(reminder.id, itemId)}
+                    onArchive={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
+                    canConvert={!!canConvert}
+                  />
+                ))}
+              </div>
+            </main>
           </div>
         </div>
       )}
@@ -1321,7 +1475,7 @@ export function GlobalFAB() {
             {editingReminder && canConvert && (
               <button
                 type="button"
-                onClick={startConvert}
+                onClick={() => startConvert(editingReminder)}
                 disabled={isSavingReminder}
                 className="w-full flex items-center justify-center gap-2 text-sm font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-4 py-3 rounded-xl transition-colors disabled:opacity-50 mb-4"
               >

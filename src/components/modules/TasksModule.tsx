@@ -254,26 +254,37 @@ export default function TasksModule() {
     }
   };
 
-  const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia') => {
+  interface ReminderPrefill {
+    title: string;
+    description: string;
+    subtasks: { id: string; title: string; completed: boolean }[];
+    startDate?: string;
+    priority: TaskPriority;
+  }
+
+  const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia', prefill?: ReminderPrefill) => {
     setCreateType(type);
     setTaskForm({
-      title: '', description: '', department: defaultDepartment,
-      priority: TaskPriority.MEDIUM, startDate: getLocalDate(),
+      title: prefill?.title || '',
+      description: prefill?.description || '',
+      department: defaultDepartment,
+      priority: prefill?.priority || TaskPriority.MEDIUM,
+      startDate: prefill?.startDate || getLocalDate(),
       startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [],
-      requiresPhoto: false, subtasks: [], selectedShifts: [], supportDepartment: '', supportUsers: [],
+      requiresPhoto: false, subtasks: prefill?.subtasks || [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
     });
     setSpecificTaskForm({
-      title: '',
-      description: '',
+      title: prefill?.title || '',
+      description: prefill?.description || '',
       department: defaultDepartment,
       shiftIds: [] as string[],
       startTime: '08:00',
       estimatedMinutes: 60,
-      priority: TaskPriority.MEDIUM,
+      priority: prefill?.priority || TaskPriority.MEDIUM,
       requiresPhoto: false,
       vigenciaDays: TaskVigencia.INDEFINIDO,
-      subtasks: [],
+      subtasks: prefill?.subtasks || [],
     });
     setEditingTemplateId(null);
     setIncidenciaForm({ title: '', description: '', department: defaultDepartment, targetDepartments: [], priority: TaskPriority.HIGH });
@@ -292,50 +303,43 @@ export default function TasksModule() {
     const create = searchParams.get('create');
     const reminderId = searchParams.get('reminderId');
     if (create === 'extra' || create === 'specific' || create === 'incidencia') {
-      handleOpenModal(create);
+      const next = new URLSearchParams(searchParams);
+      next.delete('create');
+      next.delete('reminderId');
+      setSearchParams(next, { replace: true });
+
       if (reminderId) {
         setPendingReminderId(reminderId);
-        // Precargar datos del recordatorio
         getDoc(doc(db, 'notes', reminderId)).then((snap) => {
-          if (!snap.exists()) return;
+          if (!snap.exists()) {
+            handleOpenModal(create);
+            return;
+          }
           const data = snap.data();
           const items = (data.items || []).map((item: any) => ({
             id: item.id || Math.random().toString(36).substr(2, 9),
             title: item.text || '',
             completed: !!item.completed,
           }));
-          const descriptionParts = [data.notes || '', data.url || ''].filter(Boolean);
-          const description = descriptionParts.join('\n\n');
+          const description = data.notes || '';
           const dueDate = data.dueDate || getLocalDate();
           const isUrgent = !!data.isUrgent;
           const priority = isUrgent ? TaskPriority.HIGH : TaskPriority.MEDIUM;
 
-          if (create === 'specific') {
-            setSpecificTaskForm((prev) => ({
-              ...prev,
-              title: data.title || '',
-              description,
-              subtasks: items,
-              priority,
-            }));
-          } else if (create === 'extra') {
-            setTaskForm((prev) => ({
-              ...prev,
-              title: data.title || '',
-              description,
-              subtasks: items,
-              startDate: dueDate,
-              priority,
-            }));
-          }
+          handleOpenModal(create, {
+            title: data.title || '',
+            description,
+            subtasks: items,
+            startDate: dueDate,
+            priority,
+          });
         }).catch((err) => {
           console.error('Error al precargar recordatorio:', err);
+          handleOpenModal(create);
         });
+      } else {
+        handleOpenModal(create);
       }
-      const next = new URLSearchParams(searchParams);
-      next.delete('create');
-      next.delete('reminderId');
-      setSearchParams(next, { replace: true });
     }
   }, [searchParams]);
 

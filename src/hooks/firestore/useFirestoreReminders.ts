@@ -6,7 +6,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   query,
-  orderBy,
   where,
   onSnapshot,
   addDoc,
@@ -100,14 +99,14 @@ export function useFirestoreReminders(userId: string | undefined) {
 
     const q = query(
       collection(db, COLLECTION_NAME),
-      where('userId', '==', userId),
-      orderBy('updatedAt', 'desc')
+      where('userId', '==', userId)
     );
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const docs = snapshot.docs.map((docSnap) => {
+        const docs = snapshot.docs
+          .map((docSnap) => {
           const data = docSnap.data();
           return {
             id: docSnap.id,
@@ -137,7 +136,8 @@ export function useFirestoreReminders(userId: string | undefined) {
             createdAt: timestampToISO(data.createdAt),
             updatedAt: timestampToISO(data.updatedAt),
           } as FirestoreReminder;
-        });
+        })
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
         setReminders(docs);
         setLoading(false);
         setError(null);

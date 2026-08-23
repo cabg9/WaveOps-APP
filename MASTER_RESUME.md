@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (ajustes de Recordatorios: diseño minimalista, listas, etiquetas, vista tarjetas/lista)
+> Última actualización: 2026-08-23 (rediseño de Recordatorios: sidebar desktop, tarjetas expandibles, corrección de conversión a tareas)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -43,7 +43,15 @@
 - **Etiquetas**: input con chips, se agregan con Enter y se eliminan individualmente.
 - **Vista tarjetas/lista**: toggle para cambiar entre tarjetas expandibles y lista compacta.
 - **Diseño minimalista**: colores corporativos, tarjetas blancas limpias, badges sutiles, progreso discreto.
-- **Renderizado en tiempo real**: se normalizaron `createdAt`/`updatedAt` a strings ISO para evitar problemas de ordenamiento mixto en Firestore.
+- **Renderizado en tiempo real**: se normalizaron `createdAt`/`updatedAt` a strings ISO y se quitó `orderBy` del listener para evitar problemas de índices y ordenamiento mixto; ahora se ordena en memoria.
+
+### Rediseño completo del panel de Recordatorios
+- **Desktop**: sidebar izquierdo con filtros de categoría, buscador, toggle de vista y listas; contenido (tarjetas/lista) a la derecha.
+- **Móvil**: filtros de categoría como pestañas horizontales compactas en la parte superior; buscador, toggle de vista y filtros de lista accesibles.
+- **Tarjetas expandibles**: al hacer clic se expanden para leer la información completa, ver pasos y acciones; el botón **Editar** abre el editor.
+- **Acciones en tarjeta expandida**: Editar, Convertir en tarea, Eliminar.
+- **Corrección de conversión a tarea**: el diálogo de tipo de tarea usa un estado independiente (`convertingReminder`) y no requiere abrir el editor primero.
+- **Precarga sincrónica en TasksModule**: `handleOpenModal` acepta datos del recordatorio; el `useEffect` de query params espera el `getDoc` y abre el modal ya precargado para evitar condiciones de carrera.
 
 ### Archivos modificados
 - `src/hooks/firestore/useFirestoreNotes.ts` → eliminado.
