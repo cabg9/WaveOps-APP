@@ -1080,8 +1080,10 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const completionRate = totalTasksCount > 0 ? Math.round((completedTasks / totalTasksCount) * 100) : 0;
 
   // Verificar si estamos en la segunda semana del mes (días 8-14)
+  // TEMPORAL (Fase 7 pruebas): botón siempre habilitado para probar flujo de días libres.
+  // Revertir a: const isSecondWeek = currentDay >= 8 && currentDay <= 14;
   const currentDay = new Date().getDate();
-  const isSecondWeek = currentDay >= 8 && currentDay <= 14;
+  const isSecondWeek = true;
 
   // Generar días del mes incluyendo días previos y siguientes para completar semanas (inicia en lunes)
   const monthDays = useMemo(() => {
