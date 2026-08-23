@@ -80,7 +80,7 @@ export function DepartamentosTab() {
   const { users, updateUser } = useFirestoreUsers();
   const { logAction } = useAudit();
   const { user: currentUser } = useAuth();
-  const { shifts } = useFirestoreShifts();
+  const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
   const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
   const { isOperationalDepartment, departmentTree } = useDynamicDepartments();
 
@@ -201,16 +201,31 @@ export function DepartamentosTab() {
   const templateSupervisorId = useMemo(() => {
     const deptCode = normalizeDeptCode(templateForm.department || '');
     const deptUsers = users.filter((u: any) => normalizeDeptCode(u.department || '') === deptCode && u.isActive !== false);
+    const selectedShiftIds = templateForm.shiftIds || [];
+
+    // 1. Supervisor del dept que tenga alguno de los turnos seleccionados asignado (publicado)
+    if (selectedShiftIds.length > 0) {
+      const supervisorsWithShift = deptUsers.filter(
+        (u: any) => u.role === Role.SUPERVISOR && shiftAssignments.some((a: any) => selectedShiftIds.includes(a.shiftId) && a.userId === u.id && a.status === 'PUBLICADO')
+      );
+      if (supervisorsWithShift.length > 0) return supervisorsWithShift[0].id;
+    }
+
+    // 2. Cualquier supervisor del dept
     const supervisor = deptUsers.find((u: any) => u.role === Role.SUPERVISOR);
     if (supervisor) return supervisor.id;
+
+    // 3. Gerente del departamento
     const gerente = deptUsers.find((u: any) => u.role === Role.GERENTE_DEPARTAMENTO);
     if (gerente) return gerente.id;
+
+    // 4. Fallback a superiores (DG, Director, RRHH, Gerente de Operaciones)
     const fallbackRoles = [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.RRHH, Role.GERENTE_OPERACIONES];
     const fallback = users
       .filter((u: any) => u.isActive !== false && fallbackRoles.includes(u.role))
       .sort((a: any, b: any) => (a.level || 7) - (b.level || 7))[0];
     return fallback?.id || "";
-  }, [users, templateForm.department]);
+  }, [users, templateForm.department, templateForm.shiftIds, shiftAssignments]);
 
   const templateSupervisorName = useMemo(() => {
     const s = users.find((u: any) => u.id === templateSupervisorId);
