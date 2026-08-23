@@ -1064,10 +1064,8 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const completionRate = totalTasksCount > 0 ? Math.round((completedTasks / totalTasksCount) * 100) : 0;
 
   // Verificar si estamos en la segunda semana del mes (días 8-14)
-  // TEMPORAL (Fase 7 pruebas): botón siempre habilitado para probar flujo de días libres.
-  // Revertir a: const isSecondWeek = currentDay >= 8 && currentDay <= 14;
   const currentDay = new Date().getDate();
-  const isSecondWeek = true;
+  const isSecondWeek = currentDay >= 8 && currentDay <= 14;
 
   // Generar días del mes incluyendo días previos y siguientes para completar semanas (inicia en lunes)
   const monthDays = useMemo(() => {
@@ -5150,22 +5148,20 @@ function IncapacidadesTab({
             const endDate = new Date(endYear, endMonth - 1, endDay);
             const daysCount = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
             const isExpanded = expandedIncapacityId === incapacidad.id;
-            
+
             return (
               <div
                 key={incapacidad.id}
                 className={cn(
-                  "bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all overflow-hidden",
+                  "bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all overflow-hidden",
                   isExpanded ? "shadow-[0_4px_16px_rgba(0,0,0,0.12)]" : "hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)]"
                 )}
               >
-                {/* Cabecera de la tarjeta - CLICABLE */}
                 <button
                   onClick={() => incapacidad.id && toggleExpand(incapacidad.id)}
-                  className="w-full p-4 text-left"
+                  className="w-full p-5 text-left"
                 >
                   <div className="flex items-start gap-4">
-                    {/* Avatar */}
                     {(() => {
                       const incUser = users.find(
                         (u) =>
@@ -5177,117 +5173,117 @@ function IncapacidadesTab({
                         <UserAvatar
                           name={incapacidad.userName}
                           photoUrl={incUser?.photoURL || incUser?.avatar}
-                          size="lg"
-                          fallbackClassName="bg-corporate/10 text-corporate text-lg"
+                          size="md"
+                          fallbackClassName="bg-corporate/10 text-corporate text-sm"
                         />
                       );
                     })()}
 
-                    {/* Info principal */}
                     <div className="flex-1 min-w-0">
-                      {/* Fila superior: Nombre y Estado (MÁS VISIBLE) */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                        <p className="text-sm font-medium text-[#1D1D1F]">{incapacidad.userName}</p>
-                        {/* ESTADO MÁS VISIBLE - Badge grande con borde */}
-                        <span className={cn(
-                          "flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border-2",
-                          statusCfg.bgColor,
-                          statusCfg.color,
-                          statusCfg.borderColor
-                        )}>
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div>
+                          <p className="text-sm font-semibold text-[#1D1D1F]">{incapacidad.userName}</p>
+                          <p className="text-xs text-[#86868B]">{incapacidad.userDepartment.replace(/_/g, ' ')}</p>
+                        </div>
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full",
+                            statusCfg.bgColor,
+                            statusCfg.color
+                          )}
+                        >
                           <StatusIcon className="w-3.5 h-3.5" />
                           {statusCfg.label}
                         </span>
                       </div>
-                      
-                      <p className="text-xs text-[#86868B]">
-                        {incapacidad.userDepartment.replace(/_/g, ' ')}
-                      </p>
-                      
-                      {/* Tipo y fechas */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <div className={cn("flex items-center gap-1.5 px-2 py-1 rounded-lg border", typeConfig.bgColor, typeConfig.borderColor)}>
+
+                      <div className="flex items-center flex-wrap gap-2 mt-3">
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium border",
+                            typeConfig.bgColor,
+                            typeConfig.borderColor
+                          )}
+                        >
                           <TypeIcon className={cn("w-3.5 h-3.5", typeConfig.color)} />
-                          <span className={cn("text-xs font-medium", typeConfig.color)}>{typeConfig.label}</span>
-                        </div>
-                        <span className="text-xs text-[#86868B]">
-                          {startDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                          {' '}({daysCount} {daysCount === 1 ? 'día' : 'días'})
+                          <span className={cn(typeConfig.color)}>{typeConfig.label}</span>
                         </span>
-                      </div>
-                      
-                      {incapacidad.description && (
-                        <p className="text-xs text-[#86868B] mt-2 line-clamp-1">{incapacidad.description}</p>
-                      )}
-                      
-                      {/* Reemplazo asignado (vista previa) */}
-                      {incapacidad.replacementUserName && (
-                        <div className={cn(
-                          "flex items-center gap-1.5 mt-2 text-xs",
-                          incapacidad.isExternalSupport ? "text-amber-600" : "text-green-600"
-                        )}>
-                          <User className="w-3.5 h-3.5" />
-                          <span>
-                            Reemplazo: {incapacidad.replacementUserName}
-                            {incapacidad.isExternalSupport && (
-                              <span className="ml-1 px-1.5 py-0.5 bg-amber-100 rounded text-[10px]">Apoyo externo</span>
-                            )}
+                        <div className="flex items-center gap-1.5 text-sm text-[#1D1D1F]">
+                          <Calendar className="w-4 h-4 text-[#86868B]" />
+                          <span className="font-medium">
+                            {startDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} - {endDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                          </span>
+                          <span className="text-xs text-[#86868B]">
+                            ({daysCount} {daysCount === 1 ? 'día' : 'días'})
                           </span>
                         </div>
+                      </div>
+
+                      {incapacidad.description && (
+                        <p className="text-xs text-[#86868B] mt-3 line-clamp-2">{incapacidad.description}</p>
                       )}
-                      
-                      {/* Motivo de rechazo (vista previa) */}
+
+                      {incapacidad.replacementUserName && (
+                        <div className="flex items-center gap-2 mt-3 text-xs text-[#1D1D1F]">
+                          <User className="w-3.5 h-3.5 text-[#86868B]" />
+                          <span>
+                            Reemplazo: <span className="font-medium">{incapacidad.replacementUserName}</span>
+                          </span>
+                          {incapacidad.isExternalSupport && (
+                            <span className="px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-[10px] font-medium border border-amber-100">
+                              Apoyo externo
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {incapacidad.rejectionReason && (
-                        <div className="flex items-center gap-1.5 mt-2 text-xs text-red-600">
-                          <X className="w-3.5 h-3.5" />
-                          <span>Motivo: {incapacidad.rejectionReason}</span>
+                        <div className="flex items-start gap-2 mt-3 text-xs text-red-600">
+                          <X className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <span className="line-clamp-2">Motivo: {incapacidad.rejectionReason}</span>
                         </div>
                       )}
                     </div>
-                    
-                    {/* Icono de expansión */}
+
                     <div className="flex-shrink-0">
-                      <ChevronRight className={cn(
-                        "w-5 h-5 text-[#C7C7CC] transition-transform",
-                        isExpanded && "rotate-90"
-                      )} />
+                      <ChevronRight
+                        className={cn(
+                          "w-5 h-5 text-[#C7C7CC] transition-transform",
+                          isExpanded && "rotate-90"
+                        )}
+                      />
                     </div>
                   </div>
                 </button>
-                
-                {/* CONTENIDO EXPANDIDO */}
+
                 {isExpanded && (
-                  <div className="border-t border-[#E5E5E7] p-4 bg-[#FAFAFA]">
-                    {/* Botones de acción - SOLO en Equipo */}
+                  <div className="border-t border-[#E5E5E7] p-5 bg-[#FAFAFA]">
                     {activeSubTab === 'equipo' && (
-                      <div className="flex gap-2 mb-4 flex-wrap">
-                        {/* Botón Verificar */}
+                      <div className="flex gap-2 mb-5 flex-wrap">
                         {incapacidad.status === 'pendiente' && canVerifyIncapacidad && (
                           <button
                             onClick={() => handleVerify(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-corporate border border-corporate/20 rounded-lg text-sm font-medium hover:bg-corporate/5 transition-colors"
                           >
                             <Check className="w-4 h-4" />
                             Verificar
                           </button>
                         )}
 
-                        {/* Botón Registrar */}
                         {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && canRegisterIncapacidad && (
                           <button
                             onClick={() => handleRegister(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors"
                           >
                             <Check className="w-4 h-4" />
                             Registrar
                           </button>
                         )}
 
-                        {/* Botón Rechazar */}
                         {(incapacidad.status === 'pendiente' || incapacidad.status === 'verificada') && canRejectIncapacidad && (
                           <button
                             onClick={() => handleReject(incapacidad)}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600 transition-colors ml-auto"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors ml-auto"
                           >
                             <X className="w-4 h-4" />
                             Rechazar
@@ -5295,10 +5291,9 @@ function IncapacidadesTab({
                         )}
                       </div>
                     )}
-                    
-                    {/* Información del reemplazo con botón para cambiar */}
+
                     {incapacidad.status === 'registrada' && (
-                      <div className="mb-4">
+                      <div className="mb-5">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-sm font-medium text-[#1D1D1F]">Reemplazo asignado</p>
                           <button
@@ -5309,12 +5304,7 @@ function IncapacidadesTab({
                           </button>
                         </div>
                         {incapacidad.replacementUserName ? (
-                          <div className={cn(
-                            "flex items-center gap-3 rounded-xl p-3 border",
-                            incapacidad.isExternalSupport 
-                              ? "bg-amber-50 border-amber-200" 
-                              : "bg-green-50 border-green-200"
-                          )}>
+                          <div className="flex items-center gap-3 rounded-xl p-3 bg-white border border-[#E5E5E7]">
                             {(() => {
                               const replacementUser = incapacidad.replacementUserId
                                 ? users.find(
@@ -5329,34 +5319,26 @@ function IncapacidadesTab({
                                   name={incapacidad.replacementUserName || ''}
                                   photoUrl={replacementUser?.photoURL || replacementUser?.avatar}
                                   size="md"
-                                  fallbackClassName={cn(
-                                    "text-sm",
-                                    incapacidad.isExternalSupport ? "bg-amber-500" : "bg-green-500"
-                                  )}
+                                  fallbackClassName="bg-corporate/10 text-corporate text-sm"
                                 />
                               );
                             })()}
-                            <div>
-                              <p className={cn(
-                                "text-sm font-medium",
-                                incapacidad.isExternalSupport ? "text-amber-700" : "text-green-700"
-                              )}>
-                                {incapacidad.replacementUserName}
-                              </p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[#1D1D1F]">{incapacidad.replacementUserName}</p>
                               {incapacidad.isExternalSupport && incapacidad.replacementUserDept && (
-                                <p className="text-xs text-amber-600">
+                                <p className="text-xs text-[#86868B]">
                                   Apoyo de: {incapacidad.replacementUserDept.replace(/_/g, ' ')}
                                 </p>
                               )}
                             </div>
                             {incapacidad.isExternalSupport && (
-                              <span className="ml-auto px-2 py-1 bg-amber-100 text-amber-700 text-[10px] font-medium rounded">
+                              <span className="px-2 py-1 bg-amber-50 text-amber-600 text-[10px] font-medium rounded border border-amber-100">
                                 Apoyo externo
                               </span>
                             )}
                           </div>
                         ) : (
-                          <div className="bg-[#F5F5F7] rounded-xl p-4 text-center">
+                          <div className="bg-white rounded-xl p-4 text-center border border-[#E5E5E7]">
                             <p className="text-sm text-[#86868B] mb-2">No hay reemplazo asignado</p>
                             <button
                               onClick={() => handleChangeReplacement(incapacidad)}
@@ -5368,34 +5350,30 @@ function IncapacidadesTab({
                         )}
                       </div>
                     )}
-                    
-                    {/* Documentos */}
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-medium text-[#1D1D1F] flex items-center gap-2">
-                          <ClipboardList className="w-4 h-4" /> Documentos
-                        </p>
-                      </div>
+
+                    <div className="mb-5">
+                      <p className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4" /> Documentos
+                      </p>
                       {(incapacidad.documents?.length || 0) > 0 ? (
                         <div className="space-y-2">
                           {incapacidad.documents.map(doc => (
                             <div key={doc.id} className="bg-white rounded-xl p-3 border border-[#E5E5E7]">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <ClipboardList className="w-4 h-4 text-[#86868B]" />
-                                  <span className="text-sm">{doc.name}</span>
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <ClipboardList className="w-4 h-4 text-[#86868B] flex-shrink-0" />
+                                  <span className="text-sm text-[#1D1D1F] truncate">{doc.name}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                   {doc.uploaded ? (
-                                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-600 rounded-full">
+                                    <span className="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded-full border border-green-100">
                                       Subido ({doc.fileUrls?.length || 0})
                                     </span>
                                   ) : (
-                                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-600 rounded-full">
+                                    <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full border border-amber-100">
                                       Pendiente
                                     </span>
                                   )}
-                                  {/* Botón para subir foto (solo para el usuario que cargó la incapacidad) */}
                                   {user?.id === incapacidad.userId && (
                                     <button
                                       onClick={() => {
@@ -5403,7 +5381,7 @@ function IncapacidadesTab({
                                         setSelectedDocForUpload(doc.id);
                                         setShowUploadDocModal(true);
                                       }}
-                                      className="flex items-center gap-1 px-2 py-1 bg-corporate/10 text-corporate rounded text-xs hover:bg-corporate/20"
+                                      className="flex items-center gap-1 px-2 py-1 bg-corporate/5 text-corporate rounded text-xs hover:bg-corporate/10 transition-colors"
                                     >
                                       <Camera className="w-3 h-3" />
                                       {doc.uploaded ? 'Agregar' : 'Subir'}
@@ -5411,15 +5389,14 @@ function IncapacidadesTab({
                                   )}
                                 </div>
                               </div>
-                              {/* Mostrar fotos subidas - orientación vertical */}
                               {doc.fileUrls && doc.fileUrls.length > 0 && (
                                 <div className="flex flex-wrap gap-3 mt-3">
                                   {doc.fileUrls.map((url, idx) => (
                                     <div key={idx} className="relative group">
                                       {url.startsWith('http') || url.startsWith('data:') ? (
                                         <>
-                                          <img 
-                                            src={url} 
+                                          <img
+                                            src={url}
                                             alt={`${doc.name} ${idx + 1}`}
                                             className="h-32 w-24 object-contain rounded-lg border border-[#E5E5E7] cursor-pointer hover:border-corporate transition-colors bg-[#F5F5F7]"
                                             onClick={() => setExpandedImage(url)}
@@ -5434,9 +5411,9 @@ function IncapacidadesTab({
                                           </a>
                                         </>
                                       ) : (
-                                        <div className="h-32 w-24 flex flex-col items-center justify-center rounded-lg border border-green-200 bg-green-50 p-2">
-                                          <Check className="w-8 h-8 text-green-500 mb-1" />
-                                          <span className="text-xs text-green-600 text-center">Documento subido</span>
+                                        <div className="h-32 w-24 flex flex-col items-center justify-center rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] p-2">
+                                          <Check className="w-8 h-8 text-corporate mb-1" />
+                                          <span className="text-xs text-[#86868B] text-center">Documento subido</span>
                                         </div>
                                       )}
                                     </div>
@@ -5449,18 +5426,17 @@ function IncapacidadesTab({
                       ) : (
                         <p className="text-sm text-[#86868B]">No hay documentos solicitados</p>
                       )}
-                      
-                      {/* Solicitar nuevo documento - SOLO en Equipo con permiso */}
+
                       {activeSubTab === 'equipo' && canRequestIncapacidadDocs && (
                         <div className="flex gap-2 mt-2">
                           <input
                             type="text"
                             value={newDocName}
                             onChange={(e) => setNewDocName(e.target.value)}
-                            className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
+                            className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm bg-white"
                             placeholder="Solicitar nuevo documento..."
                           />
-                          <Button 
+                          <Button
                             size="sm"
                             disabled={!newDocName.trim()}
                             onClick={() => incapacidad.id && requestDocument(incapacidad.id)}
@@ -5470,13 +5446,12 @@ function IncapacidadesTab({
                         </div>
                       )}
                     </div>
-                    
-                    {/* Historial */}
-                    <div className="mb-4">
+
+                    <div className="mb-5">
                       <p className="text-sm font-medium text-[#1D1D1F] mb-2 flex items-center gap-2">
                         <History className="w-4 h-4" /> Historial de acciones
                       </p>
-                      <div className="space-y-2 max-h-40 overflow-y-auto bg-white rounded-xl p-3 border border-[#E5E5E7]">
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
                         {(incapacidad.history || []).map((h, i) => (
                           <div key={i} className="flex items-start gap-3 text-sm">
                             <div className="w-2 h-2 bg-corporate rounded-full mt-1.5 flex-shrink-0" />
@@ -5488,14 +5463,12 @@ function IncapacidadesTab({
                         ))}
                       </div>
                     </div>
-                    
-                    {/* Notas */}
+
                     <div>
                       <p className="text-sm font-medium text-[#1D1D1F] mb-2">Notas</p>
                       <div className="space-y-2 max-h-40 overflow-y-auto mb-3">
                         {(incapacidad.notes?.length || 0) > 0 ? (
                           incapacidad.notes!.map((note, i) => {
-                            // Manejar tanto string como Timestamp de Firestore
                             const noteDate = typeof note.date === 'string' ? new Date(note.date) : new Date();
                             const isValidDate = !isNaN(noteDate.getTime());
                             return (
@@ -5516,10 +5489,10 @@ function IncapacidadesTab({
                           type="text"
                           value={newNote}
                           onChange={(e) => setNewNote(e.target.value)}
-                          className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm"
+                          className="flex-1 px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm bg-white"
                           placeholder="Añadir nota..."
                         />
-                        <Button 
+                        <Button
                           size="sm"
                           disabled={!newNote.trim()}
                           onClick={() => addNoteLocal(incapacidad.id!)}
@@ -6516,99 +6489,113 @@ function TimeOffRequestsPanel({
             </p>
           </div>
         ) : (
-          filtered.map((req) => (
-            <div
-              key={req.id}
-              className="bg-white rounded-xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  {(() => {
-                    const reqUser = users.find((u) => u.id === req.userId);
-                    return (
-                      <UserAvatar
-                        name={req.userName}
-                        photoUrl={reqUser?.photoURL || reqUser?.avatar}
-                        size="md"
-                        fallbackClassName="bg-corporate text-sm"
-                      />
-                    );
-                  })()}
-                  <div>
-                    <p className="text-sm font-medium text-[#1D1D1F]">{req.userName}</p>
-                    <p className="text-xs text-[#86868B]">{req.department.replace(/_/g, ' ')}</p>
+          filtered.map((req) => {
+            const typeVisual = TIME_OFF_VISUAL[req.type];
+            const TypeIcon = typeVisual.icon;
+            return (
+              <div
+                key={req.id}
+                className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-shadow"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const reqUser = users.find((u) => u.id === req.userId);
+                      return (
+                        <UserAvatar
+                          name={req.userName}
+                          photoUrl={reqUser?.photoURL || reqUser?.avatar}
+                          size="md"
+                          fallbackClassName="bg-corporate text-sm"
+                        />
+                      );
+                    })()}
+                    <div>
+                      <p className="text-sm font-semibold text-[#1D1D1F]">{req.userName}</p>
+                      <p className="text-xs text-[#86868B]">{req.department.replace(/_/g, ' ')}</p>
+                    </div>
                   </div>
+                  <TimeOffStatusBadge status={req.status} />
                 </div>
-                <TimeOffStatusBadge status={req.status} />
-              </div>
 
-              <div className="mt-3">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7]">
-                  <Sun className="w-3 h-3 mr-1.5" />
-                  {TIME_OFF_LABELS[req.type]}
-                </span>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2 text-sm text-[#1D1D1F]">
-                <Calendar className="w-4 h-4 text-[#86868B]" />
-                <span className="text-[#86868B]">Fechas:</span>
-                <span className="font-medium">{formatTimeOffRange(req.startDate, req.endDate)}</span>
-              </div>
-
-              {req.reason && (
-                <div className="mt-2 flex items-start gap-2 text-sm text-[#1D1D1F]">
-                  <FileText className="w-4 h-4 text-[#86868B] mt-0.5" />
-                  <span className="text-[#86868B]">Motivo:</span>
-                  <span className="font-medium">{req.reason}</span>
-                </div>
-              )}
-
-              <div className="mt-3 pt-2 border-t border-[#E5E5E7] flex items-center justify-between text-xs text-[#86868B]">
-                <span>
-                  Solicitado: {new Date(req.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
-                  {new Date(req.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                </span>
-                {req.reviewedAt && (
-                  <span>
-                    Revisado: {new Date(req.reviewedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
-                    {new Date(req.reviewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border',
+                      typeVisual.bgColor,
+                      typeVisual.color,
+                      typeVisual.borderColor
+                    )}
+                  >
+                    <TypeIcon className="w-3.5 h-3.5" />
+                    {TIME_OFF_LABELS[req.type]}
                   </span>
-                )}
-              </div>
-
-              {/* Historial: visible para quienes pueden actuar sobre la solicitud */}
-              {canActOnTimeOff(req, 'view') && (req.history || []).length > 0 && (
-                <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
-                  <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
-                  <div className="space-y-1">
-                    {req.history!.map((item, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-xs">
-                        <span className="text-[#86868B] whitespace-nowrap">
-                          {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
-                          {new Date(item.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        <span className="text-[#1D1D1F]">
-                          - <span className="font-medium">{item.by || 'Sistema'}</span> {item.action}
-                        </span>
-                        {item.note && <span className="text-[#86868B] italic">({item.note})</span>}
-                      </div>
-                    ))}
+                  <div className="flex items-center gap-2 text-sm text-[#1D1D1F]">
+                    <Calendar className="w-4 h-4 text-[#86868B]" />
+                    <span className="font-medium">{formatTimeOffRange(req.startDate, req.endDate)}</span>
                   </div>
                 </div>
-              )}
 
-              {req.status === 'pendiente' && (canActOnTimeOff(req, 'approve') || canActOnTimeOff(req, 'reject')) && (
-                <div className="mt-3 flex gap-2 justify-end">
-                  {canActOnTimeOff(req, 'approve') && (
+                {req.reason && (
+                  <div className="mt-3 flex items-start gap-2 text-sm text-[#1D1D1F]">
+                    <FileText className="w-4 h-4 text-[#86868B] mt-0.5 flex-shrink-0" />
+                    <span className="text-[#86868B]">Motivo:</span>
+                    <span className="font-medium">{req.reason}</span>
+                  </div>
+                )}
+
+                <div className="mt-4 pt-3 border-t border-[#E5E5E7] flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[#86868B]">
+                  <span>
+                    Solicitado el{' '}
+                    {new Date(req.createdAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                    {new Date(req.createdAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  {req.reviewedAt && (
+                    <span>
+                      Revisado el{' '}
+                      {new Date(req.reviewedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                      {new Date(req.reviewedAt).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  )}
+                </div>
+
+                {canActOnTimeOff(req, 'view') && (req.history || []).length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-[#E5E5E7]">
+                    <p className="text-xs font-medium text-[#86868B] mb-2 flex items-center gap-1.5">
+                      <History className="w-3.5 h-3.5" /> Historial
+                    </p>
+                    <div className="space-y-1.5">
+                      {req.history!.map((item, idx) => (
+                        <div key={idx} className="flex items-start gap-2 text-xs">
+                          <div className="w-1.5 h-1.5 rounded-full bg-corporate/60 mt-1.5 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-[#86868B] whitespace-nowrap">
+                              {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
+                              {new Date(item.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {' · '}
+                            <span className="text-[#1D1D1F]">
+                              <span className="font-medium">{item.by || 'Sistema'}</span> {item.action}
+                            </span>
+                            {item.note && <span className="text-[#86868B]"> · {item.note}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2 justify-end">
+                  {req.status === 'pendiente' && canActOnTimeOff(req, 'approve') && (
                     <button
                       onClick={() => onApprove(req)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-corporate text-white rounded-lg text-sm font-medium hover:bg-corporate/90 transition-colors"
                     >
                       <Check className="w-4 h-4" />
                       Aprobar
                     </button>
                   )}
-                  {canActOnTimeOff(req, 'reject') && (
+                  {req.status === 'pendiente' && canActOnTimeOff(req, 'reject') && (
                     <button
                       onClick={() => onReject(req)}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -6617,47 +6604,45 @@ function TimeOffRequestsPanel({
                       Rechazar
                     </button>
                   )}
+                  {canActOnTimeOff(req, 'edit') && req.status !== 'cancelada' && req.status !== 'eliminada' && (
+                    <button
+                      onClick={() => {
+                        setEditingRequest(req);
+                        setEditType(req.type);
+                        setEditStartDate(req.startDate);
+                        setEditEndDate(req.endDate);
+                        setEditReason('');
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#1D1D1F] border border-[#E5E5E7] rounded-lg text-sm font-medium hover:bg-[#F5F5F7] transition-colors"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Editar
+                    </button>
+                  )}
+                  {req.userId === user?.id && req.status !== 'cancelada' && req.status !== 'eliminada' && (
+                    <button
+                      onClick={() => req.status === 'pendiente' && onCancel(req)}
+                      disabled={req.status !== 'pendiente'}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#86868B] border border-[#E5E5E7] rounded-lg text-sm font-medium hover:bg-[#F5F5F7] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Cancelar
+                    </button>
+                  )}
+                  {(canActOnTimeOff(req, 'delete') || (req.userId === user?.id && req.status !== 'aprobada')) &&
+                    req.status !== 'eliminada' && (
+                      <button
+                        onClick={() => setDeletingRequest(req)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Eliminar
+                      </button>
+                    )}
                 </div>
-              )}
-
-              <div className="mt-2 flex gap-2 justify-end">
-                {canActOnTimeOff(req, 'edit') && req.status !== 'cancelada' && req.status !== 'eliminada' && (
-                  <button
-                    onClick={() => {
-                      setEditingRequest(req);
-                      setEditType(req.type);
-                      setEditStartDate(req.startDate);
-                      setEditEndDate(req.endDate);
-                      setEditReason('');
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F5F5F7] text-[#1D1D1F] border border-[#E5E5E7] rounded-lg text-sm font-medium hover:bg-white transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Editar
-                  </button>
-                )}
-                {req.userId === user?.id && req.status !== 'cancelada' && req.status !== 'eliminada' && (
-                  <button
-                    onClick={() => req.status === 'pendiente' && onCancel(req)}
-                    disabled={req.status !== 'pendiente'}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                    Cancelar
-                  </button>
-                )}
-                {(canActOnTimeOff(req, 'delete') || (req.userId === user?.id && req.status !== 'aprobada')) && req.status !== 'eliminada' && (
-                  <button
-                    onClick={() => setDeletingRequest(req)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    Eliminar
-                  </button>
-                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

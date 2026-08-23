@@ -1,15 +1,32 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (refinamiento del flujo de solicitud de días libres)
+> Última actualización: 2026-08-23 (rediseño de tarjetas en Horarios)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
 
 ---
 
-## Cambios temporales activos
+## Rediseño de tarjetas de Horarios
 
-- **Botón "Solicitar libre" siempre habilitado**: en `src/components/modules/HorariosModule.tsx` la variable `isSecondWeek` se forzó a `true` para permitir probar el flujo de días libres sin depender de la fecha actual (días 8-14). Revertir antes de cerrar FASE 7.
+### TimeOffRequestsPanel
+- Tarjetas de solicitudes de tiempo libre con estilo minimalista: fondo blanco, bordes redondeados (`rounded-2xl`) y sombra sutil.
+- Jerarquía clara: avatar + nombre + departamento a la izquierda, badge de estado en pill a la derecha.
+- Badge de tipo con colores de `TIME_OFF_VISUAL` pero más sutil (fondo claro, texto coloreado, icono pequeño).
+- Rango de fechas con icono `Calendar`, sin etiqueta "Fechas:".
+- Footer compacto con "Solicitado el ..." y "Revisado el ..." en gris.
+- Historial más compacto con viñetas sutiles y actor en texto tenue.
+- Botones de acción alineados a la derecha, más pequeños y coherentes: sólido solo para aprobar, outline para el resto.
+
+### IncapacidadesTab
+- Mismo estilo de tarjeta blanca minimalista que las solicitudes de tiempo libre.
+- Cabecera: avatar + nombre + departamento a la izquierda, pill de estado a la derecha (sin borde grueso ni fondos brillantes).
+- Badge de tipo pequeño con icono y fondo sutil de `incapacityTypeConfig`.
+- Fechas con icono `Calendar`, rango + duración en días.
+- Descripción truncada a 2 líneas en vista colapsada (`line-clamp-2`).
+- Vista previa de reemplazo con icono `User` y badge ámbar "Apoyo externo" si aplica.
+- Motivo de rechazo en línea roja compacta.
+- Contenido expandido con fondo `bg-[#FAFAFA]`, botones más pequeños, lista de documentos con bordes sutiles, historial tipo timeline limpio y notas en tarjetas blancas.
 
 ---
 
