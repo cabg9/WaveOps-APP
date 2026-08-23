@@ -997,6 +997,7 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
     - Indicadores cross-department en modales de **Equipo** (colaborador, día y header) normalizados.
 - **Resultado**: el Gerente de Operaciones ve de forma confiable solo `OPERACIONES` y sus departamentos hijos en **Equipo**, **Asignar** y **Tasks**, independientemente de cómo estén escritos los departamentos en Firestore. Los gerentes de departamento y supervisores también ven correctamente su subárbol jerárquico. El filtrado por departamento es robusto en todo el módulo de Horarios, Tasks, Turnos y Departamentos.
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `b10b7b5b` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
