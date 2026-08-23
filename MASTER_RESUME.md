@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.7 en progreso: fix filtro "Todos" en Horarios → Equipo/Asignar)
+> Última actualización: 2026-08-23 (FASE 7.7 en progreso: validación de tareas específicas y plantillas)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -819,6 +819,21 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
     - Se eliminaron los logs temporales de diagnóstico de jerarquía.
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `e909749f` en `fix-horarios-provider`.
+
+### Fixes de esta ronda (generación de tareas específicas al publicar asignaciones)
+- **Problema**: se necesitaba verificar que las tareas específicas se generen correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
+- **Bugs encontrados y corregidos**:
+  - `isTemplateWithinVigency` en `src/hooks/firestore/useFirestoreShifts.ts` aceptaba fechas anteriores a la creación de la plantilla, pudiendo generar tareas para días pasados.
+  - `publishAssignments` publicaba asignaciones una por una en lugar de usar `writeBatch`, perdiendo atomicidad.
+  - `generateSpecificTasksFromAssignments` consultaba tareas existentes una por una y no usaba batch; podía actualizar tareas ya completadas/verificadas.
+  - `specificTaskSupervisor` en `src/components/modules/TasksModule.tsx` comparaba `u.department === specificTaskForm.department` sin normalizar, fallando cuando el usuario tenía nombre legible y el formulario código (o viceversa).
+- **Correcciones**:
+  - `isTemplateWithinVigency` ahora exige `diffDays >= 0 && diffDays <= vigenciaDays`.
+  - `publishAssignments` usa `writeBatch` para publicar borradores y eliminar asignaciones marcadas como `ELIMINADO`.
+  - `generateSpecificTasksFromAssignments` precarga tareas existentes por `templateId` en lotes de 10, agrupa creaciones/actualizaciones en un `writeBatch` y no modifica tareas cuyo estado no sea `PENDING`, `IN_PROGRESS` o `BLOCKED`.
+  - Se importa `normalizeDeptCode` desde `useDynamicDepartments` y se normaliza la comparación en `specificTaskSupervisor`.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `bb0ec206` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
