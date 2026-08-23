@@ -1619,14 +1619,15 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
   // Para cada departamento involucrado, deben verificar obligatoriamente el gerente Y el supervisor.
   // Si el departamento no tiene uno de esos roles, un superior (RRHH, Director, Director General o Gerente de Operaciones si es operativo) puede cubrirlo.
   const todosVerificaron = deptosInvolucrados.every((dept) => {
+    const deptCode = normalizeDeptCode(dept || '');
     const verifiers = (incidencia.verifiedByList || []).map((v) => firestoreUsers.find((u) => u.id === v || u.email === v)).filter(Boolean);
-    const deptVerifiers = verifiers.filter((v) => v?.department === dept);
+    const deptVerifiers = verifiers.filter((v) => normalizeDeptCode(v?.department || '') === deptCode);
     const hasManager = deptVerifiers.some((v) => v?.role === Role.GERENTE_DEPARTAMENTO);
     const hasSupervisor = deptVerifiers.some((v) => v?.role === Role.SUPERVISOR);
 
     if (hasManager && hasSupervisor) return true;
 
-    const isOperational = isOperationalDepartment(dept);
+    const isOperational = isOperationalDepartment(deptCode);
     const hasSuperior = verifiers.some((v) =>
       v?.role === Role.RRHH ||
       v?.role === Role.DIRECTOR ||
@@ -1634,8 +1635,8 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
       (isOperational && v?.role === Role.GERENTE_OPERACIONES)
     );
 
-    const deptHasManager = firestoreUsers.some((u) => u.department === dept && u.role === Role.GERENTE_DEPARTAMENTO);
-    const deptHasSupervisor = firestoreUsers.some((u) => u.department === dept && u.role === Role.SUPERVISOR);
+    const deptHasManager = firestoreUsers.some((u) => normalizeDeptCode(u.department || '') === deptCode && u.role === Role.GERENTE_DEPARTAMENTO);
+    const deptHasSupervisor = firestoreUsers.some((u) => normalizeDeptCode(u.department || '') === deptCode && u.role === Role.SUPERVISOR);
 
     const managerOk = hasManager || (!deptHasManager && hasSuperior);
     const supervisorOk = hasSupervisor || (!deptHasSupervisor && hasSuperior);
