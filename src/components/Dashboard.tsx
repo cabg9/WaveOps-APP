@@ -34,6 +34,7 @@ import { db } from '@/firebase-config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
 import { Role } from '@/types';
+import { hasPermission } from '@/lib/permissions-config';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
@@ -132,7 +133,7 @@ function ModuleCard({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { visibleModules, hasDevelopAccess } = useAppConfig();
+  const { visibleModules, hasDevelopAccess, effectiveUser } = useAppConfig();
   const { user } = useAuth();
   const { tasks, getTaskCounts } = useTasks();
   const { getUserShifts } = useShifts();
@@ -219,7 +220,8 @@ export default function Dashboard() {
   // ─── SOLICITUDES DE TIEMPO LIBRE PENDIENTES QUE PUEDE APROBAR ───
   const [pendingTimeOffCount, setPendingTimeOffCount] = React.useState(0);
   React.useEffect(() => {
-    if (!user) return;
+    const currentUser = effectiveUser || user;
+    if (!currentUser) return;
     const q = query(
       collection(db, 'timeOffRequests'),
       where('status', '==', 'pendiente')
@@ -234,16 +236,16 @@ export default function Dashboard() {
           department: data.department || '',
           status: data.status || 'pendiente',
         };
-        return canActOnTimeOff(req, user, activeUsers);
+        return canActOnTimeOff(req, currentUser, activeUsers);
       }).length;
       setPendingTimeOffCount(count);
     });
     return () => unsubscribe();
-  }, [user, firestoreUsers]);
+  }, [effectiveUser, user, firestoreUsers]);
 
   function canActOnTimeOff(
     req: { id: string; userId: string; department: string; status: string },
-    currentUser: { id: string; role: Role; department?: string } | null | undefined,
+    currentUser: { id: string; role: Role; department?: string; permissions?: string[] } | null | undefined,
     activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[]
   ): boolean {
     if (!currentUser) return false;
@@ -252,7 +254,7 @@ export default function Dashboard() {
       currentUser.role === Role.DIRECTOR ||
       currentUser.role === Role.DIRECTOR_GENERAL
     ) {
-      return true;
+      return hasPermission(currentUser as any, 'canApproveTimeOff');
     }
     const reqDeptCode = normalizeDeptCode(req.department || '');
     const userDeptCode = normalizeDeptCode(currentUser.department || '');
@@ -264,7 +266,11 @@ export default function Dashboard() {
         normalizeDeptCode(u.department || '') === reqDeptCode
     );
     if (hasDeptManager) {
-      return currentUser.role === Role.GERENTE_DEPARTAMENTO && userDeptCode === reqDeptCode;
+      return (
+        currentUser.role === Role.GERENTE_DEPARTAMENTO &&
+        userDeptCode === reqDeptCode &&
+        hasPermission(currentUser as any, 'canApproveTimeOff')
+      );
     }
 
     const hasDeptSupervisor = activeUsers.some(
@@ -274,10 +280,17 @@ export default function Dashboard() {
         normalizeDeptCode(u.department || '') === reqDeptCode
     );
     if (hasDeptSupervisor) {
-      return currentUser.role === Role.SUPERVISOR && userDeptCode === reqDeptCode;
+      return (
+        currentUser.role === Role.SUPERVISOR &&
+        userDeptCode === reqDeptCode &&
+        hasPermission(currentUser as any, 'canApproveTimeOff')
+      );
     }
 
-    return currentUser.role === Role.GERENTE_OPERACIONES;
+    return (
+      currentUser.role === Role.GERENTE_OPERACIONES &&
+      hasPermission(currentUser as any, 'canApproveTimeOff')
+    );
   }
 
   const myTasks = userId ? tasks.filter((t) =>

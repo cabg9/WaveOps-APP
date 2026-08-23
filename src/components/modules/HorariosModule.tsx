@@ -75,7 +75,8 @@ import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
-import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType, Task } from '@/types';
+import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType, Task, type User as UserType } from '@/types';
+import { hasPermission } from '@/lib/permissions-config';
 import { sortShiftsByTime } from '@/lib/utils';
 
 import {
@@ -945,12 +946,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
   const [timeOffStart, setTimeOffStart] = useState<string>('');
   const [timeOffEnd, setTimeOffEnd] = useState<string>('');
   const [timeOffMotivo, setTimeOffMotivo] = useState('');
-  const [timeOffCalendarMonth, setTimeOffCalendarMonth] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    d.setDate(1);
-    return d;
-  });
 
   const handleSubmitTimeOff = async () => {
     if (!timeOffStart) {
@@ -997,31 +992,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
       toast.error('Error al enviar la solicitud');
     }
   };
-
-  const getCalendarDays = (year: number, month: number) => {
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    // Calendario empieza en lunes (igual que Mi Horario)
-    const leadingNulls = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
-    const days = [];
-    for (let i = 0; i < leadingNulls; i++) days.push(null);
-    for (let i = 1; i <= daysInMonth; i++) days.push(i);
-    return days;
-  };
-
-  const handleDateClick = (day: number) => {
-    const year = timeOffCalendarMonth.getFullYear();
-    const month = timeOffCalendarMonth.getMonth();
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    if (!timeOffStart || (timeOffStart && timeOffEnd) || dateStr < timeOffStart) {
-      setTimeOffStart(dateStr);
-      setTimeOffEnd('');
-    } else {
-      setTimeOffEnd(dateStr);
-    }
-  };
-
 
   const [incapacityStartDate, setIncapacityStartDate] = useState('');
   const [incapacityEndDate, setIncapacityEndDate] = useState('');
@@ -1819,14 +1789,6 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
                       setTimeOffType(opt.key as any);
                       setTimeOffStart('');
                       setTimeOffEnd('');
-                      const d = new Date();
-                      if (opt.key !== 'vacaciones') {
-                        d.setMonth(d.getMonth() + 1);
-                      } else {
-                        d.setMonth(d.getMonth());
-                      }
-                      d.setDate(1);
-                      setTimeOffCalendarMonth(d);
                     }}
                     className={`p-3 rounded-xl border-2 text-sm flex flex-col items-center gap-1 transition-all ${
                       timeOffType === opt.key
@@ -1841,97 +1803,12 @@ function MiHorarioTab({ incapacityDates, addIncapacity, getIncapacityForDate: _g
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-[#1D1D1F]">
-                  {timeOffType === 'vacaciones' ? 'Selecciona fechas' : 'Selecciona fechas (próximo mes)'}
-                </label>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const d = new Date(timeOffCalendarMonth);
-                      d.setMonth(d.getMonth() - 1);
-                      setTimeOffCalendarMonth(d);
-                    }}
-                    className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
-                    disabled={timeOffType !== 'vacaciones' && timeOffCalendarMonth.getMonth() <= new Date().getMonth()}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-sm font-medium min-w-[120px] text-center">
-                    {timeOffCalendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const d = new Date(timeOffCalendarMonth);
-                      d.setMonth(d.getMonth() + 1);
-                      setTimeOffCalendarMonth(d);
-                    }}
-                    className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
-                    disabled={timeOffType !== 'vacaciones' ? 
-                      timeOffCalendarMonth.getMonth() >= new Date().getMonth() + 1 :
-                      timeOffCalendarMonth.getFullYear() >= 2027 && timeOffCalendarMonth.getMonth() >= 11
-                    }
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {(timeOffStart || timeOffEnd) && (
-                <div className="bg-corporate/5 rounded-lg p-2 mb-2 text-center">
-                  <p className="text-sm text-corporate font-medium">
-                    {timeOffStart === timeOffEnd || !timeOffEnd
-                      ? `Día seleccionado: ${new Date(timeOffStart + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`
-                      : `Del ${new Date(timeOffStart + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} al ${new Date(timeOffEnd + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                    }
-                  </p>
-                </div>
-              )}
-
-              <div className="border border-[#E5E5E7] rounded-xl p-3">
-                <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                  {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
-                    <div key={d} className="text-xs text-[#86868B] py-1 font-medium">{d}</div>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1">
-                  {(() => {
-                    const year = timeOffCalendarMonth.getFullYear();
-                    const month = timeOffCalendarMonth.getMonth();
-                    const days = getCalendarDays(year, month);
-                    return days.map((day, idx) => {
-                      if (!day) return <div key={idx} />;
-                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                      const isStart = timeOffStart === dateStr;
-                      const isEnd = timeOffEnd === dateStr;
-                      const isInRange = timeOffStart && timeOffEnd && dateStr > timeOffStart && dateStr < timeOffEnd;
-                      return (
-                        <button
-                          key={day}
-                          type="button"
-                          onClick={() => handleDateClick(day)}
-                          className={`h-8 rounded-lg text-sm transition-all ${
-                            isStart || isEnd
-                              ? 'bg-corporate text-white font-semibold'
-                              : isInRange
-                                ? 'bg-corporate/20 text-corporate'
-                                : 'hover:bg-gray-100 text-[#1D1D1F]'
-                          }`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    });
-                  })()}
-                </div>
-              </div>
-              <p className="text-xs text-[#86868B] mt-1 text-center">
-                Primer clic: fecha inicio · Segundo clic: fecha fin · Clic en fecha anterior: reinicia inicio
-              </p>
-            </div>
+            <TimeOffDatePicker
+              type={timeOffType}
+              startDate={timeOffStart}
+              endDate={timeOffEnd}
+              onChange={(s, e) => { setTimeOffStart(s); setTimeOffEnd(e); }}
+            />
 
             <div>
               <label className="text-sm font-medium text-[#1D1D1F] mb-1 block">Motivo adicional (opcional)</label>
@@ -6219,16 +6096,26 @@ function TimeOffEditedIndicator({ req, className }: { req: TimeOffRequest; class
 // Determina si el usuario actual puede actuar sobre una solicitud de tiempo libre específica
 function canActOnTimeOff(
   req: TimeOffRequest,
-  currentUser: { id: string; role: Role; department?: string } | null | undefined,
-  activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[]
+  currentUser: UserType | null | undefined,
+  activeUsers: { id: string; role: Role; department?: string; isActive?: boolean }[],
+  action: 'approve' | 'reject' | 'edit' | 'delete' | 'view' = 'view'
 ): boolean {
   if (!currentUser) return false;
+
+  const permissionMap = {
+    approve: 'canApproveTimeOff',
+    reject: 'canRejectTimeOff',
+    edit: 'canEditTimeOff',
+    delete: 'canDeleteTimeOff',
+    view: 'canViewTeamTimeOff',
+  } as const;
+
   if (
     currentUser.role === Role.RRHH ||
     currentUser.role === Role.DIRECTOR ||
     currentUser.role === Role.DIRECTOR_GENERAL
   ) {
-    return true;
+    return hasPermission(currentUser, permissionMap[action]);
   }
   const reqDeptCode = normalizeDeptCode(req.department || '');
   const userDeptCode = normalizeDeptCode(currentUser.department || '');
@@ -6240,7 +6127,11 @@ function canActOnTimeOff(
       normalizeDeptCode(u.department || '') === reqDeptCode
   );
   if (hasDeptManager) {
-    return currentUser.role === Role.GERENTE_DEPARTAMENTO && userDeptCode === reqDeptCode;
+    return (
+      currentUser.role === Role.GERENTE_DEPARTAMENTO &&
+      userDeptCode === reqDeptCode &&
+      hasPermission(currentUser, permissionMap[action])
+    );
   }
 
   const hasDeptSupervisor = activeUsers.some(
@@ -6250,10 +6141,17 @@ function canActOnTimeOff(
       normalizeDeptCode(u.department || '') === reqDeptCode
   );
   if (hasDeptSupervisor) {
-    return currentUser.role === Role.SUPERVISOR && userDeptCode === reqDeptCode;
+    return (
+      currentUser.role === Role.SUPERVISOR &&
+      userDeptCode === reqDeptCode &&
+      hasPermission(currentUser, permissionMap[action])
+    );
   }
 
-  return currentUser.role === Role.GERENTE_OPERACIONES;
+  return (
+    currentUser.role === Role.GERENTE_OPERACIONES &&
+    hasPermission(currentUser, permissionMap[action])
+  );
 }
 
 async function notifyTimeOffStakeholders(
@@ -6379,11 +6277,158 @@ function TimeOffStatusBadge({ status }: { status: TimeOffRequest['status'] }) {
   return <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full', className)}>{label}</span>;
 }
 
+interface TimeOffDatePickerProps {
+  type: TimeOffRequest['type'];
+  startDate: string;
+  endDate: string;
+  onChange: (start: string, end: string) => void;
+}
+
+function TimeOffDatePicker({ type, startDate, endDate, onChange }: TimeOffDatePickerProps) {
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const d = new Date();
+    if (type !== 'vacaciones') {
+      d.setMonth(d.getMonth() + 1);
+    }
+    d.setDate(1);
+    return d;
+  });
+
+  // Sincronizar mes si cambia el tipo
+  useEffect(() => {
+    const d = new Date();
+    if (type !== 'vacaciones') {
+      d.setMonth(d.getMonth() + 1);
+    }
+    d.setDate(1);
+    setCalendarMonth(d);
+  }, [type]);
+
+  const getCalendarDays = (year: number, month: number) => {
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    // Calendario empieza en lunes
+    const leadingNulls = firstDay.getDay() === 0 ? 6 : firstDay.getDay() - 1;
+    const days = [];
+    for (let i = 0; i < leadingNulls; i++) days.push(null);
+    for (let i = 1; i <= daysInMonth; i++) days.push(i);
+    return days;
+  };
+
+  const handleDateClick = (day: number) => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    if (!startDate || (startDate && endDate) || dateStr < startDate) {
+      onChange(dateStr, '');
+    } else {
+      onChange(startDate, dateStr);
+    }
+  };
+
+  const canGoPrev = type === 'vacaciones' || calendarMonth.getMonth() > new Date().getMonth();
+  const canGoNext = type === 'vacaciones'
+    ? !(calendarMonth.getFullYear() >= 2027 && calendarMonth.getMonth() >= 11)
+    : calendarMonth.getMonth() < new Date().getMonth() + 1;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-sm font-medium text-[#1D1D1F]">
+          {type === 'vacaciones' ? 'Selecciona fechas' : 'Selecciona fechas (próximo mes)'}
+        </label>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              const d = new Date(calendarMonth);
+              d.setMonth(d.getMonth() - 1);
+              setCalendarMonth(d);
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+            disabled={!canGoPrev}
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="text-sm font-medium min-w-[120px] text-center">
+            {calendarMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              const d = new Date(calendarMonth);
+              d.setMonth(d.getMonth() + 1);
+              setCalendarMonth(d);
+            }}
+            className="p-1 rounded-lg hover:bg-gray-100 disabled:opacity-30"
+            disabled={!canGoNext}
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {(startDate || endDate) && (
+        <div className="bg-corporate/5 rounded-lg p-2 mb-2 text-center">
+          <p className="text-sm text-corporate font-medium">
+            {startDate === endDate || !endDate
+              ? `Día seleccionado: ${new Date(startDate + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' })}`
+              : `Del ${new Date(startDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })} al ${new Date(endDate + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            }
+          </p>
+        </div>
+      )}
+
+      <div className="border border-[#E5E5E7] rounded-xl p-3">
+        <div className="grid grid-cols-7 gap-1 text-center mb-1">
+          {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((d) => (
+            <div key={d} className="text-xs text-[#86868B] py-1 font-medium">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {(() => {
+            const year = calendarMonth.getFullYear();
+            const month = calendarMonth.getMonth();
+            const days = getCalendarDays(year, month);
+            return days.map((day, idx) => {
+              if (!day) return <div key={idx} />;
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isStart = startDate === dateStr;
+              const isEnd = endDate === dateStr;
+              const isInRange = startDate && endDate && dateStr > startDate && dateStr < endDate;
+              return (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => handleDateClick(day)}
+                  className={`h-8 rounded-lg text-sm transition-all ${
+                    isStart || isEnd
+                      ? 'bg-corporate text-white font-semibold'
+                      : isInRange
+                        ? 'bg-corporate/20 text-corporate'
+                        : 'hover:bg-gray-100 text-[#1D1D1F]'
+                  }`}
+                >
+                  {day}
+                </button>
+              );
+            });
+          })()}
+        </div>
+      </div>
+      <p className="text-xs text-[#86868B] mt-1 text-center">
+        Primer clic: fecha inicio · Segundo clic: fecha fin · Clic en fecha anterior: reinicia inicio
+      </p>
+    </div>
+  );
+}
+
 interface TimeOffRequestsPanelProps {
   myRequests: TimeOffRequest[];
   teamRequests: TimeOffRequest[];
   canApprove: boolean;
-  canActOnTimeOff: (req: TimeOffRequest) => boolean;
+  canActOnTimeOff: (req: TimeOffRequest, action: 'approve' | 'reject' | 'edit' | 'delete' | 'view') => boolean;
   users: { id: string; name: string; avatar?: string; photoURL?: string }[];
   onApprove: (req: TimeOffRequest) => void;
   onReject: (req: TimeOffRequest) => void;
@@ -6532,7 +6577,7 @@ function TimeOffRequestsPanel({
               </div>
 
               {/* Historial: visible para quienes pueden actuar sobre la solicitud */}
-              {canActOnTimeOff(req) && (req.history || []).length > 0 && (
+              {canActOnTimeOff(req, 'view') && (req.history || []).length > 0 && (
                 <div className="mt-3 pt-2 border-t border-[#E5E5E7]">
                   <p className="text-xs font-medium text-[#86868B] mb-1.5">Historial:</p>
                   <div className="space-y-1">
@@ -6542,7 +6587,9 @@ function TimeOffRequestsPanel({
                           {new Date(item.at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}{' '}
                           {new Date(item.at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-[#1D1D1F]">- {item.action}</span>
+                        <span className="text-[#1D1D1F]">
+                          - <span className="font-medium">{item.by || 'Sistema'}</span> {item.action}
+                        </span>
                         {item.note && <span className="text-[#86868B] italic">({item.note})</span>}
                       </div>
                     ))}
@@ -6550,27 +6597,31 @@ function TimeOffRequestsPanel({
                 </div>
               )}
 
-              {canActOnTimeOff(req) && req.status === 'pendiente' && (
+              {req.status === 'pendiente' && (canActOnTimeOff(req, 'approve') || canActOnTimeOff(req, 'reject')) && (
                 <div className="mt-3 flex gap-2 justify-end">
-                  <button
-                    onClick={() => onApprove(req)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
-                  >
-                    <Check className="w-4 h-4" />
-                    Aprobar
-                  </button>
-                  <button
-                    onClick={() => onReject(req)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                    Rechazar
-                  </button>
+                  {canActOnTimeOff(req, 'approve') && (
+                    <button
+                      onClick={() => onApprove(req)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+                    >
+                      <Check className="w-4 h-4" />
+                      Aprobar
+                    </button>
+                  )}
+                  {canActOnTimeOff(req, 'reject') && (
+                    <button
+                      onClick={() => onReject(req)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                      Rechazar
+                    </button>
+                  )}
                 </div>
               )}
 
               <div className="mt-2 flex gap-2 justify-end">
-                {canActOnTimeOff(req) && req.status !== 'cancelada' && req.status !== 'eliminada' && (
+                {canActOnTimeOff(req, 'edit') && req.status !== 'cancelada' && req.status !== 'eliminada' && (
                   <button
                     onClick={() => {
                       setEditingRequest(req);
@@ -6595,7 +6646,7 @@ function TimeOffRequestsPanel({
                     Cancelar
                   </button>
                 )}
-                {(canActOnTimeOff(req) || (req.userId === user?.id && req.status !== 'aprobada')) && req.status !== 'eliminada' && (
+                {(canActOnTimeOff(req, 'delete') || (req.userId === user?.id && req.status !== 'aprobada')) && req.status !== 'eliminada' && (
                   <button
                     onClick={() => setDeletingRequest(req)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white text-red-500 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
@@ -6641,26 +6692,12 @@ function TimeOffRequestsPanel({
                     <option value="otro">Otro</option>
                   </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Desde</label>
-                    <input
-                      type="date"
-                      value={editStartDate}
-                      onChange={(e) => setEditStartDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Hasta</label>
-                    <input
-                      type="date"
-                      value={editEndDate}
-                      onChange={(e) => setEditEndDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-[#E5E5E7] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                    />
-                  </div>
-                </div>
+                <TimeOffDatePicker
+                  type={editType}
+                  startDate={editStartDate}
+                  endDate={editEndDate}
+                  onChange={(s, e) => { setEditStartDate(s); setEditEndDate(e); }}
+                />
                 <div>
                   <label className="text-sm font-medium text-[#1D1D1F] mb-2 block">Motivo de la edición (opcional)</label>
                   <textarea
@@ -6683,20 +6720,31 @@ function TimeOffRequestsPanel({
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!editingRequest) return;
-                    onEdit(editingRequest, {
-                      type: editType,
-                      startDate: editStartDate,
-                      endDate: editEndDate,
-                      reason: editReason,
-                    });
-                    if (editingRequest.status !== 'aprobada' && canActOnTimeOff(editingRequest)) {
-                      setEditSaved(true);
-                    } else {
-                      setEditingRequest(null);
-                      setEditSaved(false);
-                      setEditReason('');
+                    try {
+                      await onEdit(editingRequest, {
+                        type: editType,
+                        startDate: editStartDate,
+                        endDate: editEndDate,
+                        reason: editReason,
+                      });
+                      const updatedRequest: TimeOffRequest = {
+                        ...editingRequest,
+                        type: editType,
+                        startDate: editStartDate,
+                        endDate: editEndDate,
+                      };
+                      setEditingRequest(updatedRequest);
+                      if (updatedRequest.status !== 'aprobada' && canActOnTimeOff(updatedRequest, 'approve')) {
+                        setEditSaved(true);
+                      } else {
+                        setEditingRequest(null);
+                        setEditSaved(false);
+                        setEditReason('');
+                      }
+                    } catch {
+                      // onEdit ya muestra el error; no cerrar el modal
                     }
                   }}
                   disabled={!editStartDate || !editEndDate || editEndDate < editStartDate}
@@ -6964,26 +7012,14 @@ function SolicitudesTab() {
   }, []);
 
   // Permisos para aprobar/rechazar solicitudes de tiempo libre
-  // Se incluye level <= 6 como fallback robusto por si el rol string no coincide exactamente
-  const canApproveTimeOff =
-    user?.role === Role.SUPERVISOR ||
-    user?.role === Role.GERENTE_DEPARTAMENTO ||
-    user?.role === Role.GERENTE_OPERACIONES ||
-    user?.role === Role.RRHH ||
-    user?.role === Role.DIRECTOR ||
-    user?.role === Role.DIRECTOR_GENERAL ||
-    (typeof user?.level === 'number' && user.level <= 6);
+  const canApproveTimeOff = hasPermission(effectiveUser || user, 'canApproveTimeOff');
 
-  const canViewAllTimeOff =
-    user?.role === Role.RRHH ||
-    user?.role === Role.DIRECTOR ||
-    user?.role === Role.DIRECTOR_GENERAL ||
-    user?.role === Role.GERENTE_OPERACIONES ||
-    (typeof user?.level === 'number' && user.level <= 4);
+  const canViewAllTimeOff = hasPermission(effectiveUser || user, 'canViewTeamTimeOff');
 
   const canActOnTimeOffForReq = useCallback(
-    (req: TimeOffRequest) => canActOnTimeOff(req, user, users),
-    [user, users]
+    (req: TimeOffRequest, action: 'approve' | 'reject' | 'edit' | 'delete' | 'view') =>
+      canActOnTimeOff(req, effectiveUser || user, users, action),
+    [effectiveUser, user, users]
   );
 
   const myTimeOffRequests = useMemo(
@@ -6998,7 +7034,7 @@ function SolicitudesTab() {
   }, [timeOffRequests, canApproveTimeOff, visibleDeptCodes]);
 
   const handleApproveTimeOff = async (req: TimeOffRequest) => {
-    if (!user || !canActOnTimeOffForReq(req)) return;
+    if (!user || !canActOnTimeOffForReq(req, 'approve')) return;
     try {
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
         status: 'aprobada',
@@ -7019,7 +7055,7 @@ function SolicitudesTab() {
   };
 
   const handleRejectTimeOff = async (req: TimeOffRequest) => {
-    if (!user || !canActOnTimeOffForReq(req)) return;
+    if (!user || !canActOnTimeOffForReq(req, 'reject')) return;
     const reason = window.prompt('Motivo del rechazo (opcional):') || '';
     try {
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
@@ -7046,7 +7082,8 @@ function SolicitudesTab() {
     req: TimeOffRequest,
     data: { type: TimeOffRequest['type']; startDate: string; endDate: string; reason?: string }
   ) => {
-    if (!user || !canActOnTimeOffForReq(req)) return;
+    if (!user || !canActOnTimeOffForReq(req, 'edit')) return;
+    console.log('[handleEditTimeOff] updating', req.id, { old: { start: req.startDate, end: req.endDate }, new: data });
     try {
       const changes: string[] = [];
       if (data.type !== req.type) changes.push(`tipo: ${TIME_OFF_LABELS[req.type]} → ${TIME_OFF_LABELS[data.type]}`);
@@ -7070,6 +7107,7 @@ function SolicitudesTab() {
     } catch (error) {
       console.error('Error al editar solicitud:', error);
       toast.error('No se pudo editar la solicitud');
+      throw error;
     }
   };
 
@@ -7096,7 +7134,7 @@ function SolicitudesTab() {
   };
 
   const handleDeleteTimeOff = async (req: TimeOffRequest, reason?: string) => {
-    if (!user || !canActOnTimeOffForReq(req)) return;
+    if (!user || !canActOnTimeOffForReq(req, 'delete')) return;
     try {
       await updateDoc(doc(db, 'timeOffRequests', req.id), {
         status: 'eliminada',

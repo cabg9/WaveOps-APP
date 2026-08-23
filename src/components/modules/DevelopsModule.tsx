@@ -9,7 +9,7 @@ import {
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare,
+  LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -751,6 +751,14 @@ const PERMISSION_CATEGORIES: PermCat[] = [
     {key:"canApproveChanges",label:"Aprobar cambios"},{key:"canRejectChanges",label:"Rechazar cambios"},
     {key:"canRequestChange",label:"Solicitar cambios"},
   ]},
+  { key: "timeoff", label: "Días libres", icon: <Sun size={16} />, perms: [
+    {key:"canRequestTimeOff",label:"Solicitar días libres"},
+    {key:"canViewTeamTimeOff",label:"Ver solicitudes del equipo"},
+    {key:"canApproveTimeOff",label:"Aprobar días libres"},
+    {key:"canRejectTimeOff",label:"Rechazar días libres"},
+    {key:"canEditTimeOff",label:"Editar días libres"},
+    {key:"canDeleteTimeOff",label:"Eliminar días libres"},
+  ]},
   { key: "incapacidades", label: "Incapacidades", icon: <HeartPulse size={16} />, perms: [
     {key:"canViewOwnIncapacidades",label:"Ver propias"},{key:"canViewTeamIncapacidades",label:"Ver del equipo"},
     {key:"canVerifyIncapacidad",label:"Verificar incapacidad"},{key:"canRegisterIncapacidad",label:"Registrar incapacidad"},
@@ -883,6 +891,31 @@ const PERM_DESCRIPTIONS: Record<string, { on: string; off: string }> = {
   "canRequestChange": {
     on: "Activado: puede solicitar un cambio de turno con otro usuario.",
     off: "Desactivado: NO puede solicitar cambios de turno."
+  },
+  // Días libres
+  "canRequestTimeOff": {
+    on: "Activado: puede crear solicitudes de días libres, vacaciones o citas médicas.",
+    off: "Desactivado: NO puede solicitar días libres."
+  },
+  "canViewTeamTimeOff": {
+    on: "Activado: puede ver las solicitudes de tiempo libre de su equipo.",
+    off: "Desactivado: NO ve las solicitudes de tiempo libre del equipo."
+  },
+  "canApproveTimeOff": {
+    on: "Activado: puede aprobar solicitudes de días libres según la jerarquía.",
+    off: "Desactivado: NO puede aprobar días libres."
+  },
+  "canRejectTimeOff": {
+    on: "Activado: puede rechazar solicitudes de días libres según la jerarquía.",
+    off: "Desactivado: NO puede rechazar días libres."
+  },
+  "canEditTimeOff": {
+    on: "Activado: puede editar fechas, tipo o motivo de una solicitud de tiempo libre.",
+    off: "Desactivado: NO puede editar solicitudes de tiempo libre."
+  },
+  "canDeleteTimeOff": {
+    on: "Activado: puede marcar como eliminada una solicitud de tiempo libre.",
+    off: "Desactivado: NO puede eliminar solicitudes de tiempo libre."
   },
   // Incapacidades
   "canViewOwnIncapacidades": {

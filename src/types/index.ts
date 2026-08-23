@@ -399,7 +399,14 @@ export type Permission =
   | 'canRegisterIncapacidad'
   | 'canRejectIncapacidad'
   | 'canRequestIncapacidadDocs'
-  | 'canUploadIncapacidadDocs';
+  | 'canUploadIncapacidadDocs'
+  // Tiempo libre
+  | 'canRequestTimeOff'
+  | 'canViewTeamTimeOff'
+  | 'canApproveTimeOff'
+  | 'canRejectTimeOff'
+  | 'canEditTimeOff'
+  | 'canDeleteTimeOff';
 
 // ═══════════════════════════════════════════════════════════════════
 // CONTEXTOS

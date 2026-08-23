@@ -1124,6 +1124,42 @@ Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados a
 
 ---
 
+## Fix: Solicitar Días Libres — permisos, calendario compartido y edición de fechas
+
+**Estado:** COMPLETADA
+
+### Cambios realizados
+- **Permisos de tiempo libre integrados con Develops → Roles y Permisos**:
+  - Se agregaron al tipo `Permission` en `src/types/index.ts`: `canRequestTimeOff`, `canViewTeamTimeOff`, `canApproveTimeOff`, `canRejectTimeOff`, `canEditTimeOff`, `canDeleteTimeOff`.
+  - Se configuraron por nivel en `src/lib/permissions-config.ts` (niveles 1-6 con todos; nivel 7 solo `canRequestTimeOff`).
+  - `hasPermission` ahora respeta `user.permissions` proveniente del roleTemplate, por lo que los toggles de Develops tienen efecto.
+  - Se agregó el grupo "Días libres" y los tooltips en `src/components/modules/DevelopsModule.tsx`.
+  - `canActOnTimeOff` en `src/components/modules/HorariosModule.tsx` y `src/components/Dashboard.tsx` ahora recibe la acción (`approve`, `reject`, `edit`, `delete`, `view`) y verifica el permiso correspondiente además de la jerarquía.
+- **Calendario reutilizable en modal de edición**:
+  - Se extrajo el componente `TimeOffDatePicker` en `src/components/modules/HorariosModule.tsx`.
+  - El modal de solicitud y el modal de edición usan el mismo calendario con inicio de semana en lunes, selección de rango y resumen del rango seleccionado.
+- **Edición de fechas sin acumulación**:
+  - Se confirmó que `handleEditTimeOff` actualiza `startDate`/`endDate` con `updateDoc` (sin crear documentos extra).
+  - Se agregó `console.log('[handleEditTimeOff] updating', ...)` para debugging.
+  - Después de guardar la edición, el estado local `editingRequest` se actualiza con las nuevas fechas, por lo que al aprobar/rechazar en la pantalla posterior se usan los valores editados.
+- **Historial muestra el nombre del actor**:
+  - El historial de solicitudes ya renderiza `item.by` (por ejemplo, "- Andres Bonilla editó la solicitud...").
+
+### Archivos modificados
+- `src/types/index.ts`
+- `src/lib/permissions-config.ts`
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/HorariosModule.tsx`
+- `src/components/Dashboard.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
+
+---
+
 ## Roadmap de fases pendientes
 
 ### FASE 9: Recordar usuario

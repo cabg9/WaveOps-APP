@@ -40,6 +40,13 @@ const LEVEL_1_PERMISSIONS: Permission[] = [
   'canApproveChanges',
   'canRejectChanges',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewAllIncidencias',
@@ -89,6 +96,13 @@ const LEVEL_2_PERMISSIONS: Permission[] = [
   'canApproveChanges',
   'canRejectChanges',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewAllIncidencias',
@@ -138,6 +152,13 @@ const LEVEL_3_PERMISSIONS: Permission[] = [
   'canApproveChanges',
   'canRejectChanges',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewAllIncidencias',
@@ -185,6 +206,13 @@ const LEVEL_4_PERMISSIONS: Permission[] = [
   'canApproveChanges',
   'canRejectChanges',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewOperationalIncidencias',
@@ -230,6 +258,13 @@ const LEVEL_5_PERMISSIONS: Permission[] = [
   'canApproveChanges',
   'canRejectChanges',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewOwnDepartmentIncidencias',
@@ -270,6 +305,13 @@ const LEVEL_6_PERMISSIONS: Permission[] = [
   // Horarios
   'canViewTeam',
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
+  'canViewTeamTimeOff',
+  'canApproveTimeOff',
+  'canRejectTimeOff',
+  'canEditTimeOff',
+  'canDeleteTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewOwnDepartmentIncidencias',
@@ -300,6 +342,8 @@ const LEVEL_7_PERMISSIONS: Permission[] = [
   'canViewOwnDepartment',
   // Horarios
   'canRequestChange',
+  // Tiempo libre
+  'canRequestTimeOff',
   // Incidencias
   'canCreateIncidencia',
   'canViewOwnDepartmentIncidencias',
@@ -331,6 +375,11 @@ const PERMISSIONS_BY_LEVEL: Record<number, Permission[]> = {
  */
 export const hasPermission = (user: User | null, permission: Permission): boolean => {
   if (!user) return false;
+  // Si el usuario tiene permisos explícitos del roleTemplate (toggles de Develops),
+  // respetarlos; de lo contrario usar los permisos estáticos por nivel.
+  if (user.permissions && user.permissions.length > 0) {
+    return user.permissions.includes(permission);
+  }
   const userPermissions = PERMISSIONS_BY_LEVEL[user.level] || [];
   return userPermissions.includes(permission);
 };
@@ -532,6 +581,13 @@ export const getPermissionLabel = (permission: Permission): string => {
     'canApproveChanges': 'Aprobar Cambios',
     'canRejectChanges': 'Rechazar Cambios',
     'canRequestChange': 'Solicitar Cambios',
+    // Tiempo libre
+    'canRequestTimeOff': 'Solicitar Días Libres',
+    'canViewTeamTimeOff': 'Ver Solicitudes del Equipo',
+    'canApproveTimeOff': 'Aprobar Días Libres',
+    'canRejectTimeOff': 'Rechazar Días Libres',
+    'canEditTimeOff': 'Editar Días Libres',
+    'canDeleteTimeOff': 'Eliminar Días Libres',
     // Incidencias
     'canCreateIncidencia': 'Crear Incidencias',
     'canViewAllIncidencias': 'Ver Todas las Incidencias',
