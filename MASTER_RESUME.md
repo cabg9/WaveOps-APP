@@ -1,9 +1,15 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (FASE 7.7 en progreso: normalización de comparaciones de departamento completada)
+> Última actualización: 2026-08-23 (cambio temporal para pruebas de días libres)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Cambios temporales activos
+
+- **Botón "Solicitar libre" siempre habilitado**: en `src/components/modules/HorariosModule.tsx` la variable `isSecondWeek` se forzó a `true` para permitir probar el flujo de días libres sin depender de la fecha actual (días 8-14). Revertir antes de cerrar FASE 7.
 
 ---
 
