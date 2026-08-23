@@ -4099,7 +4099,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
     
     allAssignments.forEach(a => {
       const assignedUser = users.find(u => u.id === a.userId);
-      if (assignedUser && assignedUser.department !== selectedDepartment) {
+      if (assignedUser && normalizeDeptCode(assignedUser.department || '') !== normalizeDeptCode(selectedDepartment || '')) {
         crossDeptUserIds.add(a.userId);
       }
     });
@@ -4330,7 +4330,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   Colaborador
                 </div>
                 {allVisibleUsers.map((u, rowIdx) => {
-                  const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
+                  const isCrossDept = selectedDepartment !== 'ALL' && normalizeDeptCode(u.department || '') !== normalizeDeptCode(selectedDepartment || '');
                   const isLastRow = rowIdx === allVisibleUsers.length - 1;
                   const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                   return (
@@ -4386,7 +4386,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
 
                   {/* Filas de días */}
                   {allVisibleUsers.map((u, rowIdx) => {
-                    const isCrossDept = selectedDepartment !== 'ALL' && u.department !== selectedDepartment;
+                    const isCrossDept = selectedDepartment !== 'ALL' && normalizeDeptCode(u.department || '') !== normalizeDeptCode(selectedDepartment || '');
                     const isLastRow = rowIdx === allVisibleUsers.length - 1;
                     const rowBg = isCrossDept ? 'bg-amber-50/50' : '';
                     return (
@@ -4438,7 +4438,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                                   )}
                                   {dayAssignments.map((assignment, idx) => {
                                     const shift = shifts.find(s => s.id === assignment.shiftId);
-                                    const isCrossDepartment = shift && shift.department !== selectedDepartment && selectedDepartment !== 'ALL';
+                                    const isCrossDepartment = shift && selectedDepartment !== 'ALL' && normalizeDeptCode(shift.department || '') !== normalizeDeptCode(selectedDepartment || '');
 
                                     return shift ? (
                                       <div
@@ -6254,7 +6254,7 @@ function TimeOffRequestsPanel({
 
   const activeView = canApprove ? view : 'mias';
   const requests = activeView === 'mias' ? myRequests : teamRequests;
-  const deptFiltered = deptFilter === 'ALL' ? requests : requests.filter((r) => r.department === deptFilter);
+  const deptFiltered = deptFilter === 'ALL' ? requests : requests.filter((r) => normalizeDeptCode(r.department || '') === normalizeDeptCode(deptFilter || ''));
   const filtered = deptFiltered.filter((r) => filter === 'todas' || r.status === filter);
 
   const showDeptFilter = activeView === 'equipo' && departmentOptions.length > 1;
@@ -7578,7 +7578,7 @@ function SolicitudesTab() {
               {(() => {
                 const effectiveView = canApproveTimeOff ? timeOffView : 'mias';
                 const requests = effectiveView === 'mias' ? myTimeOffRequests : teamTimeOffRequests;
-                const deptFilteredRequests = timeOffDeptFilter === 'ALL' ? requests : requests.filter((r) => r.department === timeOffDeptFilter);
+                const deptFilteredRequests = timeOffDeptFilter === 'ALL' ? requests : requests.filter((r) => normalizeDeptCode(r.department || '') === normalizeDeptCode(timeOffDeptFilter || ''));
                 const filterButtons = [
                   { id: 'todas' as const, label: 'Todas' },
                   { id: 'pendiente' as const, label: 'Pendientes' },

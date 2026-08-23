@@ -50,10 +50,8 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     isLoading: shiftsHook.loading,
 
     getShiftsByDepartment: (department: string) => {
-      return shifts.filter((s: any) => {
-        const deptCode = s.department?.replace(/ /g, '_').toUpperCase();
-        return s.department === department || deptCode === department;
-      });
+      const targetCode = normalizeDeptCode(department);
+      return shifts.filter((s: any) => normalizeDeptCode(s.department || '') === targetCode);
     },
 
     getUserShifts: (userId: string, date: string) => {
@@ -78,9 +76,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     },
 
     getDepartmentShifts: (department: string, date: string) => {
+      const targetCode = normalizeDeptCode(department);
       return shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
-        return shift?.department === department && a.date === date;
+        return shift && normalizeDeptCode(shift.department || '') === targetCode && a.date === date;
       });
     },
 
@@ -88,13 +87,13 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
       const startStr = format(weekStart, 'yyyy-MM-dd');
       const endDate = addDaysToDate(weekStart, 6);
       const endStr = format(endDate, 'yyyy-MM-dd');
+      const targetCode = department !== 'ALL' ? normalizeDeptCode(department) : null;
 
       return shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
         if (!shift) return false;
-        if ((department as any) !== 'ALL') {
-          const deptCode = shift.department?.replace(/ /g, '_').toUpperCase();
-          if (shift.department !== department && deptCode !== department) return false;
+        if (targetCode) {
+          if (normalizeDeptCode(shift.department || '') !== targetCode) return false;
         }
         return a.date >= startStr && a.date <= endStr;
       });
@@ -151,9 +150,10 @@ export function ShiftsProvider({ children }: ShiftsProviderProps) {
     },
 
     getUsersOnShift: (department: string, date: string) => {
+      const targetCode = normalizeDeptCode(department);
       const deptAssignments = shiftsHook.assignments.filter((a: any) => {
         const shift = shifts.find((s: any) => s.id === a.shiftId);
-        return shift?.department === department && a.date === date;
+        return shift && normalizeDeptCode(shift.department || '') === targetCode && a.date === date;
       });
       
       const userIds = deptAssignments.map((a: any) => a.userId);

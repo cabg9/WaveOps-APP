@@ -134,7 +134,7 @@ export default function TasksModule() {
   const { users: firestoreUsersForSupervisors } = useFirestoreUsers();
   const supervisorsByDepartment = useMemo(() => {
     return firestoreUsersForSupervisors
-      .filter((u) => u.department === taskForm.department &&
+      .filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(taskForm.department || '') &&
         (u.role === 'GERENTE_DEPARTAMENTO' || u.role === 'SUPERVISOR' || u.role === 'GERENTE_OPERACIONES'))
       .map((u) => ({ id: u.email || u.id, name: u.name, position: u.position, role: u.role }));
   }, [taskForm.department, firestoreUsersForSupervisors]);
@@ -196,7 +196,7 @@ export default function TasksModule() {
 
   // Turnos disponibles para el departamento seleccionado en tarea específica
   const shiftsForSpecificTask = useMemo(() => {
-    return shifts.filter((s) => s.department === specificTaskForm.department && s.isActive !== false);
+    return shifts.filter((s) => normalizeDeptCode(s.department || '') === normalizeDeptCode(specificTaskForm.department || '') && s.isActive !== false);
   }, [shifts, specificTaskForm.department]);
 
   // Hora límite calculada para tarea específica (solo informativa en el formulario)
@@ -343,16 +343,16 @@ export default function TasksModule() {
     if (mainTab === 'my-tasks' && user) result = result.filter((t) => (t.assignedTo && t.assignedTo.includes(user.id)) || (t.supportUserIds && t.supportUserIds.includes(user.id)) || (t.supervisorId === user.id && (t.status === TaskStatus.COMPLETED || t.status === TaskStatus.VERIFIED)) || (!t.supervisorId && t.createdBy === user.id && t.status === TaskStatus.COMPLETED));
     else if (mainTab === 'my-department' && user) {
       // Mi Depto = solo el departamento propio del usuario
-      result = result.filter((t) => t.department && t.department === user.department);
+      result = result.filter((t) => normalizeDeptCode(t.department || '') === normalizeDeptCode(user.department || ''));
     }
     else if (mainTab === 'all' && user) {
       // Todas: respeta lo que el usuario puede ver (jerarquía + permisos)
       const canViewAll = hasPermission('canViewAllDepartments');
-      const allowed = canViewAll ? departmentCodes : getVisibleDepartmentCodes(effectiveUser);
+      const allowed = (canViewAll ? departmentCodes : getVisibleDepartmentCodes(effectiveUser)).map(normalizeDeptCode);
       if (selectedDepartment !== 'all') {
-        result = result.filter((t) => t.department === selectedDepartment);
+        result = result.filter((t) => normalizeDeptCode(t.department || '') === normalizeDeptCode(selectedDepartment || ''));
       } else {
-        result = result.filter((t) => allowed.includes(t.department));
+        result = result.filter((t) => allowed.includes(normalizeDeptCode(t.department || '')));
       }
     }
 
@@ -972,7 +972,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
   }, [supervisorsByDepartment, currentUserId, firestoreUsersForModal]);
 
   const usersByDepartment = useMemo(() => {
-    return firestoreUsersForModal.filter((u) => u.department === taskForm.department && u.isActive && u.id !== currentUserId);
+    return firestoreUsersForModal.filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(taskForm.department || '') && u.isActive && u.id !== currentUserId);
   }, [taskForm.department, currentUserId, firestoreUsersForModal]);
 
   // Opciones de recurrencia para tareas específicas
@@ -1180,7 +1180,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
               {taskForm.supportDepartment && (
                 <div className="space-y-2">
                   <Label>Usuarios de apoyo</Label>
-                  {firestoreUsersForModal.filter((u) => u.department === taskForm.supportDepartment && u.isActive).map((user) => {
+                  {firestoreUsersForModal.filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(taskForm.supportDepartment || '') && u.isActive).map((user) => {
                     const isSupSelected = taskForm.supportUsers.includes(user.id);
                     return (
                       <button key={user.id} type="button" onClick={() => { if (isSupSelected) { setTaskForm({ ...taskForm, supportUsers: taskForm.supportUsers.filter((id) => id !== user.id) }); } else { setTaskForm({ ...taskForm, supportUsers: [...taskForm.supportUsers, user.id] }); } }} className={cn('w-full px-3 py-2.5 rounded-xl text-sm font-medium text-left transition-all flex items-center justify-between gap-2 border', isSupSelected ? 'border-corporate text-corporate bg-corporate/5' : 'border-[#E5E5E7] bg-white text-[#1D1D1F] hover:bg-[#F5F5F7]')}>
@@ -1189,7 +1189,7 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
                       </button>
                     );
                   })}
-                  {firestoreUsersForModal.filter((u) => u.department === taskForm.supportDepartment && u.isActive).length === 0 && (<p className="text-sm text-[#86868B] p-2">No hay usuarios disponibles</p>)}
+                  {firestoreUsersForModal.filter((u) => normalizeDeptCode(u.department || '') === normalizeDeptCode(taskForm.supportDepartment || '') && u.isActive).length === 0 && (<p className="text-sm text-[#86868B] p-2">No hay usuarios disponibles</p>)}
                 </div>
               )}
             </div>
