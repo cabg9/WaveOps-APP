@@ -28,7 +28,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useTasks } from '@/hooks/useTasks';
 import { useShifts } from '@/hooks/useShifts';
-import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { db } from '@/firebase-config';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { cn } from '@/lib/utils';
@@ -147,7 +147,7 @@ export default function Dashboard() {
   const todayStr = getLocalDate();
 
   // ─── CONTEOS DEL DEPARTAMENTO DEL USUARIO (Resumen de Equipo) ───
-  const userDept = user?.department;
+  const userDept = normalizeDeptCode(user?.department || '');
   const canViewAllDepartments = user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR || user?.role === Role.RRHH;
   const isGerenteOperaciones = user?.role === Role.GERENTE_OPERACIONES;
 
@@ -156,7 +156,7 @@ export default function Dashboard() {
     : isGerenteOperaciones
       ? tasks.filter((t) => operationalDepartmentCodes.includes(t.department))
       : userDept
-        ? tasks.filter((t) => t.department === userDept)
+        ? tasks.filter((t) => normalizeDeptCode(t.department || '') === userDept)
         : [];
 
   const now = new Date();

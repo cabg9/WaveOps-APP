@@ -2679,7 +2679,7 @@ function EquipoTab({
 
             const belongsToTargetDept = (t: Task) => {
               if (isAllDepartments) return true;
-              return t.department === targetDept;
+              return normalizeDeptCode(t.department || '') === normalizeDeptCode(targetDept || '');
             };
 
             const now = new Date();
