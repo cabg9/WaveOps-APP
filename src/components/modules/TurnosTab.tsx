@@ -15,7 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserAvatar } from '@/components/UserAvatar';
 import { SpecificTaskForm, SpecificTaskFormData } from '@/components/SpecificTaskForm';
-import { Plus, Pencil, Trash2, Clock, Eye, Users, CheckSquare, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Eye, Users, CheckSquare, X, LayoutGrid, List, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Role, TaskPriority, TaskVigencia, SpecificTaskTemplate } from '@/types';
@@ -60,6 +60,8 @@ export function TurnosTab() {
   const [showModal, setShowModal] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [filterDept, setFilterDept] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [expandedShiftIds, setExpandedShiftIds] = useState<Set<string>>(new Set());
 
   const [form, setForm] = useState({
     name: '',
@@ -387,11 +389,19 @@ export function TurnosTab() {
 
   const departmentName = (code: string) => departmentOptions.find(d => d.code === code)?.name || code.replace(/_/g, ' ');
 
+  const toggleExpandedShift = (id: string) => {
+    setExpandedShiftIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   if (loading) return <div className="p-8 text-center text-[#86868B]">Cargando turnos...</div>;
 
   return (
     <div className="space-y-5">
-      {/* Header con filtro */}
+      {/* Header con filtro y vista */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div>
           <h2 className="text-lg font-semibold text-[#1D1D1F]">Turnos</h2>
@@ -406,6 +416,20 @@ export function TurnosTab() {
             <option value="all">Todos los departamentos</option>
             {departmentTreeOptions.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
           </select>
+          <div className="flex items-center bg-[#F5F5F7] rounded-xl p-1">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all', viewMode === 'cards' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]')}
+            >
+              <LayoutGrid className="w-4 h-4" /> Tarjetas
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all', viewMode === 'list' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]')}
+            >
+              <List className="w-4 h-4" /> Lista
+            </button>
+          </div>
           <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 whitespace-nowrap">
             <Plus className="w-4 h-4" /> Nuevo Turno
           </Button>
@@ -427,41 +451,120 @@ export function TurnosTab() {
                 <h3 className="text-sm font-semibold text-[#1D1D1F]">{departmentName(deptCode)}</h3>
                 <span className="text-xs text-[#86868B] bg-[#F5F5F7] px-2 py-0.5 rounded-full">{shifts.length} turno{shifts.length !== 1 ? 's' : ''}</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {shifts.map(shift => {
-                  const shiftTemplates = getTemplatesForShift(shift);
-                  const assignedPeople = getAssignedPeopleForShift(shift);
-                  return (
-                    <Card key={shift.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: shift.color }} onClick={() => openDetail(shift)}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between">
-                          <div className="min-w-0">
-                            <h3 className="font-medium text-[#1D1D1F] truncate">{shift.name}</h3>
-                            <div className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[#86868B] bg-[#F5F5F7] px-2 py-1 rounded-lg">
-                              <Clock className="w-3 h-3" />
-                              <span>{shift.startTime} - {shift.endTime}</span>
+
+              {viewMode === 'cards' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {shifts.map(shift => {
+                    const shiftTemplates = getTemplatesForShift(shift);
+                    const assignedPeople = getAssignedPeopleForShift(shift);
+                    return (
+                      <Card key={shift.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: shift.color }} onClick={() => openDetail(shift)}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="min-w-0">
+                              <h3 className="font-medium text-[#1D1D1F] truncate">{shift.name}</h3>
+                              <div className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[#86868B] bg-[#F5F5F7] px-2 py-1 rounded-lg">
+                                <Clock className="w-3 h-3" />
+                                <span>{shift.startTime} - {shift.endTime}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                             </div>
                           </div>
+                          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#F5F5F7]">
+                            <div className="flex items-center gap-1 text-xs text-[#86868B]">
+                              <CheckSquare className="w-3.5 h-3.5" />
+                              <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-[#86868B]">
+                              <Users className="w-3.5 h-3.5" />
+                              <span>{assignedPeople.length} asignado{assignedPeople.length !== 1 ? 's' : ''}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="border border-[#E5E5E7] rounded-xl overflow-hidden divide-y divide-[#E5E5E7]">
+                  {shifts.map(shift => {
+                    const shiftTemplates = getTemplatesForShift(shift);
+                    const assignedPeople = getAssignedPeopleForShift(shift);
+                    const isExpanded = expandedShiftIds.has(shift.id);
+                    return (
+                      <div key={shift.id}>
+                        <div
+                          className="flex items-center gap-3 p-3 cursor-pointer hover:bg-[#F5F5F7]/50 transition-colors"
+                          onClick={() => toggleExpandedShift(shift.id)}
+                        >
+                          <div className="w-1 h-8 rounded-full" style={{ backgroundColor: shift.color }} />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleExpandedShift(shift.id); }}
+                            className="p-1 rounded hover:bg-[#E5E5E7] text-[#86868B]"
+                          >
+                            {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="text-sm font-medium text-[#1D1D1F] truncate">{shift.name}</h3>
+                          </div>
+                          <div className="hidden sm:flex items-center gap-1 text-xs text-[#86868B] bg-[#F5F5F7] px-2 py-1 rounded-lg">
+                            <Clock className="w-3 h-3" />
+                            <span>{shift.startTime} - {shift.endTime}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-[#86868B]">
+                            <span className="inline-flex items-center gap-1"><CheckSquare className="w-3.5 h-3.5" /> {shiftTemplates.length}</span>
+                            <span className="inline-flex items-center gap-1"><Users className="w-3.5 h-3.5" /> {assignedPeople.length}</span>
+                          </div>
                           <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => openDetail(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Eye className="w-4 h-4" /></button>
                             <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
                             <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#F5F5F7]">
-                          <div className="flex items-center gap-1 text-xs text-[#86868B]">
-                            <CheckSquare className="w-3.5 h-3.5" />
-                            <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''}</span>
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-1 bg-[#F5F5F7]/30">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-[#86868B] mb-3">
+                              <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {shift.startTime} - {shift.endTime}</span>
+                              <span className="hidden sm:inline">·</span>
+                              <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''} específica{shiftTemplates.length !== 1 ? 's' : ''}</span>
+                              <span className="hidden sm:inline">·</span>
+                              <span>{assignedPeople.length} persona{assignedPeople.length !== 1 ? 's' : ''} asignada{assignedPeople.length !== 1 ? 's' : ''}</span>
+                            </div>
+                            {shiftTemplates.length > 0 && (
+                              <div className="mb-3">
+                                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] mb-1.5">Tareas vinculadas</h4>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {shiftTemplates.map(t => (
+                                    <span key={t.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-[#E5E5E7] text-xs text-[#1D1D1F]">
+                                      <CheckSquare className="w-3 h-3 text-corporate" /> {t.title}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {assignedPeople.length > 0 && (
+                              <div>
+                                <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] mb-1.5">Asignados recientemente</h4>
+                                <div className="flex flex-wrap gap-2">
+                                  {assignedPeople.slice(0, 5).map(({ user }) => (
+                                    <UserAvatar key={user.id} name={user.name} photoUrl={user.photoURL || user.avatar} size="sm" />
+                                  ))}
+                                  {assignedPeople.length > 5 && (
+                                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-[#E5E5E7] text-[10px] font-medium text-[#86868B]">+{assignedPeople.length - 5}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center gap-1 text-xs text-[#86868B]">
-                            <Users className="w-3.5 h-3.5" />
-                            <span>{assignedPeople.length} asignado{assignedPeople.length !== 1 ? 's' : ''}</span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ))}
         </div>
