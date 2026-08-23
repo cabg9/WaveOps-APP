@@ -163,7 +163,12 @@ export function GlobalFAB() {
         )}
 
         {/* Acciones secundarias */}
-        <div className="flex flex-col items-end gap-3 mb-3 mr-0.5">
+        <div
+          className={cn(
+            'flex flex-col items-end gap-3 mb-3 mr-0.5 transition-all',
+            isOpen ? 'opacity-100 visible' : 'opacity-0 invisible h-0 overflow-hidden mb-0'
+          )}
+        >
           {visibleActions.map((action, index) => {
             const Icon = action.icon;
             const delay = index * 50;
