@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (rediseño de tarjetas en Horarios)
+> Última actualización: 2026-08-23 (unificación de historial y navegación por logo)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -15,7 +15,7 @@
 - Badge de tipo con colores de `TIME_OFF_VISUAL` pero más sutil (fondo claro, texto coloreado, icono pequeño).
 - Rango de fechas con icono `Calendar`, sin etiqueta "Fechas:".
 - Footer compacto con "Solicitado el ..." y "Revisado el ..." en gris.
-- Historial más compacto con viñetas sutiles y actor en texto tenue.
+- Historial unificado con el estilo global: título "Historial de acciones", viñeta `bg-corporate`, acción en línea principal y usuario + fecha/hora en línea secundaria.
 - Botones de acción alineados a la derecha, más pequeños y coherentes: sólido solo para aprobar, outline para el resto.
 
 ### IncapacidadesTab
@@ -27,6 +27,24 @@
 - Vista previa de reemplazo con icono `User` y badge ámbar "Apoyo externo" si aplica.
 - Motivo de rechazo en línea roja compacta.
 - Contenido expandido con fondo `bg-[#FAFAFA]`, botones más pequeños, lista de documentos con bordes sutiles, historial tipo timeline limpio y notas en tarjetas blancas.
+
+---
+
+## Fix: historial unificado y navegación por logo
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Historial de días libres**: ahora usa el mismo diseño de timeline que el historial de incapacidades (viñeta corporativa, acción principal, usuario + fecha/hora secundaria).
+- **Logo de WaveOps**: al presionar el icono de la app se regresa al Dashboard en todas las vistas:
+  - Sidebar desktop.
+  - Header mobile.
+  - Drawer del menú mobile.
+
+### Archivos modificados
+- `src/components/modules/HorariosModule.tsx`
+- `src/components/Layout.tsx`
+- `MASTER_RESUME.md`
 
 ---
 
