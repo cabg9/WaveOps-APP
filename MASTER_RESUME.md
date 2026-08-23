@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (cambio temporal para pruebas de días libres)
+> Última actualización: 2026-08-23 (refinamiento del flujo de solicitud de días libres)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -12,6 +12,29 @@
 - **Botón "Solicitar libre" siempre habilitado**: en `src/components/modules/HorariosModule.tsx` la variable `isSecondWeek` se forzó a `true` para permitir probar el flujo de días libres sin depender de la fecha actual (días 8-14). Revertir antes de cerrar FASE 7.
 
 ---
+
+## Refinamiento del flujo de días libres (timeOffRequests)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Calendario de solicitud**: la semana ahora comienza en lunes, alineado con el calendario mensual de *Mi Horario*.
+- **Aprobaciones jerárquicas**: se reemplazó el permiso genérico `canApproveTimeOff` por `canActOnTimeOff`, que resuelve el aprobador según departamento:
+  - Gerente de departamento (`GERENTE_DEPARTAMENTO`) del departamento solicitante.
+  - Si no existe, supervisor (`SUPERVISOR`) del mismo departamento.
+  - Si no existe, gerente de operaciones (`GERENTE_OPERACIONES`).
+  - RRHH, Director y Director General siempre pueden actuar.
+- **Soft delete**: las solicitudes eliminadas cambian su estado a `eliminada` en lugar de borrarse de Firestore, conservando el historial. Se agregó filtro y badge correspondiente.
+- **Historial enriquecido**:
+  - Rechazo, edición y eliminación capturan un motivo opcional que se guarda en `history.note`.
+  - Todas las entradas de historial incluyen acción, usuario, fecha/hora y nota.
+- **Acción rápida tras editar**: al guardar una edición, el modal muestra botones *Aprobar* y *Rechazar* si el usuario puede actuar sobre la solicitud.
+- **Indicador de edición**: un pequeño icono `Pencil` se muestra junto a las solicitudes editadas en los calendarios de *Mi Horario*, *Equipo* y *Asignar*, además de en las vistas expandidas y popups.
+- **Notificaciones mejoradas**:
+  - Al crear una solicitud se notifica al aprobador jerárquico correspondiente y a RRHH (fallback a Directores si no hay RRHH activo).
+  - Al aprobar, rechazar, editar o eliminar se notifica al solicitante y a RRHH/Directores.
+  - Se evitan notificaciones duplicadas usando un `Set` de `userId`.
+- **Dashboard**: el contador de *Solicitudes* del módulo Horarios ahora también incluye las solicitudes de tiempo libre pendientes que el usuario actual puede aprobar.
 
 ## FASE 7: Sincronizar timeOffRequests con HorariosModule
 
