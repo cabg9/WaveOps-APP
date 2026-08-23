@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, ReactNode } from "react";
 import {
   Pencil, Trash2, Plus, Building2, X, GitBranch,
   Shield, Crown, HardHat, Users, Briefcase, Save, UserCog,
-  LayoutTemplate, Clock
+  LayoutTemplate, Clock, ChevronRight, ChevronDown, CircleDot, Network
 } from "lucide-react";
 import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
@@ -103,6 +103,7 @@ export function DepartamentosTab() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [expandedDeptIds, setExpandedDeptIds] = useState<Set<string>>(new Set());
   const [templateForm, setTemplateForm] = useState<SpecificTaskFormData>({
     title: "",
     description: "",
@@ -626,61 +627,114 @@ export function DepartamentosTab() {
     );
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedDeptIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   const renderCard = (dept: any, level: number = 0) => {
     const deptUsers = getDeptUsers(dept);
     const userCount = deptUsers.length;
     const myChildren = childrenOf(dept.id);
     const isParent = myChildren.length > 0;
-    const isChild = !!dept.parentId;
-    const indentClass = level === 0 ? "" : level === 1 ? "ml-4" : level === 2 ? "ml-8" : "ml-12";
+    const isExpanded = expandedDeptIds.has(dept.id);
+    const parentName = dept.parentId ? deptsById.get(dept.parentId)?.name : null;
 
     return (
       <div
+        className="group relative flex items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md cursor-pointer select-none"
+        style={{ marginLeft: `${level * 28}px` }}
         onClick={() => openTeam(dept)}
-        className={`rounded-xl border transition cursor-pointer select-none hover:shadow-md ${isParent ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-white shadow-sm"} ${indentClass}`}
       >
-        <div className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-              <Building2 className="h-5 w-5" style={{ color: dept.color }} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <h4 className="text-sm font-semibold text-slate-800 truncate">{dept.name}</h4>
-                {isParent && <span className="shrink-0 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">PADRE</span>}
-                {dept.isOperational && <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 border border-sky-200">OPERACIONAL</span>}
-                {!dept.isActive && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">INACTIVO</span>}
-              </div>
-              <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                {isParent ? (
-                  <span className="uppercase tracking-wide text-[10px]">Departamento padre</span>
-                ) : isChild ? (
-                  <span className="text-slate-400">Hijo de {deptsById.get(dept.parentId)?.name || "?"}</span>
-                ) : (
-                  <span className="uppercase tracking-wide text-[10px]">Departamento raíz</span>
-                )}
-                <span>·</span>
-                <span>{userCount} usuarios</span>
-              </div>
-            </div>
+        {/* Línea de conexión jerárquica */}
+        {level > 0 && (
+          <div className="absolute -left-[15px] top-1/2 h-px w-4 bg-slate-300" />
+        )}
+
+        {/* Icono / color de departamento */}
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${dept.color}15` }}>
+          <Building2 className="h-5 w-5" style={{ color: dept.color }} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-sm font-semibold text-slate-800 truncate">{dept.name}</h4>
+            {isParent && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+                <Network className="h-3 w-3" /> Padre
+              </span>
+            )}
+            {dept.isOperational && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-medium text-sky-700 border border-sky-200">
+                <CircleDot className="h-3 w-3" /> Operacional
+              </span>
+            )}
+            {!dept.isActive && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 border border-slate-200">Inactivo</span>
+            )}
           </div>
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2" onClick={(e) => e.stopPropagation()}>
-            <span className="text-[10px] text-slate-400">{myChildren.length > 0 ? `${myChildren.length} sub-departamentos` : "Sin hijos"}</span>
-            <div className="flex items-center gap-0.5">
-              <button onClick={() => openEdit(dept)} className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-3.5 w-3.5" /></button>
-              <button onClick={() => handleDelete(dept)} className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-            </div>
+
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
+            {parentName ? (
+              <span className="text-slate-400">Sub-departamento de <span className="font-medium text-slate-600">{parentName}</span></span>
+            ) : (
+              <span className="uppercase tracking-wide text-[10px]">Departamento raíz</span>
+            )}
+            <span className="hidden sm:inline">·</span>
+            <span>{userCount} usuario{userCount !== 1 ? 's' : ''}</span>
+            {isParent && (
+              <>
+                <span className="hidden sm:inline">·</span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggleExpanded(dept.id); }}
+                  className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 font-medium"
+                >
+                  {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  {myChildren.length} sub-departamento{myChildren.length !== 1 ? 's' : ''}
+                </button>
+              </>
+            )}
           </div>
+        </div>
+
+        <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+          {isParent && (
+            <button
+              onClick={() => toggleExpanded(dept.id)}
+              className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              title={isExpanded ? "Contraer" : "Expandir"}
+            >
+              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </button>
+          )}
+          <button onClick={() => openEdit(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-4 w-4" /></button>
+          <button onClick={() => handleDelete(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>
     );
   };
 
   const renderDepartmentTree = (nodes: any[], level: number = 0): ReactNode[] => {
-    return nodes.flatMap((node) => [
-      <div key={node.id}>{renderCard(node, level)}</div>,
-      ...(node.children?.length > 0 ? renderDepartmentTree(node.children, level + 1) : []),
-    ]);
+    return nodes.flatMap((node) => {
+      const isParent = (node.children?.length || 0) > 0;
+      const isExpanded = expandedDeptIds.has(node.id);
+      const items: ReactNode[] = [
+        <div key={node.id} className="relative">
+          {level > 0 && (
+            <div className="absolute -left-[15px] top-0 bottom-0 w-px bg-slate-200" />
+          )}
+          {renderCard(node, level)}
+        </div>
+      ];
+      if (isParent && isExpanded) {
+        items.push(...renderDepartmentTree(node.children, level + 1));
+      }
+      return items;
+    });
   };
 
   return (
@@ -702,7 +756,7 @@ export function DepartamentosTab() {
           <button onClick={openCreate} className="mt-3 rounded-lg bg-sky-600 px-4 py-2 text-sm text-white hover:bg-sky-700 transition">Crear primer departamento</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="space-y-2">
           {renderDepartmentTree(departmentTree)}
         </div>
       )}

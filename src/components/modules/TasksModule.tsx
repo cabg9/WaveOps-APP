@@ -635,7 +635,7 @@ export default function TasksModule() {
                 <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
                 {visibleTaskDeptTreeOptions.map((dept) => (
                   <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -654,7 +654,7 @@ export default function TasksModule() {
                 <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
                 {incidenciaDeptOptions.map((dept) => (
                   <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -689,7 +689,7 @@ export default function TasksModule() {
                         <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
                         {visibleTaskDeptTreeOptions.map((dept) => (
                           <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                            <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -708,7 +708,7 @@ export default function TasksModule() {
                         <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
                         {incidenciaDeptOptions.map((dept) => (
                           <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                            <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>

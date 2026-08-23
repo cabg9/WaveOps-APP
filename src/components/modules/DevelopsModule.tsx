@@ -515,7 +515,7 @@ function UsuariosTab() {
                 <option value="" disabled>Seleccionar departamento</option>
                 {departmentTreeOptions.map(opt => (
                   <option key={opt.code} value={opt.code}>
-                    {'\u00A0\u00A0'.repeat(opt.level)}{opt.level > 0 ? '└─ ' : ''}{opt.name}
+                    {opt.name}
                   </option>
                 ))}
               </select>

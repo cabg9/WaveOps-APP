@@ -999,6 +999,31 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `b10b7b5b` en `fix-horarios-provider`.
 
+### Fixes de esta ronda (UI de departamentos y turnos)
+- **Problema 1**: en los dropdowns/selects de departamento se mostraba el prefijo `└─ ` y sangría para indicar jerarquía; el usuario prefiere ver solo el nombre del departamento.
+- **Corrección**: se eliminó el prefijo `└─ `, la sangría por nivel y los espacios repetidos de todos los dropdowns/selects/botones de departamento en:
+  - `src/components/modules/TasksModule.tsx`
+  - `src/components/modules/HorariosModule.tsx`
+  - `src/components/modules/TurnosTab.tsx`
+  - `src/components/modules/DevelopsModule.tsx`
+  - `src/components/EditTaskModal.tsx`
+- **Problema 2**: **Develops → Departamentos** no mostraba claramente la jerarquía padre/hijos.
+- **Corrección**: se rediseñó `src/components/modules/DepartamentosTab.tsx`:
+  - Vista de lista/arbol en una sola columna con tarjetas.
+  - Indentación visual por nivel con líneas de conexión grises a la izquierda.
+  - Botones de expandir/contraer sub-departamentos con chevrons.
+  - Badge "Padre" con ícono de red, badge "Operacional" con ícono, badge "Inactivo".
+  - Texto claro: "Sub-departamento de [Padre]" o "Departamento raíz".
+  - Acciones (editar/eliminar/expandir) a la derecha de cada tarjeta.
+- **Problema 3**: **Develops → Turnos** tenía un filtro de botones poco amigable y las tarjetas no agrupaban visualmente por departamento.
+- **Corrección**: se rediseñó `src/components/modules/TurnosTab.tsx`:
+  - Header compacto con contador y filtro de departamento como select limpio.
+  - Turnos agrupados por departamento en secciones con tarjetas.
+  - Cada tarjeta tiene borde izquierdo del color del turno, badge de horario y contadores de tareas/asignados.
+  - Estado vacío con ícono y botón de crear turno.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: pendiente de generar.
+
 ### Pendiente en esta fase
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
 - Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.

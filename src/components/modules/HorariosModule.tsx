@@ -513,7 +513,7 @@ export default function HorariosModule() {
                       <SelectItem key={dept.code} value={dept.code}>
                         <div className="flex items-center gap-2">
                           <DeptIcon department={dept.code} className="w-4 h-4" />
-                          <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                          <span>{dept.name}</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -601,7 +601,7 @@ export default function HorariosModule() {
                             <SelectItem key={dept.code} value={dept.code}>
                               <div className="flex items-center gap-2">
                                 <DeptIcon department={dept.code} className="w-4 h-4" />
-                                <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                                <span>{dept.name}</span>
                               </div>
                             </SelectItem>
                           ))}
@@ -717,7 +717,7 @@ export default function HorariosModule() {
                         <SelectItem key={dept.code} value={dept.code}>
                           <div className="flex items-center gap-2">
                             <DeptIcon department={dept.code} className="w-4 h-4" />
-                            <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                            <span>{dept.name}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -848,7 +848,7 @@ export default function HorariosModule() {
                           <SelectItem key={dept.code} value={dept.code}>
                             <div className="flex items-center gap-2">
                               <DeptIcon department={dept.code} className="w-4 h-4" />
-                              <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                              <span>{dept.name}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -4226,7 +4226,7 @@ function AsignarTab({ incapacityDates: _incapacityDates, getIncapacityForDate: _
                   <SelectItem key={dept.code} value={dept.code}>
                     <div className="flex items-center gap-2">
                       <DeptIcon department={dept.code} className="w-4 h-4" />
-                      <span style={{ paddingLeft: `${dept.level * 12}px` }}>{dept.level > 0 ? '└─ ' : ''}{dept.name}</span>
+                      <span>{dept.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -7408,7 +7408,7 @@ function SolicitudesTab() {
                         <SelectItem value="ALL">Todos</SelectItem>
                         {visibleDeptTreeOptions.map((opt) => (
                           <SelectItem key={opt.code} value={opt.code}>
-                            <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
+                            <span>{opt.name}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -7567,7 +7567,7 @@ function SolicitudesTab() {
                     <SelectItem value="ALL">Todos</SelectItem>
                     {visibleDeptTreeOptions.map((opt) => (
                       <SelectItem key={opt.code} value={opt.code}>
-                        <span style={{ paddingLeft: `${opt.level * 12}px` }}>{opt.level > 0 ? '└─ ' : ''}{opt.name}</span>
+                        <span>{opt.name}</span>
                       </SelectItem>
                     ))}
                   </SelectContent>

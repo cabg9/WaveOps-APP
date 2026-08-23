@@ -377,72 +377,95 @@ export function TurnosTab() {
 
   if (loading) return <div className="p-8 text-center text-[#86868B]">Cargando turnos...</div>;
 
+  const groupedShifts = useMemo(() => {
+    const map = new Map<string, Shift[]>();
+    filteredShifts.forEach(shift => {
+      const key = shift.department || 'Sin departamento';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(shift);
+    });
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredShifts]);
+
+  const departmentName = (code: string) => departmentOptions.find(d => d.code === code)?.name || code.replace(/_/g, ' ');
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="space-y-5">
+      {/* Header con filtro */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div>
           <h2 className="text-lg font-semibold text-[#1D1D1F]">Turnos</h2>
-          <p className="text-sm text-[#86868B]">{allShifts.length} turnos configurados</p>
+          <p className="text-sm text-[#86868B]">{allShifts.length} turnos configurados · {groupedShifts.length} departamento{groupedShifts.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 w-full sm:w-auto justify-center">
+          <select
+            value={filterDept}
+            onChange={e => setFilterDept(e.target.value)}
+            className="h-10 rounded-xl border border-[#E5E5E7] bg-[#F5F5F7] px-3 text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+          >
+            <option value="all">Todos los departamentos</option>
+            {departmentTreeOptions.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
+          </select>
+          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 whitespace-nowrap">
             <Plus className="w-4 h-4" /> Nuevo Turno
           </Button>
         </div>
       </div>
 
-      {/* Filtro por departamento */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        <button onClick={() => setFilterDept('all')} className={cn('px-3 py-1.5 rounded-full text-sm whitespace-nowrap', filterDept === 'all' ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B]')}>Todos</button>
-        {departmentTreeOptions.map(d => (
-          <button key={d.code} onClick={() => setFilterDept(d.code)} className={cn('px-3 py-1.5 rounded-full text-sm whitespace-nowrap', filterDept === d.code ? 'bg-corporate text-white' : 'bg-[#F5F5F7] text-[#86868B]')} style={{ marginLeft: `${d.level * 12}px` }}>{d.level > 0 ? '└─ ' : ''}{d.name}</button>
-        ))}
-      </div>
-
-      {/* Lista de turnos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredShifts.map(shift => {
-          const shiftTemplates = getTemplatesForShift(shift);
-          const assignedPeople = getAssignedPeopleForShift(shift);
-          return (
-            <Card key={shift.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow" onClick={() => openDetail(shift)}>
-              <div className="h-2" style={{ backgroundColor: shift.color }} />
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-medium text-[#1D1D1F]">{shift.name}</h3>
-                    <p className="text-xs text-[#86868B] mt-1">{shift.department?.replace(/_/g, ' ')}</p>
-                    <div className="flex items-center gap-1 mt-2 text-sm text-[#86868B]">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{shift.startTime} - {shift.endTime}</span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
-                    <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#F5F5F7]">
-                  <div className="flex items-center gap-1.5 text-xs text-[#86868B]">
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-xs text-[#86868B]">
-                    <Users className="w-3.5 h-3.5" />
-                    <span>{assignedPeople.length} asignado{assignedPeople.length !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-        {filteredShifts.length === 0 && (
-          <div className="col-span-full text-center py-12 text-[#86868B]">
-            No hay turnos {filterDept !== 'all' && 'para este departamento'}
-          </div>
-        )}
-      </div>
+      {/* Lista de turnos agrupada por departamento */}
+      {filteredShifts.length === 0 ? (
+        <div className="bg-white rounded-2xl p-12 text-center text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <Clock className="mx-auto mb-3 h-12 w-12 opacity-30" />
+          <p className="text-sm">No hay turnos {filterDept !== 'all' && 'para este departamento'}</p>
+          <button onClick={openCreate} className="mt-4 rounded-xl bg-corporate px-4 py-2 text-sm text-white hover:bg-corporate/90 transition">Crear primer turno</button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {groupedShifts.map(([deptCode, shifts]) => (
+            <div key={deptCode} className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="text-sm font-semibold text-[#1D1D1F]">{departmentName(deptCode)}</h3>
+                <span className="text-xs text-[#86868B] bg-[#F5F5F7] px-2 py-0.5 rounded-full">{shifts.length} turno{shifts.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {shifts.map(shift => {
+                  const shiftTemplates = getTemplatesForShift(shift);
+                  const assignedPeople = getAssignedPeopleForShift(shift);
+                  return (
+                    <Card key={shift.id} className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: shift.color }} onClick={() => openDetail(shift)}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0">
+                            <h3 className="font-medium text-[#1D1D1F] truncate">{shift.name}</h3>
+                            <div className="inline-flex items-center gap-1 mt-2 text-xs font-medium text-[#86868B] bg-[#F5F5F7] px-2 py-1 rounded-lg">
+                              <Clock className="w-3 h-3" />
+                              <span>{shift.startTime} - {shift.endTime}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => openEdit(shift)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
+                            <button onClick={() => handleDelete(shift)} className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-[#F5F5F7]">
+                          <div className="flex items-center gap-1 text-xs text-[#86868B]">
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            <span>{shiftTemplates.length} tarea{shiftTemplates.length !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs text-[#86868B]">
+                            <Users className="w-3.5 h-3.5" />
+                            <span>{assignedPeople.length} asignado{assignedPeople.length !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Modal crear/editar turno */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -458,7 +481,7 @@ export function TurnosTab() {
             <div className="space-y-2">
               <Label>Departamento</Label>
               <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className="w-full h-10 rounded-lg border border-[#E5E5E7] px-3 text-sm">
-                {departmentTreeOptions.map(d => <option key={d.code} value={d.code}>{'\u00A0\u00A0'.repeat(d.level)}{d.level > 0 ? '└─ ' : ''}{d.name}</option>)}
+                {departmentTreeOptions.map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
               </select>
             </div>
             <div className="grid grid-cols-2 gap-4">

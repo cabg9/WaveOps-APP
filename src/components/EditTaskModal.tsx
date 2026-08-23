@@ -205,8 +205,8 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
                 {departmentTreeOptions.map((dept) => (
                   <button key={dept.code} type="button" disabled={!canEditAll} onClick={() => { setDepartment(dept.code); setAssignedTo([]); setSupervisorId(""); }}
                     className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", department === dept.code ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}
-                    style={{ marginLeft: `${dept.level * 16}px` }}>
-                    {dept.level > 0 ? '└─ ' : ''}{dept.name.replace(/_/g, " ").toLowerCase()}
+>
+                    {dept.name.replace(/_/g, " ").toLowerCase()}
                   </button>
                 ))}
               </div>
@@ -322,8 +322,8 @@ export function EditTaskModal({ task, open, onOpenChange, onSave, canEditAll }: 
                     {departmentTreeOptions.filter((d) => d.code !== department).map((dept) => (
                       <button key={dept.code} type="button" disabled={!canEditAll} onClick={() => { setSupportDepartment(dept.code); setSupportUserIds([]); }}
                         className={cn("px-3 py-2 rounded-xl text-sm font-medium transition-all border capitalize", supportDepartment === dept.code ? "border-corporate text-corporate bg-corporate/5" : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]", !canEditAll && "opacity-50 cursor-not-allowed")}
-                        style={{ marginLeft: `${dept.level * 16}px` }}>
-                        {dept.level > 0 ? '└─ ' : ''}{dept.name.replace(/_/g, " ").toLowerCase()}
+>
+                        {dept.name.replace(/_/g, " ").toLowerCase()}
                       </button>
                     ))}
                   </div>
