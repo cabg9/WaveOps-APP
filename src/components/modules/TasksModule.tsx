@@ -30,7 +30,7 @@ import {
 } from '@/lib/utils';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
-import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
   const getLocalDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
@@ -161,7 +161,8 @@ export default function TasksModule() {
   // 3. Gerente del departamento
   // 4. Gerente de Operaciones (si el dept es operativo), RRHH, Director o Director General
   const specificTaskSupervisor = useMemo(() => {
-    const deptUsers = users.filter((u) => u.department === specificTaskForm.department && u.isActive !== false);
+    const deptCode = normalizeDeptCode(specificTaskForm.department || '');
+    const deptUsers = users.filter((u) => normalizeDeptCode(u.department || '') === deptCode && u.isActive !== false);
     const selectedShiftIds = specificTaskForm.shiftIds || [];
     if (selectedShiftIds.length > 0) {
       const supervisorsWithShift = deptUsers.filter(

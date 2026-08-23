@@ -252,9 +252,10 @@ export function useFirestoreShifts() {
       const borradorAssignments = weekAssignments.filter(a => a.status === AssignmentStatus.BORRADOR);
       const eliminadoAssignments = weekAssignments.filter(a => a.status === AssignmentStatus.ELIMINADO);
 
+      const batch = writeBatch(db);
       for (const assignment of borradorAssignments) {
         const docRef = doc(db, ASSIGNMENTS_COLLECTION, assignment.id);
-        await updateDoc(docRef, {
+        batch.update(docRef, {
           status: AssignmentStatus.PUBLICADO,
           publishedAt: new Date().toISOString(),
           publishedBy,
@@ -262,7 +263,11 @@ export function useFirestoreShifts() {
       }
 
       for (const assignment of eliminadoAssignments) {
-        await deleteDoc(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
+        batch.delete(doc(db, ASSIGNMENTS_COLLECTION, assignment.id));
+      }
+
+      if (borradorAssignments.length > 0 || eliminadoAssignments.length > 0) {
+        await batch.commit();
       }
 
       // Generar tareas específicas para las asignaciones publicadas
@@ -298,7 +303,32 @@ export function useFirestoreShifts() {
       if (templates.length === 0) return;
 
       const now = new Date().toISOString();
-      const today = now.split('T')[0];
+      const editableStatuses = [TaskStatus.PENDING, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED];
+
+      // Precargar tareas existentes generadas desde plantilla para los templates involucrados
+      const templateIds = templates.map(t => t.id);
+      const existingTasksMap = new Map<string, { ref: any; data: any }[]>();
+      if (templateIds.length > 0) {
+        // Firestore limita 'in' a 10; particionamos por si acaso
+        const chunkSize = 10;
+        for (let i = 0; i < templateIds.length; i += chunkSize) {
+          const chunk = templateIds.slice(i, i + chunkSize);
+          const existingQuery = query(
+            collection(db, 'tasks'),
+            where('templateId', 'in', chunk)
+          );
+          const existingSnapshot = await getDocs(existingQuery);
+          existingSnapshot.docs.forEach((d) => {
+            const data = d.data();
+            if (data.source !== 'specific-task-template') return;
+            if (!existingTasksMap.has(data.templateId)) existingTasksMap.set(data.templateId, []);
+            existingTasksMap.get(data.templateId)!.push({ ref: d.ref, data });
+          });
+        }
+      }
+
+      const batch = writeBatch(db);
+      let hasBatchOperations = false;
 
       for (const template of templates) {
         const templateShiftIds = template.shiftIds || (template.shiftId ? [template.shiftId] : []);
@@ -316,23 +346,18 @@ export function useFirestoreShifts() {
           // Verificar vigencia de la plantilla
           if (!isTemplateWithinVigency(template, date)) continue;
 
-          const assignedTo = [...new Set(dateAssignments.map(a => a.userId))];
-          const assignedShiftIds = [...new Set(dateAssignments.map(a => a.shiftId))];
+          const assignedTo = [...new Set(dateAssignments.map(a => a.userId).filter(Boolean))];
+          const assignedShiftIds = [...new Set(dateAssignments.map(a => a.shiftId).filter(Boolean))];
+          if (assignedTo.length === 0) continue;
 
-          // Evitar duplicados: buscar si ya existe una tarea para este template + fecha
-          const existingQuery = query(
-            collection(db, 'tasks'),
-            where('templateId', '==', template.id)
-          );
-          const existingSnapshot = await getDocs(existingQuery);
-          const existingDoc = existingSnapshot.docs.find((d) => {
-            const data = d.data();
-            return data.dueDate === date && data.source === 'specific-task-template';
-          });
+          // Buscar tarea existente para este template + fecha
+          const existingForTemplate = existingTasksMap.get(template.id) || [];
+          const existingDoc = existingForTemplate.find((item) => item.data.dueDate === date);
 
           if (!existingDoc) {
             // Crear nueva tarea compartida
-            await addDoc(collection(db, 'tasks'), {
+            const newTaskRef = doc(collection(db, 'tasks'));
+            batch.set(newTaskRef, {
               title: template.title || '',
               description: template.description || '',
               type: 'SPECIFIC',
@@ -362,23 +387,31 @@ export function useFirestoreShifts() {
                 }
               ],
             });
+            hasBatchOperations = true;
           } else {
-            // Actualizar asignados y turnos de la tarea existente
-            const existingData = existingDoc.data();
+            // Actualizar asignados y turnos de la tarea existente solo si aún es editable
+            const existingData = existingDoc.data;
+            if (!editableStatuses.includes(existingData.status)) continue;
+
             const currentAssignedTo = existingData.assignedTo || [];
             const newAssignedTo = [...new Set([...currentAssignedTo, ...assignedTo])];
             const currentShiftIds = existingData.shiftIds || [];
             const newShiftIds = [...new Set([...currentShiftIds, ...assignedShiftIds])];
             const hasChanges = newAssignedTo.length !== currentAssignedTo.length || newShiftIds.length !== currentShiftIds.length;
             if (hasChanges) {
-              await updateDoc(existingDoc.ref, {
+              batch.update(existingDoc.ref, {
                 assignedTo: newAssignedTo,
                 shiftIds: newShiftIds,
                 updatedAt: now,
               });
+              hasBatchOperations = true;
             }
           }
         }
+      }
+
+      if (hasBatchOperations) {
+        await batch.commit();
       }
     } catch (err: any) {
       console.error('Error al generar tareas específicas:', err);
@@ -614,5 +647,6 @@ function isTemplateWithinVigency(template: any, dateStr: string): boolean {
   const targetDate = new Date(dateStr + 'T00:00:00');
   const diffTime = targetDate.getTime() - createdAt.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays <= template.vigenciaDays;
+  // La fecha objetivo debe ser posterior o igual a la creación y no exceder la vigencia.
+  return diffDays >= 0 && diffDays <= template.vigenciaDays;
 }
