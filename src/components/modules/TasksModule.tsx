@@ -1443,17 +1443,19 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
                   ) : (
                     <form
                       onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}
-                      className="flex gap-2"
+                      className="flex flex-col sm:flex-row gap-2"
                     >
                       <Input
                         value={newNote}
                         onChange={(e) => setNewNote(e.target.value)}
                         placeholder="Escribe una nota..."
-                        className="flex-1"
+                        className="flex-1 min-w-0"
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }}
                       />
-                      <Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button>
+                      <div className="flex gap-2">
+                        <Button type="submit" size="sm" disabled={!newNote.trim()} className="flex-1 sm:flex-none min-h-[40px]">Guardar</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }} className="flex-1 sm:flex-none min-h-[40px]">Cancelar</Button>
+                      </div>
                     </form>
                   )}
                 </>
@@ -1838,17 +1840,19 @@ function IncidenciaCard({ incidencia, currentUserId, currentUser, onConfirmIncid
                     ) : (
                       <form
                         onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}
-                        className="flex gap-2"
+                        className="flex flex-col sm:flex-row gap-2"
                       >
                         <Input
                           value={newNote}
                           onChange={(e) => setNewNote(e.target.value)}
                           placeholder="Escribe una nota..."
-                          className="flex-1"
+                          className="flex-1 min-w-0"
                           onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleNoteSubmit(); } }}
                         />
-                        <Button type="submit" size="sm" disabled={!newNote.trim()}>Guardar</Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }}>Cancelar</Button>
+                        <div className="flex gap-2">
+                          <Button type="submit" size="sm" disabled={!newNote.trim()} className="flex-1 sm:flex-none min-h-[40px] touch-manipulation">Guardar</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => { setShowNoteInput(false); setNewNote(''); }} className="flex-1 sm:flex-none min-h-[40px] touch-manipulation">Cancelar</Button>
+                        </div>
                       </form>
                     )}
                   </>

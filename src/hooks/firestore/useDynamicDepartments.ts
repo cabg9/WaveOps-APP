@@ -44,7 +44,7 @@ function getDescendantIds(parentId: string | null | undefined, depts: DynamicDep
 }
 
 // Normaliza un código de departamento: mayúsculas, sin espacios/tab iniciales/finales y espacios → _
-function normalizeDeptCode(name: string): string {
+export function normalizeDeptCode(name: string): string {
   const cleaned = name.trim().replace(/\s+/g, '_');
   if (DEPT_NAME_TO_CODE[cleaned]) return DEPT_NAME_TO_CODE[cleaned];
   return cleaned.toUpperCase();

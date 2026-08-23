@@ -72,7 +72,7 @@ import { useFirestoreIncapacidades, Incapacidad } from '@/hooks/firestore/useFir
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
-import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { Shift, ShiftAssignment, AssignmentStatus, Role, NotificationType, Task } from '@/types';
 import { sortShiftsByTime } from '@/lib/utils';
@@ -207,8 +207,9 @@ export default function HorariosModule() {
     if (!effectiveUser) return;
     const allowed = getVisibleDepartmentCodes(effectiveUser);
     const canSelectAll = allowed.length > 1;
-    if ((selectedDepartment === 'ALL' && !canSelectAll) || !allowed.includes(selectedDepartment)) {
-      setSelectedDepartment(allowed.includes(effectiveUser.department) ? effectiveUser.department : allowed[0] || departmentCodes[0] || '');
+    const userDeptCode = normalizeDeptCode(effectiveUser.department || '');
+    if ((selectedDepartment === 'ALL' && !canSelectAll) || (selectedDepartment !== 'ALL' && !allowed.includes(selectedDepartment))) {
+      setSelectedDepartment(allowed.includes(userDeptCode) ? userDeptCode : allowed[0] || departmentCodes[0] || '');
     }
   }, [effectiveUser, selectedDepartment, departmentCodes, getVisibleDepartmentCodes]);
 
@@ -7768,7 +7769,7 @@ function SolicitudesTab() {
                       })()}
                       <div>
                         <p className="text-sm font-medium text-[#1D1D1F]">{solicitud.deCargo || 'Usuario'} — {solicitud.de}</p>
-                        <p className="text-xs text-[#86868B]">{solicitud.deDept || 'Dive Shop'}</p>
+                        <p className="text-xs text-[#86868B]">{getDeptName(solicitud.deDept || '') || 'Departamento no especificado'}</p>
                       </div>
                     </div>
                     {getStatusBadge(solicitud.estado)}

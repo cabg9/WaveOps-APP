@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.7 en progreso: pulido de jerarquía de departamentos y filtros ALL)
+> Última actualización: 2026-08-22 (FASE 7.7 en progreso: fix modo Todos, notas táctiles y nombre de departamento en cambios)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -853,6 +853,17 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Problema 5**: en **Horarios → Equipo**, las filas no se expandían verticalmente cuando un usuario tenía varios turnos, haciendo que se solaparan.
 - **Corrección**:
   - Se cambió `h-[72px] sm:h-[88px]` a `min-h-[72px] sm:min-h-[88px]` en la columna de colaboradores y en la fila de días.
+- **Problema 6**: el modo **Todos** en **Equipo/Asignar** no se mantenía seleccionado; el `useEffect` forzaba siempre un departamento concreto porque no consideraba `'ALL'` como valor válido.
+- **Corrección**:
+  - Se actualizó el `useEffect` de `HorariosModule.tsx` para permitir `'ALL'` cuando el usuario puede ver más de un departamento.
+  - Se normaliza `effectiveUser.department` con `normalizeDeptCode` al elegir el departamento por defecto, evitando problemas con espacios o tabuladores iniciales (por ejemplo, `\tADMINISTRATIVO`).
+- **Problema 7**: en las tarjetas de incidencias, los botones **Guardar** y **Cancelar** de las notas no siempre respondían al hover/touch; en móvil el formulario de una sola fila se desbordaba y quedaba parcialmente oculto por `overflow-hidden` de la tarjeta.
+- **Corrección**:
+  - Se cambió el formulario de notas a `flex-col` en móvil y `flex-row` en desktop en `TaskCard` e `IncidenciaCard`.
+  - Se envolvieron los botones en un contenedor con `min-h-[40px]` para mejorar el área táctil.
+- **Problema 8**: en el header de las tarjetas de solicitud de cambio de turno aparecía el código del departamento (ej. `DIVE_SHOP`) en lugar del nombre legible.
+- **Corrección**:
+  - Se reemplazó `{solicitud.deDept || 'Dive Shop'}` por `{getDeptName(solicitud.deDept || '') || 'Departamento no especificado'}`.
 - **Archivos modificados**:
   - `src/hooks/firestore/useDynamicDepartments.ts`
   - `src/components/modules/HorariosModule.tsx`
@@ -864,7 +875,7 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 ### Pendiente en esta fase
 - Validar que el Gerente de Operaciones vea `OPERACIONES` + hijos en **Equipo**, **Asignar**, **Tasks**, **Solicitudes** e **Incapacidades**.
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos.
-- Validar que el modo **Todos** no muestre usuarios de departamentos fuera de la jerarquía.
+- Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.
 - Quitar logs temporales de `getVisibleDepartmentCodes` una vez validado.
 
 ---
