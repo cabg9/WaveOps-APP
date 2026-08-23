@@ -8,7 +8,7 @@ import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartmen
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
 import { useFirestoreShifts } from "@/hooks/firestore/useFirestoreShifts";
 import { useSpecificTaskTemplates, CreateSpecificTaskTemplateData } from "@/hooks/firestore/useSpecificTaskTemplates";
-import { useDynamicDepartments } from "@/hooks/firestore/useDynamicDepartments";
+import { useDynamicDepartments, normalizeDeptCode } from "@/hooks/firestore/useDynamicDepartments";
 import { useAuth } from "@/hooks/useFirestoreAuth";
 import { useAudit } from "@/hooks/useAudit";
 import { executeWithConfirm } from "@/lib/confirm-action";
@@ -194,11 +194,13 @@ export function DepartamentosTab() {
   }, [templates, selectedDept]);
 
   const shiftsForTemplateForm = useMemo(() => {
-    return shifts.filter((s: any) => s.department === templateForm.department && s.isActive !== false);
+    const deptCode = normalizeDeptCode(templateForm.department || '');
+    return shifts.filter((s: any) => normalizeDeptCode(s.department || '') === deptCode && s.isActive !== false);
   }, [shifts, templateForm.department]);
 
   const templateSupervisorId = useMemo(() => {
-    const deptUsers = users.filter((u: any) => (u.department === templateForm.department || u.department === departments.find((d: any) => d.code === templateForm.department)?.name) && u.isActive !== false);
+    const deptCode = normalizeDeptCode(templateForm.department || '');
+    const deptUsers = users.filter((u: any) => normalizeDeptCode(u.department || '') === deptCode && u.isActive !== false);
     const supervisor = deptUsers.find((u: any) => u.role === Role.SUPERVISOR);
     if (supervisor) return supervisor.id;
     const gerente = deptUsers.find((u: any) => u.role === Role.GERENTE_DEPARTAMENTO);
@@ -208,7 +210,7 @@ export function DepartamentosTab() {
       .filter((u: any) => u.isActive !== false && fallbackRoles.includes(u.role))
       .sort((a: any, b: any) => (a.level || 7) - (b.level || 7))[0];
     return fallback?.id || "";
-  }, [users, templateForm.department, departments]);
+  }, [users, templateForm.department]);
 
   const templateSupervisorName = useMemo(() => {
     const s = users.find((u: any) => u.id === templateSupervisorId);

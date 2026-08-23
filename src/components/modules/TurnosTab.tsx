@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
-import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
@@ -215,18 +215,20 @@ export function TurnosTab() {
 
   // ── Edición de plantilla ──
   const shiftsForTemplateForm = useMemo(() => {
-    return firestoreShifts.filter((s: any) => s.department === templateForm.department && s.isActive !== false);
+    const deptCode = normalizeDeptCode(templateForm.department || '');
+    return firestoreShifts.filter((s: any) => normalizeDeptCode(s.department || '') === deptCode && s.isActive !== false);
   }, [firestoreShifts, templateForm.department]);
 
   const templateSupervisorId = useMemo(() => {
-    if (!templateForm.department) return '';
-    const deptUsers = users.filter((u: any) => u.department === templateForm.department && u.isActive !== false);
+    const deptCode = normalizeDeptCode(templateForm.department || '');
+    if (!deptCode) return '';
+    const deptUsers = users.filter((u: any) => normalizeDeptCode(u.department || '') === deptCode && u.isActive !== false);
     const supervisor = deptUsers.find((u: any) => u.role === Role.SUPERVISOR);
     if (supervisor) return supervisor.id;
     const gerente = deptUsers.find((u: any) => u.role === Role.GERENTE_DEPARTAMENTO);
     if (gerente) return gerente.id;
-    const fallback = deptUsers
-      .filter((u: any) => [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.GERENTE_OPERACIONES, Role.RRHH].includes(u.role))
+    const fallback = users
+      .filter((u: any) => u.isActive !== false && [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.GERENTE_OPERACIONES, Role.RRHH].includes(u.role))
       .sort((a: any, b: any) => (a.level || 7) - (b.level || 7))[0];
     return fallback?.id || '';
   }, [users, templateForm.department]);
@@ -295,7 +297,7 @@ export function TurnosTab() {
     setTemplateForm({
       title: '',
       description: '',
-      department: shift.department,
+      department: normalizeDeptCode(shift.department || ''),
       shiftIds: [shift.id],
       startTime: shift.startTime || '08:00',
       estimatedMinutes: 60,
