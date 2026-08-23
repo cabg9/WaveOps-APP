@@ -1222,6 +1222,56 @@ Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados a
 
 ---
 
+## GlobalFAB: Notas / Recordatorios y auto-hide inteligente
+
+### Notas personales (Apple Reminders style)
+- Nueva colección Firestore `notes` para notas/recordatorios personales.
+- Hook `src/hooks/firestore/useFirestoreNotes.ts` con listener `onSnapshot` por `userId`, ordenado por `updatedAt desc`.
+- CRUD: `createNote`, `updateNote`, `toggleNoteItem`, `deleteNote` (archiva a `status: 'archived'`), `markNoteConverted`.
+- Modelo de datos:
+  - `userId`, `title`, `items: [{ id, text, completed }]`, `status: 'active' | 'converted' | 'archived'`, `convertedToTaskId`, `createdAt`, `updatedAt`.
+- UI en `src/components/GlobalFAB.tsx`:
+  - Nueva acción "Notas" con icono `StickyNote` arriba de Feedback.
+  - Panel a pantalla completa (`fixed inset-0 z-50 bg-[#F5F5F7]`).
+  - Header con cerrar, título "Notas" y "Nueva nota".
+  - Tarjetas redondeadas (`rounded-2xl`) con título, checklist de ítems (`Circle` / `CheckCircle2`), indicador de progreso y contador.
+  - Editor de nota con título, lista editable de ítems, "Añadir elemento", eliminar ítem y guardar.
+
+### Conversión de nota a tarea
+- Disponible cuando la nota tiene ítems.
+- Permisos vía `hasPermission` de `src/lib/permissions-config.ts`:
+  - Si `canCreateSpecificTask` → convierte a **Tarea específica** (`SPECIFIC`).
+  - Sino si `canCreateExtraTask` → convierte a **Tarea extra** (`EXTRA`).
+  - Sino muestra mensaje de falta de permisos.
+- Al convertir se crea la tarea con `useFirestoreTasks().createTask()`:
+  - `title`: título de la nota.
+  - `description`: resumen de ítems pendientes.
+  - `type`: `SPECIFIC` o `EXTRA`.
+  - `status`: `PENDING`.
+  - `assignedTo`: `[user.id]`.
+  - `department`: departamento del usuario.
+  - `dueDate`: fecha actual (`yyyy-MM-dd`).
+  - `subtasks`: ítems de la nota mapeados a `{ id, title, completed }`.
+- Después de crear la tarea, la nota pasa a `status: 'converted'` y guarda `convertedToTaskId`.
+- Toast de éxito con acción "Ver tarea".
+
+### Auto-hide inteligente del FAB
+- Escritorio (ratón):
+  - Área activa de ~80 px desde la esquina inferior derecha.
+  - Si el ratón entra en el hot corner, el FAB aparece.
+  - Si sale y el menú está cerrado, se oculta tras 800 ms con transición suave (`opacity` + `translate`).
+  - Mientras el menú, el panel de Notas o el Feedback estén abiertos, permanece visible.
+- Móvil (touch):
+  - FAB oculto por defecto cuando está colapsado.
+  - Se detecta swipe hacia arriba (> 60 px) iniciado dentro del hot corner inferior derecho.
+  - Tras mostrarse, se oculta de nuevo por inactividad (~4 s) o al cerrar el menú.
+- Indicador visual:
+  - Punto sutil (`w-2 h-2`) en la esquina inferior derecha con color corporativo y baja opacidad.
+  - `pointer-events-none` para no bloquear clicks.
+- Elementos ocultos usan `pointer-events-none`; visibles usan `pointer-events-auto`.
+
+---
+
 ## Comandos útiles
 
 ```bash
