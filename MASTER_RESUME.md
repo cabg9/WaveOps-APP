@@ -835,6 +835,20 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `bb0ec206` en `fix-horarios-provider`.
 
+### Fixes de esta ronda (CRUD de plantillas de tareas específicas)
+- **Problema**: se necesitaba validar creación, edición y eliminación de plantillas desde **Develops → Departamentos** y **Develops → Turnos**.
+- **Bugs encontrados y corregidos**:
+  - En `src/components/modules/DepartamentosTab.tsx` y `src/components/modules/TurnosTab.tsx`, los turnos disponibles y el supervisor automático se filtraban comparando `s.department === templateForm.department` sin normalizar. Si los turnos o usuarios tenían el nombre legible en lugar del código, el formulario no mostraba turnos ni encontraba supervisor.
+  - En `TurnosTab.tsx`, al crear una plantilla desde un turno (`openCreateTemplateForShift`), se usaba `shift.department` directamente; si era nombre legible, el selector de departamento del formulario no quedaba seleccionado.
+  - En `TurnosTab.tsx`, el fallback de supervisor buscaba solo dentro de `deptUsers`, nunca encontrando directivos/RRHH de otros departamentos.
+- **Correcciones**:
+  - Se importa `normalizeDeptCode` en ambos archivos.
+  - Se normaliza la comparación de departamentos en `shiftsForTemplateForm` y `templateSupervisorId`.
+  - Se normaliza `department` al abrir creación de plantilla desde un turno.
+  - El fallback de supervisor en `TurnosTab` ahora busca en todos los usuarios activos con roles directivos/RRHH/Gerente de Operaciones.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `784033f7` en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
