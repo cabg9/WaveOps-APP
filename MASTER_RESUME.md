@@ -849,6 +849,24 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `784033f7` en `fix-horarios-provider`.
 
+### Fixes de esta ronda (supervisor automático y FAB de tarea específica)
+- **Problema 1**: se necesitaba validar que el botón flotante de **Tarea específica** solo cree plantillas y no liste existentes.
+- **Verificación**: `GlobalFAB.tsx` navega a `/tasks?create=specific`; `TasksModule.tsx` abre directamente el formulario de creación (`SpecificTaskForm`) y llama a `createTemplate`. No hay listado de plantillas en ese flujo.
+- **Problema 2**: se necesitaba validar supervisor automático y fallback en distintos escenarios.
+- **Bugs encontrados y corregidos**:
+  - En `DepartamentosTab.tsx` y `TurnosTab.tsx` faltaba la prioridad 1: supervisor del departamento que tenga alguno de los turnos seleccionados asignado y publicado.
+  - La lógica de fallback no era consistente entre `TasksModule.tsx`, `DepartamentosTab.tsx` y `TurnosTab.tsx`.
+- **Correcciones**:
+  - Se unificó la jerarquía de supervisor en los tres formularios:
+    1. Supervisor del departamento con turno seleccionado publicado.
+    2. Cualquier supervisor del departamento.
+    3. Gerente del departamento.
+    4. Director General / Director / RRHH / Gerente de Operaciones (fallback global).
+  - Se normaliza la comparación de departamentos en todas las búsquedas de supervisor.
+  - `DepartamentosTab.tsx` ahora lee `assignments` desde `useFirestoreShifts` para evaluar la prioridad 1.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `16f46df2` en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
 - Validar creación/edición/eliminación de plantillas de tareas específicas desde Develops → Departamentos y desde Develops → Turnos.
