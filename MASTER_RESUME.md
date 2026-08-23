@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-22 (FASE 7.7 en progreso: rediseño de tarjetas de cambio de turno y notas con Enter)
+> Última actualización: 2026-08-22 (FASE 7.7 en progreso: fix filtro "Todos" en Horarios → Equipo/Asignar)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -803,6 +803,22 @@ Corregir los detalles menores que vayan saliendo en Tasks y Horarios después de
   - Se actualizaron `TasksModule.tsx` y `HorariosModule.tsx` para usar `effectiveUser` en todos los llamados a `getVisibleDepartmentCodes`.
 - **Build + Deploy**: `npm run build` limpio y deploy a Firebase Hosting realizado.
 - **Commit local**: se hizo commit en `fix-horarios-provider`.
+
+### Fixes de esta ronda (filtro "Todos" en Horarios → Equipo/Asignar)
+- **Problema**: al seleccionar **Todos** los departamentos en **Horarios → Equipo** o **Horarios → Asignar**, no aparecían todos los usuarios que deberían mostrarse según la jerarquía del usuario (incluyendo hijos y nietos de departamentos).
+- **Causa**: `getUsersByDepartment` comparaba `u.department` contra el valor recibido de forma exacta. En modo **ALL** se le pasaban los **nombres legibles** de los departamentos (ej. `Dive Shop`), pero muchos usuarios tienen guardado el **código** (`DIVE_SHOP`). Además, variaciones de espacios, mayúsculas o tabs hacían que la comparación fallara.
+- **Correcciones**:
+  - En `src/hooks/useShifts.tsx`:
+    - Se agregó helper `normalizeDeptCode`.
+    - `getUsersByDepartment` ahora normaliza tanto el parámetro como `u.department` antes de comparar, por lo que funciona con códigos, nombres legibles y datos ligeramente sucios.
+  - En `src/components/modules/HorariosModule.tsx`:
+    - `EquipoTab` y `AsignarTab` ahora usan `visibleDeptCodes` (códigos) en lugar de `visibleDeptNames` para filtrar usuarios en modo **ALL**.
+    - El filtro de turnos disponibles en modo **ALL** de **Asignar** también compara por códigos normalizados.
+  - En `src/hooks/firestore/useDynamicDepartments.ts`:
+    - `getVisibleDepartmentCodes` ahora devuelve el departamento propio del usuario normalizado cuando `activeDepartments` aún no ha cargado, evitando que el dropdown parpadee o desaparezca momentáneamente.
+    - Se eliminaron los logs temporales de diagnóstico de jerarquía.
+- **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
+- **Commit**: `e909749f` en `fix-horarios-provider`.
 
 ### Pendiente en esta fase
 - Verificar que las tareas específicas se generan correctamente al publicar asignaciones, incluyendo tareas compartidas para múltiples usuarios en el mismo turno/día.
