@@ -1024,6 +1024,12 @@ Corregir que los dropdowns de departamentos muestren el departamento del usuario
 - **Build + Deploy**: `npm run build` limpio, push a `fix-horarios-provider` y deploy a Firebase Hosting realizado.
 - **Commit**: `270df364` en `fix-horarios-provider`.
 
+### Fixes de esta ronda (corrección post-deploy)
+- **Problema**: **Develops → Turnos** mostraba pantalla en blanco por error React #310.
+- **Causa**: el `useMemo` de agrupación por departamento estaba declarado después del `if (loading) return ...`, violando la regla de orden de hooks de React.
+- **Corrección**: se movió el `useMemo` antes del retorno condicional.
+- **Commit**: `988b22e0` en `fix-horarios-provider`.
+
 ### Pendiente en esta fase
 - Validar que un gerente/supervisor de departamento vea su departamento + sub-departamentos (incluyendo hijos de hijos).
 - Validar que el modo **Todos** se mantenga y filtre correctamente según jerarquía.
