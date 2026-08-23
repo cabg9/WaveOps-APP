@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus,
@@ -14,10 +14,22 @@ import {
   CheckCircle2,
   Trash2,
   ArrowRightLeft,
+  Calendar,
+  Clock,
+  Bell,
+  Hash,
+  MapPin,
+  Image as ImageIcon,
+  List,
+  Info,
+  ChevronRight,
+  CalendarDays,
+  CalendarCheck,
+  CheckSquare,
+  LayoutList,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useFirestoreAuth';
-import { useFirestoreNotes, NoteItem, FirestoreNote } from '@/hooks/firestore/useFirestoreNotes';
-import { useFirestoreTasks } from '@/hooks/firestore/useFirestoreTasks';
+import { useFirestoreReminders, ReminderItem, FirestoreReminder } from '@/hooks/firestore/useFirestoreReminders';
 import { db } from '@/firebase-config';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { hasPermission } from '@/lib/permissions-config';
@@ -32,8 +44,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { TaskStatus, TaskPriority } from '@/types';
+import { TaskPriority } from '@/types';
 
 interface FabAction {
   id: string;
@@ -93,12 +106,46 @@ function normalizeDept(name: string): string {
   return map[cleaned] || cleaned;
 }
 
+function formatReminderDate(dueDate?: string, hasTime?: boolean, dueTime?: string): string {
+  if (!dueDate) return '';
+  const [y, m, d] = dueDate.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+  const diff = Math.round((target.getTime() - today.getTime()) / 86400000);
+  let label = '';
+  if (diff === 0) label = 'Hoy';
+  else if (diff === 1) label = 'Mañana';
+  else if (diff === -1) label = 'Ayer';
+  else label = date.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' });
+  if (hasTime && dueTime) label += ` · ${dueTime}`;
+  return label;
+}
+
+const CATEGORIES = [
+  { id: 'today', label: 'Hoy', icon: CalendarDays, color: 'bg-[#007AFF]', countKey: 'today' },
+  { id: 'scheduled', label: 'Programados', icon: Calendar, color: 'bg-[#FF9500]', countKey: 'scheduled' },
+  { id: 'all', label: 'Todos', icon: LayoutList, color: 'bg-[#5856D6]', countKey: 'all' },
+  { id: 'flagged', label: 'Indicador', icon: Flag, color: 'bg-[#FF3B30]', countKey: 'flagged' },
+  { id: 'urgent', label: 'Urgente', icon: Bell, color: 'bg-[#FF2D55]', countKey: 'urgent' },
+  { id: 'completed', label: 'Terminados', icon: CheckSquare, color: 'bg-[#34C759]', countKey: 'completed' },
+  { id: 'personal', label: 'Personal', icon: List, color: 'bg-[#8E8E93]', countKey: 'personal' },
+] as const;
+
 export function GlobalFAB() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const { notes, createNote, updateNote, toggleNoteItem, deleteNote, markNoteConverted } = useFirestoreNotes(user?.id);
-  const { createTask } = useFirestoreTasks();
+  const {
+    reminders,
+    createReminder,
+    updateReminder,
+    toggleReminderItem,
+    archiveReminder,
+    markReminderConverted,
+  } = useFirestoreReminders(user?.id);
 
   const [isOpen, setIsOpen] = useState(false);
   const [isFabVisible, setIsFabVisible] = useState(true);
@@ -107,24 +154,40 @@ export function GlobalFAB() {
   const [feedbackMessage, setFeedbackMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [showNotesPanel, setShowNotesPanel] = useState(false);
-  const [editingNote, setEditingNote] = useState<FirestoreNote | null>(null);
-  const [noteTitle, setNoteTitle] = useState('');
-  const [noteItems, setNoteItems] = useState<NoteItem[]>([]);
-  const [isSavingNote, setIsSavingNote] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
+  const [showRemindersPanel, setShowRemindersPanel] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  const [editingReminder, setEditingReminder] = useState<FirestoreReminder | null>(null);
+  const [title, setTitle] = useState('');
+  const [notes, setNotes] = useState('');
+  const [url, setUrl] = useState('');
+  const [items, setItems] = useState<ReminderItem[]>([]);
+  const [hasDate, setHasDate] = useState(false);
+  const [hasTime, setHasTime] = useState(false);
+  const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('');
+  const [isUrgent, setIsUrgent] = useState(false);
+  const [list, setList] = useState('Personal');
+  const [tags, setTags] = useState<string[]>([]);
+  const [flagged, setFlagged] = useState(false);
+  const [priority, setPriority] = useState<FirestoreReminder['priority']>('none');
+  const [reminderLocation, setReminderLocation] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [isSavingReminder, setIsSavingReminder] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [convertType, setConvertType] = useState<'specific' | 'extra' | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseInHotCornerRef = useRef(false);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isOpenRef = useRef(isOpen);
-  const showNotesPanelRef = useRef(showNotesPanel);
+  const showRemindersPanelRef = useRef(showRemindersPanel);
   const showFeedbackRef = useRef(showFeedback);
   const touchStartRef = useRef<{ x: number; y: number; inHotCorner: boolean } | null>(null);
 
   isOpenRef.current = isOpen;
-  showNotesPanelRef.current = showNotesPanel;
+  showRemindersPanelRef.current = showRemindersPanel;
   showFeedbackRef.current = showFeedback;
 
   const showFab = useCallback(() => {
@@ -137,7 +200,7 @@ export function GlobalFAB() {
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
-      if (!isOpenRef.current && !showNotesPanelRef.current && !showFeedbackRef.current && !mouseInHotCornerRef.current) {
+      if (!isOpenRef.current && !showRemindersPanelRef.current && !showFeedbackRef.current && !mouseInHotCornerRef.current) {
         setIsFabVisible(false);
       }
     }, HIDE_DELAY);
@@ -147,13 +210,12 @@ export function GlobalFAB() {
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     inactivityTimerRef.current = setTimeout(() => {
-      if (!isOpenRef.current && !showNotesPanelRef.current && !showFeedbackRef.current && !mouseInHotCornerRef.current) {
+      if (!isOpenRef.current && !showRemindersPanelRef.current && !showFeedbackRef.current && !mouseInHotCornerRef.current) {
         setIsFabVisible(false);
       }
     }, INACTIVITY_DELAY);
   }, []);
 
-  // Auto-hide initial delay
   useEffect(() => {
     scheduleHide();
     return () => {
@@ -162,7 +224,6 @@ export function GlobalFAB() {
     };
   }, [scheduleHide]);
 
-  // Desktop hot corner
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const inHotCorner =
@@ -183,16 +244,14 @@ export function GlobalFAB() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [showFab, scheduleHide]);
 
-  // Keep visible while any panel/menu is open
   useEffect(() => {
-    if (isOpen || showNotesPanel || showFeedback) {
+    if (isOpen || showRemindersPanel || showFeedback) {
       showFab();
     } else {
       scheduleHide();
     }
-  }, [isOpen, showNotesPanel, showFeedback, showFab, scheduleHide]);
+  }, [isOpen, showRemindersPanel, showFeedback, showFab, scheduleHide]);
 
-  // Mobile swipe up from bottom-right hot corner
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
       const t = e.touches[0];
@@ -207,7 +266,7 @@ export function GlobalFAB() {
       if (!start || !start.inHotCorner) return;
       const t = e.changedTouches[0];
       const dx = t.clientX - start.x;
-      const dy = start.y - t.clientY; // positive = upward
+      const dy = start.y - t.clientY;
       if (dy > 60 && Math.abs(dy) > Math.abs(dx)) {
         showFab();
         scheduleInactivityHide();
@@ -223,7 +282,6 @@ export function GlobalFAB() {
     };
   }, [showFab, scheduleInactivityHide]);
 
-  // Cerrar al hacer click fuera
   useEffect(() => {
     if (!isOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -285,128 +343,190 @@ export function GlobalFAB() {
     }
   };
 
-  const handleOpenNotes = () => {
+  const handleOpenReminders = () => {
     setIsOpen(false);
-    setShowNotesPanel(true);
+    setShowRemindersPanel(true);
   };
 
-  const resetNoteEditor = () => {
-    setEditingNote(null);
-    setNoteTitle('');
-    setNoteItems([]);
+  const resetReminderEditor = () => {
+    setEditingReminder(null);
+    setTitle('');
+    setNotes('');
+    setUrl('');
+    setItems([]);
+    setHasDate(false);
+    setHasTime(false);
+    setDueDate('');
+    setDueTime('');
+    setIsUrgent(false);
+    setList('Personal');
+    setTags([]);
+    setFlagged(false);
+    setPriority('none');
+    setReminderLocation('');
+    setImageUrl('');
   };
 
-  const handleNewNote = () => {
-    resetNoteEditor();
-    setNoteTitle('');
-    setNoteItems([{ id: generateId(), text: '', completed: false }]);
+  const handleNewReminder = () => {
+    resetReminderEditor();
+    setItems([{ id: generateId(), text: '', completed: false }]);
   };
 
-  const handleEditNote = (note: FirestoreNote) => {
-    setEditingNote(note);
-    setNoteTitle(note.title);
-    setNoteItems(note.items.length > 0 ? note.items : [{ id: generateId(), text: '', completed: false }]);
+  const handleEditReminder = (reminder: FirestoreReminder) => {
+    setEditingReminder(reminder);
+    setTitle(reminder.title);
+    setNotes(reminder.notes || '');
+    setUrl(reminder.url || '');
+    setItems(reminder.items.length > 0 ? reminder.items : [{ id: generateId(), text: '', completed: false }]);
+    setHasDate(reminder.hasDate);
+    setHasTime(reminder.hasTime);
+    setDueDate(reminder.dueDate || '');
+    setDueTime(reminder.dueTime || '');
+    setIsUrgent(reminder.isUrgent);
+    setList(reminder.list || 'Personal');
+    setTags(reminder.tags || []);
+    setFlagged(reminder.flagged);
+    setPriority(reminder.priority || 'none');
+    setReminderLocation(reminder.location || '');
+    setImageUrl(reminder.imageUrl || '');
   };
 
-  const handleSaveNote = async () => {
+  const buildReminderData = (): Partial<FirestoreReminder> => ({
+    title: title.trim() || 'Sin título',
+    notes: notes.trim(),
+    url: url.trim(),
+    items: items.filter((item) => item.text.trim() !== ''),
+    hasDate,
+    hasTime,
+    dueDate: hasDate ? dueDate || todayISO() : '',
+    dueTime: hasDate && hasTime ? dueTime || '09:00' : '',
+    isUrgent,
+    list: list.trim() || 'Personal',
+    tags,
+    flagged,
+    priority,
+    location: reminderLocation.trim(),
+    imageUrl: imageUrl.trim(),
+  });
+
+  const handleSaveReminder = async () => {
     if (!user?.id) {
-      toast.error('Debes iniciar sesión para guardar notas');
+      toast.error('Debes iniciar sesión para guardar recordatorios');
       return;
     }
-    const title = noteTitle.trim() || 'Sin título';
-    const items = noteItems.filter((item) => item.text.trim() !== '');
-    setIsSavingNote(true);
+    const data = buildReminderData();
+    if (data.items?.length === 0 && !data.title?.trim() && !data.notes?.trim()) {
+      toast.error('Agrega un título, nota o al menos un elemento');
+      return;
+    }
+    setIsSavingReminder(true);
     try {
-      if (editingNote) {
-        await updateNote(editingNote.id, { title, items });
-        toast.success('Nota actualizada');
+      if (editingReminder) {
+        await updateReminder(editingReminder.id, data, { userId: user.id, userName: user.name || '' });
+        toast.success('Recordatorio actualizado');
       } else {
-        await createNote(title, items);
-        toast.success('Nota creada');
+        await createReminder(data);
+        toast.success('Recordatorio creado');
       }
-      resetNoteEditor();
+      resetReminderEditor();
     } catch (err) {
-      console.error('Error guardando nota:', err);
-      toast.error('No se pudo guardar la nota');
+      console.error('Error guardando recordatorio:', err);
+      toast.error('No se pudo guardar el recordatorio');
     } finally {
-      setIsSavingNote(false);
+      setIsSavingReminder(false);
     }
   };
 
   const handleAddItem = () => {
-    setNoteItems((prev) => [...prev, { id: generateId(), text: '', completed: false }]);
+    setItems((prev) => [...prev, { id: generateId(), text: '', completed: false }]);
   };
 
   const handleUpdateItemText = (id: string, text: string) => {
-    setNoteItems((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, text } : item)));
   };
 
   const handleToggleItemInEditor = (id: string) => {
-    setNoteItems((prev) => prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)));
+    setItems((prev) => prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item)));
   };
 
   const handleRemoveItem = (id: string) => {
-    setNoteItems((prev) => prev.filter((item) => item.id !== id));
+    setItems((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleConvertNote = async (note: FirestoreNote) => {
-    if (!user?.id || !user.department) {
-      toast.error('Debes iniciar sesión para convertir notas');
-      return;
-    }
+  const canConvert = user && (hasPermission(user, 'canCreateSpecificTask') || hasPermission(user, 'canCreateExtraTask'));
 
-    const canSpecific = hasPermission(user, 'canCreateSpecificTask');
-    const canExtra = hasPermission(user, 'canCreateExtraTask');
-
+  const startConvert = () => {
+    if (!editingReminder) return;
+    const canSpecific = user && hasPermission(user, 'canCreateSpecificTask');
+    const canExtra = user && hasPermission(user, 'canCreateExtraTask');
     if (!canSpecific && !canExtra) {
       toast.error('No tienes permiso para crear tareas');
       return;
     }
-
-    setIsConverting(true);
-    try {
-      const taskType = canSpecific ? 'SPECIFIC' : 'EXTRA';
-      const uncheckedItems = note.items.filter((item) => !item.completed);
-      const description =
-        uncheckedItems.length > 0
-          ? `Pendientes: ${uncheckedItems.map((item) => item.text).join(', ')}`
-          : '';
-
-      const taskId = await createTask({
-        title: note.title,
-        description,
-        type: taskType as 'SPECIFIC' | 'EXTRA',
-        status: TaskStatus.PENDING,
-        priority: TaskPriority.MEDIUM,
-        assignedTo: [user.id],
-        department: normalizeDept(user.department),
-        dueDate: todayISO(),
-        createdBy: user.id,
-        createdAt: new Date().toISOString(),
-        subtasks: note.items.map((item) => ({
-          id: item.id,
-          title: item.text,
-          completed: item.completed,
-        })),
-      });
-
-      await markNoteConverted(note.id, taskId);
-      toast.success(`Nota convertida en ${canSpecific ? 'tarea específica' : 'tarea extra'}`, {
-        action: {
-          label: 'Ver tarea',
-          onClick: () => navigate(`/tasks?id=${taskId}`),
-        },
-      });
-      resetNoteEditor();
-    } catch (err) {
-      console.error('Error convirtiendo nota:', err);
-      toast.error('No se pudo convertir la nota');
-    } finally {
-      setIsConverting(false);
+    if (canSpecific && canExtra) {
+      setShowConvertDialog(true);
+      return;
     }
+    doConvert(canSpecific ? 'specific' : 'extra');
   };
 
-  const activeNotes = notes.filter((note) => note.status === 'active');
+  const doConvert = (type: 'specific' | 'extra') => {
+    if (!editingReminder) return;
+    setShowConvertDialog(false);
+    setShowRemindersPanel(false);
+    resetReminderEditor();
+    navigate(`/tasks?create=${type}&reminderId=${editingReminder.id}`);
+  };
+
+  const activeReminders = reminders.filter((r) => r.status === 'active');
+
+  const counts = useMemo(() => {
+    const today = todayISO();
+    return {
+      today: activeReminders.filter((r) => r.hasDate && r.dueDate === today).length,
+      scheduled: activeReminders.filter((r) => r.hasDate).length,
+      all: activeReminders.length,
+      flagged: activeReminders.filter((r) => r.flagged).length,
+      urgent: activeReminders.filter((r) => r.isUrgent).length,
+      completed: reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed))).length,
+      personal: activeReminders.filter((r) => r.list === 'Personal' || !r.list).length,
+    };
+  }, [activeReminders, reminders]);
+
+  const filteredReminders = useMemo(() => {
+    let result = [...activeReminders];
+    switch (selectedCategory) {
+      case 'today':
+        result = result.filter((r) => r.hasDate && r.dueDate === todayISO());
+        break;
+      case 'scheduled':
+        result = result.filter((r) => r.hasDate);
+        break;
+      case 'flagged':
+        result = result.filter((r) => r.flagged);
+        break;
+      case 'urgent':
+        result = result.filter((r) => r.isUrgent);
+        break;
+      case 'completed':
+        result = reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed)));
+        break;
+      case 'personal':
+        result = result.filter((r) => r.list === 'Personal' || !r.list);
+        break;
+    }
+    return result;
+  }, [activeReminders, reminders, selectedCategory]);
+
+  const groupedReminders = useMemo(() => {
+    const groups: Record<string, FirestoreReminder[]> = {};
+    filteredReminders.forEach((r) => {
+      const key = r.list || 'Personal';
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(r);
+    });
+    return groups;
+  }, [filteredReminders]);
 
   const actions: FabAction[] = [
     {
@@ -435,12 +555,12 @@ export function GlobalFAB() {
       requiredRole: () => user?.role === 'DIRECTOR_GENERAL',
     },
     {
-      id: 'notes',
-      label: 'Notas',
+      id: 'reminders',
+      label: 'Recordatorios',
       icon: StickyNote,
       color: 'text-[#FF9500]',
       bgColor: 'bg-white',
-      onClick: handleOpenNotes,
+      onClick: handleOpenReminders,
     },
     {
       id: 'feedback',
@@ -475,11 +595,6 @@ export function GlobalFAB() {
             : 'opacity-0 translate-y-4 pointer-events-none'
         )}
       >
-        {/* Overlay semitransparente solo para dar foco */}
-        {isOpen && (
-          <div className="fixed inset-0 bg-black/10 pointer-events-none" />
-        )}
-
         {/* Acciones secundarias */}
         <div
           className={cn(
@@ -616,237 +731,472 @@ export function GlobalFAB() {
         </DialogContent>
       </Dialog>
 
-      {/* Panel de Notas a pantalla completa */}
-      {showNotesPanel && (
-        <div className="fixed inset-0 z-50 bg-[#F5F5F7] flex flex-col">
-          <header className="sticky top-0 z-10 bg-[#F5F5F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
+      {/* Panel de Recordatorios a pantalla completa */}
+      {showRemindersPanel && (
+        <div className="fixed inset-0 z-50 bg-[#F2F2F7] flex flex-col">
+          <header className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
             <button
               onClick={() => {
-                setShowNotesPanel(false);
-                resetNoteEditor();
+                setShowRemindersPanel(false);
+                resetReminderEditor();
               }}
               className="flex items-center gap-1 text-corporate font-medium text-sm px-2 py-1 rounded-lg hover:bg-corporate/5 transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
               Cerrar
             </button>
-            <h1 className="text-lg font-semibold text-[#1D1D1F]">Notas</h1>
+            <h1 className="text-lg font-semibold text-[#1D1D1F]">Recordatorios</h1>
             <button
-              onClick={handleNewNote}
+              onClick={handleNewReminder}
               className="flex items-center gap-1 text-corporate font-medium text-sm px-3 py-1.5 rounded-lg hover:bg-corporate/5 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              Nueva nota
+              Nuevo
             </button>
           </header>
 
           <div className="flex-1 overflow-y-auto p-4">
-            {activeNotes.length === 0 && !editingNote && (
-              <div className="flex flex-col items-center justify-center h-full text-[#86868B] space-y-3">
-                <StickyNote className="w-12 h-12 opacity-20" />
-                <p className="text-sm">No tienes notas activas</p>
+            {/* Categorías */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6 max-w-5xl mx-auto">
+              {CATEGORIES.map((cat) => {
+                const Icon = cat.icon;
+                const count = (counts as any)[cat.countKey] || 0;
+                const active = selectedCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={cn(
+                      'relative flex flex-col justify-between items-start text-left rounded-2xl p-3 min-h-[80px] transition-transform hover:scale-[1.02]',
+                      cat.color,
+                      active ? 'ring-2 ring-offset-2 ring-corporate' : ''
+                    )}
+                  >
+                    <Icon className="w-6 h-6 text-white/90" />
+                    <div className="w-full">
+                      <div className="text-2xl font-bold text-white leading-none">{count}</div>
+                      <div className="text-xs text-white/90 font-medium mt-0.5">{cat.label}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {Object.keys(groupedReminders).length === 0 && (
+              <div className="flex flex-col items-center justify-center h-64 text-[#86868B] space-y-3">
+                <CalendarCheck className="w-12 h-12 opacity-20" />
+                <p className="text-sm">No hay recordatorios en esta categoría</p>
                 <button
-                  onClick={handleNewNote}
+                  onClick={handleNewReminder}
                   className="text-corporate text-sm font-medium px-4 py-2 rounded-xl bg-corporate/5 hover:bg-corporate/10 transition-colors"
                 >
-                  Crear una nota
+                  Crear un recordatorio
                 </button>
               </div>
             )}
 
-            <div className="space-y-3 max-w-2xl mx-auto">
-              {activeNotes.map((note) => {
-                const completed = note.items.filter((item) => item.completed).length;
-                const total = note.items.length;
-                const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
-                return (
-                  <div
-                    key={note.id}
-                    className="bg-white rounded-2xl shadow-sm border border-[#E5E5E7] p-4 space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <button
-                        onClick={() => handleEditNote(note)}
-                        className="text-left flex-1"
-                      >
-                        <h3 className="font-semibold text-[#1D1D1F]">{note.title}</h3>
-                      </button>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleEditNote(note)}
-                          className="p-2 text-[#86868B] hover:text-corporate hover:bg-corporate/5 rounded-full transition-colors"
-                          title="Editar"
+            <div className="space-y-4 max-w-2xl mx-auto">
+              {Object.entries(groupedReminders).map(([listName, listReminders]) => (
+                <div key={listName} className="space-y-2">
+                  <h2 className="text-sm font-semibold text-[#8E8E93] uppercase tracking-wide ml-1">{listName}</h2>
+                  <div className="bg-white rounded-2xl shadow-sm border border-[#E5E5E7] overflow-hidden">
+                    {listReminders.map((reminder, idx) => {
+                      const completed = reminder.items.filter((item) => item.completed).length;
+                      const total = reminder.items.length;
+                      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+                      const dateLabel = formatReminderDate(reminder.dueDate, reminder.hasTime, reminder.dueTime);
+                      return (
+                        <div
+                          key={reminder.id}
+                          className={cn(
+                            'p-4 transition-colors hover:bg-[#F9F9FB]',
+                            idx !== listReminders.length - 1 && 'border-b border-[#E5E5E7]'
+                          )}
                         >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteNote(note.id)}
-                          className="p-2 text-[#86868B] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-full transition-colors"
-                          title="Archivar"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {note.items.length > 0 && (
-                      <div className="space-y-2">
-                        {note.items.slice(0, 4).map((item) => (
-                          <div key={item.id} className="flex items-center gap-3">
+                          <div className="flex items-start justify-between gap-3">
                             <button
-                              onClick={() => toggleNoteItem(note.id, item.id)}
-                              className={cn(
-                                'flex-shrink-0 transition-colors',
-                                item.completed ? 'text-corporate' : 'text-[#C7C7CC]'
-                              )}
+                              onClick={() => handleEditReminder(reminder)}
+                              className="text-left flex-1 min-w-0"
                             >
-                              {item.completed ? (
-                                <CheckCircle2 className="w-5 h-5" />
-                              ) : (
-                                <Circle className="w-5 h-5" />
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {total > 0 && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleReminderItem(reminder.id, reminder.items[0].id);
+                                    }}
+                                    className={cn(
+                                      'flex-shrink-0 transition-colors',
+                                      reminder.items[0].completed ? 'text-corporate' : 'text-[#C7C7CC]'
+                                    )}
+                                  >
+                                    {reminder.items[0].completed ? (
+                                      <CheckCircle2 className="w-5 h-5" />
+                                    ) : (
+                                      <Circle className="w-5 h-5" />
+                                    )}
+                                  </button>
+                                )}
+                                <h3 className={cn('font-semibold text-[#1D1D1F]', completed === total && total > 0 && 'line-through text-[#86868B]')}>
+                                  {reminder.title}
+                                </h3>
+                              </div>
+                              {reminder.notes && (
+                                <p className="text-sm text-[#86868B] mt-0.5 line-clamp-2">{reminder.notes}</p>
+                              )}
+                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                {dateLabel && (
+                                  <span className={cn(
+                                    'text-xs flex items-center gap-1',
+                                    reminder.dueDate && reminder.dueDate < todayISO() ? 'text-[#FF3B30]' : 'text-[#007AFF]'
+                                  )}>
+                                    <Calendar className="w-3 h-3" />
+                                    {dateLabel}
+                                  </span>
+                                )}
+                                {reminder.isUrgent && (
+                                  <span className="text-xs text-[#FF2D55] flex items-center gap-1">
+                                    <Bell className="w-3 h-3" />
+                                    Urgente
+                                  </span>
+                                )}
+                                {reminder.flagged && (
+                                  <span className="text-xs text-[#FF9500] flex items-center gap-1">
+                                    <Flag className="w-3 h-3" />
+                                    Indicador
+                                  </span>
+                                )}
+                                {total > 0 && (
+                                  <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>
+                                )}
+                              </div>
+                              {total > 1 && (
+                                <div className="mt-2 space-y-1">
+                                  {reminder.items.slice(1, 4).map((item) => (
+                                    <div key={item.id} className="flex items-center gap-2 text-sm">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleReminderItem(reminder.id, item.id);
+                                        }}
+                                        className={cn(
+                                          'flex-shrink-0 transition-colors',
+                                          item.completed ? 'text-corporate' : 'text-[#C7C7CC]'
+                                        )}
+                                      >
+                                        {item.completed ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4" />}
+                                      </button>
+                                      <span className={cn('truncate', item.completed && 'line-through text-[#86868B]')}>
+                                        {item.text}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {total > 4 && (
+                                    <p className="text-xs text-[#86868B] pl-6">+{total - 4} más</p>
+                                  )}
+                                </div>
+                              )}
+                              {total > 0 && (
+                                <div className="mt-2">
+                                  <Progress value={progress} className="h-1 bg-[#E5E5E7]" />
+                                </div>
                               )}
                             </button>
-                            <span
-                              className={cn(
-                                'text-sm truncate',
-                                item.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]'
+                            <div className="flex flex-col items-end gap-1">
+                              {canConvert && (
+                                <button
+                                  onClick={() => handleEditReminder(reminder)}
+                                  className="p-2 text-[#86868B] hover:text-corporate hover:bg-corporate/5 rounded-full transition-colors"
+                                  title="Convertir en tarea"
+                                >
+                                  <ArrowRightLeft className="w-4 h-4" />
+                                </button>
                               )}
-                            >
-                              {item.text}
-                            </span>
+                              <button
+                                onClick={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
+                                className="p-2 text-[#86868B] hover:text-[#FF3B30] hover:bg-[#FF3B30]/5 rounded-full transition-colors"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
-                        ))}
-                        {note.items.length > 4 && (
-                          <p className="text-xs text-[#86868B] pl-8">
-                            +{note.items.length - 4} elementos más
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {total > 0 && (
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-xs text-[#86868B]">
-                          <span>{completed} de {total}</span>
-                          <span>{progress}%</span>
                         </div>
-                        <Progress value={progress} className="h-1.5 bg-[#E5E5E7]" />
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-end pt-1">
-                      <button
-                        onClick={() => handleConvertNote(note)}
-                        disabled={isConverting}
-                        className="flex items-center gap-1.5 text-xs font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <ArrowRightLeft className="w-3.5 h-3.5" />
-                        {isConverting ? 'Convirtiendo...' : 'Convertir en tarea'}
-                      </button>
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
 
-      {/* Editor de nota */}
-      <Dialog
-        open={!!editingNote || noteItems.length > 0 || noteTitle !== ''}
-        onOpenChange={(open) => {
-          if (!open) resetNoteEditor();
-        }}
-      >
-        <DialogContent className="w-[calc(100%-2rem)] max-w-lg rounded-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="text-lg">
-              {editingNote ? 'Editar nota' : 'Nueva nota'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2 overflow-y-auto">
-            <Input
-              value={noteTitle}
-              onChange={(e) => setNoteTitle(e.target.value)}
-              placeholder="Título"
-              className="rounded-xl border-[#E5E5E7] text-[#1D1D1F] font-medium"
-            />
+      {/* Editor de recordatorio */}
+      {(editingReminder || items.length > 0 || title !== '' || notes !== '' || url !== '') && (
+        <div className="fixed inset-0 z-[60] bg-[#F2F2F7] flex flex-col">
+          <header className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
+            <button
+              onClick={resetReminderEditor}
+              className="flex items-center gap-1 text-[#007AFF] font-medium text-sm px-2 py-1 rounded-lg hover:bg-[#007AFF]/5 transition-colors"
+            >
+              Cancelar
+            </button>
+            <h1 className="text-lg font-semibold text-[#1D1D1F]">
+              {editingReminder ? 'Editar recordatorio' : 'Nuevo recordatorio'}
+            </h1>
+            <button
+              onClick={handleSaveReminder}
+              disabled={isSavingReminder}
+              className="flex items-center gap-1 text-[#007AFF] font-semibold text-sm px-3 py-1.5 rounded-lg hover:bg-[#007AFF]/5 transition-colors disabled:opacity-50"
+            >
+              {isSavingReminder ? 'Guardando...' : 'Guardar'}
+            </button>
+          </header>
 
-            <div className="space-y-2">
-              {noteItems.map((item, index) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleItemInEditor(item.id)}
-                    className={cn(
-                      'flex-shrink-0 transition-colors',
-                      item.completed ? 'text-corporate' : 'text-[#C7C7CC]'
-                    )}
-                  >
-                    {item.completed ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      <Circle className="w-5 h-5" />
-                    )}
-                  </button>
-                  <Input
-                    value={item.text}
-                    onChange={(e) => handleUpdateItemText(item.id, e.target.value)}
-                    placeholder={`Elemento ${index + 1}`}
-                    className="flex-1 rounded-xl border-[#E5E5E7] text-sm"
-                    autoFocus={index === noteItems.length - 1 && item.text === ''}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveItem(item.id)}
-                    className="p-1.5 text-[#C7C7CC] hover:text-[#FF3B30] rounded-full transition-colors"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+          <div className="flex-1 overflow-y-auto p-4 max-w-2xl mx-auto w-full">
+            <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Título"
+                className="border-0 rounded-none text-[#1D1D1F] font-medium placeholder:text-[#C7C7CC] focus-visible:ring-0 h-12"
+              />
+              <div className="h-px bg-[#E5E5E7]" />
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Notas"
+                rows={3}
+                className="border-0 rounded-none resize-none text-[#1D1D1F] placeholder:text-[#C7C7CC] focus-visible:ring-0"
+              />
+              <div className="h-px bg-[#E5E5E7]" />
+              <Input
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="URL"
+                className="border-0 rounded-none text-[#1D1D1F] placeholder:text-[#C7C7CC] focus-visible:ring-0 h-12"
+              />
             </div>
 
-            <button
-              type="button"
-              onClick={handleAddItem}
-              className="flex items-center gap-2 text-sm font-medium text-corporate hover:text-corporate/80 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Añadir elemento
-            </button>
+            {/* Fecha y hora */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-[#007AFF]" />
+                  <span className="text-[#1D1D1F]">Fecha</span>
+                </div>
+                <Switch checked={hasDate} onCheckedChange={setHasDate} />
+              </div>
+              {hasDate && (
+                <div className="px-4 py-2 border-b border-[#E5E5E7]">
+                  <Input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="border-0 rounded-none focus-visible:ring-0"
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-[#007AFF]" />
+                  <span className="text-[#1D1D1F]">Hora</span>
+                </div>
+                <Switch checked={hasTime} onCheckedChange={(v) => { setHasTime(v); if (v) setHasDate(true); }} />
+              </div>
+              {hasTime && (
+                <div className="px-4 py-2">
+                  <Input
+                    type="time"
+                    value={dueTime}
+                    onChange={(e) => setDueTime(e.target.value)}
+                    className="border-0 rounded-none focus-visible:ring-0"
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <Bell className="w-5 h-5 text-[#FF2D55]" />
+                  <span className="text-[#1D1D1F]">Urgente</span>
+                </div>
+                <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
+              </div>
+            </div>
 
-            {editingNote && (
-              <div className="pt-2">
+            {/* Lista */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
+                <List className="w-5 h-5 text-[#FF9500]" />
+                <span className="text-[#1D1D1F]">Lista</span>
+              </div>
+              <div className="px-4 py-2">
+                <Input
+                  value={list}
+                  onChange={(e) => setList(e.target.value)}
+                  placeholder="Nombre de lista"
+                  className="border-0 rounded-none focus-visible:ring-0"
+                />
+              </div>
+            </div>
+
+            {/* Detalles */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
+                <Info className="w-5 h-5 text-[#5856D6]" />
+                <span className="font-medium text-[#1D1D1F]">Detalles</span>
+              </div>
+              <div className="px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3 mb-2">
+                  <Hash className="w-5 h-5 text-[#8E8E93]" />
+                  <span className="text-[#1D1D1F]">Etiquetas</span>
+                </div>
+                <Input
+                  value={tags.join(', ')}
+                  onChange={(e) => setTags(e.target.value.split(',').map((t) => t.trim()).filter(Boolean))}
+                  placeholder="Separadas por coma"
+                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
+                />
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3">
+                  <Flag className="w-5 h-5 text-[#FF9500]" />
+                  <span className="text-[#1D1D1F]">Poner indicador</span>
+                </div>
+                <Switch checked={flagged} onCheckedChange={setFlagged} />
+              </div>
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-5 h-5 text-[#FF3B30]" />
+                  <span className="text-[#1D1D1F]">Prioridad</span>
+                </div>
+                <select
+                  value={priority}
+                  onChange={(e) => setPriority(e.target.value as FirestoreReminder['priority'])}
+                  className="text-sm bg-transparent text-[#007AFF] focus:outline-none"
+                >
+                  <option value="none">Ninguna</option>
+                  <option value="low">Baja</option>
+                  <option value="medium">Media</option>
+                  <option value="high">Alta</option>
+                </select>
+              </div>
+              <div className="px-4 py-3 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-3 mb-2">
+                  <MapPin className="w-5 h-5 text-[#8E8E93]" />
+                  <span className="text-[#1D1D1F]">Ubicación</span>
+                </div>
+                <Input
+                  value={reminderLocation}
+                  onChange={(e) => setReminderLocation(e.target.value)}
+                  placeholder="Agregar ubicación"
+                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
+                />
+              </div>
+              <div className="px-4 py-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <ImageIcon className="w-5 h-5 text-[#8E8E93]" />
+                  <span className="text-[#1D1D1F]">Imagen</span>
+                </div>
+                <Input
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="URL de imagen"
+                  className="border-0 rounded-none focus-visible:ring-0 text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Items / checklist */}
+            <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
+                <CheckSquare className="w-5 h-5 text-corporate" />
+                <span className="font-medium text-[#1D1D1F]">Lista de pasos</span>
+              </div>
+              <div className="px-4 py-3 space-y-2">
+                {items.map((item, index) => (
+                  <div key={item.id} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleItemInEditor(item.id)}
+                      className={cn(
+                        'flex-shrink-0 transition-colors',
+                        item.completed ? 'text-corporate' : 'text-[#C7C7CC]'
+                      )}
+                    >
+                      {item.completed ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
+                    </button>
+                    <Input
+                      value={item.text}
+                      onChange={(e) => handleUpdateItemText(item.id, e.target.value)}
+                      placeholder={`Paso ${index + 1}`}
+                      className="flex-1 border-0 rounded-none focus-visible:ring-0 text-sm px-0"
+                      autoFocus={index === items.length - 1 && item.text === ''}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="p-1.5 text-[#C7C7CC] hover:text-[#FF3B30] rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
                 <button
                   type="button"
-                  onClick={() => handleConvertNote(editingNote)}
-                  disabled={isConverting}
-                  className="w-full flex items-center justify-center gap-2 text-sm font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50"
+                  onClick={handleAddItem}
+                  className="flex items-center gap-2 text-sm font-medium text-[#007AFF] hover:text-[#007AFF]/80 transition-colors pt-1"
                 >
-                  <ArrowRightLeft className="w-4 h-4" />
-                  {isConverting ? 'Convirtiendo...' : 'Convertir en tarea'}
+                  <Plus className="w-4 h-4" />
+                  Añadir paso
                 </button>
               </div>
-            )}
+            </div>
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1 rounded-xl"
-                onClick={resetNoteEditor}
-                disabled={isSavingNote || isConverting}
+            {editingReminder && canConvert && (
+              <button
+                type="button"
+                onClick={startConvert}
+                disabled={isSavingReminder}
+                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-4 py-3 rounded-xl transition-colors disabled:opacity-50 mb-4"
               >
-                Cancelar
-              </Button>
-              <Button
-                className="flex-1 rounded-xl text-white bg-corporate hover:bg-corporate/90"
-                onClick={handleSaveNote}
-                disabled={isSavingNote || isConverting || noteItems.every((item) => !item.text.trim())}
-              >
-                {isSavingNote ? 'Guardando...' : 'Guardar'}
-              </Button>
+                <ArrowRightLeft className="w-4 h-4" />
+                Convertir en tarea
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Diálogo de conversión */}
+      <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <DialogContent className="w-[calc(100%-2rem)] max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-lg">Convertir en tarea</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-[#86868B]">
+              Elige el tipo de tarea. Se abrirá el formulario completo para que completes asignación, turnos y demás detalles.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {user && hasPermission(user, 'canCreateSpecificTask') && (
+                <button
+                  onClick={() => doConvert('specific')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#E5E5E7] hover:border-corporate hover:bg-corporate/5 transition-colors"
+                >
+                  <Target className="w-6 h-6 text-corporate" />
+                  <span className="text-sm font-medium text-[#1D1D1F]">Específica</span>
+                </button>
+              )}
+              {user && hasPermission(user, 'canCreateExtraTask') && (
+                <button
+                  onClick={() => doConvert('extra')}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl border border-[#E5E5E7] hover:border-amber-500 hover:bg-amber-500/5 transition-colors"
+                >
+                  <Plus className="w-6 h-6 text-amber-500" />
+                  <span className="text-sm font-medium text-[#1D1D1F]">Extra</span>
+                </button>
+              )}
             </div>
           </div>
         </DialogContent>

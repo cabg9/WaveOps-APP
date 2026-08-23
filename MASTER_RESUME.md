@@ -1,9 +1,45 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (unificación de historial y navegación por logo)
+> Última actualización: 2026-08-23 (Notas → Recordatorios Apple Reminders style + integración real con Tasks)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## GlobalFAB: Recordatorios (Apple Reminders style) + integración con Tasks
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Eliminar overlay oscuro del FAB**: se quitó el `div` con `bg-black/10` que aparecía al abrir el botón flotante.
+- **Renombrar Notas → Recordatorios**: en el FAB, panel, editor y toda la UI.
+- **Nuevo hook `src/hooks/firestore/useFirestoreReminders.ts`**:
+  - Modelo ampliado: título, notas, URL, fecha/hora, urgente, lista, etiquetas, indicador, prioridad, ubicación, imagen, historial.
+  - Mantiene la colección Firestore `notes` para no perder datos.
+  - Agrega `getReminderById` para lectura puntual desde TasksModule.
+- **Panel de Recordatorios rediseñado**:
+  - Grid de categorías con contadores: Hoy, Programados, Todos, Indicador, Urgente, Terminados, Personal.
+  - Lista agrupada por lista con fecha, indicadores, progreso y acciones.
+- **Editor de recordatorio a pantalla completa estilo Apple**:
+  - Título, Notas, URL.
+  - Toggles de Fecha, Hora y Urgente.
+  - Lista, Detalles (etiquetas, indicador, prioridad, ubicación, imagen).
+  - Lista de pasos/checklist.
+- **Conversión a tarea mediante formulario real**:
+  - Diálogo para elegir entre tarea específica o extra según permisos.
+  - Navega a `/tasks?create=specific|extra&reminderId=<id>`.
+  - TasksModule precarga título, descripción, subtareas, fecha y prioridad.
+  - Al guardar, el recordatorio se marca como `converted` y desaparece de Recordatorios.
+- **Índice Firestore**: se agregó índice compuesto para `notes` (`userId ASC`, `updatedAt DESC`).
+
+### Archivos modificados
+- `src/hooks/firestore/useFirestoreNotes.ts` → eliminado.
+- `src/hooks/firestore/useFirestoreReminders.ts` → creado.
+- `src/components/GlobalFAB.tsx`.
+- `src/components/modules/TasksModule.tsx`.
+- `firestore.indexes.json`.
+- `MASTER_RESUME.md`.
 
 ---
 
@@ -1224,43 +1260,48 @@ Validar que toda la FASE 7 esté estable, 100% online y sin datos hardcodeados a
 
 ## GlobalFAB: Notas / Recordatorios y auto-hide inteligente
 
-### Notas personales (Apple Reminders style)
-- Nueva colección Firestore `notes` para notas/recordatorios personales.
-- Hook `src/hooks/firestore/useFirestoreNotes.ts` con listener `onSnapshot` por `userId`, ordenado por `updatedAt desc`.
-- CRUD: `createNote`, `updateNote`, `toggleNoteItem`, `deleteNote` (archiva a `status: 'archived'`), `markNoteConverted`.
-- Modelo de datos:
-  - `userId`, `title`, `items: [{ id, text, completed }]`, `status: 'active' | 'converted' | 'archived'`, `convertedToTaskId`, `createdAt`, `updatedAt`.
+### Recordatorios personales (Apple Reminders style)
+- Colección Firestore `notes` para recordatorios personales (se mantiene el nombre para no perder datos existentes).
+- Hook `src/hooks/firestore/useFirestoreReminders.ts` con listener `onSnapshot` por `userId`, ordenado por `updatedAt desc`.
+- CRUD: `createReminder`, `updateReminder`, `toggleReminderItem`, `archiveReminder`, `markReminderConverted`, `getReminderById`.
+- Modelo de datos ampliado:
+  - `userId`, `title`, `notes`, `url`.
+  - `items: [{ id, text, completed }]`.
+  - `hasDate`, `hasTime`, `dueDate`, `dueTime`.
+  - `isUrgent`, `list`, `tags`, `flagged`, `priority`, `location`, `imageUrl`.
+  - `status: 'active' | 'converted' | 'archived'`, `convertedToTaskId`.
+  - `history: [{ action, by, byName, at, note? }]`.
 - UI en `src/components/GlobalFAB.tsx`:
-  - Nueva acción "Notas" con icono `StickyNote` arriba de Feedback.
-  - Panel a pantalla completa (`fixed inset-0 z-50 bg-[#F5F5F7]`).
-  - Header con cerrar, título "Notas" y "Nueva nota".
-  - Tarjetas redondeadas (`rounded-2xl`) con título, checklist de ítems (`Circle` / `CheckCircle2`), indicador de progreso y contador.
-  - Editor de nota con título, lista editable de ítems, "Añadir elemento", eliminar ítem y guardar.
+  - Acción "Recordatorios" con icono `StickyNote`.
+  - Panel a pantalla completa con grid de categorías (Hoy, Programados, Todos, Indicador, Urgente, Terminados, Personal) y contadores.
+  - Lista de recordatorios agrupada por lista, con fecha, indicador, urgencia, progreso y acciones.
+  - Editor de recordatorio a pantalla completa estilo Apple:
+    - Campos: Título, Notas, URL.
+    - Sección "Fecha y hora": toggles de Fecha, Hora y Urgente.
+    - Sección "Más opciones": Lista, Detalles.
+    - Detalles expande: Etiquetas, Poner indicador, Prioridad, Ubicación, Imagen.
+    - Lista de pasos/checklist.
 
-### Conversión de nota a tarea
-- Disponible cuando la nota tiene ítems.
+### Conversión de recordatorio a tarea
+- Botón "Convertir en tarea" en la tarjeta y en el editor.
 - Permisos vía `hasPermission` de `src/lib/permissions-config.ts`:
-  - Si `canCreateSpecificTask` → convierte a **Tarea específica** (`SPECIFIC`).
-  - Sino si `canCreateExtraTask` → convierte a **Tarea extra** (`EXTRA`).
-  - Sino muestra mensaje de falta de permisos.
-- Al convertir se crea la tarea con `useFirestoreTasks().createTask()`:
-  - `title`: título de la nota.
-  - `description`: resumen de ítems pendientes.
-  - `type`: `SPECIFIC` o `EXTRA`.
-  - `status`: `PENDING`.
-  - `assignedTo`: `[user.id]`.
-  - `department`: departamento del usuario.
-  - `dueDate`: fecha actual (`yyyy-MM-dd`).
-  - `subtasks`: ítems de la nota mapeados a `{ id, title, completed }`.
-- Después de crear la tarea, la nota pasa a `status: 'converted'` y guarda `convertedToTaskId`.
-- Toast de éxito con acción "Ver tarea".
+  - Si `canCreateSpecificTask` → permite elegir **Tarea específica**.
+  - Si `canCreateExtraTask` → permite elegir **Tarea extra**.
+  - Si solo tiene uno, se selecciona automáticamente.
+- Al convertir se navega a `/tasks?create=specific&reminderId=<id>` o `/tasks?create=extra&reminderId=<id>`.
+- `TasksModule` lee el recordatorio, precarga título, descripción, subtareas, fecha y prioridad en el formulario real de tareas.
+- El usuario completa el formulario real (turnos, departamento, asignados, etc.).
+- Al guardar:
+  - Tarea extra: se crea la tarea y el recordatorio pasa a `status: 'converted'` con `convertedToTaskId`.
+  - Tarea específica: se crea la plantilla y el recordatorio pasa a `status: 'converted'` con `convertedToTaskId` (templateId).
+- Toast de éxito y el recordatorio desaparece de la lista de Recordatorios.
 
 ### Auto-hide inteligente del FAB
 - Escritorio (ratón):
   - Área activa de ~80 px desde la esquina inferior derecha.
   - Si el ratón entra en el hot corner, el FAB aparece.
   - Si sale y el menú está cerrado, se oculta tras 800 ms con transición suave (`opacity` + `translate`).
-  - Mientras el menú, el panel de Notas o el Feedback estén abiertos, permanece visible.
+  - Mientras el menú, el panel de Recordatorios o el Feedback estén abiertos, permanece visible.
 - Móvil (touch):
   - FAB oculto por defecto cuando está colapsado.
   - Se detecta swipe hacia arriba (> 60 px) iniciado dentro del hot corner inferior derecho.

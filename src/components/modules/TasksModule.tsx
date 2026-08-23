@@ -33,6 +33,8 @@ import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useDynamicDepartments, normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useFirestoreShifts } from '@/hooks/firestore/useFirestoreShifts';
 import { useSpecificTaskTemplates } from '@/hooks/firestore/useSpecificTaskTemplates';
+import { db } from '@/firebase-config';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
   const getLocalDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
   const getLocalDateFromISO = (iso) => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
@@ -80,6 +82,7 @@ export default function TasksModule() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createType, setCreateType] = useState<'extra' | 'specific' | 'incidencia'>('extra');
+  const [pendingReminderId, setPendingReminderId] = useState<string | null>(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -236,6 +239,21 @@ export default function TasksModule() {
     title: '', description: '', department: defaultDepartment, targetDepartments: [] as string[], priority: TaskPriority.HIGH,
   });
 
+  const markReminderConverted = async (reminderId: string, convertedId: string) => {
+    if (!user?.id || !reminderId) return;
+    try {
+      await updateDoc(doc(db, 'notes', reminderId), {
+        status: 'converted',
+        convertedToTaskId: convertedId,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success('Recordatorio convertido en tarea');
+    } catch (err) {
+      console.error('Error al marcar recordatorio convertido:', err);
+      toast.error('No se pudo actualizar el recordatorio');
+    }
+  };
+
   const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia') => {
     setCreateType(type);
     setTaskForm({
@@ -262,13 +280,61 @@ export default function TasksModule() {
     setIsCreateModalOpen(true);
   };
 
+  // Resetear reminder pendiente si se cierra el modal sin convertir
+  useEffect(() => {
+    if (!isCreateModalOpen && pendingReminderId) {
+      setPendingReminderId(null);
+    }
+  }, [isCreateModalOpen]);
+
   // Abrir modal de creación desde query param (FAB global)
   useEffect(() => {
     const create = searchParams.get('create');
+    const reminderId = searchParams.get('reminderId');
     if (create === 'extra' || create === 'specific' || create === 'incidencia') {
       handleOpenModal(create);
+      if (reminderId) {
+        setPendingReminderId(reminderId);
+        // Precargar datos del recordatorio
+        getDoc(doc(db, 'notes', reminderId)).then((snap) => {
+          if (!snap.exists()) return;
+          const data = snap.data();
+          const items = (data.items || []).map((item: any) => ({
+            id: item.id || Math.random().toString(36).substr(2, 9),
+            title: item.text || '',
+            completed: !!item.completed,
+          }));
+          const descriptionParts = [data.notes || '', data.url || ''].filter(Boolean);
+          const description = descriptionParts.join('\n\n');
+          const dueDate = data.dueDate || getLocalDate();
+          const isUrgent = !!data.isUrgent;
+          const priority = isUrgent ? TaskPriority.HIGH : TaskPriority.MEDIUM;
+
+          if (create === 'specific') {
+            setSpecificTaskForm((prev) => ({
+              ...prev,
+              title: data.title || '',
+              description,
+              subtasks: items,
+              priority,
+            }));
+          } else if (create === 'extra') {
+            setTaskForm((prev) => ({
+              ...prev,
+              title: data.title || '',
+              description,
+              subtasks: items,
+              startDate: dueDate,
+              priority,
+            }));
+          }
+        }).catch((err) => {
+          console.error('Error al precargar recordatorio:', err);
+        });
+      }
       const next = new URLSearchParams(searchParams);
       next.delete('create');
+      next.delete('reminderId');
       setSearchParams(next, { replace: true });
     }
   }, [searchParams]);
@@ -301,7 +367,7 @@ export default function TasksModule() {
         });
         toast.success('Plantilla de tarea específica actualizada.');
       } else {
-        await createTemplate({
+        const templateId = await createTemplate({
           title: specificTaskForm.title.trim(),
           description: specificTaskForm.description.trim(),
           department: specificTaskForm.department,
@@ -317,6 +383,10 @@ export default function TasksModule() {
           createdBy: user.id,
         });
         toast.success('Tarea específica creada. Se generará automáticamente al asignar el turno.');
+        if (pendingReminderId) {
+          await markReminderConverted(pendingReminderId, templateId);
+          setPendingReminderId(null);
+        }
       }
       setIsCreateModalOpen(false);
       setEditingTemplateId(null);
@@ -926,7 +996,7 @@ export default function TasksModule() {
                 isEditing={!!editingTemplateId}
               />
             ) : createType === 'extra' ? (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }).then((id) => { console.log('Tarea creada:', id); setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }).then(async (id) => { console.log('Tarea creada:', id); if (pendingReminderId) { await markReminderConverted(pendingReminderId, id); setPendingReminderId(null); } setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
             ) : null}
             </div>
           </DialogContent>
