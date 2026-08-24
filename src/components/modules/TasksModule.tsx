@@ -605,9 +605,9 @@ export default function TasksModule() {
           </div>
         </div>
 
-        {/* MÓVIL: tres dropdowns en una sola fila */}
+        {/* MÓVIL: tres dropdowns en una sola fila, ajustados al texto */}
         <div className="lg:hidden flex items-center gap-2 w-full max-w-full overflow-hidden">
-          <div className="flex-1 min-w-0">
+          <div className="flex-initial min-w-0">
             <Select value={mainTab} onValueChange={(v) => {
               const tab = v as MainTab;
               setMainTab(tab);
@@ -629,7 +629,7 @@ export default function TasksModule() {
             </Select>
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-initial min-w-0">
             <Select value={timeFilter} onValueChange={(v) => {
               const tf = v as TimeFilter;
               setTimeFilter(tf);
@@ -662,7 +662,7 @@ export default function TasksModule() {
             </Select>
           </div>
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-initial min-w-0">
             <Select value={String(statusFilter)} onValueChange={(v) => {
               if (!isIncidenciasTab) {
                 if (v === 'all') setStatusFilter('all');
@@ -1472,7 +1472,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {(() => {
               const isOverdue = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.VERIFIED && task.status !== TaskStatus.COMPLETED;
               return (
-              <div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><Calendar className="w-3.5 h-3.5 shrink-0" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse shrink-0">ATRASADA</Badge>)}</div>
+              <div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><Calendar className="w-3.5 h-3.5 shrink-0" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[9px] sm:text-[10px] px-1 py-0 sm:px-1.5 sm:py-0 border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse shrink-0">ATRASADA</Badge>)}</div>
               );
             })()}
             {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
