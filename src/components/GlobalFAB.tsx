@@ -127,6 +127,38 @@ function formatReminderDate(dueDate?: string, hasTime?: boolean, dueTime?: strin
   return label;
 }
 
+function isReminderDue(reminder: FirestoreReminder): boolean {
+  if (!reminder.hasDate || !reminder.dueDate) return false;
+  const now = new Date();
+  const [y, m, d] = reminder.dueDate.split('-').map(Number);
+  const due = new Date(y, m - 1, d);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (due < today) return true;
+  if (due.getTime() !== today.getTime()) return false;
+  if (!reminder.hasTime || !reminder.dueTime) return true;
+  const [hh, mm] = reminder.dueTime.split(':').map(Number);
+  return now.getHours() > hh || (now.getHours() === hh && now.getMinutes() >= mm);
+}
+
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {
+    // ignore
+  }
+}
+
 const CATEGORIES = [
   { id: 'today', label: 'Hoy', icon: CalendarDays, color: 'bg-corporate', countKey: 'today' },
   { id: 'scheduled', label: 'Programados', icon: Calendar, color: 'bg-amber-500', countKey: 'scheduled' },
@@ -546,6 +578,7 @@ export function GlobalFAB() {
   const [imageUrl, setImageUrl] = useState('');
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const notifiedRemindersRef = useRef<Record<string, string>>({});
   const [convertingReminder, setConvertingReminder] = useState<FirestoreReminder | null>(null);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 
@@ -739,6 +772,9 @@ export function GlobalFAB() {
 
   const handleNewReminder = () => {
     resetReminderEditor();
+    if (selectedListFilter !== 'all') {
+      setList(selectedListFilter);
+    }
     setItems([{ id: generateId(), text: '', completed: false }]);
     setIsEditorOpen(true);
   };
@@ -853,6 +889,37 @@ export function GlobalFAB() {
   };
 
   const activeReminders = reminders.filter((r) => r.status === 'active');
+  const dueCount = useMemo(() => activeReminders.filter(isReminderDue).length, [activeReminders]);
+
+  // Solicitar permiso de notificaciones al montar
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => {});
+    }
+  }, []);
+
+  // Revisar recordatorios vencidos y notificar
+  useEffect(() => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    const checkDue = () => {
+      const nowKey = new Date().toISOString().slice(0, 16);
+      activeReminders.forEach((reminder) => {
+        if (!isReminderDue(reminder)) return;
+        const lastNotified = notifiedRemindersRef.current[reminder.id];
+        if (lastNotified === nowKey) return;
+        notifiedRemindersRef.current[reminder.id] = nowKey;
+        playNotificationSound();
+        new Notification('Recordatorio', {
+          body: reminder.title || 'Tienes un recordatorio',
+          icon: '/logo-icon.png',
+          tag: reminder.id,
+        });
+      });
+    };
+    checkDue();
+    const interval = setInterval(checkDue, 30000);
+    return () => clearInterval(interval);
+  }, [activeReminders]);
 
   const availableLists = useMemo(() => {
     const existing = new Set<string>();
@@ -870,7 +937,7 @@ export function GlobalFAB() {
       all: activeReminders.length,
       flagged: activeReminders.filter((r) => r.flagged).length,
       urgent: activeReminders.filter((r) => r.isUrgent).length,
-      completed: reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed))).length,
+      completed: reminders.filter((r) => r.status === 'converted' || r.status === 'archived' || (r.items.length > 0 && r.items.every((i) => i.completed))).length,
     };
   }, [activeReminders, reminders]);
 
@@ -894,7 +961,7 @@ export function GlobalFAB() {
           result = result.filter((r) => r.isUrgent);
           break;
         case 'completed':
-          result = reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed)));
+          result = reminders.filter((r) => r.status === 'converted' || r.status === 'archived' || (r.items.length > 0 && r.items.every((i) => i.completed)));
           break;
       }
     }
@@ -1011,13 +1078,18 @@ export function GlobalFAB() {
                 <button
                   onClick={action.onClick}
                   className={cn(
-                    'w-12 h-12 rounded-full shadow-lg border border-[#E5E5E7] flex items-center justify-center transition-transform duration-200 hover:scale-110',
+                    'relative w-12 h-12 rounded-full shadow-lg border border-[#E5E5E7] flex items-center justify-center transition-transform duration-200 hover:scale-110',
                     action.bgColor,
                     action.color
                   )}
                   title={action.label}
                 >
                   <Icon className="w-5 h-5" />
+                  {action.id === 'reminders' && dueCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white">
+                      {dueCount > 9 ? '9+' : dueCount}
+                    </span>
+                  )}
                 </button>
               </div>
             );
@@ -1028,12 +1100,17 @@ export function GlobalFAB() {
         <button
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            'w-14 h-14 rounded-full bg-corporate text-white shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105',
+            'relative w-14 h-14 rounded-full bg-corporate text-white shadow-xl flex items-center justify-center transition-all duration-300 hover:scale-105',
             isOpen && 'rotate-45'
           )}
           aria-label="Acciones rápidas"
         >
           {isOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+          {!isOpen && dueCount > 0 && (
+            <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] px-1 flex items-center justify-center bg-red-500 text-white text-[11px] font-bold rounded-full border-2 border-corporate">
+              {dueCount > 9 ? '9+' : dueCount}
+            </span>
+          )}
         </button>
       </div>
 
@@ -1309,25 +1386,23 @@ export function GlobalFAB() {
                       >
                         <Pencil className="w-3 h-3" />
                       </button>
-                      {!DEFAULT_LISTS.includes(listName) && (
-                        <button
-                          onClick={() => {
-                            if (window.confirm(`¿Eliminar la lista "${listName}"? Los recordatorios se moverán a General.`)) {
-                              deleteList(listName).then((count) => {
-                                toast.success(`Lista eliminada (${count} recordatorios movidos)`);
-                                if (selectedListFilter === listName) {
-                                  setSelectedListFilter('all');
-                                  setSelectedCategory('all');
-                                }
-                              }).catch(() => toast.error('No se pudo eliminar la lista'));
-                            }
-                          }}
-                          className="p-1.5 rounded-lg text-[#86868B] hover:text-red-500 hover:bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Eliminar lista"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          if (window.confirm(`¿Eliminar la lista "${listName}"? Los recordatorios se moverán a General.`)) {
+                            deleteList(listName).then((count) => {
+                              toast.success(`Lista eliminada (${count} recordatorios movidos)`);
+                              if (selectedListFilter === listName) {
+                                setSelectedListFilter('all');
+                                setSelectedCategory('all');
+                              }
+                            }).catch(() => toast.error('No se pudo eliminar la lista'));
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-[#86868B] hover:text-red-500 hover:bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Eliminar lista"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
                     </div>
                   ))}
                 </div>

@@ -1,9 +1,46 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (correcciones de Recordatorios: filtros/listas excluyentes, vista lista por defecto, check de tarjetas, persistencia de listas)
+> Última actualización: 2026-08-23 (correcciones y notificaciones de Recordatorios: completados, badges, notificaciones escritorio + sonido)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Notificaciones de Recordatorios
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Completados incluye recordatorios archivados**: al marcar un recordatorio como completado desde el check principal, pasa a `status: 'archived'` y ahora aparece en el filtro **Terminados**.
+- **Listas por defecto eliminables**: todas las listas (General, Proyectos, Seguimiento) pueden eliminarse si el usuario lo desea.
+- **Preservar lista al crear**: si el usuario tiene una lista seleccionada y presiona **+ Nuevo**, el recordatorio nuevo se crea en esa lista.
+- **Badges visuales**:
+  - Globo rojo con contador en el botón principal del FAB cuando hay recordatorios vencidos.
+  - Globo rojo con contador en la acción **Recordatorios** del FAB expandido.
+- **Notificaciones de escritorio + sonido**:
+  - Se solicita permiso de notificaciones al usuario al cargar la app.
+  - Se revisan los recordatorios activos cada 30 segundos.
+  - Cuando un recordatorio llega a su fecha/hora, se muestra una notificación nativa del navegador con el título.
+  - Se reproduce un sonido de alerta (beep) junto con la notificación.
+  - Cada recordatorio se notifica una vez por minuto para evitar spam.
+
+### Sobre sincronización con recordatorios nativos
+- **Navegador / PWA**: lo que se entregó (notificaciones push del navegador + sonido) es lo práctico para una PWA sin convertirla en app nativa.
+- **Recordatorios nativos del celular/desktop**: es posible pero implica salir del navegador. Opciones:
+  - **CalDAV**: sincronizar con el calendario del usuario; los recordatorios aparecerían en apps de calendario, no en la app de Recordatorios del sistema.
+  - **App nativa**: envolver la app con Capacitor o React Native para usar las APIs nativas de iOS/Android; esto requiere publicar en App Store/Play Store.
+  - **Web Share / Add to calendar**: generar archivos `.ics` para que el usuario los importe manualmente.
+- **Recomendación**: para la fase actual, mantener las notificaciones del navegador/PWA. Si más adelante se requiere integración nativa real, evaluar Capacitor.
+
+### Archivos modificados
+- `src/components/GlobalFAB.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
