@@ -1,9 +1,52 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Ajustes post-7.5: iconos, móvil, departamentos base, posiciones y edición de módulos)
+> Última actualización: 2026-08-24 (Fixes post-7.5: TDZ departamentos, edición de perfil, auditoría unificada)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Nota importante: políticas de seguridad
+
+Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contraseña, requerir mayúsculas/números, intentos máximos de inicio de sesión, timeout de sesión, retención de logs, etc.) **aún no están conectadas al flujo real de la aplicación**.
+
+- Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
+- Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
+- Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Fixes post-7.5 (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Departamentos — pantalla blanca (TDZ)**:
+  - Corregido el error `ReferenceError: Cannot access '_e' before initialization` en `DepartamentosTab.tsx`.
+  - Se reordenaron las declaraciones para que `childDepts`, `childrenOf` y `getDescendantIds` se definan antes de los `useMemo` que los usan.
+  - No se cambió la lógica, solo el orden de declaración.
+- **Perfil (header) — edición restaurada y unificada**:
+  - `ProfilePage.tsx` ahora permite editar la información laboral.
+  - Solo `DIRECTOR_GENERAL` puede editar: rol, departamento, posición, fecha de ingreso, nivel y estado activo.
+  - El resto de usuarios solo puede editar sus datos personales básicos.
+  - En modo lectura se muestra una nueva sección "Información laboral" con rol, departamento, posición, fecha de ingreso, nivel y estado.
+  - Se usan `useFirestorePositions` y `useDynamicDepartments` para cargar posiciones y departamentos desde Firebase.
+- **Auditoría — tarjetas superiores unificadas**:
+  - En `DevelopsModule.tsx`, la pestaña Auditoría ahora muestra un solo bloque blanco titulado "Resumen de auditoría".
+  - Dentro del bloque hay 6 tarjetas internas: Críticas, Mayores, Sensibles, Menores, Departamentos eliminados y Usuarios eliminados.
+- **Seguridad — documentación de deuda técnica**:
+  - Se documentó que las políticas de seguridad aún no están conectadas al flujo real y deben programarse en una fase futura.
+
+### Archivos modificados
+- `src/components/modules/DepartamentosTab.tsx`
+- `src/components/ProfilePage.tsx`
+- `src/components/modules/DevelopsModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

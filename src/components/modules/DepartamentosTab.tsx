@@ -117,11 +117,7 @@ export function DepartamentosTab() {
   });
   const [templateCounts, setTemplateCounts] = useState<Record<string, number>>({});
 
-  const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId).sort((a: any, b: any) => a.name.localeCompare(b.name)), [departments]);
   const childDepts = useMemo(() => departments.filter((d: any) => d.parentId), [departments]);
-  const independentDepts = useMemo(() => rootDepts.filter((d: any) => childrenOf(d.id).length === 0), [rootDepts]);
-  const mainDept = useMemo(() => departments.find((d: any) => d.code === 'OPERACIONES') || rootDepts[0], [departments, rootDepts]);
-  const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
   const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
   const getDescendantIds = (parentId: string | null, depts: any[]): string[] => {
     if (!parentId) return [];
@@ -129,6 +125,10 @@ export function DepartamentosTab() {
     const indirect = direct.flatMap(childId => getDescendantIds(childId, depts));
     return Array.from(new Set([...direct, ...indirect]));
   };
+  const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId).sort((a: any, b: any) => a.name.localeCompare(b.name)), [departments]);
+  const independentDepts = useMemo(() => rootDepts.filter((d: any) => childrenOf(d.id).length === 0), [rootDepts]);
+  const mainDept = useMemo(() => departments.find((d: any) => d.code === 'OPERACIONES') || rootDepts[0], [departments, rootDepts]);
+  const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
 
   const PROTECTED_DEPT_CODES = ["OPERACIONES", "ADMINISTRATIVO"];
 

@@ -7,6 +7,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useFirestorePositions } from '@/hooks/firestore/useFirestorePositions';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
+import { Role } from '@/types';
 import { Layout } from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +55,9 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
   const [searchParams] = useSearchParams();
   const { user: currentUser } = useAuth();
   const { updateUser, users } = useFirestoreUsers();
+  const { positions } = useFirestorePositions();
+  const { departmentTreeOptions } = useDynamicDepartments();
+  const isDirectorGeneral = currentUser?.role === Role.DIRECTOR_GENERAL;
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -94,6 +100,7 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
     position: '',
     level: 7,
     joinDate: '',
+    isActive: true,
   });
 
   useEffect(() => {
@@ -129,6 +136,7 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
         position: freshUser.position || '',
         level: freshUser.level || 7,
         joinDate: freshUser.joinDate || '',
+        isActive: freshUser.isActive !== false,
       });
     }
   }, [freshUser]);
@@ -181,8 +189,7 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
         photoURL = await uploadPhoto(targetUserId!) || photoURL;
       }
 
-      await updateUser(targetUserId!, {
-        // @ts-ignore
+      const updates: any = {
         displayName: formData.displayName,
         phone: formData.phone,
         nationality: formData.nationality,
@@ -208,7 +215,18 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
         name: formData.name,
         position: formData.position,
         updatedAt: new Date().toISOString(),
-      });
+      };
+
+      if (isDirectorGeneral) {
+        updates.role = formData.role;
+        updates.department = formData.department;
+        updates.position = formData.position;
+        updates.level = Number(formData.level);
+        updates.joinDate = formData.joinDate;
+        updates.isActive = formData.isActive;
+      }
+
+      await updateUser(targetUserId!, updates);
 
       setIsEditing(false);
       setPhotoFile(null);
@@ -266,30 +284,34 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
   );
 
   // Editable field
-  const EditableField = ({ label, field, type = 'text', placeholder = '', selectOptions = null }: any) => (
-    <div className="space-y-1.5">
-      <Label className="text-xs text-[#86868B]">{label}</Label>
-      {selectOptions ? (
-        <select
-          value={formData[field as keyof typeof formData] || ''}
-          onChange={e => handleChange(field, e.target.value)}
-          className="w-full h-10 rounded-xl border border-[#E5E5E7] px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20"
-        >
-          {selectOptions.map((opt: any) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
-          ))}
-        </select>
-      ) : (
-        <Input
-          type={type}
-          value={formData[field as keyof typeof formData] || ''}
-          onChange={e => handleChange(field, e.target.value)}
-          placeholder={placeholder}
-          className="h-10 rounded-xl border-[#E5E5E7] focus:ring-corporate/20"
-        />
-      )}
-    </div>
-  );
+  const EditableField = ({ label, field, type = 'text', placeholder = '', selectOptions = null }: any) => {
+    const rawValue = formData[field as keyof typeof formData];
+    const value = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+    return (
+      <div className="space-y-1.5">
+        <Label className="text-xs text-[#86868B]">{label}</Label>
+        {selectOptions ? (
+          <select
+            value={value}
+            onChange={e => handleChange(field, e.target.value)}
+            className="w-full h-10 rounded-xl border border-[#E5E5E7] px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20"
+          >
+            {selectOptions.map((opt: any) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <Input
+            type={type}
+            value={value}
+            onChange={e => handleChange(field, e.target.value)}
+            placeholder={placeholder}
+            className="h-10 rounded-xl border-[#E5E5E7] focus:ring-corporate/20"
+          />
+        )}
+      </div>
+    );
+  };
 
   const isOwnProfile = !userId || userId === currentUser?.id;
 
@@ -392,6 +414,68 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
                 <EditableField label="Email" field="email" type="email" />
               </div>
             </div>
+
+            {isDirectorGeneral && (
+              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                <h3 className="font-semibold text-[#1D1D1F] mb-4">Información laboral</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <EditableField
+                    label="Rol"
+                    field="role"
+                    selectOptions={[
+                      { value: '', label: 'Seleccionar' },
+                      { value: Role.DIRECTOR_GENERAL, label: 'Director General' },
+                      { value: Role.DIRECTOR, label: 'Director' },
+                      { value: Role.RRHH, label: 'RRHH' },
+                      { value: Role.GERENTE_OPERACIONES, label: 'Gerente de Operaciones' },
+                      { value: Role.GERENTE_DEPARTAMENTO, label: 'Gerente de Departamento' },
+                      { value: Role.SUPERVISOR, label: 'Supervisor' },
+                      { value: Role.STAFF, label: 'Staff' },
+                    ]}
+                  />
+                  <EditableField
+                    label="Departamento"
+                    field="department"
+                    selectOptions={[
+                      { value: '', label: 'Seleccionar' },
+                      ...departmentTreeOptions.map((d) => ({ value: d.code, label: d.name })),
+                    ]}
+                  />
+                  <EditableField
+                    label="Posición"
+                    field="position"
+                    selectOptions={[
+                      { value: '', label: 'Seleccionar' },
+                      ...positions.map((p) => ({ value: p.name, label: p.name })),
+                    ]}
+                  />
+                  <EditableField label="Fecha de ingreso" field="joinDate" type="date" />
+                  <EditableField
+                    label="Nivel"
+                    field="level"
+                    selectOptions={[
+                      { value: 1, label: '1 - Director General' },
+                      { value: 2, label: '2 - Director' },
+                      { value: 3, label: '3 - RRHH' },
+                      { value: 4, label: '4 - Gerente de Operaciones' },
+                      { value: 5, label: '5 - Gerente de Departamento' },
+                      { value: 6, label: '6 - Supervisor' },
+                      { value: 7, label: '7 - Staff' },
+                    ]}
+                  />
+                  <div className="flex items-center gap-2 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      id="isActive"
+                      checked={formData.isActive}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                      className="rounded border-[#E5E5E7]"
+                    />
+                    <Label htmlFor="isActive" className="text-sm text-[#1D1D1F]">Usuario activo</Label>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
               <h3 className="font-semibold text-[#1D1D1F] mb-4">Salud</h3>
@@ -511,6 +595,15 @@ export default function ProfilePage({ userId, onClose }: ProfilePageProps = {}) 
             <Section title="Contacto" icon={Phone} color="bg-blue-500">
               <InfoRow icon={Phone} label="Teléfono" value={formData.phone} />
               <InfoRow icon={Mail} label="Email" value={formData.email} />
+            </Section>
+
+            <Section title="Información laboral" icon={Briefcase} color="bg-indigo-500">
+              <InfoRow icon={Shield} label="Rol" value={formData.role?.replace(/_/g, ' ') || ''} />
+              <InfoRow icon={Building2} label="Departamento" value={formData.department?.replace(/_/g, ' ') || ''} />
+              <InfoRow icon={Award} label="Posición" value={formData.position || ''} />
+              <InfoRow icon={Calendar} label="Fecha de ingreso" value={formData.joinDate || ''} />
+              <InfoRow icon={User} label="Nivel" value={formData.level ? String(formData.level) : ''} />
+              <InfoRow icon={BadgeCheck} label="Estado" value={formData.isActive ? 'Activo' : 'Inactivo'} />
             </Section>
 
             <Section title="Salud" icon={Heart} color="bg-red-500">

@@ -2088,37 +2088,33 @@ function AuditoriaTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-sm font-semibold text-[#1D1D1F] mb-3">Acciones mas frecuentes</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-[#E5E5E7] p-3">
-              <p className="text-[10px] text-[#86868B]">Criticas</p>
-              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.critical}</p>
-            </div>
-            <div className="rounded-xl border border-[#E5E5E7] p-3">
-              <p className="text-[10px] text-[#86868B]">Mayores</p>
-              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.major}</p>
-            </div>
-            <div className="rounded-xl border border-[#E5E5E7] p-3">
-              <p className="text-[10px] text-[#86868B]">Sensibles</p>
-              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.sensitive}</p>
-            </div>
-            <div className="rounded-xl border border-[#E5E5E7] p-3">
-              <p className="text-[10px] text-[#86868B]">Menores</p>
-              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.minor}</p>
-            </div>
+      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <p className="text-sm font-semibold text-[#1D1D1F] mb-3">Resumen de auditoría</p>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Críticas</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.critical}</p>
           </div>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Departamentos eliminados</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{deletedDepartments}</p>
-        </div>
-
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Usuarios eliminados</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{deletedUsers}</p>
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Mayores</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.major}</p>
+          </div>
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Sensibles</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.sensitive}</p>
+          </div>
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Menores</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.minor}</p>
+          </div>
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Departamentos eliminados</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{deletedDepartments}</p>
+          </div>
+          <div className="rounded-xl border border-[#E5E5E7] p-3">
+            <p className="text-[10px] text-[#86868B]">Usuarios eliminados</p>
+            <p className="text-lg font-semibold text-[#1D1D1F]">{deletedUsers}</p>
+          </div>
         </div>
       </div>
 
