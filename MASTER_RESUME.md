@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Ajustes responsivos en Tasks)
+> Última actualización: 2026-08-24 (Corrección ancho buscador móvil en Tasks)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,27 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Corrección ancho buscador móvil en Tasks (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Buscador móvil en Tasks**:
+  - Se reorganizó el layout móvil para que el buscador + toggles mantengan el mismo ancho en "Todas" y "Mi Departamento".
+  - En celulares pequeños (`< md`) el dropdown de departamento permanece oculto; solo se muestra buscador + toggles.
+  - En tablet (`md` a `lg`) el dropdown de departamento aparece en una fila separada arriba del buscador, evitando que comprima o desborde la barra de búsqueda.
+  - Se aplicó `w-full max-w-full` al contenedor, al dropdown y al input para evitar scroll horizontal.
+
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

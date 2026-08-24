@@ -805,12 +805,13 @@ export default function TasksModule() {
           </div>
         </div>
 
-        {/* Buscador móvil (junto al selector de departamento) */}
-        <div className="lg:hidden flex flex-wrap items-center gap-3">
+        {/* Buscador móvil */}
+        <div className="lg:hidden w-full max-w-full space-y-3">
+          {/* Selector de departamento en tablet (md a lg) */}
           {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
-            <div className="hidden md:flex lg:hidden shrink-0">
+            <div className="hidden md:flex lg:hidden w-full max-w-full">
               <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit">
+                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full max-w-full">
                   <SelectValue placeholder="Departamento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -825,9 +826,9 @@ export default function TasksModule() {
             </div>
           )}
           {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
-            <div className="hidden md:flex lg:hidden shrink-0">
+            <div className="hidden md:flex lg:hidden w-full max-w-full">
               <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit">
+                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full max-w-full">
                   <SelectValue placeholder="Departamento" />
                 </SelectTrigger>
                 <SelectContent>
@@ -841,13 +842,17 @@ export default function TasksModule() {
               </Select>
             </div>
           )}
-          <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-            <Input placeholder="Buscar" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 sm:pl-10 h-9 sm:h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
-          </div>
-          <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1 shrink-0">
-            <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
-            <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
+
+          {/* Buscador + toggles */}
+          <div className="flex items-center gap-3 w-full max-w-full">
+            <div className="relative flex-1 min-w-0 max-w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+              <Input placeholder="Buscar" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 sm:pl-10 h-9 sm:h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate w-full max-w-full" />
+            </div>
+            <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1 shrink-0">
+              <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
+              <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
+            </div>
           </div>
         </div>
 
