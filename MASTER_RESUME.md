@@ -1,9 +1,35 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (correcciones y notificaciones de Recordatorios: completados, badges, notificaciones escritorio + sonido)
+> Última actualización: 2026-08-23 (fix eliminar tareas y limpieza automática de recordatorios terminados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Fix: eliminar tareas y limpieza de recordatorios terminados
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Fix botón eliminar en tarjetas de tareas**:
+  - El handler `onDelete` ahora es async y muestra toast de éxito/error.
+  - Se captura el error si Firestore rechaza la eliminación.
+- **Limpieza automática de recordatorios terminados**:
+  - Recordatorios con estado `archived` o `converted` y `updatedAt` mayor a **7 días** se eliminan automáticamente de Firestore.
+  - Revisión al cargar la app y cada hora.
+  - Nuevo método `cleanupOldCompleted` en `useFirestoreReminders`.
+
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `src/hooks/firestore/useFirestoreReminders.ts`
+- `src/components/GlobalFAB.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

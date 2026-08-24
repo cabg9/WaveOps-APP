@@ -547,6 +547,7 @@ export function GlobalFAB() {
     renameList,
     addList,
     deleteList,
+    cleanupOldCompleted,
   } = useFirestoreReminders(user?.id);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -920,6 +921,16 @@ export function GlobalFAB() {
     const interval = setInterval(checkDue, 30000);
     return () => clearInterval(interval);
   }, [activeReminders]);
+
+  // Limpiar recordatorios terminados/archivados mayores a 1 semana
+  useEffect(() => {
+    if (!user?.id) return;
+    cleanupOldCompleted(7).catch(() => {});
+    const interval = setInterval(() => {
+      cleanupOldCompleted(7).catch(() => {});
+    }, 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user?.id, cleanupOldCompleted]);
 
   const availableLists = useMemo(() => {
     const existing = new Set<string>();

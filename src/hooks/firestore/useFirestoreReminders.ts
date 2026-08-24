@@ -415,6 +415,36 @@ export function useFirestoreReminders(userId: string | undefined) {
     }
   }, [userId]);
 
+  const cleanupOldCompleted = useCallback(async (days = 7): Promise<number> => {
+    try {
+      if (!userId) return 0;
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+      const q = query(
+        collection(db, COLLECTION_NAME),
+        where('userId', '==', userId),
+        where('status', 'in', ['archived', 'converted'])
+      );
+      const snapshot = await getDocs(q);
+      const toDelete = snapshot.docs.filter((d) => {
+        const data = d.data();
+        const updatedAt = data.updatedAt;
+        if (!updatedAt) return true;
+        if (typeof updatedAt === 'string') return updatedAt < cutoff;
+        if (updatedAt instanceof Date) return updatedAt.toISOString() < cutoff;
+        if (typeof updatedAt.toDate === 'function') return updatedAt.toDate().toISOString() < cutoff;
+        return false;
+      });
+      if (toDelete.length === 0) return 0;
+      const batch = writeBatch(db);
+      toDelete.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      return toDelete.length;
+    } catch (err: any) {
+      console.error('Error al limpiar recordatorios viejos:', err);
+      throw err;
+    }
+  }, [userId]);
+
   return {
     reminders,
     lists,
@@ -429,5 +459,6 @@ export function useFirestoreReminders(userId: string | undefined) {
     deleteList,
     getReminderById,
     renameList,
+    cleanupOldCompleted,
   };
 }
