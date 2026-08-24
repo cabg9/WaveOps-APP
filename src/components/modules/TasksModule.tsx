@@ -606,7 +606,7 @@ export default function TasksModule() {
         </div>
 
         {/* MÓVIL: tres dropdowns en una sola fila */}
-        <div className="md:hidden flex items-center gap-2">
+        <div className="lg:hidden flex items-center gap-2">
           <Select value={mainTab} onValueChange={(v) => {
             const tab = v as MainTab;
             setMainTab(tab);
@@ -702,46 +702,8 @@ export default function TasksModule() {
           </Select>
         </div>
 
-        {/* MÓVIL: selector de departamento para Todas */}
-        {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
-          <div className="md:hidden">
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
-                {visibleTaskDeptTreeOptions.map((dept) => (
-                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        {/* MÓVIL: selector de departamento para incidencias (jerarquía) */}
-        {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
-          <div className="md:hidden">
-            <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
-                {incidenciaDeptOptions.map((dept) => (
-                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
         {/* DESKTOP: tres filas */}
-        <div className="hidden md:block space-y-3">
+        <div className="hidden lg:block space-y-3">
           {/* Fila 1: pestañas + tiempo */}
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1 bg-white rounded-xl p-1 w-fit">
@@ -839,13 +801,43 @@ export default function TasksModule() {
           </div>
         </div>
 
-        {/* Buscador móvil (debajo de los dropdowns) */}
-        <div className="md:hidden flex items-center gap-3">
-          <div className="relative flex-1">
+        {/* Buscador móvil (junto al selector de departamento) */}
+        <div className="lg:hidden flex items-center gap-3">
+          {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
+            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit shrink-0">
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
+                {visibleTaskDeptTreeOptions.map((dept) => (
+                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
+            <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit shrink-0">
+                <SelectValue placeholder="Departamento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
+                {incidenciaDeptOptions.map((dept) => (
+                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
             <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
           </div>
-          <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1">
+          <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1 shrink-0">
             <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
             <button onClick={() => setViewType('grid')} className={cn('p-2 rounded-md transition-all', viewType === 'grid' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><LayoutTemplate className="w-4 h-4" /></button>
           </div>
@@ -860,7 +852,7 @@ export default function TasksModule() {
               <p className="text-[#86868B]">{isIncidenciasTab ? 'No hay incidencias' : 'No hay tareas'}</p>
             </div>
           ) : (
-            <div className={cn('space-y-3', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : '')}>
+            <div className={cn('space-y-3 min-w-0', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
@@ -1445,7 +1437,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
             <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
-          <p className="text-sm text-[#86868B] mt-1 line-clamp-2">{task.description}</p>
+          <p className="text-sm text-[#86868B] mt-1 line-clamp-3">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
             <div className="flex -space-x-2">
               {(task.assignedTo || []).slice(0, 10).map((userId, i) => {
@@ -1497,7 +1489,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
             {task.supportUserIds && task.supportUserIds.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Apoyo:</span> <span className="text-[#1D1D1F] font-medium">{task.supportUserIds.map((id) => getUserName(id)).join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
-            <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-base text-[#1D1D1F] whitespace-pre-wrap leading-relaxed">{task.description || 'Sin descripción'}</p></div>
+            <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-base text-[#1D1D1F] whitespace-pre-wrap break-words leading-relaxed">{task.description || 'Sin descripción'}</p></div>
             {localSubtasks && localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
             <div className="space-y-2">
               <div className="flex items-center justify-between">

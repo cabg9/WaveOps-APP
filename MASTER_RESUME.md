@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Unificación perfil en Usuarios y popups claros en Departamentos)
+> Última actualización: 2026-08-24 (Ajustes UI en Tasks y Develops > Usuarios)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,33 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Ajustes UI en Tasks y Develops > Usuarios (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Develops > Usuarios**:
+  - Se eliminó el botón "Ver perfil" de la fila de acciones, ya que ahora el perfil se expande inline al hacer click en la fila.
+  - Se limpió la función `openProfile` que quedó sin uso.
+- **Tasks — tarjetas**:
+  - La descripción en tarjetas ahora crece hacia abajo (`line-clamp-3`) en vez de forzar el ancho.
+  - Se agregó `min-w-0` al contenedor del grid para evitar desbordamiento horizontal.
+  - En la vista expandida, la descripción usa `break-words` para partir palabras largas y evitar scroll horizontal.
+- **Tasks — filtros en pantallas medianas**:
+  - El breakpoint entre layout móvil y desktop cambió de `md` a `lg`.
+  - En el layout intermedio (`lg:hidden`), el dropdown de departamento ahora va junto a la barra de búsqueda en una sola fila, reduciendo el scroll vertical en iPads y pantallas medianas.
+
+### Archivos modificados
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/TasksModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
