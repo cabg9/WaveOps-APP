@@ -128,8 +128,13 @@ export function DepartamentosTab() {
     return Array.from(new Set([...direct, ...indirect]));
   };
 
+  const PROTECTED_DEPT_CODES = ["OPERACIONES", "ADMINISTRATIVO"];
+
   const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
-  const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true); };
+  const openEdit = (dept: any) => {
+    if (PROTECTED_DEPT_CODES.includes(dept.code)) { alert("No se puede editar el departamento " + dept.name + " porque es un departamento base del sistema."); return; }
+    setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true);
+  };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
   const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
@@ -138,6 +143,10 @@ export function DepartamentosTab() {
     if (!form.name.trim()) { alert("El nombre es obligatorio"); return; }
     if (editingId && form.parentId === editingId) { alert("Un departamento no puede ser padre de si mismo"); return; }
     if (editingId && form.parentId && getDescendantIds(editingId, departments).includes(form.parentId)) { alert("Un departamento no puede ser padre de sus propios descendientes"); return; }
+    if (editingId) {
+      const editingDept = departments.find((d: any) => d.id === editingId);
+      if (editingDept && PROTECTED_DEPT_CODES.includes(editingDept.code)) { alert("No se puede editar el departamento " + editingDept.name + " porque es un departamento base del sistema."); return; }
+    }
     setSaving(true);
     try {
       if (editingId) {
@@ -774,8 +783,12 @@ export function DepartamentosTab() {
               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           )}
-          <button onClick={() => openEdit(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-4 w-4" /></button>
-          <button onClick={() => handleDelete(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+          {!PROTECTED_DEPT_CODES.includes(dept.code) && (
+            <>
+              <button onClick={() => openEdit(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-4 w-4" /></button>
+              <button onClick={() => handleDelete(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"><Trash2 className="h-4 w-4" /></button>
+            </>
+          )}
         </div>
       </div>
     );

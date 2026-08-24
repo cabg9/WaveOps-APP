@@ -164,3 +164,12 @@ export const ICON_MAP: Record<string, LucideIcon> = ICON_OPTIONS.reduce((acc, ic
   return acc;
 }, {} as Record<string, LucideIcon>);
 
+export function normalizeIconKey(icon: string): string {
+  if (!icon) return '';
+  // Soporta tanto kebab-case (clipboard-list) como PascalCase (ClipboardList)
+  return icon
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/_/g, '-')
+    .toLowerCase();
+}
+

@@ -10,6 +10,7 @@ import {
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
   LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
+  Briefcase,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -25,8 +26,13 @@ import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useInvitation } from '@/hooks/useInvitation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { UserAvatar } from '@/components/UserAvatar';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
+import { CORPORATE_COLORS } from '@/lib/colors';
+import { ICON_OPTIONS, normalizeIconKey, getIconByValue } from '@/lib/icons';
+import type { AppModule } from '@/types/develops';
 import { DepartamentosTab } from './DepartamentosTab';
 import { TurnosTab } from './TurnosTab';
 
@@ -34,7 +40,7 @@ import { TurnosTab } from './TurnosTab';
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos' | 'feedback';
+type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'posiciones' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos' | 'feedback';
 
 interface TabConfig {
   id: DevelopTab;
@@ -47,6 +53,16 @@ interface TabConfig {
 type SortField = 'name' | 'email' | 'role' | 'department' | 'isActive';
 type SortDir = 'asc' | 'desc';
 
+const LEVELS = [
+  { value: 1, label: '1 - Director General' },
+  { value: 2, label: '2 - Director' },
+  { value: 3, label: '3 - RRHH' },
+  { value: 4, label: '4 - Gerente Operaciones' },
+  { value: 5, label: '5 - Gerente Departamento' },
+  { value: 6, label: '6 - Supervisor' },
+  { value: 7, label: '7 - Staff' },
+];
+
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG TABS
 // ═══════════════════════════════════════════════════════════════════
@@ -57,6 +73,7 @@ const TABS: TabConfig[] = [
   { id: 'modulos', label: 'Modulos', icon: Puzzle, description: 'Activar/desactivar modulos', impact: 'high' },
   { id: 'departamentos', label: 'Departamentos', icon: Building2, description: 'Gestion de departamentos', impact: 'high' },
   { id: 'roles', label: 'Roles', icon: UserCog, description: 'Plantillas de roles y permisos', impact: 'high' },
+  { id: 'posiciones', label: 'Posiciones', icon: Briefcase, description: 'Catalogo de cargos del sistema', impact: 'high' },
   { id: 'auditoria', label: 'Auditoria', icon: ClipboardList, description: 'Logs de actividad', impact: 'low' },
   { id: 'seguridad', label: 'Seguridad', icon: Lock, description: 'Politicas de seguridad', impact: 'high' },
   { id: 'papelera', label: 'Papelera', icon: Trash2, description: 'Elementos eliminados', impact: 'medium' },
@@ -711,6 +728,8 @@ function ModulosTab() {
   const { modules } = useAppConfig();
   const { logAction } = useAudit();
   const [saving, setSaving] = useState<string | null>(null);
+  const [editingMod, setEditingMod] = useState<AppModule | null>(null);
+  const [form, setForm] = useState({ name: '', description: '', icon: '', color: '' });
 
   const toggleModule = async (modId: string, current: boolean) => {
     setSaving(modId);
@@ -739,6 +758,46 @@ function ModulosTab() {
     finally { setSaving(null); }
   };
 
+  const openEdit = (mod: AppModule) => {
+    setEditingMod(mod);
+    setForm({ name: mod.name, description: mod.description, icon: mod.icon, color: mod.color });
+  };
+
+  const closeEdit = () => {
+    setEditingMod(null);
+    setForm({ name: '', description: '', icon: '', color: '' });
+  };
+
+  const handleSave = async () => {
+    if (!editingMod) return;
+    if (!form.name.trim()) { alert('El nombre es obligatorio'); return; }
+    setSaving(editingMod.id + '_edit');
+    try {
+      const iconKey = form.icon.trim();
+      const normalizedIcon = normalizeIconKey(iconKey);
+      const payload = {
+        name: form.name.trim(),
+        description: form.description.trim(),
+        icon: normalizedIcon,
+        color: form.color.trim(),
+        updatedAt: new Date().toISOString(),
+      };
+      await updateDoc(doc(db, 'appModules', editingMod.id), payload);
+      await logAction({
+        action: 'SETTINGS_UPDATED',
+        targetType: 'module',
+        targetId: editingMod.id,
+        targetName: editingMod.id,
+        previousValue: { name: editingMod.name, description: editingMod.description, icon: editingMod.icon, color: editingMod.color },
+        newValue: payload,
+        impactLevel: 'major',
+        description: `Modulo ${editingMod.id} editado`,
+      });
+      closeEdit();
+    } catch (err) { alert('Error: ' + (err as Error).message); }
+    finally { setSaving(null); }
+  };
+
   const statusBadge = (status?: string) => {
     const s = status || 'live';
     const styles: Record<string, string> = {
@@ -750,6 +809,10 @@ function ModulosTab() {
     return <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium border uppercase tracking-wide', styles[s])}>{labels[s]}</span>;
   };
 
+  const selectedIcon = useMemo(() => {
+    return getIconByValue(form.icon) || getIconByValue(normalizeIconKey(form.icon)) || Puzzle;
+  }, [form.icon]);
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <div className="mb-4 p-3 rounded-xl bg-corporate/5 border border-corporate/10">
@@ -760,49 +823,127 @@ function ModulosTab() {
         </p>
       </div>
       <div className="space-y-3">
-        {modules.map((mod) => (
-          <div key={mod.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#E5E5E7] gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: mod.color + '20' }}>
-                <div className="w-4 h-4 rounded-full" style={{ backgroundColor: mod.color }} />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
-                  {statusBadge(mod.status)}
+        {modules.map((mod) => {
+          const ModIcon = getIconByValue(mod.icon) || getIconByValue(normalizeIconKey(mod.icon)) || Puzzle;
+          return (
+            <div key={mod.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#E5E5E7] gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: mod.color + '20' }}>
+                  <ModIcon className="h-5 w-5" style={{ color: mod.color }} />
                 </div>
-                <p className="text-xs text-[#86868B] truncate">{mod.description}</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
+                    {statusBadge(mod.status)}
+                  </div>
+                  <p className="text-xs text-[#86868B] truncate">{mod.description}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 flex-wrap">
+                <button onClick={() => openEdit(mod)} className="rounded-lg p-1.5 text-[#86868B] hover:bg-[#F5F5F7] hover:text-corporate transition" title="Editar modulo"><Pencil className="h-4 w-4" /></button>
+                <select
+                  value={mod.status || 'live'}
+                  disabled={saving === mod.id + '_status'}
+                  onChange={(e) => setStatus(mod.id, e.target.value as any)}
+                  className="text-xs border border-[#E5E5E7] rounded-lg px-2 py-1.5 bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                >
+                  <option value="live">En vivo</option>
+                  <option value="beta">Beta</option>
+                  <option value="development">En desarrollo</option>
+                </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#86868B]">Visible</span>
+                  <button onClick={() => toggleVisibility(mod.id, mod.isVisible)} disabled={saving === mod.id + '_vis'}
+                    className={cn("w-10 h-6 rounded-full flex items-center px-0.5 transition-all", mod.isVisible ? 'bg-corporate' : 'bg-[#E5E5E7]', saving === mod.id + '_vis' && 'opacity-50')}>
+                    <div className={cn("w-5 h-5 rounded-full bg-white shadow-sm transition-transform", mod.isVisible ? 'translate-x-4' : 'translate-x-0')} />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[#86868B]">Activo</span>
+                  <button onClick={() => toggleModule(mod.id, mod.isActive)} disabled={saving === mod.id}
+                    className={cn("w-10 h-6 rounded-full flex items-center px-0.5 transition-all", mod.isActive ? 'bg-corporate' : 'bg-[#E5E5E7]', saving === mod.id && 'opacity-50')}>
+                    <div className={cn("w-5 h-5 rounded-full bg-white shadow-sm transition-transform", mod.isActive ? 'translate-x-4' : 'translate-x-0')} />
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4 flex-wrap">
-              <select
-                value={mod.status || 'live'}
-                disabled={saving === mod.id + '_status'}
-                onChange={(e) => setStatus(mod.id, e.target.value as any)}
-                className="text-xs border border-[#E5E5E7] rounded-lg px-2 py-1.5 bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
-              >
-                <option value="live">En vivo</option>
-                <option value="beta">Beta</option>
-                <option value="development">En desarrollo</option>
-              </select>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#86868B]">Visible</span>
-                <button onClick={() => toggleVisibility(mod.id, mod.isVisible)} disabled={saving === mod.id + '_vis'}
-                  className={cn("w-10 h-6 rounded-full flex items-center px-0.5 transition-all", mod.isVisible ? 'bg-corporate' : 'bg-[#E5E5E7]', saving === mod.id + '_vis' && 'opacity-50')}>
-                  <div className={cn("w-5 h-5 rounded-full bg-white shadow-sm transition-transform", mod.isVisible ? 'translate-x-4' : 'translate-x-0')} />
-                </button>
+          );
+        })}
+      </div>
+
+      {editingMod && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeEdit(); }}>
+          <div className="w-full max-w-lg rounded-2xl border border-[#E5E5E7] bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#1D1D1F]">Editar modulo</h3>
+              <button onClick={closeEdit} className="rounded-lg p-1.5 text-[#86868B] hover:bg-[#F5F5F7]"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Nombre visible *</Label>
+                <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Tareas" />
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#86868B]">Activo</span>
-                <button onClick={() => toggleModule(mod.id, mod.isActive)} disabled={saving === mod.id}
-                  className={cn("w-10 h-6 rounded-full flex items-center px-0.5 transition-all", mod.isActive ? 'bg-corporate' : 'bg-[#E5E5E7]', saving === mod.id && 'opacity-50')}>
-                  <div className={cn("w-5 h-5 rounded-full bg-white shadow-sm transition-transform", mod.isActive ? 'translate-x-4' : 'translate-x-0')} />
-                </button>
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Descripcion</Label>
+                <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Breve descripcion del modulo" />
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Color</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CORPORATE_COLORS.map((c) => (
+                    <button
+                      key={c.value}
+                      onClick={() => setForm(f => ({ ...f, color: c.value }))}
+                      title={c.label}
+                      className={`h-7 w-7 rounded-full border-2 transition ${form.color === c.value ? "border-[#1D1D1F] scale-110" : "border-transparent hover:scale-105"}`}
+                      style={{ backgroundColor: c.value }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Icono</Label>
+                <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-48 overflow-y-auto rounded-xl border border-[#E5E5E7] bg-[#F5F5F7] p-2">
+                  {ICON_OPTIONS.map((opt) => {
+                    const Icon = opt.icon;
+                    const isSelected = normalizeIconKey(form.icon) === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        title={opt.label}
+                        onClick={() => setForm(f => ({ ...f, icon: opt.value }))}
+                        className={`flex h-8 w-8 items-center justify-center rounded-md border transition ${isSelected ? 'border-corporate bg-corporate/10 text-corporate' : 'border-[#E5E5E7] bg-white text-[#86868B] hover:bg-[#F5F5F7]'}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs text-[#86868B]">Vista previa:</span>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: form.color + '20' }}>
+                    {(() => {
+                      const Icon = selectedIcon;
+                      return <Icon className="h-4 w-4" style={{ color: form.color }} />;
+                    })()}
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl bg-[#F5F5F7] p-3 space-y-1">
+                <p className="text-xs text-[#86868B]"><strong>ID:</strong> {editingMod.id}</p>
+                <p className="text-xs text-[#86868B]"><strong>Ruta:</strong> {editingMod.route}</p>
+                <p className="text-xs text-[#86868B]"><strong>Permiso requerido:</strong> {editingMod.requiredPermission}</p>
+                <p className="text-[11px] text-[#86868B]">Estos valores no se pueden editar porque estan ligados al codigo de la aplicacion.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-2 justify-end">
+              <Button variant="ghost" onClick={closeEdit}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={saving === editingMod.id + '_edit'} className="bg-corporate hover:bg-corporate/90">Guardar cambios</Button>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1221,6 +1362,236 @@ function RolesTab() {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PESTANA: Posiciones — Catalogo de cargos
+// ═══════════════════════════════════════════════════════════════════
+
+function PosicionesTab() {
+  const { positions, loading, createPosition, updatePosition, deletePosition } = useFirestorePositions();
+  const { users } = useFirestoreUsers();
+  const { departments } = useDynamicDepartments();
+  const { user: currentUser } = useAuth();
+  const { logAction } = useAudit();
+
+  const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', level: 7, department: '', isActive: true });
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+
+  const usageCount = useCallback((positionName: string) => {
+    return users.filter((u: any) => u.position === positionName && u.isActive !== false).length;
+  }, [users]);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm({ name: '', level: 7, department: '', isActive: true });
+    setShowModal(true);
+  };
+
+  const openEdit = (pos: any) => {
+    setEditingId(pos.id);
+    setForm({ name: pos.name, level: pos.level, department: pos.department || '', isActive: pos.isActive !== false });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingId(null);
+    setForm({ name: '', level: 7, department: '', isActive: true });
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { alert('El nombre es obligatorio'); return; }
+    setSaving(true);
+    try {
+      if (editingId) {
+        const previous = positions.find((p) => p.id === editingId);
+        await updatePosition(editingId, {
+          name: form.name.trim(),
+          level: Number(form.level),
+          department: form.department || null,
+          isActive: form.isActive,
+        });
+        await logAction({
+          action: 'POSITION_UPDATED',
+          targetType: 'position',
+          targetId: editingId,
+          targetName: form.name.trim(),
+          impactLevel: 'major',
+          previousValue: previous ? { name: previous.name, level: previous.level, department: previous.department, isActive: previous.isActive } : undefined,
+          newValue: { name: form.name.trim(), level: Number(form.level), department: form.department || null, isActive: form.isActive },
+          description: `Posicion actualizada: ${form.name.trim()}`,
+        });
+      } else {
+        const id = await createPosition(
+          {
+            name: form.name.trim(),
+            level: Number(form.level),
+            department: form.department || null,
+            isActive: true,
+          },
+          currentUser?.id || 'system'
+        );
+        if (id) {
+          await logAction({
+            action: 'POSITION_CREATED',
+            targetType: 'position',
+            targetId: id,
+            targetName: form.name.trim(),
+            impactLevel: 'major',
+            description: `Posicion creada: ${form.name.trim()}`,
+          });
+        }
+      }
+      closeModal();
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (pos: any) => {
+    const count = usageCount(pos.name);
+    if (count > 0) {
+      alert(`No se puede eliminar "${pos.name}" porque esta asignada a ${count} usuario(s).`);
+      return;
+    }
+    if (!window.confirm(`¿Marcar "${pos.name}" como inactiva?`)) return;
+    try {
+      await deletePosition(pos.id);
+      await logAction({
+        action: 'POSITION_DELETED',
+        targetType: 'position',
+        targetId: pos.id,
+        targetName: pos.name,
+        impactLevel: 'major',
+        description: `Posicion eliminada: ${pos.name}`,
+      });
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
+  const filteredPositions = useMemo(() => {
+    return positions
+      .filter((p) => showInactive || p.isActive !== false)
+      .filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()) || (p.department || '').toLowerCase().includes(filter.toLowerCase()))
+      .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name));
+  }, [positions, filter, showInactive]);
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-lg font-semibold text-[#1D1D1F]">Posiciones</h3>
+            <p className="text-sm text-[#86868B]">{positions.filter((p) => p.isActive !== false).length} activas · {positions.length} total</p>
+          </div>
+          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90"><Plus className="mr-1.5 h-4 w-4" />Crear posicion</Button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#86868B]" />
+            <input
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              placeholder="Buscar posicion o departamento..."
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-sm text-[#86868B] cursor-pointer">
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-[#E5E5E7]" />
+            Mostrar inactivas
+          </label>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-corporate/20 border-t-corporate" /></div>
+        ) : filteredPositions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-[#E5E5E7] p-10 text-center text-[#86868B]">
+            <Briefcase className="mx-auto mb-3 h-10 w-10 opacity-30" />
+            <p className="text-sm">No hay posiciones registradas.</p>
+            <button onClick={openCreate} className="mt-3 rounded-lg bg-corporate px-4 py-2 text-sm text-white hover:bg-corporate/90 transition">Crear primera posicion</button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            {filteredPositions.map((pos) => {
+              const count = usageCount(pos.name);
+              return (
+                <div key={pos.id} className="rounded-xl border border-[#E5E5E7] p-4 hover:shadow-sm transition bg-white">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-medium text-[#1D1D1F] truncate">{pos.name}</p>
+                        {pos.isActive === false && <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Inactiva</span>}
+                      </div>
+                      <div className="mt-1 flex items-center gap-2 text-xs text-[#86868B]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-corporate/5 px-2 py-0.5 border border-corporate/10">
+                          Nivel {pos.level}
+                        </span>
+                        {pos.department && <span>· {pos.department}</span>}
+                      </div>
+                      <p className="mt-2 text-xs text-[#86868B]">{count} usuario{count !== 1 ? 's' : ''} asignado{count !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="flex items-center gap-0.5">
+                      <button onClick={() => openEdit(pos)} className="rounded p-1.5 text-[#86868B] hover:bg-[#F5F5F7] hover:text-corporate transition"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => handleDelete(pos)} className="rounded p-1.5 text-[#86868B] hover:bg-red-50 hover:text-[#FF3B30] transition"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeModal(); }}>
+          <div className="w-full max-w-md rounded-2xl border border-[#E5E5E7] bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-[#1D1D1F]">{editingId ? 'Editar posicion' : 'Nueva posicion'}</h3>
+              <button onClick={closeModal} className="rounded-lg p-1.5 text-[#86868B] hover:bg-[#F5F5F7]"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Nombre *</Label>
+                <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Gerente de Operaciones" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Nivel jerarquico</Label>
+                <select value={form.level} onChange={(e) => setForm(f => ({ ...f, level: Number(e.target.value) }))} className="w-full rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                  {LEVELS.map((l) => (<option key={l.value} value={l.value}>{l.label}</option>))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm text-[#1D1D1F]">Departamento asociado (opcional)</Label>
+                <select value={form.department} onChange={(e) => setForm(f => ({ ...f, department: e.target.value }))} className="w-full rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                  <option value="">Ninguno (transversal)</option>
+                  {departments.map((d: any) => (<option key={d.id} value={d.code || d.name}>{d.name}</option>))}
+                </select>
+              </div>
+              {editingId && (
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="posActive" checked={form.isActive} onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded border-[#E5E5E7]" />
+                  <Label htmlFor="posActive" className="text-sm text-[#1D1D1F]">Activa</Label>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex gap-2 justify-end">
+              <Button variant="ghost" onClick={closeModal}>Cancelar</Button>
+              <Button onClick={handleSave} disabled={saving} className="bg-corporate hover:bg-corporate/90">{editingId ? 'Guardar cambios' : 'Crear posicion'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1859,12 +2230,34 @@ function FeedbackTab() {
   );
 }
 
+const MOBILE_ONLY_TABS: DevelopTab[] = ['usuarios', 'departamentos', 'roles', 'turnos', 'feedback'];
+
 export default function DevelopsModule() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { modules, settings, roleTemplates } = useAppConfig();
   const { logs } = useAudit();
+  const { positions } = useFirestorePositions();
   const [activeTab, setActiveTab] = useState<DevelopTab>('general');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  const visibleTabs = useMemo(() => {
+    return isMobile ? TABS.filter((t) => MOBILE_ONLY_TABS.includes(t.id)) : TABS;
+  }, [isMobile]);
+
+  // Si la pestaña activa no está disponible en móvil, forzar la primera visible
+  useEffect(() => {
+    if (isMobile && !MOBILE_ONLY_TABS.includes(activeTab)) {
+      setActiveTab(MOBILE_ONLY_TABS[0]);
+    }
+  }, [isMobile, activeTab]);
 
   const tabComponents: Record<DevelopTab, React.ReactNode> = {
     general: <GeneralTab />,
@@ -1872,6 +2265,7 @@ export default function DevelopsModule() {
     modulos: <ModulosTab />,
     departamentos: <DepartamentosTab />,
     roles: <RolesTab />,
+    posiciones: <PosicionesTab />,
     auditoria: <AuditoriaTab />,
     seguridad: <SeguridadTab />,
     papelera: <PapeleraTab />,
@@ -1908,6 +2302,11 @@ export default function DevelopsModule() {
           { title: 'Roles', value: roleTemplates.length, icon: UserCog, color: 'text-apple-blue' },
           { title: 'Permisos', value: Object.values(PERMISSION_CATEGORIES).reduce((acc, cat) => acc + cat.perms.length, 0), icon: Shield, color: 'text-apple-purple' },
         ];
+      case 'posiciones':
+        return [
+          { title: 'Activas', value: positions.filter((p) => p.isActive !== false).length, icon: Briefcase, color: 'text-corporate' },
+          { title: 'Inactivas', value: positions.filter((p) => p.isActive === false).length, icon: Briefcase, color: 'text-[#86868B]' },
+        ];
       case 'auditoria':
         return [
           { title: 'Registros', value: logs.length, icon: ClipboardList, color: 'text-apple-green' },
@@ -1931,7 +2330,7 @@ export default function DevelopsModule() {
       default:
         return [];
     }
-  }, [activeTab, modules, settings, roleTemplates, logs]);
+  }, [activeTab, modules, settings, roleTemplates, logs, positions]);
 
   return (
     <Layout title="Develops" showDate={false}>
@@ -1941,7 +2340,7 @@ export default function DevelopsModule() {
           <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] sticky top-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-[#86868B] mb-3 px-2">Secciones</p>
             <nav className="space-y-1">
-              {TABS.map((tab) => {
+              {visibleTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
@@ -1967,7 +2366,7 @@ export default function DevelopsModule() {
 
         {/* Tabs - mobile */}
         <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (

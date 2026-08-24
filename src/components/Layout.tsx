@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { ICON_MAP } from '@/lib/icons';
+import { ICON_MAP, getIconByValue, normalizeIconKey } from '@/lib/icons';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useNotifications } from '@/hooks/firestore/useNotifications';
 import { useFCMToken } from '@/hooks/useFCMToken';
@@ -69,7 +69,7 @@ function useNavItems(): NavItem[] {
 
   visibleModules.forEach((mod) => {
     if (mod.id === "develops") return;
-    const IconComponent = ICON_MAP[mod.icon] || LayoutDashboard;
+    const IconComponent = ICON_MAP[normalizeIconKey(mod.icon)] || getIconByValue(normalizeIconKey(mod.icon)) || LayoutDashboard;
     items.push({ id: mod.id, label: mod.name, icon: IconComponent, path: mod.route, permission: mod.requiredPermission });
   });
 
