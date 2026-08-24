@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Corrección ancho buscador móvil en Tasks)
+> Última actualización: 2026-08-24 (Fix scroll horizontal en Tasks móvil)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,30 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Fix scroll horizontal en Tasks móvil (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Contenedor principal**: se agregó `overflow-x-hidden` al layout interno de Tasks.
+- **Buscador móvil**: `overflow-hidden` y `min-w-0` en el input para evitar que el buscador fuerce ancho.
+- **Grid de tarjetas**: `overflow-hidden` en la vista grid para contener el ancho.
+- **TaskCard**:
+  - Encabezado: badges con `flex-wrap`, título con `min-w-0`, nombres de supervisor truncados.
+  - Metadatos: avatares reducidos a 5 asignados + 3 de apoyo, textos "Por verificar" y "Verificada por" truncados.
+  - Reemplazo del emoji de cámara por icono `Camera` de `lucide-react`.
+- No se modificó lógica de tareas, filtros ni estados.
+
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

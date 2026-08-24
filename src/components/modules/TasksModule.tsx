@@ -596,7 +596,7 @@ export default function TasksModule() {
 
   return (
     <Layout title="Tasks" showDate={true}>
-      <div className="space-y-4">
+      <div className="space-y-4 overflow-x-hidden">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
@@ -806,7 +806,7 @@ export default function TasksModule() {
         </div>
 
         {/* Buscador móvil */}
-        <div className="lg:hidden w-full max-w-full space-y-3">
+        <div className="lg:hidden w-full max-w-full space-y-3 overflow-hidden">
           {/* Selector de departamento en tablet (md a lg) */}
           {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
             <div className="hidden md:flex lg:hidden w-full max-w-full">
@@ -847,7 +847,7 @@ export default function TasksModule() {
           <div className="flex items-center gap-3 w-full max-w-full">
             <div className="relative flex-1 min-w-0 max-w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-              <Input placeholder="Buscar" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 sm:pl-10 h-9 sm:h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate w-full max-w-full" />
+              <Input placeholder="Buscar" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 sm:pl-10 h-9 sm:h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate w-full max-w-full min-w-0" />
             </div>
             <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1 shrink-0">
               <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
@@ -865,7 +865,7 @@ export default function TasksModule() {
               <p className="text-[#86868B]">{isIncidenciasTab ? 'No hay incidencias' : 'No hay tareas'}</p>
             </div>
           ) : (
-            <div className={cn('space-y-3 min-w-0', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3' : '')}>
+            <div className={cn('space-y-3 min-w-0', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-hidden' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
@@ -1443,36 +1443,36 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
           <span className="text-[10px] text-[#C7C7CC] whitespace-nowrap">{task.type === 'EXTRA' ? 'Tarea Extra' : 'Tarea Especifica'}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h4 className="font-medium text-[#1D1D1F] truncate">{task.title}</h4>
-            <div className="flex items-center gap-1.5 flex-shrink-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse">Por verificar: {supervisorName}</Badge>)}
+          <div className="flex items-start justify-between gap-2 min-w-0">
+            <h4 className="font-medium text-[#1D1D1F] truncate min-w-0 flex-1">{task.title}</h4>
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[50%]">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse">Por verificar: <span className="truncate max-w-[80px] sm:max-w-[120px] inline-block align-bottom">{supervisorName}</span></Badge>)}
             {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
             {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
             <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
           <p className="text-sm text-[#86868B] mt-1 line-clamp-3">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap">
-            <div className="flex -space-x-2">
-              {(task.assignedTo || []).slice(0, 10).map((userId, i) => {
+            <div className="flex -space-x-2 min-w-0">
+              {(task.assignedTo || []).slice(0, 5).map((userId, i) => {
                 const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
                 return (<UserAvatar key={i} name={assignedUser?.name || userId} photoUrl={assignedUser?.photoURL || assignedUser?.avatar} size="xs" className="border-2 border-white" title={assignedUser?.name || userId} />);
               })}
-              {(task.supportUserIds || []).slice(0, 5).map((userId, i) => {
+              {(task.supportUserIds || []).slice(0, 3).map((userId, i) => {
                 const supportUser = allUsers.find((u) => u.id === userId || u.email === userId);
                 return (<UserAvatar key={`s-${i}`} name={supportUser?.name || userId} photoUrl={supportUser?.photoURL || supportUser?.avatar} size="xs" className="border-2 border-dashed border-blue-400" fallbackClassName="bg-blue-500 text-[10px]" title={`Apoyo: ${supportUser?.name || userId}`} />);
               })}
-              {task.assignedTo && task.assignedTo.length > 10 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 10}</div>)}
+              {task.assignedTo && task.assignedTo.length > 5 && (<div className="w-6 h-6 rounded-full bg-[#F5F5F7] border-2 border-white flex items-center justify-center text-[10px] text-[#86868B]">+{task.assignedTo.length - 5}</div>)}
             </div>
             {(() => {
               const isOverdue = new Date(task.dueDate + 'T' + (task.dueTime || '23:59')) < new Date() && task.status !== TaskStatus.VERIFIED && task.status !== TaskStatus.COMPLETED;
               return (
-              <div className="flex items-center gap-1 text-xs text-[#86868B]"><Calendar className="w-3.5 h-3.5" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse">ATRASADA</Badge>)}</div>
+              <div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><Calendar className="w-3.5 h-3.5 shrink-0" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse shrink-0">ATRASADA</Badge>)}</div>
               );
             })()}
             {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
-            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><span>📷</span><span>{task.photos ? task.photos.length : 0}</span></div>)}
-            {task.status === TaskStatus.COMPLETED && (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium"><CheckCircle2 className="w-3.5 h-3.5" /><span>Por verificar: {supervisorName}</span></div>)}
-            {task.status === TaskStatus.VERIFIED && (() => { const vEntry = task.history?.find((h) => h.action?.includes('VERIFIED')); const verifier = vEntry ? getUserName(vEntry.performedBy) : '—'; return (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium"><CheckCircle2 className="w-3.5 h-3.5" /><span>Verificada por: {verifier}</span></div>); })()}
+            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><Camera className="w-3.5 h-3.5" /><span>{task.photos ? task.photos.length : 0}</span></div>)}
+            {task.status === TaskStatus.COMPLETED && (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium min-w-0"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" /><span className="truncate max-w-[120px] sm:max-w-[200px]">Por verificar: {supervisorName}</span></div>)}
+            {task.status === TaskStatus.VERIFIED && (() => { const vEntry = task.history?.find((h) => h.action?.includes('VERIFIED')); const verifier = vEntry ? getUserName(vEntry.performedBy) : '—'; return (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium min-w-0"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" /><span className="truncate max-w-[120px] sm:max-w-[200px]">Verificada por: {verifier}</span></div>); })()}
           </div>
         </div>
       </button>
