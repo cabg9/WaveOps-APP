@@ -25,9 +25,10 @@
   - En desktop se muestran todas las pestañas.
   - Si el usuario tenía una pestaña oculta activa, se redirige automáticamente a la primera disponible.
 - **Protección de departamentos base**:
-  - `ADMINISTRATIVO` y `OPERACIONES` no pueden editarse ni eliminarse.
-  - En `DepartamentosTab.tsx` se ocultan los botones de editar/eliminar para estos códigos.
-  - Se muestra alerta si se intenta editar o guardar un departamento protegido.
+  - `ADMINISTRATIVO` y `OPERACIONES` no pueden eliminarse.
+  - No se puede cambiar su nombre, descripción, departamento padre ni estado.
+  - Sí se permite editar su color e icono desde el formulario de departamento.
+  - En `DepartamentosTab.tsx` se oculta el botón de eliminar y se deshabilitan los campos protegidos.
 - **Catálogo de posiciones**:
   - Nueva pestaña **Posiciones** en Develops.
   - Permite crear, editar (nombre, nivel, departamento, estado) y eliminar posiciones de forma lógica.
