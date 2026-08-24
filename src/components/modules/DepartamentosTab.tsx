@@ -132,21 +132,29 @@ export function DepartamentosTab() {
 
   const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
   const openEdit = (dept: any) => {
-    if (PROTECTED_DEPT_CODES.includes(dept.code)) { alert("No se puede editar el departamento " + dept.name + " porque es un departamento base del sistema."); return; }
     setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true);
   };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
+  const isEditingProtected = editingId ? PROTECTED_DEPT_CODES.includes(departments.find((d: any) => d.id === editingId)?.code) : false;
   const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
 
   const handleSave = async () => {
+    if (editingId && isEditingProtected) {
+      // Departamentos base: solo permitir editar color e icono
+      setSaving(true);
+      try {
+        const editingDept = departments.find((d: any) => d.id === editingId);
+        await updateDepartment(editingId, { color: form.color, icon: form.icon });
+        await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: editingDept?.name || form.name, impactLevel: "major", description: "Actualizado color/icono: " + (editingDept?.name || form.name) });
+        closeFormModal();
+      } catch (err: any) { alert("Error: " + err.message); }
+      finally { setSaving(false); }
+      return;
+    }
     if (!form.name.trim()) { alert("El nombre es obligatorio"); return; }
     if (editingId && form.parentId === editingId) { alert("Un departamento no puede ser padre de si mismo"); return; }
     if (editingId && form.parentId && getDescendantIds(editingId, departments).includes(form.parentId)) { alert("Un departamento no puede ser padre de sus propios descendientes"); return; }
-    if (editingId) {
-      const editingDept = departments.find((d: any) => d.id === editingId);
-      if (editingDept && PROTECTED_DEPT_CODES.includes(editingDept.code)) { alert("No se puede editar el departamento " + editingDept.name + " porque es un departamento base del sistema."); return; }
-    }
     setSaving(true);
     try {
       if (editingId) {
@@ -387,20 +395,27 @@ export function DepartamentosTab() {
             <button onClick={closeFormModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
           </div>
           <div className="space-y-4">
+            {isEditingProtected && (
+              <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
+                <p className="text-xs text-amber-200">
+                  <strong>Departamento base:</strong> solo puedes cambiar el color y el icono. El nombre, descripción, departamento padre y estado están protegidos.
+                </p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label className="text-slate-300">Nombre *</Label>
-              <Input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Operaciones" className="border-slate-600 bg-slate-700 text-slate-100" />
-              {editingId && originalName && originalName !== form.name && (
+              <Input value={form.name} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Operaciones" className="border-slate-600 bg-slate-700 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed" />
+              {editingId && originalName && originalName !== form.name && !isEditingProtected && (
                 <p className="text-[11px] text-amber-400">Se sincronizara en usuarios, tareas y turnos.</p>
               )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-300">Descripcion</Label>
-              <Input value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-slate-600 bg-slate-700 text-slate-100" />
+              <Input value={form.description} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-slate-600 bg-slate-700 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed" />
             </div>
             <div className="space-y-1.5">
               <Label className="text-slate-300">Departamento Padre</Label>
-              <select value={form.parentId || ""} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100">
+              <select value={form.parentId || ""} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
                 <option value="">Ninguno (departamento raíz)</option>
                 {departments
                   .filter((d: any) => d.id !== editingId)
@@ -449,7 +464,7 @@ export function DepartamentosTab() {
               </div>
             </div>
             <div className="flex items-center gap-2 pt-2">
-              <input type="checkbox" checked={form.isActive} onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded border-slate-500" />
+              <input type="checkbox" checked={form.isActive} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" />
               <Label className="text-sm text-slate-300">Activo</Label>
             </div>
           </div>
