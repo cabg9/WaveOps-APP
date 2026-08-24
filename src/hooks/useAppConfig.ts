@@ -161,6 +161,10 @@ export function useAppConfig() {
   const hasDevelopAccess = useMemo(() => {
     if (!user) return false;
 
+    // SEGURIDAD: el Director General nunca puede perder acceso a Develops,
+    // incluso si la whitelist o los roles permitidos se corrompen.
+    if (user.role === Role.DIRECTOR_GENERAL) return true;
+
     const { developAccess } = settings;
     const mode = developAccess.mode || 'whitelist';
 
