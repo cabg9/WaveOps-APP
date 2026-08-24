@@ -68,6 +68,49 @@
 
 ---
 
+## Fixes post-rediseño del panel Develops
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Feature flags metadata**:
+  - Agregadas descripciones legibles para todos los feature flags de módulos: `enableReportes`, `enableOrdenesPago`, `enableDiveOps`, `enableRequisiciones`, `enableMovilidad`, `enableVessels`, `enableDevelops`.
+  - Cada flag muestra nombre legible y descripción condicional según esté activado o desactivado.
+- **Usuarios — edición de perfil unificada**:
+  - El popup de perfil ahora permite editar datos del usuario, pero solo para `DIRECTOR_GENERAL`.
+  - Campos editables: nombre, apellido, email, rol, departamento, posición, fecha de ingreso, nivel y estado activo.
+  - Para otros roles el popup sigue siendo de solo lectura.
+  - El lápiz de la tabla abre el popup directamente en modo edición.
+  - Corrección de overflow de emails largos en filas expandidas.
+- **Departamentos — pantalla blanca**:
+  - Agregada protección contra ciclos en `useDynamicDepartments.ts` y `DepartamentosTab.tsx`.
+  - Se evita recursión infinita cuando los datos tienen referencias circulares en `parentId`.
+- **Roles — toggles de permisos restaurados**:
+  - Cada permiso es clickeable y se actualiza `roleTemplates/{roleId}` en Firestore.
+  - Auditoría con `ROLE_PERMISSION_GRANTED` y `ROLE_PERMISSION_REVOKED`.
+  - Advertencia clara de que los cambios afectan inmediatamente a los usuarios con ese rol.
+- **Auditoría**:
+  - Reorganizadas las tarjetas superiores.
+  - "Acciones más frecuentes" contiene tarjetas internas por nivel de impacto (Críticas, Mayores, Sensibles, Menores).
+  - Tarjetas separadas para departamentos eliminados y usuarios eliminados.
+- **Seguridad**:
+  - Se revisó cada política contra el código real de la app.
+  - Ninguna política se lee actualmente desde `settings.security`; todas se marcaron como no aplicables con mensaje explicativo.
+  - Se documentó que deben programarse en una fase posterior.
+
+### Archivos modificados
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `src/hooks/firestore/useDynamicDepartments.ts`
+- `src/types/develops.ts`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
+
+---
+
 ## Rediseño completo del panel Develops
 
 **Estado:** COMPLETADO

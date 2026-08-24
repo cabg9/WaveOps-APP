@@ -33,6 +33,7 @@ import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-actio
 import { CORPORATE_COLORS } from '@/lib/colors';
 import { ICON_OPTIONS, normalizeIconKey, getIconByValue } from '@/lib/icons';
 import type { AppModule } from '@/types/develops';
+import { Role } from '@/types';
 import { DepartamentosTab } from './DepartamentosTab';
 import { TurnosTab } from './TurnosTab';
 
@@ -153,6 +154,41 @@ const FEATURE_FLAG_META: Record<string, { name: string; on: string; off: string 
     name: 'Nuevo Dashboard',
     on: 'Los usuarios veran el nuevo diseno del Dashboard.',
     off: 'Se conserva el Dashboard anterior mientras se completa la transicion.',
+  },
+  enableReportes: {
+    name: 'Modulo de reportes',
+    on: 'El modulo Reportes esta visible y se pueden consultar los reportes operativos.',
+    off: 'El modulo Reportes esta oculto; nadie podra acceder a los reportes.',
+  },
+  enableOrdenesPago: {
+    name: 'Modulo de ordenes de pago',
+    on: 'El modulo Ordenes de Pago esta visible y se pueden gestionar pagos.',
+    off: 'El modulo Ordenes de Pago esta oculto; no se podran consultar ni crear ordenes.',
+  },
+  enableDiveOps: {
+    name: 'Modulo de DiveOps',
+    on: 'El modulo DiveOps esta visible y se pueden gestionar las operaciones de buceo.',
+    off: 'El modulo DiveOps esta oculto; nadie podra acceder a las operaciones de buceo.',
+  },
+  enableRequisiciones: {
+    name: 'Modulo de requisiciones',
+    on: 'El modulo Requisiciones esta visible y se pueden crear y aprobar requisiciones.',
+    off: 'El modulo Requisiciones esta oculto; no se podran gestionar requisiciones.',
+  },
+  enableMovilidad: {
+    name: 'Modulo de movilidad',
+    on: 'El modulo Movilidad esta visible y se pueden gestionar vehiculos y traslados.',
+    off: 'El modulo Movilidad esta oculto; no se podra consultar ni editar la movilidad.',
+  },
+  enableVessels: {
+    name: 'Modulo de vessels',
+    on: 'El modulo Vessels esta visible y se pueden gestionar embarcaciones.',
+    off: 'El modulo Vessels esta oculto; no se podra consultar ni editar embarcaciones.',
+  },
+  enableDevelops: {
+    name: 'Modulo de Develops',
+    on: 'El modulo Develops (configuracion avanzada) esta visible para quienes tengan permiso.',
+    off: 'El modulo Develops esta oculto; solo se podra acceder si se reactiva desde otro canal.',
   },
 };
 
@@ -359,6 +395,7 @@ function UsuariosTab() {
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [profileUser, setProfileUser] = useState<any>(null);
+  const [profileEditMode, setProfileEditMode] = useState(false);
   const [formData, setFormData] = useState({
     name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
@@ -442,14 +479,53 @@ function UsuariosTab() {
   const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setInvitationLink(null); setShowForm(true); };
 
-  const handleEdit = (u: any) => {
-    setEditingUser(u);
+  const openProfile = (u: any, editMode = false) => {
+    setProfileUser(u);
+    const isDirector = user?.role === Role.DIRECTOR_GENERAL;
+    setProfileEditMode(editMode && isDirector);
     setFormData({
       name: u.name?.split(' ')[0] || '', lastName: u.name?.split(' ').slice(1).join(' ') || '', email: u.email || '', role: u.role || 'STAFF',
       department: u.department || 'DIVE_SHOP', joinDate: u.joinDate || '', position: u.position || '',
       level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
     });
-    setShowForm(true);
+  };
+
+  const closeProfile = () => {
+    setProfileUser(null);
+    setProfileEditMode(false);
+    setFormData({ name: '', lastName: '', email: '', role: '', department: '',
+      joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
+  };
+
+  const handleProfileSave = async () => {
+    if (!profileUser) return;
+    try {
+      const fullName = (formData.name + (formData.lastName ? " " + formData.lastName : "")).trim();
+      const updates = {
+        name: fullName,
+        email: formData.email,
+        role: formData.role,
+        department: formData.department,
+        position: formData.position,
+        joinDate: formData.joinDate,
+        level: Number(formData.level),
+        isActive: formData.isActive,
+        phone: formData.phone,
+      };
+      await updateUser(profileUser.id, updates as any);
+      await logAction({
+        action: 'USER_UPDATED', targetType: 'user', targetId: profileUser.id,
+        targetName: fullName, impactLevel: 'major',
+        description: `Usuario "${fullName}" actualizado desde perfil`,
+      });
+      closeProfile();
+    } catch (err) {
+      alert('Error: ' + (err as Error).message);
+    }
+  };
+
+  const handleEdit = (u: any) => {
+    openProfile(u, true);
   };
 
   const handleToggleActive = async (u: any, makeActive: boolean) => {
@@ -808,12 +884,12 @@ function UsuariosTab() {
                           <span className="text-sm font-medium text-[#1D1D1F]">{u.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
+                      <td className="px-4 py-3 text-sm text-[#86868B] break-all max-w-[200px]">{u.email}</td>
                       <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
                       <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => setProfileUser(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><User className="w-4 h-4" /></button>
+                          <button onClick={() => openProfile(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><User className="w-4 h-4" /></button>
                           <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
                           {(showInactive || u.invitationPending || (!u.authUid && u.isActive)) && (
                             <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
@@ -835,9 +911,9 @@ function UsuariosTab() {
                       <tr className="border-b border-[#E5E5E7] bg-[#F5F5F7]/30">
                         <td colSpan={5} className="px-4 py-4">
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div>
+                            <div className="min-w-0">
                               <p className="text-xs text-[#86868B]">Email</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.email || '-'}</p>
+                              <p className="text-[#1D1D1F] font-medium break-all">{u.email || '-'}</p>
                             </div>
                             <div>
                               <p className="text-xs text-[#86868B]">Telefono</p>
@@ -880,48 +956,159 @@ function UsuariosTab() {
 
       {/* Profile Modal */}
       {profileUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setProfileUser(null)}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeProfile}>
+          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[#1D1D1F]">Perfil de usuario</h3>
-              <button onClick={() => setProfileUser(null)} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
+              <h3 className="font-semibold text-[#1D1D1F]">{profileEditMode ? 'Editar perfil' : 'Perfil de usuario'}</h3>
+              <button onClick={closeProfile} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
             </div>
             <div className="flex items-center gap-4 mb-5">
               <UserAvatar name={profileUser.name} photoUrl={profileUser.photoURL || profileUser.avatar} size="lg" fallbackClassName="bg-corporate/10 text-corporate text-lg" />
-              <div>
-                <p className="text-lg font-semibold text-[#1D1D1F]">{profileUser.name}</p>
-                <p className="text-sm text-[#86868B]">{profileUser.email}</p>
+              <div className="min-w-0">
+                <p className="text-lg font-semibold text-[#1D1D1F] truncate">{profileUser.name}</p>
+                <p className="text-sm text-[#86868B] break-all">{profileUser.email}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-xs text-[#86868B]">Rol</p>
-                <p className="text-[#1D1D1F] font-medium">{roleLabels[profileUser.role] || profileUser.role}</p>
+
+            {profileEditMode && user?.role === Role.DIRECTOR_GENERAL ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre</label>
+                  <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Apellido</label>
+                  <input value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Email</label>
+                  <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Rol</label>
+                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                    {roleTemplates.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Departamento</label>
+                  <select value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                    {departmentTreeOptions.map(opt => (
+                      <option key={opt.code} value={opt.code}>{opt.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
+                  <select
+                    value={formData.position}
+                    onChange={async (e) => {
+                      const value = e.target.value;
+                      if (value === '__create__') {
+                        const name = window.prompt('Nombre de la nueva posicion:');
+                        if (!name || !name.trim()) {
+                          setFormData((prev) => ({ ...prev, position: '' }));
+                          return;
+                        }
+                        const id = await createPosition(
+                          { name: name.trim(), level: formData.level || 7, department: formData.department || null, isActive: true },
+                          user?.id || 'system'
+                        );
+                        if (id) {
+                          setFormData((prev) => ({ ...prev, position: name.trim() }));
+                        } else {
+                          alert('Error al crear la posicion');
+                          setFormData((prev) => ({ ...prev, position: '' }));
+                        }
+                      } else {
+                        setFormData((prev) => ({ ...prev, position: value }));
+                      }
+                    }}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                  >
+                    <option value="">Seleccionar posicion</option>
+                    {positions.map((p) => (
+                      <option key={p.id} value={p.name}>{p.name}</option>
+                    ))}
+                    <option value="__create__">+ Crear nueva posicion</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Fecha de ingreso</label>
+                  <input type="date" value={formData.joinDate || ''} onChange={e => setFormData({...formData, joinDate: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[#86868B] mb-1">Nivel</label>
+                  <select value={formData.level || ''} onChange={e => setFormData({...formData, level: Number(e.target.value)})}
+                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                    <option value={1}>1 - Director General</option>
+                    <option value={2}>2 - Director</option>
+                    <option value={3}>3 - RRHH / Alta Gerencia</option>
+                    <option value={4}>4 - Gerente</option>
+                    <option value={5}>5 - Gerente Departamento</option>
+                    <option value={6}>6 - Supervisor</option>
+                    <option value={7}>7 - Staff</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <input type="checkbox" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})}
+                    className="w-4 h-4 rounded border-[#E5E5E7]" />
+                  <label className="text-sm text-[#1D1D1F]">Usuario activo</label>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-[#86868B]">Departamento</p>
-                <p className="text-[#1D1D1F] font-medium">{profileUser.department?.replace(/_/g, ' ') || '-'}</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-[#86868B]">Rol</p>
+                  <p className="text-[#1D1D1F] font-medium">{roleLabels[profileUser.role] || profileUser.role}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Departamento</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.department?.replace(/_/g, ' ') || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Posicion</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.position || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Nivel</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.level || 7}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Telefono</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.phone || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.joinDate || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#86868B]">Estado</p>
+                  <p className="text-[#1D1D1F] font-medium">{profileUser.isActive !== false ? 'Activo' : 'Inactivo'}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-[#86868B]">Posicion</p>
-                <p className="text-[#1D1D1F] font-medium">{profileUser.position || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[#86868B]">Nivel</p>
-                <p className="text-[#1D1D1F] font-medium">{profileUser.level || 7}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[#86868B]">Telefono</p>
-                <p className="text-[#1D1D1F] font-medium">{profileUser.phone || '-'}</p>
-              </div>
-              <div>
-                <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
-                <p className="text-[#1D1D1F] font-medium">{profileUser.joinDate || '-'}</p>
-              </div>
-            </div>
+            )}
+
             <div className="mt-6 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setProfileUser(null)}>Cerrar</Button>
-              <Button onClick={() => { setProfileUser(null); handleEdit(profileUser); }}>Editar</Button>
+              {profileEditMode && user?.role === Role.DIRECTOR_GENERAL ? (
+                <>
+                  <Button variant="outline" onClick={() => setProfileEditMode(false)}>Cancelar</Button>
+                  <Button onClick={handleProfileSave}>Guardar cambios</Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={closeProfile}>Cerrar</Button>
+                  {user?.role === Role.DIRECTOR_GENERAL && (
+                    <Button onClick={() => setProfileEditMode(true)}>Editar</Button>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -1448,20 +1635,50 @@ function PermDescription({ permKey, checked }: { permKey: string; checked: boole
 
 function RolesTab() {
   const { roleTemplates } = useAppConfig();
+  const { logAction } = useAudit();
   const [openRole, setOpenRole] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const togglePermission = async (role: any, permKey: string, currentPerms: Set<string>) => {
+    const isAdding = !currentPerms.has(permKey);
+    const newPerms = isAdding
+      ? [...Array.from(currentPerms), permKey]
+      : Array.from(currentPerms).filter((p) => p !== permKey);
+    setSaving(`${role.id}:${permKey}`);
+    try {
+      await updateDoc(doc(db, 'roleTemplates', role.id), {
+        permissions: newPerms,
+        updatedAt: new Date().toISOString(),
+      });
+      await logAction({
+        action: isAdding ? 'ROLE_PERMISSION_GRANTED' : 'ROLE_PERMISSION_REVOKED',
+        targetType: 'role',
+        targetId: role.id,
+        targetName: role.name,
+        impactLevel: 'sensitive',
+        previousValue: { permissions: Array.from(currentPerms) },
+        newValue: { permissions: newPerms },
+        description: `Permiso "${permKey}" ${isAdding ? 'activado' : 'desactivado'} para el rol "${role.name}"`,
+      });
+    } catch (err) {
+      console.error('Error updating role permission:', err);
+      alert('Error al actualizar el permiso: ' + (err as Error).message);
+    } finally {
+      setSaving(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
       <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <p className="text-sm text-[#1D1D1F] leading-relaxed">
-          Vista de solo lectura de los roles configurados en el sistema y los permisos que incluye cada uno.
-          La creacion y edicion de roles estara disponible en una proxima actualizacion.
+          Desde aqui puedes activar o desactivar los permisos de cada rol. Los cambios se guardan directamente en la plantilla del rol y <strong>afectan de inmediato</strong> a todos los usuarios que tengan ese rol asignado.
         </p>
       </div>
       <div className="space-y-3">
         {roleTemplates.map((role: any) => {
           const isOpen = openRole === role.id;
-          const currentPerms = new Set(role.permissions || []);
+          const currentPerms = new Set<string>(role.permissions || []);
           return (
             <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-[#E5E5E7] shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
               <button onClick={() => setOpenRole((prev) => (prev === role.id ? null : role.id))} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-[#F5F5F7]/50 transition-colors rounded-2xl gap-3">
@@ -1479,6 +1696,11 @@ function RolesTab() {
               </button>
               {isOpen && (
                 <div className="px-5 pb-5 pt-1 border-t border-[#E5E5E7]">
+                  <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
+                    <p className="text-xs text-amber-700 leading-relaxed">
+                      <strong>Importante:</strong> los cambios en los permisos de este rol se aplican inmediatamente a todos los usuarios con el rol <strong>{role.name}</strong>. Verifica el impacto antes de desactivar un permiso que el equipo este usando.
+                    </p>
+                  </div>
                   <div className="space-y-3">
                     {PERMISSION_CATEGORIES.map((cat) => {
                       const permsList = cat.perms;
@@ -1496,14 +1718,22 @@ function RolesTab() {
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               {permsList.map((perm) => {
                                 const checked = currentPerms.has(perm.key);
+                                const isSaving = saving === `${role.id}:${perm.key}`;
                                 return (
-                                  <div key={perm.key} className={`p-2.5 rounded-lg border ${checked ? "border-corporate/20 bg-corporate/5" : "border-[#E5E5E7] bg-white opacity-60"}`}>
+                                  <button
+                                    key={perm.key}
+                                    disabled={isSaving}
+                                    onClick={() => togglePermission(role, perm.key, currentPerms)}
+                                    className={`text-left p-2.5 rounded-lg border transition-colors ${checked ? "border-corporate/20 bg-corporate/5" : "border-[#E5E5E7] bg-white opacity-60 hover:opacity-100"} ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  >
                                     <div className="flex items-center gap-1.5">
-                                      <span className={`w-1.5 h-1.5 rounded-full ${checked ? 'bg-corporate' : 'bg-[#C7C7CC]'}`} />
+                                      <span className={cn("w-8 h-4 rounded-full flex items-center px-0.5 transition-all shrink-0", checked ? 'bg-corporate' : 'bg-[#E5E5E7]')}>
+                                        <span className={cn("w-2.5 h-2.5 rounded-full bg-white shadow-sm transition-transform", checked ? 'translate-x-3.5' : 'translate-x-0')} />
+                                      </span>
                                       <span className="text-xs font-medium text-[#1D1D1F]">{perm.label}</span>
                                     </div>
                                     <PermDescription permKey={perm.key} checked={checked} />
-                                  </div>
+                                  </button>
                                 );
                               })}
                             </div>
@@ -1830,12 +2060,6 @@ function AuditoriaTab() {
     return counts;
   }, [logs]);
 
-  const actionCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    logs.forEach((l) => { counts[l.action] = (counts[l.action] || 0) + 1; });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  }, [logs]);
-
   const deletedDepartments = useMemo(() => logs.filter((l) => l.action === 'DEPARTMENT_DELETED').length, [logs]);
   const deletedUsers = useMemo(() => logs.filter((l) => l.action === 'USER_DELETED').length, [logs]);
 
@@ -1864,53 +2088,39 @@ function AuditoriaTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Registros criticos</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.critical}</p>
+          <p className="text-sm font-semibold text-[#1D1D1F] mb-3">Acciones mas frecuentes</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-[#E5E5E7] p-3">
+              <p className="text-[10px] text-[#86868B]">Criticas</p>
+              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.critical}</p>
+            </div>
+            <div className="rounded-xl border border-[#E5E5E7] p-3">
+              <p className="text-[10px] text-[#86868B]">Mayores</p>
+              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.major}</p>
+            </div>
+            <div className="rounded-xl border border-[#E5E5E7] p-3">
+              <p className="text-[10px] text-[#86868B]">Sensibles</p>
+              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.sensitive}</p>
+            </div>
+            <div className="rounded-xl border border-[#E5E5E7] p-3">
+              <p className="text-[10px] text-[#86868B]">Menores</p>
+              <p className="text-lg font-semibold text-[#1D1D1F]">{impactCounts.minor}</p>
+            </div>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Registros mayores</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.major}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Registros sensibles</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.sensitive}</p>
-        </div>
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Registros menores</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.minor}</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <p className="text-xs text-[#86868B] mb-1">Departamentos eliminados</p>
           <p className="text-xl font-semibold text-[#1D1D1F]">{deletedDepartments}</p>
         </div>
+
         <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <p className="text-xs text-[#86868B] mb-1">Usuarios eliminados</p>
           <p className="text-xl font-semibold text-[#1D1D1F]">{deletedUsers}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <p className="text-xs text-[#86868B] mb-1">Total de registros</p>
-          <p className="text-xl font-semibold text-[#1D1D1F]">{logs.length}</p>
-        </div>
       </div>
-
-      {actionCounts.length > 0 && (
-        <div className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <h4 className="text-sm font-semibold text-[#1D1D1F] mb-3">Acciones mas frecuentes</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-            {actionCounts.map(([action, count]) => (
-              <div key={action} className="rounded-xl border border-[#E5E5E7] p-3">
-                <p className="text-[10px] text-[#86868B] truncate" title={action}>{action}</p>
-                <p className="text-lg font-semibold text-[#1D1D1F]">{count}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -1986,53 +2196,60 @@ function SeguridadTab() {
 
   useEffect(() => { setDraft(sec); }, [sec]);
 
+  // NOTA: A agosto 2026 ninguna de estas politicas se lee realmente en el flujo de la app.
+  // - Las reglas de contraseña estan hardcodeadas en ChangePasswordModal, LoginScreen e InvitationPage.
+  // - La reautenticacion en acciones sensibles esta hardcodeada a partir de nivel "sensible" en confirm-action.ts.
+  // - maxLoginAttempts, sessionTimeoutMinutes y auditLogRetentionDays no tienen implementacion.
+  // Por eso todas se muestran como no editables hasta que se conecten en una fase posterior.
+  const NOT_APPLIED_MESSAGE = 'Esta politica aun no se aplica en el flujo de la app. Se programara en una proxima fase.';
+
   const policyDefinitions: { key: keyof typeof sec; label: string; description: string; editable: boolean; type: 'number' | 'boolean' }[] = [
     {
       key: 'passwordMinLength',
       label: 'Longitud minima de contraseña',
-      description: 'Numero minimo de caracteres que debe tener una contraseña. Actualmente se respeta en el modal de cambio de contraseña (minimo 8). El login y la pagina de invitacion aun usan un minimo fijo de 6.',
-      editable: true,
+      description: NOT_APPLIED_MESSAGE,
+      editable: false,
       type: 'number',
     },
     {
       key: 'passwordRequireUppercase',
       label: 'Requerir mayusculas',
-      description: 'Si esta activo, las contraseñas deben incluir al menos una letra mayuscula. Se aplica en ChangePasswordModal; el login y la invitacion no validan mayusculas.',
-      editable: true,
+      description: NOT_APPLIED_MESSAGE,
+      editable: false,
       type: 'boolean',
     },
     {
       key: 'passwordRequireNumbers',
       label: 'Requerir numeros',
-      description: 'Si esta activo, las contraseñas deben incluir al menos un numero. Se aplica en ChangePasswordModal; el login y la invitacion no validan numeros.',
-      editable: true,
+      description: NOT_APPLIED_MESSAGE,
+      editable: false,
       type: 'boolean',
     },
     {
       key: 'requirePasswordForSensitiveActions',
       label: 'Pedir contraseña en acciones sensibles',
-      description: 'Cuando esta activo, el sistema solicitara la contraseña del usuario para confirmar acciones criticas o sensibles. La logica de confirmacion ya solicita contraseña a partir de nivel sensible; este flag centraliza la politica.',
-      editable: true,
+      description: NOT_APPLIED_MESSAGE,
+      editable: false,
       type: 'boolean',
     },
     {
       key: 'maxLoginAttempts',
       label: 'Intentos maximos de inicio de sesion',
-      description: 'Cantidad de intentos fallidos consecutivos antes de bloquear temporalmente el acceso. Esta politica aun no se aplica en el flujo de login.',
+      description: NOT_APPLIED_MESSAGE,
       editable: false,
       type: 'number',
     },
     {
       key: 'sessionTimeoutMinutes',
       label: 'Timeout de sesion (minutos)',
-      description: 'Tiempo de inactividad despues del cual la sesion deberia cerrarse automaticamente. Esta politica aun no se aplica en la app.',
+      description: NOT_APPLIED_MESSAGE,
       editable: false,
       type: 'number',
     },
     {
       key: 'auditLogRetentionDays',
       label: 'Retencion de logs (dias)',
-      description: 'Dias que se conservaran los registros de auditoria antes de su eliminacion automatica. Actualmente los logs se mantienen indefinidamente.',
+      description: NOT_APPLIED_MESSAGE,
       editable: false,
       type: 'number',
     },
@@ -2124,6 +2341,10 @@ function SeguridadTab() {
             {saving ? 'Guardando...' : 'Guardar cambios'}
           </Button>
         </div>
+        <p className="text-sm text-[#86868B] mb-4 leading-relaxed">
+          Estas politicas estan definidas en la configuracion, pero aun no estan conectadas con el flujo de la aplicacion.
+          Los valores editables se habilitaran a medida que cada politica se implemente en su modulo correspondiente.
+        </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {policyDefinitions.map((policy) => {
             const value = draft[policy.key];

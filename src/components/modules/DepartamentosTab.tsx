@@ -816,8 +816,11 @@ export function DepartamentosTab() {
     );
   };
 
-  const renderDepartmentTree = (nodes: any[], level: number = 0): ReactNode[] => {
+  const renderDepartmentTree = (nodes: any[], level: number = 0, visited: Set<string> = new Set()): ReactNode[] => {
     return nodes.flatMap((node) => {
+      if (visited.has(node.id)) return [];
+      const nextVisited = new Set(visited);
+      nextVisited.add(node.id);
       const isParent = (node.children?.length || 0) > 0;
       const isExpanded = expandedDeptIds.has(node.id);
       const items: ReactNode[] = [
@@ -829,7 +832,7 @@ export function DepartamentosTab() {
         </div>
       ];
       if (isParent && isExpanded) {
-        items.push(...renderDepartmentTree(node.children, level + 1));
+        items.push(...renderDepartmentTree(node.children, level + 1, nextVisited));
       }
       return items;
     });

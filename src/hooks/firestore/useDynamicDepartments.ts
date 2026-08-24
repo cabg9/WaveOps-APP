@@ -222,11 +222,15 @@ export function useDynamicDepartments() {
 
   // Árbol de departamentos para mostrar en UI (padres con sus hijos recursivamente)
   const departmentTree = useMemo(() => {
-    const buildTree = (parentId: string | null): DynamicDepartment[] => {
+    const buildTree = (parentId: string | null, visited: Set<string> = new Set()): DynamicDepartment[] => {
       return activeDepartments
-        .filter(d => d.parentId === parentId)
+        .filter(d => d.parentId === parentId && !visited.has(d.id))
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map(d => ({ ...d, children: buildTree(d.id) }));
+        .map(d => {
+          const nextVisited = new Set(visited);
+          nextVisited.add(d.id);
+          return { ...d, children: buildTree(d.id, nextVisited) };
+        });
     };
     return buildTree(null);
   }, [activeDepartments]);
