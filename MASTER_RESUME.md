@@ -1,9 +1,61 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Subfase 7.5: Develops estable y usable)
+> Última actualización: 2026-08-24 (Ajustes post-7.5: iconos, móvil, departamentos base, posiciones y edición de módulos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Ajustes post-Subfase 7.5
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Migración de módulos a `status: 'live'`**:
+  - Script de administrador creado y ejecutado: `scripts/migrate-module-status-admin.cjs`.
+  - Usa service account key proporcionado por el usuario.
+  - 9 documentos de `appModules` actualizados con `status: 'live'`.
+- **Iconos de módulos en menú lateral**:
+  - `Layout.tsx` ahora normaliza nombres de iconos entre kebab-case (`clipboard-list`) y PascalCase (`ClipboardList`).
+  - Nueva utilidad compartida `normalizeIconKey` en `src/lib/icons.ts`.
+  - Los módulos con iconos guardados en cualquier formato se muestran correctamente.
+- **Restricción de pestañas de Develops en móvil**:
+  - En pantallas menores a `lg` solo se muestran: Usuarios, Departamentos, Roles, Turnos y Feedback.
+  - En desktop se muestran todas las pestañas.
+  - Si el usuario tenía una pestaña oculta activa, se redirige automáticamente a la primera disponible.
+- **Protección de departamentos base**:
+  - `ADMINISTRATIVO` y `OPERACIONES` no pueden editarse ni eliminarse.
+  - En `DepartamentosTab.tsx` se ocultan los botones de editar/eliminar para estos códigos.
+  - Se muestra alerta si se intenta editar o guardar un departamento protegido.
+- **Catálogo de posiciones**:
+  - Nueva pestaña **Posiciones** en Develops.
+  - Permite crear, editar (nombre, nivel, departamento, estado) y eliminar posiciones de forma lógica.
+  - Muestra contador de usuarios asignados a cada posición.
+  - No permite eliminar posiciones que tengan usuarios asignados.
+  - Auditoría de creación, actualización y eliminación.
+- **Edición de módulos en Develops > Módulos**:
+  - Botón de edición en cada tarjeta de módulo.
+  - Permite cambiar: nombre visible, descripción, color e icono.
+  - No permite cambiar `id`, `route` ni `requiredPermission` (se muestran como solo lectura).
+  - Galería de iconos con vista previa en tiempo real.
+  - El icono seleccionado se guarda normalizado en kebab-case.
+  - Auditoría de cambios.
+
+### Archivos modificados
+- `src/lib/icons.ts`
+- `src/components/Layout.tsx`
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `scripts/migrate-module-status-admin.cjs` (nuevo)
+- `scripts/package.json` (nuevo)
+- `scripts/package-lock.json` (nuevo)
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit `956828a7` y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
