@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Ajustes UI en Tasks y Develops > Usuarios)
+> Última actualización: 2026-08-24 (Ajustes responsivos en Tasks)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,30 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Ajustes responsivos en Tasks (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Dropdown de departamento en pantallas medianas**:
+  - En el rango `md` a `lg` (por ejemplo, iPad vertical), el dropdown de departamento ahora aparece junto a la barra de búsqueda.
+  - En desktop (`lg+`) el dropdown permanece en la fila de filtros de tiempo.
+  - En móviles pequeños (`< md`) el dropdown se oculta del buscador para evitar saturar el ancho.
+- **Barra de búsqueda más compacta en móvil**:
+  - Placeholder reducido a `"Buscar"` en el layout móvil.
+  - Menor padding y altura del input en pantallas pequeñas (`pl-9 sm:pl-10`, `h-9 sm:h-10`).
+  - El contenedor del buscador usa `flex-wrap` y `shrink-0` para evitar scroll horizontal.
+
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

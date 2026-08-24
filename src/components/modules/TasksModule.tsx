@@ -723,17 +723,19 @@ export default function TasksModule() {
                     <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY || filter.id === TimeFilter.TOMORROW) { setStatusFilter(TaskStatus.PENDING); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
                   ))}
                   {mainTab === 'all' && visibleTaskDeptTreeOptions.length > 1 && (
-                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                      <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
-                        {visibleTaskDeptTreeOptions.map((dept) => (
-                          <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                            <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="hidden lg:flex">
+                      <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                        <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
+                          {visibleTaskDeptTreeOptions.map((dept) => (
+                            <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                              <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </>
               ) : (
@@ -742,17 +744,19 @@ export default function TasksModule() {
                     <button key={filter.id} onClick={() => { setTimeFilter(filter.id); if (filter.id === TimeFilter.TODAY) { setStatusFilter(IncidenciaStatus.NEW); } else { setStatusFilter('all'); } }} className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap', timeFilter === filter.id ? 'border border-corporate text-corporate bg-white' : 'bg-white text-[#86868B] hover:text-[#1D1D1F] border border-[#E5E5E7]')}>{filter.label}</button>
                   ))}
                   {user && incidenciaDeptOptions.length > 1 && (
-                    <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-                      <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
-                        {incidenciaDeptOptions.map((dept) => (
-                          <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                            <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="hidden lg:flex">
+                      <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+                        <SelectTrigger className="w-[180px] h-9 rounded-lg border-[#E5E5E7] text-sm shrink-0 bg-white"><SelectValue placeholder="Departamento" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos'}</SelectItem>
+                          {incidenciaDeptOptions.map((dept) => (
+                            <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                              <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   )}
                 </>
               )}
@@ -802,40 +806,44 @@ export default function TasksModule() {
         </div>
 
         {/* Buscador móvil (junto al selector de departamento) */}
-        <div className="lg:hidden flex items-center gap-3">
+        <div className="lg:hidden flex flex-wrap items-center gap-3">
           {!isIncidenciasTab && mainTab === 'all' && user && visibleTaskDeptTreeOptions.length > 1 && (
-            <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit shrink-0">
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
-                {visibleTaskDeptTreeOptions.map((dept) => (
-                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="hidden md:flex lg:hidden shrink-0">
+              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit">
+                  <SelectValue placeholder="Departamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{hasPermission('canViewAllDepartments') ? 'Todos los departamentos' : 'Todos'}</SelectItem>
+                  {visibleTaskDeptTreeOptions.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                      <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
           {isIncidenciasTab && user && incidenciaDeptOptions.length > 1 && (
-            <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit shrink-0">
-                <SelectValue placeholder="Departamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
-                {incidenciaDeptOptions.map((dept) => (
-                  <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
-                    <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="hidden md:flex lg:hidden shrink-0">
+              <Select value={incidenciaDepartmentFilter} onValueChange={setIncidenciaDepartmentFilter}>
+                <SelectTrigger className="h-9 sm:h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit">
+                  <SelectValue placeholder="Departamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{incidenciaDeptOptions.every(d => operationalDepartmentCodes.includes(d.code)) ? 'Todos (operacionales)' : 'Todos los departamentos'}</SelectItem>
+                  {incidenciaDeptOptions.map((dept) => (
+                    <SelectItem key={dept.code} value={dept.code} className={dept.name === user?.department ? 'text-[#5856D6] font-medium' : ''}>
+                      <span>{dept.name}{dept.name === user?.department ? ' (tú)' : ''}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
           <div className="relative flex-1 min-w-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-            <Input placeholder="Buscar..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
+            <Input placeholder="Buscar" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 sm:pl-10 h-9 sm:h-10 rounded-xl border-[#E5E5E7] focus:border-corporate focus:ring-corporate" />
           </div>
           <div className="flex items-center bg-white rounded-lg border border-[#E5E5E7] p-1 shrink-0">
             <button onClick={() => setViewType('list')} className={cn('p-2 rounded-md transition-all', viewType === 'list' ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'text-[#86868B]')}><List className="w-4 h-4" /></button>
