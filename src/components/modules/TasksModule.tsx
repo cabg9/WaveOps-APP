@@ -605,9 +605,9 @@ export default function TasksModule() {
           </div>
         </div>
 
-        {/* MÓVIL: tres dropdowns responsivos */}
-        <div className="lg:hidden flex flex-wrap items-center gap-2 w-full max-w-full overflow-hidden">
-          <div className="w-full sm:w-fit min-w-0">
+        {/* MÓVIL: tres dropdowns en una sola fila */}
+        <div className="lg:hidden flex items-center gap-2 w-full max-w-full overflow-hidden">
+          <div className="flex-1 min-w-0">
             <Select value={mainTab} onValueChange={(v) => {
               const tab = v as MainTab;
               setMainTab(tab);
@@ -615,8 +615,8 @@ export default function TasksModule() {
               else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
               else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
             }}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
-                <SelectValue placeholder="Vista" className="truncate" />
+              <SelectTrigger className="h-9 sm:h-10 px-2 sm:px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full min-w-0">
+                <SelectValue placeholder="Vista" className="truncate text-xs" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="my-tasks">Mis Tareas</SelectItem>
@@ -629,7 +629,7 @@ export default function TasksModule() {
             </Select>
           </div>
 
-          <div className="w-full sm:w-fit min-w-0">
+          <div className="flex-1 min-w-0">
             <Select value={timeFilter} onValueChange={(v) => {
               const tf = v as TimeFilter;
               setTimeFilter(tf);
@@ -639,8 +639,8 @@ export default function TasksModule() {
                 if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
               }
             }}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
-                <SelectValue placeholder="Periodo" className="truncate" />
+              <SelectTrigger className="h-9 sm:h-10 px-2 sm:px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full min-w-0">
+                <SelectValue placeholder="Periodo" className="truncate text-xs" />
               </SelectTrigger>
               <SelectContent>
                 {!isIncidenciasTab ? (
@@ -662,7 +662,7 @@ export default function TasksModule() {
             </Select>
           </div>
 
-          <div className="w-full sm:w-fit min-w-0">
+          <div className="flex-1 min-w-0">
             <Select value={String(statusFilter)} onValueChange={(v) => {
               if (!isIncidenciasTab) {
                 if (v === 'all') setStatusFilter('all');
@@ -672,8 +672,8 @@ export default function TasksModule() {
                 else setStatusFilter(v as IncidenciaStatus);
               }
             }}>
-              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
-                <SelectValue placeholder="Estado" className="truncate" />
+              <SelectTrigger className="h-9 sm:h-10 px-2 sm:px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full min-w-0">
+                <SelectValue placeholder="Estado" className="truncate text-xs" />
               </SelectTrigger>
               <SelectContent>
                 {!isIncidenciasTab ? (
@@ -1442,7 +1442,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
 
   return (
     <div className={cn('bg-white rounded-xl border overflow-hidden transition-all max-w-full', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', task.status === TaskStatus.COMPLETED && currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId))) && 'border-[#5856D6]', expanded && 'shadow-lg')}>
-      <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
+      <button onClick={() => setExpanded(!expanded)} className="w-full p-4 py-5 sm:p-4 flex items-start gap-3 text-left">
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
           <div className="relative"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />{task.status === TaskStatus.VERIFIED && (<div className="absolute -top-1 -right-1 w-2 h-2 bg-[#34C759] rounded-full border border-white" title="Verificada" />)}</div>
           <span className="text-[10px] font-medium text-[#86868B] whitespace-nowrap">{getStatusLabel(task.status)}</span>
@@ -1451,12 +1451,12 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 min-w-0">
             <h4 className="font-medium text-[#1D1D1F] truncate min-w-0 flex-1">{task.title}</h4>
-            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[50%] min-w-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse max-w-full">Por verificar: <span className="truncate max-w-[60px] sm:max-w-[120px] inline-block align-bottom">{supervisorName}</span></Badge>)}
-            {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
-            {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
-            <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[50%] min-w-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 border-[#5856D6] text-[#5856D6] animate-pulse max-w-full">Por verificar: <span className="truncate max-w-[60px] sm:max-w-[120px] inline-block align-bottom">{supervisorName}</span></Badge>)}
+            {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
+            {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5 border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
+            <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-[10px] sm:text-xs px-1.5 sm:px-2.5 py-0.5">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
-          <p className="text-sm text-[#86868B] mt-1 line-clamp-2 break-words">{task.description}</p>
+          <p className="text-sm text-[#86868B] mt-2 sm:mt-1 line-clamp-4 sm:line-clamp-2 break-words">{task.description}</p>
           <div className="flex items-center gap-4 mt-3 flex-wrap min-w-0">
             <div className="flex -space-x-2 min-w-0">
               {(task.assignedTo || []).slice(0, 5).map((userId, i) => {
