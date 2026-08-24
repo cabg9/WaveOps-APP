@@ -6786,7 +6786,7 @@ function TimeOffRequestsPanel({
           </DialogHeader>
           <div className="py-4 space-y-3">
             <p className="text-sm text-[#1D1D1F]">
-              ¿Estás seguro de que querés eliminar la solicitud de{' '}
+              ¿Estás seguro de que quieres eliminar la solicitud de{' '}
               <span className="font-medium">{TIME_OFF_LABELS[deletingRequest?.type || 'dia_libre']}</span>{' '}
               de <span className="font-medium">{deletingRequest?.userName}</span>?
             </p>

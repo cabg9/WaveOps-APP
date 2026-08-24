@@ -6,15 +6,6 @@ import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home,
-  ClipboardList,
-  Clock,
-  IdCard,
-  Anchor,
-  Car,
-  ShoppingCart,
-  CreditCard,
-  FileText,
-  Code2,
   LayoutDashboard,
   Bell,
   LogOut,
@@ -23,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { ICON_MAP } from '@/lib/icons';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useNotifications } from '@/hooks/firestore/useNotifications';
 import { useFCMToken } from '@/hooks/useFCMToken';
@@ -64,31 +56,25 @@ interface NavItem {
   permission?: string;
 }
 
-const iconMap: Record<string, LucideIcon> = {
-  Home, ClipboardList, Clock, IdCard, Anchor, Car, ShoppingCart, CreditCard, FileText, Code2, LayoutDashboard,
-};
-
 // ═══════════════════════════════════════════════════════════════════
 // NAV ITEMS
 // ═══════════════════════════════════════════════════════════════════
 
 function useNavItems(): NavItem[] {
-  const { modules, hasDevelopAccess } = useAppConfig();
-  const { hasPermission } = useAuth();
+  const { visibleModules, hasDevelopAccess } = useAppConfig();
 
   const items: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/' },
   ];
 
-  modules.forEach((mod) => {
-    if (!mod.isVisible) return;
+  visibleModules.forEach((mod) => {
     if (mod.id === "develops") return;
-    const IconComponent = iconMap[mod.icon] || LayoutDashboard;
+    const IconComponent = ICON_MAP[mod.icon] || LayoutDashboard;
     items.push({ id: mod.id, label: mod.name, icon: IconComponent, path: mod.route, permission: mod.requiredPermission });
   });
 
   if (hasDevelopAccess) {
-    items.push({ id: 'develops', label: 'Develops', icon: Code2, path: '/develops', permission: 'canViewModuleDevelops' });
+    items.push({ id: 'develops', label: 'Develops', icon: ICON_MAP['code-2'] || LayoutDashboard, path: '/develops', permission: 'canViewModuleDevelops' });
   }
 
   return items;
@@ -101,7 +87,7 @@ function useNavItems(): NavItem[] {
 export function Layout({ children, title, showDate = true }: LayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications(user?.id);
   const { permission, isSupported, requestPermission } = useFCMToken();
   const navItems = useNavItems();

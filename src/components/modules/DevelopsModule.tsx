@@ -9,7 +9,7 @@ import {
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
-  LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun,
+  LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -20,6 +20,7 @@ import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useFirestorePositions } from '@/hooks/firestore/useFirestorePositions';
 import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useInvitation } from '@/hooks/useInvitation';
 import { cn } from '@/lib/utils';
@@ -86,9 +87,14 @@ function StatCard({ title, value, icon: Icon, color }: { title: string; value: s
 // ═══════════════════════════════════════════════════════════════════
 
 function GeneralTab() {
-  const { settings, modules } = useAppConfig();
+  const { settings } = useAppConfig();
   const { logAction } = useAudit();
   const [saving, setSaving] = useState<string | null>(null);
+  const [branding, setBranding] = useState(settings.branding);
+
+  useEffect(() => {
+    setBranding(settings.branding);
+  }, [settings.branding]);
 
   const toggleFlag = async (key: string, currentValue: boolean) => {
     setSaving(key);
@@ -116,33 +122,81 @@ function GeneralTab() {
     }
   };
 
-  const toggleModule = async (modId: string, currentActive: boolean) => {
-    setSaving(modId);
+  const saveBranding = async () => {
+    setSaving('branding');
     try {
-      await updateDoc(doc(db, 'appModules', modId), {
-        isActive: !currentActive,
+      await updateDoc(doc(db, 'appSettings', 'global'), {
+        branding,
         updatedAt: new Date().toISOString(),
       });
       await logAction({
-        action: 'MODULE_ACTIVATED',
-        targetType: 'module',
-        targetId: modId,
-        targetName: modId,
-        previousValue: { isActive: currentActive },
-        newValue: { isActive: !currentActive },
-        impactLevel: 'sensitive',
-        description: `Modulo "${modId}" ${!currentActive ? 'activado' : 'desactivado'}`,
+        action: 'SETTINGS_UPDATED',
+        targetType: 'settings',
+        targetId: 'global',
+        targetName: 'Branding',
+        impactLevel: 'major',
+        description: 'Datos de branding actualizados',
       });
     } catch (err) {
-      console.error('Error toggling module:', err);
-      alert('Error al cambiar estado del modulo');
+      console.error('Error saving branding:', err);
+      alert('Error al guardar branding');
     } finally {
       setSaving(null);
     }
   };
 
+  const flagDescription = (key: string): string => {
+    const map: Record<string, string> = {
+      enableTasks: 'Activa el modulo Tasks para todos los usuarios con permiso.',
+      enableHorarios: 'Activa el modulo Horarios para todos los usuarios con permiso.',
+      enableTaskPhotos: 'Permite adjuntar fotos a las tareas.',
+      enableTaskSubtasks: 'Permite agregar pasos o sub-tareas dentro de las tareas.',
+      enableTaskRating: 'Permite calificar la calidad de las tareas completadas.',
+      enableShiftDraft: 'Permite guardar horarios como borrador antes de publicar.',
+      enableIncapacidades: 'Activa el registro y gestion de incapacidades.',
+      enableIncidencias: 'Activa el modulo de incidencias y reportes.',
+      enableBetaFeatures: 'Habilita funciones experimentales en desarrollo.',
+      enableNewDashboard: 'Muestra el nuevo diseno del Dashboard.',
+    };
+    return map[key] || 'Funcionalidad controlada por feature flag.';
+  };
+
   return (
     <div className="space-y-6">
+      {/* Branding */}
+      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="w-5 h-5 text-corporate" />
+          <h3 className="font-semibold text-[#1D1D1F]">Configuracion general</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre de la app</label>
+            <input value={branding.appName} onChange={(e) => setBranding({ ...branding, appName: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre de la empresa</label>
+            <input value={branding.companyName} onChange={(e) => setBranding({ ...branding, companyName: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Color principal</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={branding.primaryColor} onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })} className="h-9 w-9 rounded border border-[#E5E5E7] p-0.5" />
+              <span className="text-sm text-[#86868B]">{branding.primaryColor}</span>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">URL del logo</label>
+            <input value={branding.logoUrl} onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })} placeholder="https://..." className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+          </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button onClick={saveBranding} disabled={saving === 'branding'} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-corporate hover:bg-corporate/90 disabled:opacity-50 transition-colors">
+            {saving === 'branding' ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+
       {/* Feature Flags */}
       <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2 mb-4">
@@ -154,16 +208,17 @@ function GeneralTab() {
             <p className="text-sm text-[#86868B]">No hay feature flags configurados</p>
           ) : (
             Object.entries(settings.featureFlags).map(([key, value]) => (
-              <div key={key} className="flex items-center justify-between py-2 border-b border-[#E5E5E7] last:border-0">
-                <div>
+              <div key={key} className="flex items-start justify-between py-3 border-b border-[#E5E5E7] last:border-0">
+                <div className="pr-4">
                   <p className="text-sm font-medium text-[#1D1D1F]">{key}</p>
-                  <p className="text-xs text-[#86868B]">{value ? 'Activado' : 'Desactivado'}</p>
+                  <p className="text-xs text-[#86868B] mt-0.5">{flagDescription(key)}</p>
+                  <p className="text-[10px] text-corporate mt-0.5">{value ? 'Activado' : 'Desactivado'}</p>
                 </div>
                 <button
                   onClick={() => toggleFlag(key, !!value)}
                   disabled={saving === key}
                   className={cn(
-                    "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200",
+                    "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200 shrink-0 mt-0.5",
                     value ? 'bg-corporate' : 'bg-[#E5E5E7]',
                     saving === key && 'opacity-50 cursor-not-allowed'
                   )}
@@ -176,41 +231,6 @@ function GeneralTab() {
               </div>
             ))
           )}
-        </div>
-      </div>
-
-      {/* Modulos activos con toggle */}
-      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <div className="flex items-center gap-2 mb-4">
-          <Puzzle className="w-5 h-5 text-corporate" />
-          <h3 className="font-semibold text-[#1D1D1F]">Modulos del sistema</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {modules.map((mod) => (
-            <div key={mod.id} className={cn(
-              "flex items-center gap-3 p-3 rounded-xl border transition-colors",
-              mod.isActive ? 'border-[#E5E5E7]' : 'border-[#FF3B30]/30 bg-[#FF3B30]/5'
-            )}>
-              <button
-                onClick={() => toggleModule(mod.id, mod.isActive)}
-                disabled={saving === mod.id}
-                className={cn(
-                  "w-10 h-6 rounded-full flex items-center px-0.5 transition-all flex-shrink-0",
-                  mod.isActive ? 'bg-corporate' : 'bg-[#E5E5E7]',
-                  saving === mod.id && 'opacity-50'
-                )}
-              >
-                <div className={cn(
-                  "w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
-                  mod.isActive ? 'translate-x-4' : 'translate-x-0'
-                )} />
-              </button>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
-                <p className="text-xs text-[#86868B]">{mod.isActive ? 'Activo' : 'Inactivo'}</p>
-              </div>
-            </div>
-          ))}
         </div>
       </div>
     </div>
@@ -237,6 +257,8 @@ function UsuariosTab() {
   const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const { settings, roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
+  const { positions, createPosition } = useFirestorePositions();
+  const { user } = useAuth();
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
@@ -522,8 +544,38 @@ function UsuariosTab() {
             </div>
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
-              <input value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})}
-                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+              <select
+                value={formData.position}
+                onChange={async (e) => {
+                  const value = e.target.value;
+                  if (value === '__create__') {
+                    const name = window.prompt('Nombre de la nueva posicion:');
+                    if (!name || !name.trim()) {
+                      setFormData((prev) => ({ ...prev, position: '' }));
+                      return;
+                    }
+                    const id = await createPosition(
+                      { name: name.trim(), level: formData.level || 7, department: formData.department || null, isActive: true },
+                      user?.id || 'system'
+                    );
+                    if (id) {
+                      setFormData((prev) => ({ ...prev, position: name.trim() }));
+                    } else {
+                      alert('Error al crear la posicion');
+                      setFormData((prev) => ({ ...prev, position: '' }));
+                    }
+                  } else {
+                    setFormData((prev) => ({ ...prev, position: value }));
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+              >
+                <option value="">Seleccionar posicion</option>
+                {positions.map((p) => (
+                  <option key={p.id} value={p.name}>{p.name}</option>
+                ))}
+                <option value="__create__">+ Crear nueva posicion</option>
+              </select>
             </div>
             <div>
               <label className="block text-xs font-medium text-[#86868B] mb-1">Fecha de ingreso</label>
@@ -678,8 +730,35 @@ function ModulosTab() {
     finally { setSaving(null); }
   };
 
+  const setStatus = async (modId: string, status: 'live' | 'beta' | 'development') => {
+    setSaving(modId + '_status');
+    try {
+      await updateDoc(doc(db, 'appModules', modId), { status, updatedAt: new Date().toISOString() });
+      await logAction({ action: 'SETTINGS_UPDATED', targetType: 'module', targetId: modId, targetName: modId, previousValue: { status: 'unknown' }, newValue: { status }, impactLevel: 'major', description: `Estado de ${modId} cambiado a ${status}` });
+    } catch (err) { alert('Error: ' + (err as Error).message); }
+    finally { setSaving(null); }
+  };
+
+  const statusBadge = (status?: string) => {
+    const s = status || 'live';
+    const styles: Record<string, string> = {
+      live: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      beta: 'bg-amber-50 text-amber-700 border-amber-200',
+      development: 'bg-slate-100 text-slate-600 border-slate-200',
+    };
+    const labels: Record<string, string> = { live: 'En vivo', beta: 'Beta', development: 'En desarrollo' };
+    return <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium border uppercase tracking-wide', styles[s])}>{labels[s]}</span>;
+  };
+
   return (
     <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+      <div className="mb-4 p-3 rounded-xl bg-corporate/5 border border-corporate/10">
+        <p className="text-xs text-[#1D1D1F]">
+          <strong>En desarrollo:</strong> solo quienes tienen acceso a Develops ven el modulo.
+          <strong> Beta:</strong> visible para usuarios con el permiso requerido.
+          <strong> En vivo:</strong> visible segun permisos y visibilidad normales.
+        </p>
+      </div>
       <div className="space-y-3">
         {modules.map((mod) => (
           <div key={mod.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-[#E5E5E7] gap-4">
@@ -688,11 +767,24 @@ function ModulosTab() {
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: mod.color }} />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-[#1D1D1F] truncate">{mod.name}</p>
+                  {statusBadge(mod.status)}
+                </div>
                 <p className="text-xs text-[#86868B] truncate">{mod.description}</p>
               </div>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
+              <select
+                value={mod.status || 'live'}
+                disabled={saving === mod.id + '_status'}
+                onChange={(e) => setStatus(mod.id, e.target.value as any)}
+                className="text-xs border border-[#E5E5E7] rounded-lg px-2 py-1.5 bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+              >
+                <option value="live">En vivo</option>
+                <option value="beta">Beta</option>
+                <option value="development">En desarrollo</option>
+              </select>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#86868B]">Visible</span>
                 <button onClick={() => toggleVisibility(mod.id, mod.isVisible)} disabled={saving === mod.id + '_vis'}
@@ -1769,7 +1861,7 @@ function FeedbackTab() {
 
 export default function DevelopsModule() {
   const navigate = useNavigate();
-  const { user, hasPermission } = useAuth();
+  const { user } = useAuth();
   const { modules, settings, roleTemplates } = useAppConfig();
   const { logs } = useAudit();
   const [activeTab, setActiveTab] = useState<DevelopTab>('general');
@@ -1787,44 +1879,141 @@ export default function DevelopsModule() {
     feedback: <FeedbackTab />,
   };
 
+  const activeTabConfig = TABS.find((t) => t.id === activeTab) || TABS[0];
+
+  const headerStats = useMemo(() => {
+    switch (activeTab) {
+      case 'general':
+        return [
+          { title: 'Modulos', value: modules.length, icon: Puzzle, color: 'text-corporate' },
+          { title: 'Feature flags', value: Object.keys(settings.featureFlags).length, icon: ToggleRight, color: 'text-apple-blue' },
+        ];
+      case 'usuarios':
+        return [
+          { title: 'Roles', value: roleTemplates.length, icon: UserCog, color: 'text-apple-blue' },
+          { title: 'Audit logs', value: logs.length, icon: ClipboardList, color: 'text-apple-green' },
+        ];
+      case 'modulos':
+        return [
+          { title: 'En vivo', value: modules.filter((m) => m.status === 'live').length, icon: CheckCircle, color: 'text-emerald-500' },
+          { title: 'En desarrollo', value: modules.filter((m) => m.status === 'development').length, icon: Code2, color: 'text-slate-500' },
+        ];
+      case 'departamentos':
+        return [
+          { title: 'Departamentos', value: modules.length, icon: Building2, color: 'text-corporate' },
+          { title: 'Activos', value: modules.filter((m) => m.isActive).length, icon: Activity, color: 'text-apple-green' },
+        ];
+      case 'roles':
+        return [
+          { title: 'Roles', value: roleTemplates.length, icon: UserCog, color: 'text-apple-blue' },
+          { title: 'Permisos', value: Object.values(PERMISSION_CATEGORIES).reduce((acc, cat) => acc + cat.perms.length, 0), icon: Shield, color: 'text-apple-purple' },
+        ];
+      case 'auditoria':
+        return [
+          { title: 'Registros', value: logs.length, icon: ClipboardList, color: 'text-apple-green' },
+        ];
+      case 'seguridad':
+        return [
+          { title: 'Politicas', value: 6, icon: Lock, color: 'text-apple-red' },
+        ];
+      case 'papelera':
+        return [
+          { title: 'Eliminados', value: 0, icon: Trash2, color: 'text-[#FF3B30]' },
+        ];
+      case 'turnos':
+        return [
+          { title: 'Turnos', value: modules.length, icon: Clock, color: 'text-corporate' },
+        ];
+      case 'feedback':
+        return [
+          { title: 'Sugerencias', value: modules.length, icon: MessageSquare, color: 'text-apple-blue' },
+        ];
+      default:
+        return [];
+    }
+  }, [activeTab, modules, settings, roleTemplates, logs]);
+
   return (
     <Layout title="Develops" showDate={false}>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-[#1D1D1F]">Panel de Administracion</h2>
-          <p className="text-sm text-[#86868B]">{user?.name} — {user?.role?.replace(/_/g, ' ')}</p>
+      <div className="flex flex-col lg:flex-row gap-6 min-h-[70vh]">
+        {/* Sidebar - desktop */}
+        <aside className="hidden lg:block w-64 shrink-0">
+          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] sticky top-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#86868B] mb-3 px-2">Secciones</p>
+            <nav className="space-y-1">
+              {TABS.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left",
+                      isActive
+                        ? 'bg-[#1D1D1F] text-white'
+                        : 'text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                    {tab.impact === 'high' && <AlertTriangle className="w-3 h-3 text-[#FF9500] ml-auto" />}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Tabs - mobile */}
+        <div className="lg:hidden flex gap-2 overflow-x-auto pb-2 -mx-2 px-2">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
+                  isActive
+                    ? 'bg-[#1D1D1F] text-white'
+                    : 'bg-white text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]'
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
-      </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard title="Modulos" value={modules.length} icon={Puzzle} color="text-corporate" />
-        <StatCard title="Roles" value={roleTemplates.length} icon={UserCog} color="text-apple-blue" />
-        <StatCard title="Audit Logs" value={logs.length} icon={ClipboardList} color="text-apple-green" />
-        <StatCard title="Usuarios DG" value={settings.developAccess.allowedUserIds.length} icon={Shield} color="text-apple-purple" />
-      </div>
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
-        {TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
-                isActive
-                  ? 'bg-[#1D1D1F] text-white'
-                  : 'bg-white text-[#86868B] hover:text-[#1D1D1F] hover:bg-[#F5F5F7]'
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {tab.label}
-              {tab.impact === 'high' && <AlertTriangle className="w-3 h-3 text-[#FF9500]" />}
-            </button>
-          );
-        })}
-      </div>
-      <div className="min-h-[400px]">
-        {tabComponents[activeTab]}
+
+        {/* Contenido */}
+        <main className="flex-1 min-w-0">
+          {/* Header dinamico */}
+          <div className="mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-xl font-bold text-[#1D1D1F]">{activeTabConfig.label}</h2>
+                <p className="text-sm text-[#86868B]">{activeTabConfig.description}</p>
+              </div>
+              <div className="text-xs text-[#86868B] bg-white px-3 py-1.5 rounded-lg border border-[#E5E5E7]">
+                {user?.name} · {user?.role?.replace(/_/g, ' ')}
+              </div>
+            </div>
+            {headerStats.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {headerStats.map((stat) => (
+                  <StatCard key={stat.title} title={stat.title} value={stat.value} icon={stat.icon} color={stat.color} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="min-h-[400px]">
+            {tabComponents[activeTab]}
+          </div>
+        </main>
       </div>
     </Layout>
   );

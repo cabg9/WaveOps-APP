@@ -16,6 +16,7 @@ export interface AppModule {
   route: string;
   isActive: boolean;
   isVisible: boolean;
+  status: 'live' | 'beta' | 'development';
   order: number;
   category: string;
   requiredPermission: string;
@@ -85,6 +86,21 @@ export interface ModuleAccess {
   moduleId: string;
   canView: boolean;
   canEdit: boolean;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// POSICIONES
+// ═══════════════════════════════════════════════════════════════════
+
+export interface Position {
+  id: string;
+  name: string;
+  level: number;
+  department?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
 }
 
 // ═══════════════════════════════════════════════════════════════════

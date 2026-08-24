@@ -1,9 +1,66 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (etiquetas inteligentes y eliminar recordatorios inmediatamente)
+> Última actualización: 2026-08-24 (Subfase 7.5: Develops estable y usable)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Subfase 7.5: Develops estable y usable
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Sistema de permisos unificado**:
+  - Eliminado `hasPermission` duplicado de `useFirestoreAuth.tsx`.
+  - `useAppConfig.ts` es ahora la unica fuente de permisos dinamicos, delegando en `permissions-config.ts` y aplicando overrides de `roleTemplates`.
+  - Los modulos ahora respetan su `requiredPermission` para aparecer en el menu.
+  - Acceso a Develops funciona por permiso `canViewModuleDevelops`, whitelist, roles permitidos o modo hibrido.
+- **Estados de modulo (feature flags visuales)**:
+  - Agregado campo `status: 'live' | 'beta' | 'development'` a `AppModule`.
+  - Un modulo en `development` solo es visible para quienes tienen acceso a Develops.
+  - Selector de estado en Develops > Modulos con badges e indicadores visuales.
+  - Seed actualizado; script de migracion creado (`scripts/migrate-module-status.cjs`).
+- **Posiciones como entidad**:
+  - Nueva coleccion `positions` y hook `useFirestorePositions`.
+  - El formulario de usuario y el modal de equipo en departamentos ahora usan un select de posiciones.
+  - Se permite crear nuevas posiciones al vuelo desde ambos formularios.
+- **Paleta corporativa y galeria de iconos**:
+  - Nueva paleta restringida en `src/lib/colors.ts`.
+  - Nueva galeria de ~50 iconos en `src/lib/icons.ts` organizados por categoria.
+  - Departamentos usan la paleta corporativa y pueden elegir icono con validacion de no repeticion.
+  - Turnos usan la misma paleta corporativa.
+  - Layout utiliza `ICON_MAP` para mostrar iconos de modulos dinamicamente.
+- **Rediseño de Develops**:
+  - Header dinamico con titulo, descripcion y tarjetas de resumen segun la pestaña activa.
+  - Sidebar vertical en desktop, tabs scrolleables en mobile.
+  - Pestaña General ahora muestra solo configuracion global (branding + feature flags con descripciones).
+  - Pestaña Modulos separada con controles de estado, visibilidad y activacion.
+  - Correccion de texto argentino en Horarios > Solicitudes: "queres" → "quieres".
+
+### Archivos modificados
+- `src/types/index.ts`
+- `src/types/develops.ts`
+- `src/lib/permissions-config.ts`
+- `src/lib/colors.ts` (nuevo)
+- `src/lib/icons.ts` (nuevo)
+- `src/hooks/useFirestoreAuth.tsx`
+- `src/hooks/useAppConfig.ts`
+- `src/hooks/firestore/useFirestorePositions.ts` (nuevo)
+- `src/components/Layout.tsx`
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `src/components/modules/TurnosTab.tsx`
+- `src/components/modules/HorariosModule.tsx`
+- `scripts/seed-develops.cjs`
+- `scripts/migrate-module-status.cjs` (nuevo)
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 

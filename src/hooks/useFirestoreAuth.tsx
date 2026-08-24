@@ -138,51 +138,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser((prev) => prev ? { ...prev, ...updates } : null);
   }, []);
 
-  const hasPermission = useCallback((permission: string): boolean => {
-    if (!user) return false;
-    const level = user.level || 7;
-    switch (permission) {
-      case 'canCreateTask': return level <= 6;
-      case 'canCreateExtraTask': return level <= 6;
-      case 'canReopenTask': return level <= 3;
-      case 'canBlockTask': return level <= 6;
-      case 'canUnblockTask': return level <= 6;
-      case 'canVerifyTask': return level <= 7;
-      case 'canRateTask': return level <= 7;
-      case 'canEditAllTasks': return level <= 3;
-      case 'canEditOwnTasks': return level <= 6;
-      case 'canDeleteAllTasks': return level <= 2;
-      case 'canDeleteOwnTasks': return level <= 6;
-      case 'canCreateSpecificTask': return level <= 1;
-      case 'canConfirmIncidenciaAsManager': return level <= 5;
-      case 'canConfirmIncidenciaAsSupervisor': return level <= 6;
-      case 'canResolveIncidencia': return level <= 6;
-      case 'canCloseIncidencia': return level <= 4;
-      case 'canReopenIncidencia': return level <= 6;
-      case 'canCreateIncidencia': return level <= 7;
-      case 'canViewAllIncidencias': return level <= 2;
-      case 'canViewOperationalIncidencias': return level <= 4;
-      case 'canViewOwnDepartmentIncidencias': return level <= 7;
-      case 'canDeleteTask': return level <= 2;
-      case 'canManageUsers': return level <= 2;
-      case 'canCreateIncapacity': return level <= 6;
-      case 'canApproveIncapacity': return level <= 3;
-      case 'canViewAllDepartments': return level <= 3;
-      case 'canCreateSolicitud': return level <= 7;
-      case 'canApproveSolicitud': return level <= 4;
-      case 'canCreateSchedule': return level <= 5;
-      case 'canViewSchedule': return level <= 7;
-      case 'canManageInventory': return level <= 5;
-      case 'canAssignShifts': return level <= 5;
-      case 'canModifyShifts': return level <= 5;
-      case 'canApproveChanges': return level <= 4;
-      case 'canRejectChanges': return level <= 4;
-      case 'canRequestChange': return level <= 7;
-      case 'canViewInventory': return level <= 7;
-      default: return false;
-    }
-  }, [user]);
-
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -191,7 +146,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       updateUser,
       isLoading, 
       isAuthenticated: !!user,
-      hasPermission 
     }}>
       {children}
     </AuthContext.Provider>

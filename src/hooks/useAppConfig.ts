@@ -123,6 +123,65 @@ export function useAppConfig() {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
+  // COMPUTED: Plantilla de rol del usuario actual
+  // ═══════════════════════════════════════════════════════════════════
+
+  const userRoleTemplate = useMemo(() => {
+    if (!user) return undefined;
+    return roleTemplates.find((r) => r.baseRole === user.role || r.id === user.role);
+  }, [roleTemplates, user]);
+
+  // Usuario efectivo: combina datos de auth con permisos del roleTemplate
+  const effectiveUser = useMemo(() => {
+    if (!user) return null;
+    return {
+      ...user,
+      permissions: userRoleTemplate?.permissions || [],
+    };
+  }, [user, userRoleTemplate]);
+
+  // Verificar si el usuario actual tiene un permiso específico
+  const hasPermission = useCallback(
+    (perm: string): boolean => {
+      if (!user) return false;
+      // Director General tiene acceso total
+      if (user.role === Role.DIRECTOR_GENERAL) return true;
+      // Usar usuario efectivo (combina datos de auth con permisos del roleTemplate)
+      const targetUser = effectiveUser || user;
+      // Fallback a permisos estáticos por nivel/rol (que también respeta user.permissions)
+      return hasStaticPermission(targetUser, perm as any);
+    },
+    [user, effectiveUser]
+  );
+
+  // ═══════════════════════════════════════════════════════════════════
+  // COMPUTED: Tiene acceso a Develops
+  // ═══════════════════════════════════════════════════════════════════
+
+  const hasDevelopAccess = useMemo(() => {
+    if (!user) return false;
+
+    const { developAccess } = settings;
+    const mode = developAccess.mode || 'whitelist';
+
+    // Acceso por permiso explicito del rol
+    if (hasPermission('canViewModuleDevelops')) return true;
+
+    // Modo whitelist
+    if (mode === 'whitelist' || mode === 'hybrid') {
+      if (developAccess.allowedUserIds.includes(user.id)) return true;
+      if (user.email && developAccess.allowedUserIds.includes(user.email)) return true;
+    }
+
+    // Modo role-based
+    if (mode === 'role-based' || mode === 'hybrid') {
+      if (developAccess.allowedRoles.includes(user.role)) return true;
+    }
+
+    return false;
+  }, [settings, user, hasPermission]);
+
+  // ═══════════════════════════════════════════════════════════════════
   // COMPUTED: Módulos visibles para el usuario actual
   // ═══════════════════════════════════════════════════════════════════
 
@@ -136,30 +195,14 @@ export function useAppConfig() {
         .slice(1)
         .replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`;
       if (settings.featureFlags[flagKey] === false) return false;
+      // Estado del modulo: development solo para quienes tienen acceso a Develops
+      const moduleStatus = m.status || 'live';
+      if (moduleStatus === 'development' && !hasDevelopAccess) return false;
       // Usuario debe tener el permiso requerido
-      // (fallback: si no hay permiso definido, se muestra)
+      if (m.requiredPermission && !hasPermission(m.requiredPermission)) return false;
       return true;
     });
-  }, [modules, settings, user]);
-
-  // ═══════════════════════════════════════════════════════════════════
-  // COMPUTED: Tiene acceso a Develops
-  // ═══════════════════════════════════════════════════════════════════
-
-  const hasDevelopAccess = useMemo(() => {
-    console.log("[hasDevelopAccess] user:", { id: user?.id, email: user?.email, role: user?.role, allowedIds: settings.developAccess.allowedUserIds });
-    if (!user) return false;
-
-    const { developAccess } = settings;
-
-    // Modo whitelist
-    // Por ID de usuario
-    if (developAccess.allowedUserIds.includes(user.id)) return true;
-    // Por email de usuario (fallback)
-    if (user.email && developAccess.allowedUserIds.includes(user.email)) return true;
-    // Por rol
-    return false;
-  }, [settings, user]);
+  }, [modules, settings, user, hasPermission, hasDevelopAccess]);
 
   // ═══════════════════════════════════════════════════════════════════
   // FUNCIONES AUXILIARES
@@ -187,35 +230,6 @@ export function useAppConfig() {
       return roleTemplates.find((r) => r.id === roleId);
     },
     [roleTemplates]
-  );
-
-  // Plantilla de rol del usuario actual
-  const userRoleTemplate = useMemo(() => {
-    if (!user) return undefined;
-    return roleTemplates.find((r) => r.baseRole === user.role || r.id === user.role);
-  }, [roleTemplates, user]);
-
-  // Usuario efectivo: combina datos de auth con permisos del roleTemplate
-  const effectiveUser = useMemo(() => {
-    if (!user) return null;
-    return {
-      ...user,
-      permissions: userRoleTemplate?.permissions || [],
-    };
-  }, [user, userRoleTemplate]);
-
-  // Verificar si el usuario actual tiene un permiso específico
-  const hasPermission = useCallback(
-    (perm: string): boolean => {
-      if (!user) return false;
-      // Director General tiene acceso total
-      if (user.role === Role.DIRECTOR_GENERAL) return true;
-      // Si hay plantilla de rol dinámica, usarla
-      if (userRoleTemplate?.permissions?.includes(perm)) return true;
-      // Fallback a permisos estáticos por nivel/rol
-      return hasStaticPermission(user, perm as any);
-    },
-    [user, userRoleTemplate]
   );
 
   // ═══════════════════════════════════════════════════════════════════

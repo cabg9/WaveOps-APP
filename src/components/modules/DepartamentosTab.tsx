@@ -7,11 +7,14 @@ import {
 import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
 import { useFirestoreShifts } from "@/hooks/firestore/useFirestoreShifts";
+import { useFirestorePositions } from "@/hooks/firestore/useFirestorePositions";
 import { useSpecificTaskTemplates, CreateSpecificTaskTemplateData } from "@/hooks/firestore/useSpecificTaskTemplates";
 import { useDynamicDepartments, normalizeDeptCode } from "@/hooks/firestore/useDynamicDepartments";
 import { useAuth } from "@/hooks/useFirestoreAuth";
 import { useAudit } from "@/hooks/useAudit";
 import { executeWithConfirm } from "@/lib/confirm-action";
+import { CORPORATE_COLORS } from "@/lib/colors";
+import { ICON_OPTIONS, getIconByValue } from "@/lib/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,11 +23,6 @@ import type { DepartmentFormData } from "@/types/department";
 import { Role, TaskPriority, TaskVigencia, TaskStatus, SpecificTaskTemplate } from "@/types";
 import { writeBatch, collection, getDocs, query, where, doc } from "firebase/firestore";
 import { db } from "@/firebase-config";
-
-const DEPARTMENT_COLORS = [
-  "#64748b", "#475569", "#334155", "#1e293b", "#0f172a",
-  "#94a3b8", "#78716c", "#57534e", "#44403c", "#292524",
-];
 
 const ROLES_LIST = [
   { value: Role.DIRECTOR_GENERAL, label: "Director General", level: 1 },
@@ -80,6 +78,7 @@ export function DepartamentosTab() {
   const { users, updateUser } = useFirestoreUsers();
   const { logAction } = useAudit();
   const { user: currentUser } = useAuth();
+  const { positions, createPosition } = useFirestorePositions();
   const { shifts, assignments: shiftAssignments } = useFirestoreShifts();
   const { templates, createTemplate, updateTemplate, deleteTemplate } = useSpecificTaskTemplates();
   const { isOperationalDepartment, departmentTree } = useDynamicDepartments();
@@ -91,7 +90,7 @@ export function DepartamentosTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
-    code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null,
+    code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null,
   });
   const [saving, setSaving] = useState(false);
 
@@ -129,7 +128,7 @@ export function DepartamentosTab() {
     return Array.from(new Set([...direct, ...indirect]));
   };
 
-  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: DEPARTMENT_COLORS[0], icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
   const openEdit = (dept: any) => { setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true); };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
@@ -407,7 +406,37 @@ export function DepartamentosTab() {
             <div className="space-y-1.5">
               <Label className="text-slate-300">Color</Label>
               <div className="flex flex-wrap gap-1.5">
-                {DEPARTMENT_COLORS.map(c => (<button key={c} onClick={() => setForm(f => ({ ...f, color: c }))} className={`h-7 w-7 rounded-full border-2 transition ${form.color === c ? "border-white scale-110" : "border-transparent hover:scale-105"}`} style={{ backgroundColor: c }} />))}
+                {CORPORATE_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => setForm(f => ({ ...f, color: c.value }))}
+                    title={c.label}
+                    className={`h-7 w-7 rounded-full border-2 transition ${form.color === c.value ? "border-white scale-110" : "border-transparent hover:scale-105"}`}
+                    style={{ backgroundColor: c.value }}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-slate-300">Icono</Label>
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-lg border border-slate-600 bg-slate-700 p-2">
+                {ICON_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const isUsed = departments.some((d: any) => d.id !== editingId && d.icon === opt.value && d.isActive !== false);
+                  const isSelected = form.icon === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      title={`${opt.label}${isUsed ? ' (en uso)' : ''}`}
+                      disabled={isUsed}
+                      onClick={() => setForm(f => ({ ...f, icon: opt.value }))}
+                      className={`flex h-8 w-8 items-center justify-center rounded-md border transition ${isSelected ? 'border-white bg-slate-500 text-white' : 'border-slate-600 text-slate-300 hover:bg-slate-600'} ${isUsed ? 'opacity-30 cursor-not-allowed' : ''}`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="flex items-center gap-2 pt-2">
@@ -505,7 +534,38 @@ export function DepartamentosTab() {
                           <td className="py-3 pr-4">
                             {isEditing ? (
                               <div className="flex flex-col gap-1">
-                                <input value={editPosition} onChange={(e) => setEditPosition(e.target.value)} placeholder="Posicion" className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200" />
+                                <select
+                                  value={editPosition}
+                                  onChange={async (e) => {
+                                    const value = e.target.value;
+                                    if (value === '__create__') {
+                                      const name = window.prompt('Nombre de la nueva posicion:');
+                                      if (!name || !name.trim()) {
+                                        setEditPosition('');
+                                        return;
+                                      }
+                                      const id = await createPosition(
+                                        { name: name.trim(), level: editLevel || 7, department: selectedDept?.code || null, isActive: true },
+                                        currentUser?.id || 'system'
+                                      );
+                                      if (id) {
+                                        setEditPosition(name.trim());
+                                      } else {
+                                        alert('Error al crear la posicion');
+                                        setEditPosition('');
+                                      }
+                                    } else {
+                                      setEditPosition(value);
+                                    }
+                                  }}
+                                  className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200"
+                                >
+                                  <option value="">Posicion</option>
+                                  {positions.map((p) => (
+                                    <option key={p.id} value={p.name}>{p.name}</option>
+                                  ))}
+                                  <option value="__create__">+ Nueva</option>
+                                </select>
                                 <select value={editLevel} onChange={(e) => setEditLevel(Number(e.target.value))} className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
                                   {LEVELS.map(l => (<option key={l.value} value={l.value}>{l.label}</option>))}
                                 </select>
@@ -656,7 +716,10 @@ export function DepartamentosTab() {
 
         {/* Icono / color de departamento */}
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${dept.color}15` }}>
-          <Building2 className="h-5 w-5" style={{ color: dept.color }} />
+          {(() => {
+            const Icon = getIconByValue(dept.icon) || Building2;
+            return <Icon className="h-5 w-5" style={{ color: dept.color }} />;
+          })()}
         </div>
 
         <div className="min-w-0 flex-1">

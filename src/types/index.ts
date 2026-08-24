@@ -419,7 +419,6 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
   updateUser: (updates: Partial<User>) => void;
-  hasPermission: (permission: Permission) => boolean;
 }
 
 export interface TasksContextType {

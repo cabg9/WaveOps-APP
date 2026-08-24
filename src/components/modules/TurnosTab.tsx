@@ -18,6 +18,7 @@ import { SpecificTaskForm, SpecificTaskFormData } from '@/components/SpecificTas
 import { Plus, Pencil, Trash2, Clock, Eye, Users, CheckSquare, X, LayoutGrid, List, ChevronDown, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { CORPORATE_COLORS } from '@/lib/colors';
 import { Role, TaskPriority, TaskVigencia, SpecificTaskTemplate } from '@/types';
 
 interface Shift {
@@ -28,11 +29,6 @@ interface Shift {
   endTime: string;
   color: string;
 }
-
-const COLORS = [
-  '#007AFF', '#34C759', '#5856D6', '#FF9500', '#FF3B30',
-  '#5AC8FA', '#AF52DE', '#FFCC00', '#8E8E93', '#1C1C1E',
-];
 
 function generateShiftId(name: string, dept: string) {
   const deptPrefix = dept.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 4);
@@ -600,8 +596,14 @@ export function TurnosTab() {
             <div className="space-y-2">
               <Label>Color</Label>
               <div className="flex gap-2 flex-wrap">
-                {COLORS.map(c => (
-                  <button key={c} onClick={() => setForm({ ...form, color: c })} className={cn('w-8 h-8 rounded-full border-2', form.color === c ? 'border-corporate scale-110' : 'border-transparent')} style={{ backgroundColor: c }} />
+                {CORPORATE_COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    title={c.label}
+                    onClick={() => setForm({ ...form, color: c.value })}
+                    className={cn('w-8 h-8 rounded-full border-2', form.color === c.value ? 'border-corporate scale-110' : 'border-transparent')}
+                    style={{ backgroundColor: c.value }}
+                  />
                 ))}
               </div>
             </div>
