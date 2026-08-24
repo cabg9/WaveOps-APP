@@ -749,7 +749,7 @@ function ModulosTab() {
     finally { setSaving(null); }
   };
 
-  const setStatus = async (modId: string, status: 'live' | 'beta' | 'development') => {
+  const setStatus = async (modId: string, status: 'live' | 'development') => {
     setSaving(modId + '_status');
     try {
       await updateDoc(doc(db, 'appModules', modId), { status, updatedAt: new Date().toISOString() });
@@ -802,10 +802,9 @@ function ModulosTab() {
     const s = status || 'live';
     const styles: Record<string, string> = {
       live: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      beta: 'bg-amber-50 text-amber-700 border-amber-200',
       development: 'bg-slate-100 text-slate-600 border-slate-200',
     };
-    const labels: Record<string, string> = { live: 'En vivo', beta: 'Beta', development: 'En desarrollo' };
+    const labels: Record<string, string> = { live: 'En vivo', development: 'En desarrollo' };
     return <span className={cn('text-[10px] px-2 py-0.5 rounded-full font-medium border uppercase tracking-wide', styles[s])}>{labels[s]}</span>;
   };
 
@@ -817,8 +816,7 @@ function ModulosTab() {
     <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
       <div className="mb-4 p-3 rounded-xl bg-corporate/5 border border-corporate/10">
         <p className="text-xs text-[#1D1D1F]">
-          <strong>En desarrollo:</strong> solo quienes tienen acceso a Develops ven el modulo.
-          <strong> Beta:</strong> visible para usuarios con el permiso requerido.
+          <strong>En desarrollo:</strong> solo quienes tienen acceso a Develops ven el modulo. Se lanza a produccion solo cuando esta completamente operativo.
           <strong> En vivo:</strong> visible segun permisos y visibilidad normales.
         </p>
       </div>
@@ -848,7 +846,6 @@ function ModulosTab() {
                   className="text-xs border border-[#E5E5E7] rounded-lg px-2 py-1.5 bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
                 >
                   <option value="live">En vivo</option>
-                  <option value="beta">Beta</option>
                   <option value="development">En desarrollo</option>
                 </select>
                 <div className="flex items-center gap-2">

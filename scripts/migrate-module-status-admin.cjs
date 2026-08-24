@@ -17,6 +17,9 @@ async function migrate() {
     if (!data.status) {
       batch.update(doc.ref, { status: 'live' });
       count++;
+    } else if (data.status === 'beta') {
+      batch.update(doc.ref, { status: 'live' });
+      count++;
     }
   });
 
@@ -24,7 +27,7 @@ async function migrate() {
     await batch.commit();
     console.log(`✅ Migración completa: ${count} módulos actualizados a status: 'live'`);
   } else {
-    console.log('ℹ️ No había módulos sin status.');
+    console.log('ℹ️ No había módulos sin status ni en estado beta.');
   }
 }
 

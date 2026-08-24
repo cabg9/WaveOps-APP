@@ -16,7 +16,7 @@ export interface AppModule {
   route: string;
   isActive: boolean;
   isVisible: boolean;
-  status: 'live' | 'beta' | 'development';
+  status: 'live' | 'development';
   order: number;
   category: string;
   requiredPermission: string;
