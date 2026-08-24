@@ -12,6 +12,9 @@
 **Estado:** COMPLETADO
 
 ### Cambios realizados
+- **Seguridad de acceso a Develops**:
+  - `DIRECTOR_GENERAL` ahora tiene acceso irrenunciable a Develops en `useAppConfig.ts`.
+  - Incluso si la whitelist o los roles permitidos se corrompen, el director general nunca pierde el control.
 - **Migración de módulos a `status: 'live'`**:
   - Script de administrador creado y ejecutado: `scripts/migrate-module-status-admin.cjs`.
   - Usa service account key proporcionado por el usuario.
@@ -48,6 +51,7 @@
 - `src/components/Layout.tsx`
 - `src/components/modules/DevelopsModule.tsx`
 - `src/components/modules/DepartamentosTab.tsx`
+- `src/hooks/useAppConfig.ts`
 - `scripts/migrate-module-status-admin.cjs` (nuevo)
 - `scripts/package.json` (nuevo)
 - `scripts/package-lock.json` (nuevo)
