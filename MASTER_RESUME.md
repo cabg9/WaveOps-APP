@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Fix scroll horizontal Tasks móvil - navegación y tarjetas)
+> Última actualización: 2026-08-24 (Tasks: dropdowns móviles en fila + tarjetas más espaciosas)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -17,20 +17,21 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 
 ---
 
-## Fix scroll horizontal Tasks móvil — navegación y tarjetas (24 de agosto)
+## Tasks: dropdowns móviles en fila + tarjetas más espaciosas (24 de agosto)
 
 **Estado:** COMPLETADO
 
 ### Cambios realizados
 - **Navegación móvil de Tasks**:
-  - Los selects de pestaña, periodo y estado ahora se apilan en pantallas pequeñas (`< sm`) y ocupan el ancho completo.
-  - En pantallas `sm` y mayores vuelven a estar en línea.
-  - Se limitó el ancho máximo de los triggers y se truncan los textos largos.
+  - Los selects de pestaña, periodo y estado vuelven a mostrarse en una sola fila en móvil.
+  - Cada dropdown ocupa `flex-1` para distribuirse equitativamente sin generar scroll horizontal.
+  - Triggers más compactos en móvil (`h-9`, `px-2`) y normales en tablet/desktop (`h-10`, `px-3`).
+  - Textos largos truncados dentro de cada dropdown.
 - **Tarjetas de tareas**:
-  - Contenedor principal con `max-w-full`.
-  - Badges del encabezado con `min-w-0` y truncamiento del supervisor.
-  - Descripción colapsada con `line-clamp-2` y `break-words`.
-  - Fila de metadatos con `min-w-0` y contenedor del grid/listado con `max-w-full`.
+  - Mayor altura en móvil (`py-5`) para distribuir mejor los componentes.
+  - Descripción ahora crece hacia abajo: `line-clamp-4` en móvil y `line-clamp-2` en desktop, con `break-words` para evitar desbordamiento lateral.
+  - Badges reducidos en móvil (`text-[10px]`, padding compacto) y tamaño normal en desktop.
+  - Metadatos mantienen `flex-wrap` y `min-w-0` para no forzar ancho.
 - No se modificó lógica de estados, filtros ni Firebase.
 
 ### Archivos modificados
