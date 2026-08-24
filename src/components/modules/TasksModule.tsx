@@ -117,6 +117,7 @@ export default function TasksModule() {
     selectedShifts: [] as string[], supportDepartment: '' as string | '',
     supportUsers: [] as string[],
     recurrence: TaskRecurrence.NONE,
+    photos: [] as string[],
   });
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
@@ -260,6 +261,7 @@ export default function TasksModule() {
     subtasks: { id: string; title: string; completed: boolean }[];
     startDate?: string;
     priority: TaskPriority;
+    imageUrl?: string;
   }
 
   const handleOpenModal = (type: 'extra' | 'specific' | 'incidencia', prefill?: ReminderPrefill) => {
@@ -273,6 +275,7 @@ export default function TasksModule() {
       startTime: '09:00', estimatedHours: 60, supervisor: '', assignedTo: [],
       requiresPhoto: false, subtasks: prefill?.subtasks || [], selectedShifts: [], supportDepartment: '', supportUsers: [],
       recurrence: TaskRecurrence.NONE,
+      photos: prefill?.imageUrl ? [prefill.imageUrl] : [],
     });
     setSpecificTaskForm({
       title: prefill?.title || '',
@@ -332,6 +335,7 @@ export default function TasksModule() {
             subtasks: items,
             startDate: dueDate,
             priority,
+            imageUrl: data.imageUrl || '',
           });
         }).catch((err) => {
           console.error('Error al precargar recordatorio:', err);
@@ -1000,7 +1004,7 @@ export default function TasksModule() {
                 isEditing={!!editingTemplateId}
               />
             ) : createType === 'extra' ? (
-              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers }).then(async (id) => { console.log('Tarea creada:', id); if (pendingReminderId) { await markReminderConverted(pendingReminderId, id); setPendingReminderId(null); } setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
+              <TaskFormModal createType={createType} taskForm={taskForm} setTaskForm={setTaskForm} newSubtaskTitle={newSubtaskTitle} setNewSubtaskTitle={setNewSubtaskTitle} allDepartments={allDepartments} supervisorsByDepartment={supervisorsByDepartment} calculatedDueDate={calculatedDueDateTime.date} calculatedDueTime={calculatedDueDateTime.time} onCancel={() => setIsCreateModalOpen(false)} currentUserId={user?.id} onSubmit={() => { if (user) { createTask({ title: taskForm.title, description: taskForm.description, department: taskForm.department, priority: taskForm.priority, dueDate: calculatedDueDateTime.date, dueTime: calculatedDueDateTime.time, assignedTo: taskForm.assignedTo && taskForm.assignedTo.length > 0 ? taskForm.assignedTo : [user.id], createdBy: user.id, status: TaskStatus.PENDING, type: TaskType.EXTRA, supervisorId: taskForm.supervisor || user.id, requiresPhoto: taskForm.requiresPhoto, startTime: taskForm.startTime, estimatedMinutes: taskForm.estimatedHours, subtasks: taskForm.subtasks, shiftIds: taskForm.selectedShifts, supportUserIds: taskForm.supportUsers, photos: taskForm.photos }).then(async (id) => { console.log('Tarea creada:', id); if (pendingReminderId) { await markReminderConverted(pendingReminderId, id); setPendingReminderId(null); } setIsCreateModalOpen(false); }).catch((err) => { console.error('Error creando tarea:', err); alert('Error al crear tarea: ' + err.message); }); } }} />
             ) : null}
             </div>
           </DialogContent>
@@ -1022,7 +1026,7 @@ export default function TasksModule() {
 
 interface TaskFormModalProps {
   createType: 'extra' | 'specific';
-  taskForm: { title: string; description: string; department: string; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: string; supportUsers: string[]; recurrence: TaskRecurrence; };
+  taskForm: { title: string; description: string; department: string; priority: TaskPriority; startDate: string; startTime: string; estimatedHours: number; supervisor: string; assignedTo: string[]; requiresPhoto: boolean; subtasks: { id: string; title: string; completed: boolean }[]; selectedShifts: string[]; supportDepartment: string; supportUsers: string[]; recurrence: TaskRecurrence; photos: string[]; };
   setTaskForm: React.Dispatch<React.SetStateAction<TaskFormModalProps['taskForm']>>;
   newSubtaskTitle: string;
   setNewSubtaskTitle: React.Dispatch<React.SetStateAction<string>>;
@@ -1092,6 +1096,26 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
           <Textarea placeholder="Describe la tarea..." value={taskForm.description} onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })} rows={3} />
         </div>
 
+        {taskForm.photos && taskForm.photos.length > 0 && (
+          <div className="space-y-2">
+            <Label>Fotos adjuntas</Label>
+            <div className="flex flex-wrap gap-2">
+              {taskForm.photos.map((photo, idx) => (
+                <div key={idx} className="relative w-16 h-16 rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden group">
+                  <img src={photo} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setTaskForm({ ...taskForm, photos: taskForm.photos.filter((_, i) => i !== idx) })}
+                    className="absolute top-0.5 right-0.5 w-4 h-4 bg-[#FF3B30] text-white rounded-full flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Subtareas</Label>
           <div className="flex gap-2">
@@ -1136,7 +1160,12 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
 
         {createType === 'extra' && (
           <div className="space-y-2">
-            <Label>Asignar a</Label>
+            <div className="flex items-center justify-between">
+              <Label>Asignar a</Label>
+              {taskForm.assignedTo.length === 0 && (
+                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Se asignará a ti</span>
+              )}
+            </div>
             <div className="space-y-2">
               {usersByDepartment.length > 0 ? usersByDepartment.map((user) => {
                 const isSelected = taskForm.assignedTo.includes(user.id);
@@ -1148,6 +1177,11 @@ function TaskFormModal({ createType, taskForm, setTaskForm, newSubtaskTitle, set
                 );
               }) : <p className="text-sm text-[#86868B] p-2">No hay usuarios disponibles en este departamento</p>}
             </div>
+            {taskForm.assignedTo.length > 0 && (
+              <p className="text-xs text-[#86868B]">
+                {taskForm.assignedTo.length} responsable{taskForm.assignedTo.length > 1 ? 'es' : ''} seleccionado{taskForm.assignedTo.length > 1 ? 's' : ''}
+              </p>
+            )}
           </div>
         )}
 

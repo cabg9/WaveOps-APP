@@ -147,6 +147,7 @@ const LIST_COLORS: Record<string, string> = {
 function ReminderImageUpload({ imageUrl, onChange }: { imageUrl: string; onChange: (url: string) => void }) {
   const { uploadImage, uploading, progress } = useStorageUpload();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [maximized, setMaximized] = useState(false);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -171,14 +172,29 @@ function ReminderImageUpload({ imageUrl, onChange }: { imageUrl: string; onChang
         onChange={handleFileChange}
       />
       {imageUrl ? (
-        <div className="relative rounded-xl overflow-hidden border border-[#E5E5E7]">
-          <img src={imageUrl} alt="Recordatorio" className="w-full h-40 object-cover" />
+        <div className="flex items-center gap-3">
+          <div className="relative w-20 h-20 rounded-xl bg-[#F5F5F7] flex items-center justify-center border border-[#E5E5E7] overflow-hidden group">
+            <img
+              src={imageUrl}
+              alt="Recordatorio"
+              className="w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => setMaximized(true)}
+            />
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="absolute top-0.5 right-0.5 w-5 h-5 bg-[#FF3B30] text-white rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => onChange('')}
-            className="absolute top-2 right-2 p-1.5 bg-white/90 rounded-full text-[#FF3B30] hover:bg-white transition-colors"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="text-xs font-medium text-corporate hover:text-corporate/80 transition-colors"
           >
-            <X className="w-4 h-4" />
+            {uploading ? `Subiendo ${progress}%...` : 'Cambiar imagen'}
           </button>
         </div>
       ) : (
@@ -191,6 +207,19 @@ function ReminderImageUpload({ imageUrl, onChange }: { imageUrl: string; onChang
           {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
           {uploading ? `Subiendo ${progress}%...` : 'Agregar imagen'}
         </button>
+      )}
+
+      {maximized && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setMaximized(false)}
+        >
+          <img
+            src={imageUrl}
+            alt="Recordatorio"
+            className="max-w-full max-h-full rounded-xl object-contain"
+          />
+        </div>
       )}
     </div>
   );
@@ -214,6 +243,7 @@ function ReminderCard({
   canConvert: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [maximizedPhoto, setMaximizedPhoto] = useState<string | null>(null);
   const completed = reminder.items.filter((item) => item.completed).length;
   const total = reminder.items.length;
   const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -253,6 +283,16 @@ function ReminderCard({
                 {reminder.notes}
               </p>
             )}
+            {reminder.imageUrl && expanded && (
+              <div className="mt-2">
+                <div
+                  className="relative w-16 h-16 rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); setMaximizedPhoto(reminder.imageUrl || null); }}
+                >
+                  <img src={reminder.imageUrl} alt="Recordatorio" className="w-full h-full object-cover" />
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {dateLabel && (
                 <span className={cn('text-xs', reminder.dueDate && reminder.dueDate < todayISO() ? 'text-red-500' : 'text-corporate')}>
@@ -262,6 +302,9 @@ function ReminderCard({
               {total > 0 && <span className="text-xs text-[#8E8E93]">{completed} de {total}</span>}
               {reminder.tags.length > 0 && (
                 <span className="text-xs text-[#8E8E93]">{reminder.tags.map((t) => `#${t}`).join(' ')}</span>
+              )}
+              {reminder.imageUrl && !expanded && (
+                <ImageIcon className="w-3.5 h-3.5 text-[#8E8E93]" />
               )}
             </div>
 
@@ -381,6 +424,17 @@ function ReminderCard({
         </div>
       )}
 
+      {expanded && reminder.imageUrl && (
+        <div className="mt-3">
+          <div
+            className="relative w-20 h-20 rounded-xl bg-[#F5F5F7] border border-[#E5E5E7] overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={(e) => { e.stopPropagation(); setMaximizedPhoto(reminder.imageUrl || null); }}
+          >
+            <img src={reminder.imageUrl} alt="Recordatorio" className="w-full h-full object-cover" />
+          </div>
+        </div>
+      )}
+
       {expanded && (
         <div className="flex items-center gap-2 mt-4 pt-3 border-t border-[#E5E5E7]">
           <button
@@ -408,6 +462,19 @@ function ReminderCard({
           </button>
         </div>
       )}
+
+      {maximizedPhoto && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4"
+          onClick={(e) => { e.stopPropagation(); setMaximizedPhoto(null); }}
+        >
+          <img
+            src={maximizedPhoto}
+            alt="Recordatorio"
+            className="max-w-full max-h-full rounded-xl object-contain"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -423,6 +490,7 @@ export function GlobalFAB() {
     toggleReminderItem,
     archiveReminder,
     markReminderConverted,
+    renameList,
   } = useFirestoreReminders(user?.id);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -455,6 +523,7 @@ export function GlobalFAB() {
   const [isSavingReminder, setIsSavingReminder] = useState(false);
   const [showConvertDialog, setShowConvertDialog] = useState(false);
   const [convertingReminder, setConvertingReminder] = useState<FirestoreReminder | null>(null);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const mouseInHotCornerRef = useRef(false);
@@ -647,10 +716,12 @@ export function GlobalFAB() {
   const handleNewReminder = () => {
     resetReminderEditor();
     setItems([{ id: generateId(), text: '', completed: false }]);
+    setIsEditorOpen(true);
   };
 
   const handleEditReminder = (reminder: FirestoreReminder) => {
     setEditingReminder(reminder);
+    setIsEditorOpen(true);
     setTitle(reminder.title);
     setNotes(reminder.notes || '');
     setItems(reminder.items.length > 0 ? reminder.items : [{ id: generateId(), text: '', completed: false }]);
@@ -701,6 +772,7 @@ export function GlobalFAB() {
         await createReminder(data);
         toast.success('Recordatorio creado');
       }
+      setIsEditorOpen(false);
       resetReminderEditor();
     } catch (err) {
       console.error('Error guardando recordatorio:', err);
@@ -1077,6 +1149,7 @@ export function GlobalFAB() {
                   const Icon = cat.icon;
                   const count = (counts as any)[cat.countKey] || 0;
                   const active = selectedCategory === cat.id;
+                  const isUrgent = cat.id === 'urgent';
                   return (
                     <button
                       key={cat.id}
@@ -1088,7 +1161,7 @@ export function GlobalFAB() {
                           : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
                       )}
                     >
-                      <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center text-white', cat.color)}>
+                      <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-corporate/10', isUrgent ? 'text-red-500' : 'text-corporate')}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <span className="flex-1 text-left">{cat.label}</span>
@@ -1100,37 +1173,36 @@ export function GlobalFAB() {
 
               {/* Buscador y vista */}
               <div className="p-3 lg:p-4 border-t border-[#E5E5E7] space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Buscar recordatorio..."
-                    className="pl-9 rounded-xl border-[#E5E5E7] text-sm"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#86868B]">Vista</span>
-                  <div className="flex items-center gap-1 bg-[#F2F2F7] rounded-lg p-1">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
+                    <Input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar..."
+                      className="pl-9 rounded-xl border-[#E5E5E7] text-sm"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1 bg-[#F2F2F7] rounded-lg p-1 shrink-0">
                     <button
                       onClick={() => setReminderView('cards')}
                       className={cn(
-                        'px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        'px-2 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
                         reminderView === 'cards' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
                       )}
                     >
                       <LayoutGrid className="w-3.5 h-3.5" />
-                      Tarjetas
+                      <span className="hidden sm:inline">Tarjetas</span>
                     </button>
                     <button
                       onClick={() => setReminderView('list')}
                       className={cn(
-                        'px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
+                        'px-2 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1',
                         reminderView === 'list' ? 'bg-white text-corporate shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
                       )}
                     >
                       <List className="w-3.5 h-3.5" />
-                      Lista
+                      <span className="hidden sm:inline">Lista</span>
                     </button>
                   </div>
                 </div>
@@ -1138,7 +1210,18 @@ export function GlobalFAB() {
 
               {/* Filtro de listas */}
               <div className="hidden lg:block p-4 border-t border-[#E5E5E7] flex-1 overflow-y-auto">
-                <h2 className="text-xs font-semibold text-[#86868B] uppercase tracking-wider mb-2 px-2">Listas</h2>
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <h2 className="text-xs font-semibold text-[#86868B] uppercase tracking-wider">Listas</h2>
+                  <button
+                    onClick={() => {
+                      const name = window.prompt('Nombre de la nueva lista');
+                      if (name?.trim()) setSelectedListFilter(name.trim());
+                    }}
+                    className="text-xs text-corporate hover:text-corporate/80 font-medium"
+                  >
+                    + Nueva
+                  </button>
+                </div>
                 <div className="space-y-1">
                   <button
                     onClick={() => setSelectedListFilter('all')}
@@ -1151,20 +1234,39 @@ export function GlobalFAB() {
                     <span className="flex-1 text-left">Todas las listas</span>
                   </button>
                   {availableLists.map((listName) => (
-                    <button
+                    <div
                       key={listName}
-                      onClick={() => setSelectedListFilter(listName)}
                       className={cn(
-                        'flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm transition-colors',
+                        'flex items-center gap-1 w-full px-2 py-1.5 rounded-xl text-sm transition-colors group',
                         selectedListFilter === listName ? 'bg-corporate/10 text-corporate font-medium' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
                       )}
                     >
-                      <div className={cn('w-2 h-2 rounded-full', LIST_COLORS[listName] || 'bg-slate-400')} />
-                      <span className="flex-1 text-left">{listName}</span>
-                      <span className="text-xs text-[#86868B]">
-                        {activeReminders.filter((r) => r.list === listName).length}
-                      </span>
-                    </button>
+                      <button
+                        onClick={() => setSelectedListFilter(listName)}
+                        className="flex items-center gap-2 flex-1 text-left"
+                      >
+                        <div className={cn('w-2 h-2 rounded-full', LIST_COLORS[listName] || 'bg-slate-400')} />
+                        <span className="truncate">{listName}</span>
+                        <span className="text-xs text-[#86868B]">
+                          {activeReminders.filter((r) => r.list === listName).length}
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          const name = window.prompt('Nuevo nombre para la lista', listName);
+                          if (name?.trim() && name.trim() !== listName) {
+                            renameList(listName, name.trim()).then((count) => {
+                              toast.success(`Lista actualizada (${count} recordatorios)`);
+                              if (selectedListFilter === listName) setSelectedListFilter(name.trim());
+                            }).catch(() => toast.error('No se pudo renombrar la lista'));
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-[#86868B] hover:text-corporate hover:bg-corporate/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Editar lista"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1235,54 +1337,47 @@ export function GlobalFAB() {
         </div>
       )}
 
-      {/* Editor de recordatorio */}
-      {(editingReminder || items.length > 0 || title !== '' || notes !== '') && (
-        <div className="fixed inset-0 z-[60] bg-[#F2F2F7] flex flex-col">
-          <header className="sticky top-0 z-10 bg-[#F2F2F7]/95 backdrop-blur border-b border-[#E5E5E7] px-4 py-3 flex items-center justify-between">
-            <button
-              onClick={resetReminderEditor}
-              className="flex items-center gap-1 text-[#007AFF] font-medium text-sm px-2 py-1 rounded-lg hover:bg-[#007AFF]/5 transition-colors"
-            >
-              Cancelar
-            </button>
-            <h1 className="text-lg font-semibold text-[#1D1D1F]">
+      {/* Editor de recordatorio (popup) */}
+      <Dialog
+        open={isEditorOpen}
+        onOpenChange={(open) => {
+          setIsEditorOpen(open);
+          if (!open) resetReminderEditor();
+        }}
+      >
+        <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg rounded-2xl max-h-[90vh] overflow-hidden p-0">
+          <DialogHeader className="px-4 py-3 border-b border-[#E5E5E7]">
+            <DialogTitle className="text-lg">
               {editingReminder ? 'Editar recordatorio' : 'Nuevo recordatorio'}
-            </h1>
-            <button
-              onClick={handleSaveReminder}
-              disabled={isSavingReminder}
-              className="flex items-center gap-1 text-[#007AFF] font-semibold text-sm px-3 py-1.5 rounded-lg hover:bg-[#007AFF]/5 transition-colors disabled:opacity-50"
-            >
-              {isSavingReminder ? 'Guardando...' : 'Guardar'}
-            </button>
-          </header>
+            </DialogTitle>
+          </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-4 max-w-2xl mx-auto w-full">
+          <div className="overflow-y-auto p-4 max-h-[calc(90vh-80px)]">
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Título"
-                className="border-0 rounded-none text-[#1D1D1F] font-medium placeholder:text-[#C7C7CC] focus-visible:ring-0 h-12"
+                className="border-0 rounded-none text-[#1D1D1F] font-medium placeholder:text-[#C7C7CC] focus-visible:ring-0 h-11"
               />
               <div className="h-px bg-[#E5E5E7]" />
               <Textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Notas"
-                rows={3}
+                rows={2}
                 className="border-0 rounded-none resize-none text-[#1D1D1F] placeholder:text-[#C7C7CC] focus-visible:ring-0"
               />
             </div>
 
             {/* Fecha y hora */}
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
-                  <Calendar className="w-5 h-5 text-[#007AFF]" />
-                  <span className="text-[#1D1D1F]">Fecha</span>
+                  <Calendar className="w-4 h-4 text-corporate" />
+                  <span className="text-sm text-[#1D1D1F]">Fecha</span>
                 </div>
-                <Switch checked={hasDate} onCheckedChange={setHasDate} />
+                <Switch checked={hasDate} onCheckedChange={setHasDate} className="scale-90" />
               </div>
               {hasDate && (
                 <div className="px-4 py-2 border-b border-[#E5E5E7]">
@@ -1290,16 +1385,16 @@ export function GlobalFAB() {
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
-                    className="border-0 rounded-none focus-visible:ring-0"
+                    className="border-0 rounded-none focus-visible:ring-0 h-9"
                   />
                 </div>
               )}
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
-                  <Clock className="w-5 h-5 text-[#007AFF]" />
-                  <span className="text-[#1D1D1F]">Hora</span>
+                  <Clock className="w-4 h-4 text-corporate" />
+                  <span className="text-sm text-[#1D1D1F]">Hora</span>
                 </div>
-                <Switch checked={hasTime} onCheckedChange={(v) => { setHasTime(v); if (v) setHasDate(true); }} />
+                <Switch checked={hasTime} onCheckedChange={(v) => { setHasTime(v); if (v) setHasDate(true); }} className="scale-90" />
               </div>
               {hasTime && (
                 <div className="px-4 py-2">
@@ -1307,66 +1402,80 @@ export function GlobalFAB() {
                     type="time"
                     value={dueTime}
                     onChange={(e) => setDueTime(e.target.value)}
-                    className="border-0 rounded-none focus-visible:ring-0"
+                    className="border-0 rounded-none focus-visible:ring-0 h-9"
                   />
                 </div>
               )}
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center gap-3">
-                  <Bell className="w-5 h-5 text-[#FF2D55]" />
-                  <span className="text-[#1D1D1F]">Urgente</span>
+                  <Bell className="w-4 h-4 text-red-500" />
+                  <span className="text-sm text-[#1D1D1F]">Urgente</span>
                 </div>
-                <Switch checked={isUrgent} onCheckedChange={setIsUrgent} />
+                <Switch checked={isUrgent} onCheckedChange={setIsUrgent} className="scale-90" />
               </div>
             </div>
 
             {/* Lista */}
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
-                <List className="w-5 h-5 text-corporate" />
-                <span className="text-[#1D1D1F]">Lista</span>
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#E5E5E7]">
+                <List className="w-4 h-4 text-corporate" />
+                <span className="text-sm font-medium text-[#1D1D1F]">Lista</span>
               </div>
-              <div className="px-4 py-3 flex flex-wrap gap-2">
-                {availableLists.map((listName) => (
+              <div className="px-4 py-3">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {availableLists.map((listName) => (
+                    <button
+                      key={listName}
+                      type="button"
+                      onClick={() => setList(listName)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                        list === listName
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                      )}
+                    >
+                      {listName}
+                    </button>
+                  ))}
                   <button
-                    key={listName}
                     type="button"
-                    onClick={() => setList(listName)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-full text-sm font-medium transition-colors border',
-                      list === listName
-                        ? 'bg-corporate text-white border-corporate'
-                        : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
-                    )}
+                    onClick={() => {
+                      const name = window.prompt('Nombre de la nueva lista');
+                      if (name?.trim()) setList(name.trim());
+                    }}
+                    className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-[#C7C7CC] text-[#86868B] hover:border-corporate hover:text-corporate transition-colors"
                   >
-                    {listName}
+                    + Nueva lista
                   </button>
-                ))}
-                <Input
-                  value={availableLists.includes(list) ? '' : list}
-                  onChange={(e) => setList(e.target.value)}
-                  placeholder="Nueva lista..."
-                  className="w-36 border-0 rounded-none focus-visible:ring-0 text-sm px-0"
-                />
+                </div>
+                {!availableLists.includes(list) && list && (
+                  <div className="flex items-center gap-2 text-xs text-corporate">
+                    <span>Lista nueva: {list}</span>
+                    <button onClick={() => setList('General')} className="text-[#86868B] hover:text-[#FF3B30]">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Detalles */}
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
-                <Info className="w-5 h-5 text-[#5856D6]" />
-                <span className="font-medium text-[#1D1D1F]">Detalles</span>
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#E5E5E7]">
+                <Info className="w-4 h-4 text-corporate" />
+                <span className="text-sm font-medium text-[#1D1D1F]">Detalles</span>
               </div>
-              <div className="px-4 py-3 border-b border-[#E5E5E7]">
-                <div className="flex items-center gap-3 mb-2">
-                  <Hash className="w-5 h-5 text-[#8E8E93]" />
-                  <span className="text-[#1D1D1F]">Etiquetas</span>
+              <div className="px-4 py-2.5 border-b border-[#E5E5E7]">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Hash className="w-4 h-4 text-[#8E8E93]" />
+                  <span className="text-sm text-[#1D1D1F]">Etiquetas</span>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {tags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-corporate/10 text-corporate text-xs font-medium"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-corporate/10 text-corporate text-xs font-medium"
                     >
                       #{tag}
                       <button
@@ -1379,8 +1488,8 @@ export function GlobalFAB() {
                     </span>
                   ))}
                   <Input
-                    placeholder="Agregar etiqueta..."
-                    className="flex-1 min-w-[120px] border-0 rounded-none focus-visible:ring-0 text-sm px-0"
+                    placeholder="Agregar..."
+                    className="w-20 border-0 rounded-none focus-visible:ring-0 text-xs px-0 h-7"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1394,22 +1503,22 @@ export function GlobalFAB() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
-                  <Flag className="w-5 h-5 text-[#FF9500]" />
-                  <span className="text-[#1D1D1F]">Poner indicador</span>
+                  <Flag className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm text-[#1D1D1F]">Indicador</span>
                 </div>
-                <Switch checked={flagged} onCheckedChange={setFlagged} />
+                <Switch checked={flagged} onCheckedChange={setFlagged} className="scale-90" />
               </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E5E7]">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">
-                  <AlertCircle className="w-5 h-5 text-[#FF3B30]" />
-                  <span className="text-[#1D1D1F]">Prioridad</span>
+                  <AlertCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-sm text-[#1D1D1F]">Prioridad</span>
                 </div>
                 <select
                   value={priority}
                   onChange={(e) => setPriority(e.target.value as FirestoreReminder['priority'])}
-                  className="text-sm bg-transparent text-[#007AFF] focus:outline-none"
+                  className="text-sm bg-transparent text-corporate focus:outline-none"
                 >
                   <option value="none">Ninguna</option>
                   <option value="low">Baja</option>
@@ -1417,10 +1526,10 @@ export function GlobalFAB() {
                   <option value="high">Alta</option>
                 </select>
               </div>
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-3 mb-2">
-                  <ImageIcon className="w-5 h-5 text-[#8E8E93]" />
-                  <span className="text-[#1D1D1F]">Imagen</span>
+              <div className="px-4 py-2.5">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <ImageIcon className="w-4 h-4 text-[#8E8E93]" />
+                  <span className="text-sm text-[#1D1D1F]">Imagen</span>
                 </div>
                 <ReminderImageUpload imageUrl={imageUrl} onChange={setImageUrl} />
               </div>
@@ -1428,9 +1537,9 @@ export function GlobalFAB() {
 
             {/* Items / checklist */}
             <div className="bg-white rounded-2xl border border-[#E5E5E7] overflow-hidden mb-4">
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-[#E5E5E7]">
-                <CheckSquare className="w-5 h-5 text-corporate" />
-                <span className="font-medium text-[#1D1D1F]">Lista de pasos</span>
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[#E5E5E7]">
+                <CheckSquare className="w-4 h-4 text-corporate" />
+                <span className="text-sm font-medium text-[#1D1D1F]">Pasos</span>
               </div>
               <div className="px-4 py-3 space-y-2">
                 {items.map((item, index) => (
@@ -1455,7 +1564,7 @@ export function GlobalFAB() {
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
-                      className="p-1.5 text-[#C7C7CC] hover:text-[#FF3B30] rounded-full transition-colors"
+                      className="p-1 text-[#C7C7CC] hover:text-[#FF3B30] rounded-full transition-colors"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -1464,7 +1573,7 @@ export function GlobalFAB() {
                 <button
                   type="button"
                   onClick={handleAddItem}
-                  className="flex items-center gap-2 text-sm font-medium text-[#007AFF] hover:text-[#007AFF]/80 transition-colors pt-1"
+                  className="flex items-center gap-1.5 text-sm font-medium text-corporate hover:text-corporate/80 transition-colors pt-1"
                 >
                   <Plus className="w-4 h-4" />
                   Añadir paso
@@ -1477,15 +1586,33 @@ export function GlobalFAB() {
                 type="button"
                 onClick={() => startConvert(editingReminder)}
                 disabled={isSavingReminder}
-                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-4 py-3 rounded-xl transition-colors disabled:opacity-50 mb-4"
+                className="w-full flex items-center justify-center gap-2 text-sm font-medium text-corporate bg-corporate/5 hover:bg-corporate/10 px-4 py-2.5 rounded-xl transition-colors disabled:opacity-50 mb-4"
               >
                 <ArrowRightLeft className="w-4 h-4" />
                 Convertir en tarea
               </button>
             )}
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => { setIsEditorOpen(false); resetReminderEditor(); }}
+                disabled={isSavingReminder}
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 rounded-xl text-white bg-corporate hover:bg-corporate/90"
+                onClick={handleSaveReminder}
+                disabled={isSavingReminder}
+              >
+                {isSavingReminder ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Diálogo de conversión */}
       <Dialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>

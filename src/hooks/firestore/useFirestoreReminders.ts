@@ -12,6 +12,8 @@ import {
   updateDoc,
   doc,
   getDoc,
+  getDocs,
+  writeBatch,
   serverTimestamp,
   Timestamp,
   DocumentData,
@@ -319,6 +321,28 @@ export function useFirestoreReminders(userId: string | undefined) {
     }
   }, []);
 
+  const renameList = useCallback(async (oldName: string, newName: string): Promise<number> => {
+    try {
+      const trimmed = newName.trim();
+      if (!trimmed || trimmed === oldName) return 0;
+      const q = query(collection(db, COLLECTION_NAME), where('userId', '==', userId), where('list', '==', oldName));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return 0;
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((d) => {
+        batch.update(d.ref, {
+          list: trimmed,
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
+      return snapshot.docs.length;
+    } catch (err: any) {
+      console.error('Error al renombrar lista:', err);
+      throw err;
+    }
+  }, [userId]);
+
   return {
     reminders,
     loading,
@@ -329,5 +353,6 @@ export function useFirestoreReminders(userId: string | undefined) {
     archiveReminder,
     markReminderConverted,
     getReminderById,
+    renameList,
   };
 }

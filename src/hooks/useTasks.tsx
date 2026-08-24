@@ -107,6 +107,7 @@ export function TasksProvider({ children }: TasksProviderProps) {
         shiftIds: task.shiftIds || [],
         supportUserIds: task.supportUserIds || [],
         recurrence: task.recurrence || 'NONE',
+        photos: task.photos || [],
       });
     },
 

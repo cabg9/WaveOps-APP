@@ -1,9 +1,43 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (rediseño de Recordatorios: sidebar desktop, tarjetas expandibles, corrección de conversión a tareas)
+> Última actualización: 2026-08-23 (refinamiento de Recordatorios: fotos en tarjetas, paso de fotos a tareas, filtros desktop unificados, listas editables)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Refinamiento de Recordatorios (post-rediseño)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Editor como popup**: se reemplazó el editor a pantalla completa por un `<Dialog>` modal, más limpio y consistente con el resto de la app.
+- **Fotos en tarjetas**:
+  - La tarjeta de recordatorio muestra un icono de imagen cuando tiene foto y no está expandida.
+  - Al expandir la tarjeta se muestra una miniatura clickeable.
+  - Al tocar la miniatura se abre una vista maximizada de la foto.
+- **Subida de fotos estilo Tasks**: el componente `ReminderImageUpload` ahora muestra una miniatura cuadrada pequeña (80x80) con botón de eliminar y opción de cambiar, igual que las fotos de tareas.
+- **Paso de fotos al convertir en tarea**: al convertir un recordatorio en tarea extra, la foto del recordatorio se precarga como `photos` en el formulario de tarea y se guarda en Firestore.
+- **Filtros desktop unificados**: en la sidebar de escritorio todos los filtros de categoría usan el color corporativo; solo el icono de campana de **Urgente** se muestra en rojo, manteniendo la coherencia visual.
+- **Buscador móvil compacto**: el input de búsqueda se achicó y se eliminó el label "Vista" para que el toggle Tarjetas/Lista quepa en una sola fila en pantallas pequeñas.
+- **Listas editables y creables**:
+  - Botón "+ Nueva" en el header de la sección de listas.
+  - Botón de edición (lápiz) al pasar el mouse sobre cada lista para renombrarla; actualiza todos los recordatorios de esa lista vía `writeBatch`.
+  - Nuevo método `renameList` en `src/hooks/firestore/useFirestoreReminders.ts`.
+- **Claridad en asignación de tareas**: en el formulario de tarea extra se indica "Se asignará a ti" cuando no hay responsables seleccionados y se muestra el conteo de responsables elegidos.
+
+### Archivos modificados
+- `src/components/GlobalFAB.tsx`
+- `src/components/modules/TasksModule.tsx`
+- `src/hooks/firestore/useFirestoreReminders.ts`
+- `src/hooks/useTasks.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
