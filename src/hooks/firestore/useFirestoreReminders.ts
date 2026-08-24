@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   writeBatch,
+  deleteDoc,
   serverTimestamp,
   Timestamp,
   DocumentData,
@@ -86,12 +87,15 @@ function parseHistory(raw: any[]): ReminderHistoryEntry[] {
   }));
 }
 
+const LISTS_COLLECTION = 'reminderLists';
+
 export function useFirestoreReminders(userId: string | undefined) {
   const [reminders, setReminders] = useState<FirestoreReminder[]>([]);
+  const [lists, setLists] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Realtime listener
+  // Realtime listener de recordatorios
   useEffect(() => {
     if (!userId) {
       setReminders([]);
@@ -151,6 +155,22 @@ export function useFirestoreReminders(userId: string | undefined) {
       }
     );
 
+    return () => unsubscribe();
+  }, [userId]);
+
+  // Realtime listener de listas del usuario
+  useEffect(() => {
+    if (!userId) {
+      setLists([]);
+      return;
+    }
+    const q = query(collection(db, LISTS_COLLECTION), where('userId', '==', userId));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const userLists = snapshot.docs.map((d) => d.data().name).filter(Boolean) as string[];
+      setLists(userLists);
+    }, (err) => {
+      console.error('Error al escuchar listas:', err);
+    });
     return () => unsubscribe();
   }, [userId]);
 
@@ -321,19 +341,43 @@ export function useFirestoreReminders(userId: string | undefined) {
     }
   }, []);
 
+  const addList = useCallback(async (name: string): Promise<void> => {
+    try {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const q = query(collection(db, LISTS_COLLECTION), where('userId', '==', userId), where('name', '==', trimmed));
+      const existing = await getDocs(q);
+      if (!existing.empty) return;
+      await addDoc(collection(db, LISTS_COLLECTION), {
+        userId,
+        name: trimmed,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      console.error('Error al agregar lista:', err);
+      throw err;
+    }
+  }, [userId]);
+
   const renameList = useCallback(async (oldName: string, newName: string): Promise<number> => {
     try {
       const trimmed = newName.trim();
       if (!trimmed || trimmed === oldName) return 0;
+      // Actualizar recordatorios
       const q = query(collection(db, COLLECTION_NAME), where('userId', '==', userId), where('list', '==', oldName));
       const snapshot = await getDocs(q);
-      if (snapshot.empty) return 0;
       const batch = writeBatch(db);
       snapshot.docs.forEach((d) => {
         batch.update(d.ref, {
           list: trimmed,
           updatedAt: new Date().toISOString(),
         });
+      });
+      // Actualizar documento de lista
+      const listQ = query(collection(db, LISTS_COLLECTION), where('userId', '==', userId), where('name', '==', oldName));
+      const listSnap = await getDocs(listQ);
+      listSnap.docs.forEach((d) => {
+        batch.update(d.ref, { name: trimmed, updatedAt: new Date().toISOString() });
       });
       await batch.commit();
       return snapshot.docs.length;
@@ -343,8 +387,37 @@ export function useFirestoreReminders(userId: string | undefined) {
     }
   }, [userId]);
 
+  const deleteList = useCallback(async (name: string): Promise<number> => {
+    try {
+      const trimmed = name.trim();
+      if (!trimmed) return 0;
+      const batch = writeBatch(db);
+      // Mover recordatorios activos a General
+      const q = query(collection(db, COLLECTION_NAME), where('userId', '==', userId), where('list', '==', trimmed));
+      const snapshot = await getDocs(q);
+      snapshot.docs.forEach((d) => {
+        batch.update(d.ref, {
+          list: 'General',
+          updatedAt: new Date().toISOString(),
+        });
+      });
+      // Eliminar documento de lista
+      const listQ = query(collection(db, LISTS_COLLECTION), where('userId', '==', userId), where('name', '==', trimmed));
+      const listSnap = await getDocs(listQ);
+      listSnap.docs.forEach((d) => {
+        batch.delete(d.ref);
+      });
+      await batch.commit();
+      return snapshot.docs.length;
+    } catch (err: any) {
+      console.error('Error al eliminar lista:', err);
+      throw err;
+    }
+  }, [userId]);
+
   return {
     reminders,
+    lists,
     loading,
     error,
     createReminder,
@@ -352,6 +425,8 @@ export function useFirestoreReminders(userId: string | undefined) {
     toggleReminderItem,
     archiveReminder,
     markReminderConverted,
+    addList,
+    deleteList,
     getReminderById,
     renameList,
   };

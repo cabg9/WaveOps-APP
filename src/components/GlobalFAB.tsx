@@ -136,7 +136,7 @@ const CATEGORIES = [
   { id: 'completed', label: 'Terminados', icon: CheckSquare, color: 'bg-emerald-500', countKey: 'completed' },
 ] as const;
 
-const DEFAULT_LISTS = ['General', 'Proyectos', 'Seguimiento', 'Urgente'];
+const DEFAULT_LISTS = ['General', 'Proyectos', 'Seguimiento'];
 const LIST_COLORS: Record<string, string> = {
   General: 'bg-corporate',
   Proyectos: 'bg-amber-500',
@@ -260,7 +260,11 @@ function ReminderCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              if (total > 0) onToggleItem(reminder.items[0].id);
+              if (total === 0 || allCompleted) {
+                onArchive();
+              } else {
+                toast.info('Completa todos los pasos primero');
+              }
             }}
             className={cn('flex-shrink-0 transition-colors mt-0.5', allCompleted ? 'text-corporate' : 'text-[#C7C7CC]')}
           >
@@ -400,6 +404,23 @@ function ReminderCard({
             )}
           </div>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (total === 0 || allCompleted) {
+              onArchive();
+            } else {
+              toast.info('Completa todos los pasos primero');
+            }
+          }}
+          className={cn('flex-shrink-0 transition-colors mt-1', allCompleted ? 'text-corporate' : 'text-[#C7C7CC]')}
+        >
+          {total > 0 ? (
+            allCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />
+          ) : (
+            <Circle className="w-6 h-6" />
+          )}
+        </button>
       </div>
 
       {total > 0 && (
@@ -485,12 +506,15 @@ export function GlobalFAB() {
   const { user } = useAuth();
   const {
     reminders,
+    lists: userLists,
     createReminder,
     updateReminder,
     toggleReminderItem,
     archiveReminder,
     markReminderConverted,
     renameList,
+    addList,
+    deleteList,
   } = useFirestoreReminders(user?.id);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -503,7 +527,7 @@ export function GlobalFAB() {
   const [showRemindersPanel, setShowRemindersPanel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedListFilter, setSelectedListFilter] = useState<string>('all');
-  const [reminderView, setReminderView] = useState<'cards' | 'list'>('cards');
+  const [reminderView, setReminderView] = useState<'cards' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [editingReminder, setEditingReminder] = useState<FirestoreReminder | null>(null);
@@ -772,6 +796,9 @@ export function GlobalFAB() {
         await createReminder(data);
         toast.success('Recordatorio creado');
       }
+      if (data.list && data.list !== 'General') {
+        addList(data.list).catch(() => {});
+      }
       setIsEditorOpen(false);
       resetReminderEditor();
     } catch (err) {
@@ -828,10 +855,12 @@ export function GlobalFAB() {
   const activeReminders = reminders.filter((r) => r.status === 'active');
 
   const availableLists = useMemo(() => {
-    const existing = new Set(activeReminders.map((r) => r.list).filter(Boolean));
+    const existing = new Set<string>();
     DEFAULT_LISTS.forEach((l) => existing.add(l));
+    userLists.forEach((l) => existing.add(l));
+    activeReminders.map((r) => r.list).filter(Boolean).forEach((l) => existing.add(l as string));
     return Array.from(existing).sort();
-  }, [activeReminders]);
+  }, [activeReminders, userLists]);
 
   const counts = useMemo(() => {
     const today = todayISO();
@@ -845,32 +874,29 @@ export function GlobalFAB() {
     };
   }, [activeReminders, reminders]);
 
-  const filteredReminders = useMemo(() => {
-    let result = [...activeReminders];
-    switch (selectedCategory) {
-      case 'today':
-        result = result.filter((r) => r.hasDate && r.dueDate === todayISO());
-        break;
-      case 'scheduled':
-        result = result.filter((r) => r.hasDate);
-        break;
-      case 'flagged':
-        result = result.filter((r) => r.flagged);
-        break;
-      case 'urgent':
-        result = result.filter((r) => r.isUrgent);
-        break;
-      case 'completed':
-        result = reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed)));
-        break;
-    }
-    return result;
-  }, [activeReminders, reminders, selectedCategory]);
-
   const filteredDisplayReminders = useMemo(() => {
-    let result = [...filteredReminders];
+    let result = [...activeReminders];
+    // Filtros y listas son mutuamente excluyentes
     if (selectedListFilter !== 'all') {
       result = result.filter((r) => r.list === selectedListFilter);
+    } else if (selectedCategory !== 'all') {
+      switch (selectedCategory) {
+        case 'today':
+          result = result.filter((r) => r.hasDate && r.dueDate === todayISO());
+          break;
+        case 'scheduled':
+          result = result.filter((r) => r.hasDate);
+          break;
+        case 'flagged':
+          result = result.filter((r) => r.flagged);
+          break;
+        case 'urgent':
+          result = result.filter((r) => r.isUrgent);
+          break;
+        case 'completed':
+          result = reminders.filter((r) => r.status === 'converted' || (r.items.length > 0 && r.items.every((i) => i.completed)));
+          break;
+      }
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -883,7 +909,7 @@ export function GlobalFAB() {
       );
     }
     return result;
-  }, [filteredReminders, selectedListFilter, searchQuery]);
+  }, [activeReminders, reminders, selectedCategory, selectedListFilter, searchQuery]);
 
   const actions: FabAction[] = [
     {
@@ -1125,7 +1151,10 @@ export function GlobalFAB() {
                     return (
                       <button
                         key={cat.id}
-                        onClick={() => setSelectedCategory(cat.id)}
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setSelectedListFilter('all');
+                        }}
                         className={cn(
                           'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
                           active
@@ -1153,7 +1182,10 @@ export function GlobalFAB() {
                   return (
                     <button
                       key={cat.id}
-                      onClick={() => setSelectedCategory(cat.id)}
+                      onClick={() => {
+                        setSelectedCategory(cat.id);
+                        setSelectedListFilter('all');
+                      }}
                       className={cn(
                         'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
                         active
@@ -1179,7 +1211,7 @@ export function GlobalFAB() {
                     <Input
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Buscar..."
+                      placeholder=""
                       className="pl-9 rounded-xl border-[#E5E5E7] text-sm"
                     />
                   </div>
@@ -1215,7 +1247,12 @@ export function GlobalFAB() {
                   <button
                     onClick={() => {
                       const name = window.prompt('Nombre de la nueva lista');
-                      if (name?.trim()) setSelectedListFilter(name.trim());
+                      if (name?.trim()) {
+                        const trimmed = name.trim();
+                        setSelectedListFilter(trimmed);
+                        setSelectedCategory('all');
+                        addList(trimmed).catch(() => {});
+                      }
                     }}
                     className="text-xs text-corporate hover:text-corporate/80 font-medium"
                   >
@@ -1224,7 +1261,10 @@ export function GlobalFAB() {
                 </div>
                 <div className="space-y-1">
                   <button
-                    onClick={() => setSelectedListFilter('all')}
+                    onClick={() => {
+                      setSelectedListFilter('all');
+                      setSelectedCategory('all');
+                    }}
                     className={cn(
                       'flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm transition-colors',
                       selectedListFilter === 'all' ? 'bg-corporate/10 text-corporate font-medium' : 'text-[#1D1D1F] hover:bg-[#F5F5F7]'
@@ -1242,7 +1282,10 @@ export function GlobalFAB() {
                       )}
                     >
                       <button
-                        onClick={() => setSelectedListFilter(listName)}
+                        onClick={() => {
+                          setSelectedListFilter(listName);
+                          setSelectedCategory('all');
+                        }}
                         className="flex items-center gap-2 flex-1 text-left"
                       >
                         <div className={cn('w-2 h-2 rounded-full', LIST_COLORS[listName] || 'bg-slate-400')} />
@@ -1266,6 +1309,25 @@ export function GlobalFAB() {
                       >
                         <Pencil className="w-3 h-3" />
                       </button>
+                      {!DEFAULT_LISTS.includes(listName) && (
+                        <button
+                          onClick={() => {
+                            if (window.confirm(`¿Eliminar la lista "${listName}"? Los recordatorios se moverán a General.`)) {
+                              deleteList(listName).then((count) => {
+                                toast.success(`Lista eliminada (${count} recordatorios movidos)`);
+                                if (selectedListFilter === listName) {
+                                  setSelectedListFilter('all');
+                                  setSelectedCategory('all');
+                                }
+                              }).catch(() => toast.error('No se pudo eliminar la lista'));
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-[#86868B] hover:text-red-500 hover:bg-red-500/5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Eliminar lista"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1277,7 +1339,10 @@ export function GlobalFAB() {
               {/* Mobile: filtros de lista */}
               <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-3 scrollbar-hide">
                 <button
-                  onClick={() => setSelectedListFilter('all')}
+                  onClick={() => {
+                    setSelectedListFilter('all');
+                    setSelectedCategory('all');
+                  }}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
                     selectedListFilter === 'all'
@@ -1290,7 +1355,10 @@ export function GlobalFAB() {
                 {availableLists.map((listName) => (
                   <button
                     key={listName}
-                    onClick={() => setSelectedListFilter(listName)}
+                    onClick={() => {
+                      setSelectedListFilter(listName);
+                      setSelectedCategory('all');
+                    }}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
                       selectedListFilter === listName
@@ -1358,6 +1426,7 @@ export function GlobalFAB() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Título"
+                autoFocus={!editingReminder}
                 className="border-0 rounded-none text-[#1D1D1F] font-medium placeholder:text-[#C7C7CC] focus-visible:ring-0 h-11"
               />
               <div className="h-px bg-[#E5E5E7]" />
@@ -1442,7 +1511,11 @@ export function GlobalFAB() {
                     type="button"
                     onClick={() => {
                       const name = window.prompt('Nombre de la nueva lista');
-                      if (name?.trim()) setList(name.trim());
+                      if (name?.trim()) {
+                        const trimmed = name.trim();
+                        setList(trimmed);
+                        addList(trimmed).catch(() => {});
+                      }
                     }}
                     className="px-2.5 py-1 rounded-full text-xs font-medium border border-dashed border-[#C7C7CC] text-[#86868B] hover:border-corporate hover:text-corporate transition-colors"
                   >
@@ -1559,7 +1632,6 @@ export function GlobalFAB() {
                       onChange={(e) => handleUpdateItemText(item.id, e.target.value)}
                       placeholder={`Paso ${index + 1}`}
                       className="flex-1 border-0 rounded-none focus-visible:ring-0 text-sm px-0"
-                      autoFocus={index === items.length - 1 && item.text === ''}
                     />
                     <button
                       type="button"

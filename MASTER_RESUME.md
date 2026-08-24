@@ -1,9 +1,45 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (refinamiento de Recordatorios: fotos en tarjetas, paso de fotos a tareas, filtros desktop unificados, listas editables)
+> Última actualización: 2026-08-23 (correcciones de Recordatorios: filtros/listas excluyentes, vista lista por defecto, check de tarjetas, persistencia de listas)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Correcciones de Recordatorios
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Filtros y listas mutuamente excluyentes**:
+  - Los filtros de categoría (Hoy, Programados, Todos, etc.) filtran entre **todos** los recordatorios, sin importar la lista.
+  - Las listas muestran **todo** el contenido de la lista seleccionada, sin importar la categoría.
+  - Al seleccionar un filtro se resetea la lista a "Todas" y viceversa.
+- **Vista por defecto**: el toggle Tarjetas/Lista ahora inicia en **Lista**.
+- **Botón check de tarjetas**:
+  - El círculo de check principal ahora archiva el recordatorio cuando no hay pasos o todos los pasos están completos.
+  - Si aún faltan pasos, muestra un mensaje informativo: "Completa todos los pasos primero".
+- **Subtasks completados al convertir**: los pasos marcados como completados en el recordatorio se pasan a la tarea ya marcados como completados.
+- **Cursor al crear**: al abrir el editor para un nuevo recordatorio, el foco va directo al campo **Título** en lugar del último paso.
+- **Buscador desktop**: el input de búsqueda ya no muestra texto de placeholder; solo se ve el icono de lupa.
+- **Listas por defecto**: las listas iniciales ahora son **General**, **Proyectos** y **Seguimiento** (se quitó **Urgente**).
+- **Persistencia de listas**:
+  - Nueva colección `reminderLists` para guardar las listas creadas por cada usuario.
+  - Las listas creadas aparecen inmediatamente, aunque aún no tengan recordatorios.
+  - Las listas son editables (renombrar) y eliminables; al eliminar, los recordatorios de esa lista se mueven a **General**.
+  - Los métodos `addList`, `renameList` y `deleteList` se agregaron a `useFirestoreReminders`.
+- **Privacidad de recordatorios**: cada usuario solo ve sus propios recordatorios; el listener filtra por `userId`, por lo que son personales.
+
+### Archivos modificados
+- `src/components/GlobalFAB.tsx`
+- `src/hooks/firestore/useFirestoreReminders.ts`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
