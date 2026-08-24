@@ -23,14 +23,15 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 
 ### Cambios realizados
 - **Navegación móvil de Tasks**:
-  - Los selects de pestaña, periodo y estado vuelven a mostrarse en una sola fila en móvil.
-  - Cada dropdown ocupa `flex-1` para distribuirse equitativamente sin generar scroll horizontal.
+  - Los selects de pestaña, periodo y estado se muestran en una sola fila en móvil.
+  - Cada dropdown ajusta su ancho al texto (`flex-initial`) pero puede encogerse si es necesario para no generar scroll horizontal.
   - Triggers más compactos en móvil (`h-9`, `px-2`) y normales en tablet/desktop (`h-10`, `px-3`).
   - Textos largos truncados dentro de cada dropdown.
 - **Tarjetas de tareas**:
   - Mayor altura en móvil (`py-5`) para distribuir mejor los componentes.
   - Descripción ahora crece hacia abajo: `line-clamp-4` en móvil y `line-clamp-2` en desktop, con `break-words` para evitar desbordamiento lateral.
   - Badges reducidos en móvil (`text-[10px]`, padding compacto) y tamaño normal en desktop.
+  - Badge "ATRASADA" aún más reducido en móvil (`text-[9px]`, sin padding).
   - Metadatos mantienen `flex-wrap` y `min-w-0` para no forzar ancho.
 - No se modificó lógica de estados, filtros ni Firebase.
 
