@@ -605,101 +605,107 @@ export default function TasksModule() {
           </div>
         </div>
 
-        {/* MÓVIL: tres dropdowns en una sola fila */}
-        <div className="lg:hidden flex items-center gap-2">
-          <Select value={mainTab} onValueChange={(v) => {
-            const tab = v as MainTab;
-            setMainTab(tab);
-            if (tab === 'all') { setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }
-            else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
-            else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
-          }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-              <SelectValue placeholder="Vista" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="my-tasks">Mis Tareas</SelectItem>
-              <SelectItem value="my-department">Mi Depto</SelectItem>
-              {(hasPermission('canViewAllDepartments') || visibleTaskDeptTreeOptions.length > 1) && (
-                <SelectItem value="all">Todas</SelectItem>
-              )}
-              <SelectItem value="incidencias">Incidencias</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* MÓVIL: tres dropdowns responsivos */}
+        <div className="lg:hidden flex flex-wrap items-center gap-2 w-full max-w-full overflow-hidden">
+          <div className="w-full sm:w-fit min-w-0">
+            <Select value={mainTab} onValueChange={(v) => {
+              const tab = v as MainTab;
+              setMainTab(tab);
+              if (tab === 'all') { setTimeFilter(TimeFilter.TODAY); setStatusFilter('all'); }
+              else if (tab === 'incidencias') { setTimeFilter(TimeFilter.TODAY); setStatusFilter(IncidenciaStatus.NEW); }
+              else { setTimeFilter(TimeFilter.TODAY); setStatusFilter(TaskStatus.PENDING); }
+            }}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
+                <SelectValue placeholder="Vista" className="truncate" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="my-tasks">Mis Tareas</SelectItem>
+                <SelectItem value="my-department">Mi Depto</SelectItem>
+                {(hasPermission('canViewAllDepartments') || visibleTaskDeptTreeOptions.length > 1) && (
+                  <SelectItem value="all">Todas</SelectItem>
+                )}
+                <SelectItem value="incidencias">Incidencias</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select value={timeFilter} onValueChange={(v) => {
-            const tf = v as TimeFilter;
-            setTimeFilter(tf);
-            if (isIncidenciasTab) {
-              if (tf === TimeFilter.TODAY) setStatusFilter(IncidenciaStatus.NEW); else setStatusFilter('all');
-            } else {
-              if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
-            }
-          }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-              <SelectValue placeholder="Periodo" />
-            </SelectTrigger>
-            <SelectContent>
-              {!isIncidenciasTab ? (
-                <>
-                  <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
-                  <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
-                  <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
-                  <SelectItem value={TimeFilter.TOMORROW}>Mañana</SelectItem>
-                  <SelectItem value={TimeFilter.UPCOMING}>Próximas</SelectItem>
-                </>
-              ) : (
-                <>
-                  <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
-                  <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
-                  <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
+          <div className="w-full sm:w-fit min-w-0">
+            <Select value={timeFilter} onValueChange={(v) => {
+              const tf = v as TimeFilter;
+              setTimeFilter(tf);
+              if (isIncidenciasTab) {
+                if (tf === TimeFilter.TODAY) setStatusFilter(IncidenciaStatus.NEW); else setStatusFilter('all');
+              } else {
+                if (tf === TimeFilter.TODAY || tf === TimeFilter.TOMORROW) setStatusFilter(TaskStatus.PENDING); else setStatusFilter('all');
+              }
+            }}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
+                <SelectValue placeholder="Periodo" className="truncate" />
+              </SelectTrigger>
+              <SelectContent>
+                {!isIncidenciasTab ? (
+                  <>
+                    <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
+                    <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
+                    <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
+                    <SelectItem value={TimeFilter.TOMORROW}>Mañana</SelectItem>
+                    <SelectItem value={TimeFilter.UPCOMING}>Próximas</SelectItem>
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value={TimeFilter.PAST_WEEKS}>Anteriores</SelectItem>
+                    <SelectItem value={TimeFilter.YESTERDAY}>Ayer</SelectItem>
+                    <SelectItem value={TimeFilter.TODAY}>Hoy</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
 
-          <Select value={String(statusFilter)} onValueChange={(v) => {
-            if (!isIncidenciasTab) {
-              if (v === 'all') setStatusFilter('all');
-              else setStatusFilter(v as TaskStatus);
-            } else {
-              if (v === 'all') setStatusFilter('all');
-              else setStatusFilter(v as IncidenciaStatus);
-            }
-          }}>
-            <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-fit min-w-0">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {!isIncidenciasTab ? (
-                <>
-                  <SelectItem value="all">Todas ({filteredTaskCounts.total})</SelectItem>
-                  <SelectItem value={TaskStatus.PENDING}>Pendientes ({filteredTaskCounts.pending})</SelectItem>
-                  <SelectItem value={TaskStatus.IN_PROGRESS}>En Progreso ({filteredTaskCounts.inProgress})</SelectItem>
-                  {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                    <>
-                      <SelectItem value={TaskStatus.COMPLETED}>Completadas ({filteredTaskCounts.completed})</SelectItem>
-                      <SelectItem value={TaskStatus.VERIFIED}>Verificadas ({filteredTaskCounts.verified})</SelectItem>
-                    </>
-                  )}
-                  <SelectItem value={TaskStatus.BLOCKED}>Bloqueadas ({filteredTaskCounts.blocked})</SelectItem>
-                  {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
-                    <SelectItem value={TaskStatus.OVERDUE}>Atrasadas ({filteredTaskCounts.overdue})</SelectItem>
-                  )}
-                </>
-              ) : (
-                <>
-                  <SelectItem value="all">Todas ({incidenciaCounts.total})</SelectItem>
-                  {timeFilter === TimeFilter.TODAY && <SelectItem value={IncidenciaStatus.NEW}>Nuevas ({incidenciaCounts.new})</SelectItem>}
-                  <SelectItem value={IncidenciaStatus.OPEN}>Visualizadas ({incidenciaCounts.open})</SelectItem>
-                  <SelectItem value={IncidenciaStatus.VERIFIED}>Verificadas ({incidenciaCounts.verified})</SelectItem>
-                  <SelectItem value={IncidenciaStatus.RESOLVED}>Resueltas ({incidenciaCounts.resolved})</SelectItem>
-                  <SelectItem value={IncidenciaStatus.CLOSED}>Cerradas ({incidenciaCounts.closed})</SelectItem>
-                  <SelectItem value={IncidenciaStatus.REOPENED}>Reabiertas ({incidenciaCounts.reopened})</SelectItem>
-                </>
-              )}
-            </SelectContent>
-          </Select>
+          <div className="w-full sm:w-fit min-w-0">
+            <Select value={String(statusFilter)} onValueChange={(v) => {
+              if (!isIncidenciasTab) {
+                if (v === 'all') setStatusFilter('all');
+                else setStatusFilter(v as TaskStatus);
+              } else {
+                if (v === 'all') setStatusFilter('all');
+                else setStatusFilter(v as IncidenciaStatus);
+              }
+            }}>
+              <SelectTrigger className="h-10 px-3 bg-white border-[#E5E5E7] rounded-xl hover:bg-[#F5F5F7] transition-colors text-[#86868B] w-full sm:w-fit min-w-0 max-w-full sm:max-w-[140px]">
+                <SelectValue placeholder="Estado" className="truncate" />
+              </SelectTrigger>
+              <SelectContent>
+                {!isIncidenciasTab ? (
+                  <>
+                    <SelectItem value="all">Todas ({filteredTaskCounts.total})</SelectItem>
+                    <SelectItem value={TaskStatus.PENDING}>Pendientes ({filteredTaskCounts.pending})</SelectItem>
+                    <SelectItem value={TaskStatus.IN_PROGRESS}>En Progreso ({filteredTaskCounts.inProgress})</SelectItem>
+                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                      <>
+                        <SelectItem value={TaskStatus.COMPLETED}>Completadas ({filteredTaskCounts.completed})</SelectItem>
+                        <SelectItem value={TaskStatus.VERIFIED}>Verificadas ({filteredTaskCounts.verified})</SelectItem>
+                      </>
+                    )}
+                    <SelectItem value={TaskStatus.BLOCKED}>Bloqueadas ({filteredTaskCounts.blocked})</SelectItem>
+                    {timeFilter !== TimeFilter.TOMORROW && timeFilter !== TimeFilter.UPCOMING && (
+                      <SelectItem value={TaskStatus.OVERDUE}>Atrasadas ({filteredTaskCounts.overdue})</SelectItem>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <SelectItem value="all">Todas ({incidenciaCounts.total})</SelectItem>
+                    {timeFilter === TimeFilter.TODAY && <SelectItem value={IncidenciaStatus.NEW}>Nuevas ({incidenciaCounts.new})</SelectItem>}
+                    <SelectItem value={IncidenciaStatus.OPEN}>Visualizadas ({incidenciaCounts.open})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.VERIFIED}>Verificadas ({incidenciaCounts.verified})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.RESOLVED}>Resueltas ({incidenciaCounts.resolved})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.CLOSED}>Cerradas ({incidenciaCounts.closed})</SelectItem>
+                    <SelectItem value={IncidenciaStatus.REOPENED}>Reabiertas ({incidenciaCounts.reopened})</SelectItem>
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* DESKTOP: tres filas */}
@@ -865,7 +871,7 @@ export default function TasksModule() {
               <p className="text-[#86868B]">{isIncidenciasTab ? 'No hay incidencias' : 'No hay tareas'}</p>
             </div>
           ) : (
-            <div className={cn('space-y-3 min-w-0', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-hidden' : '')}>
+            <div className={cn('space-y-3 min-w-0 max-w-full', viewType === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 gap-3 overflow-hidden' : '')}>
               {displayItems.map((item) => isIncidenciasTab ? (
                 <IncidenciaCard key={item.id} incidencia={item as Incidencia} currentUserId={user?.id} currentUser={user} onConfirmIncidencia={confirmIncidencia} onResolveIncidencia={resolveIncidencia} onCloseIncidencia={closeIncidencia} onReopenIncidencia={reopenIncidencia} onAddNote={addIncidenciaNote} onAddPhoto={addIncidenciaPhoto} onAddViewer={addIncidenciaViewer} />
               ) : (
@@ -1435,7 +1441,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
   };
 
   return (
-    <div className={cn('bg-white rounded-xl border overflow-hidden transition-all', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', task.status === TaskStatus.COMPLETED && currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId))) && 'border-[#5856D6]', expanded && 'shadow-lg')}>
+    <div className={cn('bg-white rounded-xl border overflow-hidden transition-all max-w-full', task.type === 'EXTRA' ? 'border-amber-300' : 'border-[#E5E5E7]', task.status === TaskStatus.COMPLETED && currentUserId && ((task.supervisorId === currentUserId) || (!task.supervisorId && (task.createdBy === currentUserId))) && 'border-[#5856D6]', expanded && 'shadow-lg')}>
       <button onClick={() => setExpanded(!expanded)} className="w-full p-4 flex items-start gap-3 text-left">
         <div className="flex flex-col items-center gap-1 flex-shrink-0">
           <div className="relative"><div className="w-3 h-3 rounded-full" style={{ backgroundColor: statusColor }} />{task.status === TaskStatus.VERIFIED && (<div className="absolute -top-1 -right-1 w-2 h-2 bg-[#34C759] rounded-full border border-white" title="Verificada" />)}</div>
@@ -1445,13 +1451,13 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 min-w-0">
             <h4 className="font-medium text-[#1D1D1F] truncate min-w-0 flex-1">{task.title}</h4>
-            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[50%]">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse">Por verificar: <span className="truncate max-w-[80px] sm:max-w-[120px] inline-block align-bottom">{supervisorName}</span></Badge>)}
+            <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end max-w-[50%] min-w-0">{task.status === TaskStatus.COMPLETED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6] animate-pulse max-w-full">Por verificar: <span className="truncate max-w-[60px] sm:max-w-[120px] inline-block align-bottom">{supervisorName}</span></Badge>)}
             {task.status === TaskStatus.VERIFIED && (<Badge variant="outline" className="text-xs border-[#5856D6] text-[#5856D6]">Verificada</Badge>)}
             {task.rating === 'bad' && task.ratingNote && canSeeRating && (<Badge variant="outline" className="text-xs border-[#FF3B30] text-[#FF3B30]"><ThumbsDown className="w-3 h-3 inline" /></Badge>)}
             <Badge style={{ borderColor: priorityColor, color: priorityColor, backgroundColor: 'transparent' }} className="text-xs">{getPriorityLabel(task.priority)}</Badge></div>
           </div>
-          <p className="text-sm text-[#86868B] mt-1 line-clamp-3">{task.description}</p>
-          <div className="flex items-center gap-4 mt-3 flex-wrap">
+          <p className="text-sm text-[#86868B] mt-1 line-clamp-2 break-words">{task.description}</p>
+          <div className="flex items-center gap-4 mt-3 flex-wrap min-w-0">
             <div className="flex -space-x-2 min-w-0">
               {(task.assignedTo || []).slice(0, 5).map((userId, i) => {
                 const assignedUser = allUsers.find((u) => u.id === userId || u.email === userId);
@@ -1469,8 +1475,8 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
               <div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><Calendar className="w-3.5 h-3.5 shrink-0" /><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{formatDateWithYear(task.dueDate)}</span><span>•</span><span className={isOverdue ? 'text-[#FF3B30] font-medium' : ''}>{task.dueTime || '23:59'}</span>{isOverdue && (<Badge variant="outline" className="text-[10px] border-[#FF3B30] text-[#FF3B30] ml-1 animate-pulse shrink-0">ATRASADA</Badge>)}</div>
               );
             })()}
-            {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
-            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B]"><Camera className="w-3.5 h-3.5" /><span>{task.photos ? task.photos.length : 0}</span></div>)}
+            {task.subtasks?.length > 0 && (<div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><CheckCircle2 className="w-3.5 h-3.5" /><span>{task.subtasks.filter((s) => s.completed).length}/{task.subtasks.length}</span></div>)}
+            {task.requiresPhoto && (<div className="flex items-center gap-1 text-xs text-[#86868B] min-w-0"><Camera className="w-3.5 h-3.5" /><span>{task.photos ? task.photos.length : 0}</span></div>)}
             {task.status === TaskStatus.COMPLETED && (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium min-w-0"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" /><span className="truncate max-w-[120px] sm:max-w-[200px]">Por verificar: {supervisorName}</span></div>)}
             {task.status === TaskStatus.VERIFIED && (() => { const vEntry = task.history?.find((h) => h.action?.includes('VERIFIED')); const verifier = vEntry ? getUserName(vEntry.performedBy) : '—'; return (<div className="flex items-center gap-1 text-xs text-[#5856D6] font-medium min-w-0"><CheckCircle2 className="w-3.5 h-3.5 shrink-0" /><span className="truncate max-w-[120px] sm:max-w-[200px]">Verificada por: {verifier}</span></div>); })()}
           </div>
@@ -1502,7 +1508,7 @@ function TaskCard({ task, onStatusChange, onComplete, onReopen, onAddNote, canRe
             {assignees.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Asignados:</span> <span className="text-[#1D1D1F] font-medium">{assignees.join(', ')}</span></div>)}
             {task.supportUserIds && task.supportUserIds.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Apoyo:</span> <span className="text-[#1D1D1F] font-medium">{task.supportUserIds.map((id) => getUserName(id)).join(', ')}</span></div>)}
             {assignedShifts.length > 0 && (<div className="text-sm"><span className="text-[#86868B]">Turnos:</span> <span className="text-[#1D1D1F]">{assignedShifts.map((s) => `${s?.name} (${s?.startTime}-${s?.endTime})`).join(', ')}</span></div>)}
-            <div className="bg-[#F5F5F7] rounded-lg p-3"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-base text-[#1D1D1F] whitespace-pre-wrap break-words leading-relaxed">{task.description || 'Sin descripción'}</p></div>
+            <div className="bg-[#F5F5F7] rounded-lg p-3 max-w-full"><h5 className="text-sm font-medium text-[#1D1D1F] mb-2">Descripción</h5><p className="text-base text-[#1D1D1F] whitespace-pre-wrap break-words leading-relaxed max-w-full">{task.description || 'Sin descripción'}</p></div>
             {localSubtasks && localSubtasks.length > 0 && (<div className="space-y-2"><h5 className="text-sm font-medium text-[#1D1D1F]">Subtareas</h5><div className="space-y-1">{localSubtasks.map((subtask) => (<div key={subtask.id} className="flex items-center gap-2 cursor-pointer hover:bg-slate-50 p-1 rounded" onClick={() => toggleSubtask(subtask.id)}><div className={cn('w-4 h-4 rounded border flex items-center justify-center', subtask.completed ? 'bg-[#34C759] border-[#34C759]' : 'border-[#C7C7CC]')}>{subtask.completed && <CheckCircle2 className="w-3 h-3 text-white" />}</div><span className={cn('text-sm', subtask.completed ? 'text-[#86868B] line-through' : 'text-[#1D1D1F]')}>{subtask.title}</span></div>))}</div></div>)}
             <div className="space-y-2">
               <div className="flex items-center justify-between">

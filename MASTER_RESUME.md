@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Fix scroll horizontal en Tasks móvil)
+> Última actualización: 2026-08-24 (Fix scroll horizontal Tasks móvil - navegación y tarjetas)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,32 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Fix scroll horizontal Tasks móvil — navegación y tarjetas (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Navegación móvil de Tasks**:
+  - Los selects de pestaña, periodo y estado ahora se apilan en pantallas pequeñas (`< sm`) y ocupan el ancho completo.
+  - En pantallas `sm` y mayores vuelven a estar en línea.
+  - Se limitó el ancho máximo de los triggers y se truncan los textos largos.
+- **Tarjetas de tareas**:
+  - Contenedor principal con `max-w-full`.
+  - Badges del encabezado con `min-w-0` y truncamiento del supervisor.
+  - Descripción colapsada con `line-clamp-2` y `break-words`.
+  - Fila de metadatos con `min-w-0` y contenedor del grid/listado con `max-w-full`.
+- No se modificó lógica de estados, filtros ni Firebase.
+
+### Archivos modificados
+- `src/components/modules/TasksModule.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
