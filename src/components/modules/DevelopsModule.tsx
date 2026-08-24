@@ -10,7 +10,7 @@ import {
   ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
   LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
-  Briefcase,
+  Briefcase, User, Upload, List,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -103,15 +103,82 @@ function StatCard({ title, value, icon: Icon, color }: { title: string; value: s
 // PESTANA: General — Feature Flags funcionales
 // ═══════════════════════════════════════════════════════════════════
 
+const FEATURE_FLAG_META: Record<string, { name: string; on: string; off: string }> = {
+  enableTasks: {
+    name: 'Modulo de tareas',
+    on: 'El modulo Tasks esta visible para los usuarios que tengan permiso.',
+    off: 'El modulo Tasks esta oculto; nadie podra acceder a el.',
+  },
+  enableHorarios: {
+    name: 'Modulo de horarios',
+    on: 'El modulo Horarios esta visible y se pueden asignar turnos.',
+    off: 'El modulo Horarios esta oculto; no se podra consultar ni editar la programacion.',
+  },
+  enableTaskPhotos: {
+    name: 'Fotos en tareas',
+    on: 'Los usuarios podran adjuntar fotos como evidencia al completar tareas.',
+    off: 'No se permitira adjuntar fotos en las tareas.',
+  },
+  enableTaskSubtasks: {
+    name: 'Subtareas',
+    on: 'Las tareas podran contener pasos o subtareas obligatorias.',
+    off: 'Las tareas no mostraran subtareas.',
+  },
+  enableTaskRating: {
+    name: 'Calificacion de tareas',
+    on: 'Si activas esto, los supervisores podran calificar la calidad de las tareas completadas.',
+    off: 'Si lo desactivas, nadie podra calificar las tareas y la columna de calificacion desaparecera.',
+  },
+  enableShiftDraft: {
+    name: 'Borradores de horarios',
+    on: 'Los gestores podran guardar horarios como borrador antes de publicarlos.',
+    off: 'Los cambios en horarios se aplicaran de inmediato sin etapa de borrador.',
+  },
+  enableIncapacidades: {
+    name: 'Incapacidades',
+    on: 'Se activa el registro y seguimiento de incapacidades del personal.',
+    off: 'El modulo de incapacidades queda oculto.',
+  },
+  enableIncidencias: {
+    name: 'Incidencias',
+    on: 'Se activa el modulo de incidencias para reportar y resolver problemas operativos.',
+    off: 'El modulo de incidencias queda oculto.',
+  },
+  enableBetaFeatures: {
+    name: 'Funciones beta',
+    on: 'Se muestran funciones experimentales en desarrollo (pueden ser inestables).',
+    off: 'Solo se muestran las funciones probadas y estables.',
+  },
+  enableNewDashboard: {
+    name: 'Nuevo Dashboard',
+    on: 'Los usuarios veran el nuevo diseno del Dashboard.',
+    off: 'Se conserva el Dashboard anterior mientras se completa la transicion.',
+  },
+};
+
 function GeneralTab() {
   const { settings } = useAppConfig();
   const { logAction } = useAudit();
   const [saving, setSaving] = useState<string | null>(null);
   const [branding, setBranding] = useState(settings.branding);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState(settings.branding.logoUrl);
 
   useEffect(() => {
     setBranding(settings.branding);
+    setLogoPreview(settings.branding.logoUrl);
+    setLogoFile(null);
   }, [settings.branding]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLogoFile(file);
+    const url = URL.createObjectURL(file);
+    setLogoPreview(url);
+    // Nota: en produccion este archivo debe subirse a Firebase Storage y guardar la URL publica.
+    setBranding((prev) => ({ ...prev, logoUrl: url }));
+  };
 
   const toggleFlag = async (key: string, currentValue: boolean) => {
     setSaving(key);
@@ -122,14 +189,14 @@ function GeneralTab() {
         updatedAt: new Date().toISOString(),
       });
       await logAction({
-        action: 'FEATURE_ENABLED',
+        action: currentValue ? 'FEATURE_DISABLED' : 'FEATURE_ENABLED',
         targetType: 'feature_flag',
         targetId: key,
-        targetName: key,
+        targetName: FEATURE_FLAG_META[key]?.name || key,
         previousValue: { [key]: currentValue },
         newValue: { [key]: !currentValue },
         impactLevel: 'major',
-        description: `Feature flag "${key}" cambiado a ${!currentValue}`,
+        description: `Feature flag "${FEATURE_FLAG_META[key]?.name || key}" cambiado a ${!currentValue}`,
       });
     } catch (err) {
       console.error('Error toggling flag:', err);
@@ -162,24 +229,14 @@ function GeneralTab() {
     }
   };
 
-  const flagDescription = (key: string): string => {
-    const map: Record<string, string> = {
-      enableTasks: 'Activa el modulo Tasks para todos los usuarios con permiso.',
-      enableHorarios: 'Activa el modulo Horarios para todos los usuarios con permiso.',
-      enableTaskPhotos: 'Permite adjuntar fotos a las tareas.',
-      enableTaskSubtasks: 'Permite agregar pasos o sub-tareas dentro de las tareas.',
-      enableTaskRating: 'Permite calificar la calidad de las tareas completadas.',
-      enableShiftDraft: 'Permite guardar horarios como borrador antes de publicar.',
-      enableIncapacidades: 'Activa el registro y gestion de incapacidades.',
-      enableIncidencias: 'Activa el modulo de incidencias y reportes.',
-      enableBetaFeatures: 'Habilita funciones experimentales en desarrollo.',
-      enableNewDashboard: 'Muestra el nuevo diseno del Dashboard.',
-    };
-    return map[key] || 'Funcionalidad controlada por feature flag.';
-  };
-
   return (
     <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <p className="text-sm text-[#1D1D1F] leading-relaxed">
+          En esta pestana configuras la identidad visual de la aplicacion y los interruptores (feature flags) que activan o desactivan funcionalidades. Los cambios se reflejan de inmediato en toda la plataforma, asi que verifica el impacto antes de guardar.
+        </p>
+      </div>
+
       {/* Branding */}
       <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <div className="flex items-center gap-2 mb-4">
@@ -189,22 +246,36 @@ function GeneralTab() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre de la app</label>
-            <input value={branding.appName} onChange={(e) => setBranding({ ...branding, appName: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+            <input value={branding.appName} disabled className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-[#F5F5F7] text-sm text-[#86868B] cursor-not-allowed" />
+            <p className="text-[11px] text-[#86868B] mt-1">El nombre de la aplicacion es fijo y no se puede modificar.</p>
           </div>
           <div>
             <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre de la empresa</label>
             <input value={branding.companyName} onChange={(e) => setBranding({ ...branding, companyName: e.target.value })} className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#86868B] mb-1">Color principal</label>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Color principal de marca</label>
             <div className="flex items-center gap-2">
               <input type="color" value={branding.primaryColor} onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })} className="h-9 w-9 rounded border border-[#E5E5E7] p-0.5" />
               <span className="text-sm text-[#86868B]">{branding.primaryColor}</span>
             </div>
+            <p className="text-[11px] text-[#86868B] mt-1">Este color representa la marca de la empresa a la que se le presta el servicio y se usa en botones, iconos y acentos.</p>
           </div>
           <div>
-            <label className="block text-xs font-medium text-[#86868B] mb-1">URL del logo</label>
-            <input value={branding.logoUrl} onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })} placeholder="https://..." className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Logo de la empresa</label>
+            <div className="flex items-center gap-3">
+              {(logoPreview || branding.logoUrl) && (
+                <img src={logoPreview || branding.logoUrl} alt="Logo preview" className="h-10 w-10 object-contain rounded-lg border border-[#E5E5E7]" />
+              )}
+              <label className="flex items-center gap-2 px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm text-[#1D1D1F] hover:bg-[#F5F5F7] cursor-pointer transition-colors">
+                <Upload className="w-4 h-4 text-[#86868B]" />
+                <span>{logoFile ? logoFile.name : 'Cargar logo'}</span>
+                <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+              </label>
+            </div>
+            <p className="text-[11px] text-[#86868B] mt-1">
+              Selecciona una imagen desde tu dispositivo. En produccion el archivo debe subirse a Firebase Storage; por ahora se muestra solo la vista previa local.
+            </p>
           </div>
         </div>
         <div className="flex justify-end mt-4">
@@ -224,29 +295,32 @@ function GeneralTab() {
           {Object.entries(settings.featureFlags).length === 0 ? (
             <p className="text-sm text-[#86868B]">No hay feature flags configurados</p>
           ) : (
-            Object.entries(settings.featureFlags).map(([key, value]) => (
-              <div key={key} className="flex items-start justify-between py-3 border-b border-[#E5E5E7] last:border-0">
-                <div className="pr-4">
-                  <p className="text-sm font-medium text-[#1D1D1F]">{key}</p>
-                  <p className="text-xs text-[#86868B] mt-0.5">{flagDescription(key)}</p>
-                  <p className="text-[10px] text-corporate mt-0.5">{value ? 'Activado' : 'Desactivado'}</p>
+            Object.entries(settings.featureFlags).map(([key, value]) => {
+              const meta = FEATURE_FLAG_META[key] || { name: key, on: 'Funcionalidad controlada por feature flag.', off: 'Funcionalidad controlada por feature flag.' };
+              return (
+                <div key={key} className="flex items-start justify-between py-3 border-b border-[#E5E5E7] last:border-0">
+                  <div className="pr-4">
+                    <p className="text-sm font-medium text-[#1D1D1F]">{meta.name}</p>
+                    <p className="text-xs text-[#86868B] mt-0.5">{value ? meta.on : meta.off}</p>
+                    <p className={cn('text-[10px] mt-0.5 font-medium', value ? 'text-[#34C759]' : 'text-[#FF3B30]')}>{value ? 'Activado' : 'Desactivado'}</p>
+                  </div>
+                  <button
+                    onClick={() => toggleFlag(key, !!value)}
+                    disabled={saving === key}
+                    className={cn(
+                      "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200 shrink-0 mt-0.5",
+                      value ? 'bg-corporate' : 'bg-[#E5E5E7]',
+                      saving === key && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    <div className={cn(
+                      "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                      value ? 'translate-x-5' : 'translate-x-0'
+                    )} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => toggleFlag(key, !!value)}
-                  disabled={saving === key}
-                  className={cn(
-                    "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200 shrink-0 mt-0.5",
-                    value ? 'bg-corporate' : 'bg-[#E5E5E7]',
-                    saving === key && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  <div className={cn(
-                    "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200",
-                    value ? 'translate-x-5' : 'translate-x-0'
-                  )} />
-                </button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
@@ -283,6 +357,8 @@ function UsuariosTab() {
   const [showForm, setShowForm] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [profileUser, setProfileUser] = useState<any>(null);
   const [formData, setFormData] = useState({
     name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
@@ -291,6 +367,15 @@ function UsuariosTab() {
 
   const roleLabels: Record<string, string> = {};
   roleTemplates.forEach((r) => { roleLabels[r.id] = r.name; });
+
+  const counts = useMemo(() => ({
+    directorGeneral: users.filter((u) => u.role === 'DIRECTOR_GENERAL').length,
+    rrhh: users.filter((u) => u.role === 'RRHH').length,
+    gerenteOperaciones: users.filter((u) => u.role === 'GERENTE_OPERACIONES').length,
+    active: users.filter((u) => u.isActive !== false).length,
+    inactive: users.filter((u) => u.isActive === false).length,
+    pending: users.filter((u) => u.invitationPending === true && u.isActive !== false).length,
+  }), [users]);
 
   const filteredUsers = useMemo(() => {
     let list = users.filter((u) => (showInactive ? u.isActive === false : u.isActive !== false));
@@ -316,6 +401,10 @@ function UsuariosTab() {
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedUserId((prev) => (prev === id ? null : id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -328,7 +417,7 @@ function UsuariosTab() {
         });
       } else {
         const userToCreate = sendInvite 
-          ? { ...formData, password: undefined }  // No enviar password temporal
+          ? { ...formData, password: undefined }
           : formData;
         const result = await createUser({...userToCreate, name: (userToCreate.name + (userToCreate.lastName ? " " + userToCreate.lastName : "")).trim()} as any);
         if (sendInvite) {
@@ -342,6 +431,7 @@ function UsuariosTab() {
       }
       setShowForm(false);
       setEditingUser(null);
+      setExpandedUserId(null);
       setFormData({ name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
     } catch (err) {
@@ -388,7 +478,6 @@ function UsuariosTab() {
     if (!u.email || !u.name) { alert('Faltan datos del usuario'); return; }
     setResendingId(u.id);
     try {
-      // Si el usuario está inactivo o eliminado, restaurarlo antes de reenviar
       if (u.isActive === false || u.deletedAt) {
         await updateUser(u.id, {
           isActive: true,
@@ -462,6 +551,34 @@ function UsuariosTab() {
 
   return (
     <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Director General</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.directorGeneral}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">RRHH</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.rrhh}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Gerente de Operaciones</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.gerenteOperaciones}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Usuarios activos</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.active}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Usuarios inactivos</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.inactive}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Invitaciones pendientes</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{counts.pending}</p>
+        </div>
+      </div>
+
       {/* Tabs + Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
         <div className="flex gap-2">
@@ -680,42 +797,135 @@ function UsuariosTab() {
                 <tr><td colSpan={5} className="text-center py-8 text-[#86868B]">{showInactive ? 'No hay usuarios inactivos' : 'No se encontraron usuarios'}</td></tr>
               ) : (
                 filteredUsers.map((u) => (
-                  <tr key={u.id} className="border-b border-[#E5E5E7] last:border-0 hover:bg-[#F5F5F7]/50">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" fallbackClassName="bg-corporate/10 text-corporate text-xs" />
-                        <span className="text-sm font-medium text-[#1D1D1F]">{u.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
-                    <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
-                    <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => window.location.href = "/perfil?userId=" + u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><Eye className="w-4 h-4" /></button><button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
-                        {/* Reenviar invitación: disponible para inactivos/eliminados o activos sin authUid */}
-                        {(showInactive || u.invitationPending || (!u.authUid && u.isActive)) && (
-                          <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
-                            {resendingId === u.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                          </button>
-                        )}
-                        {showInactive ? (
-                          <>
-                            <button onClick={() => handleToggleActive(u, true)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-green" title="Reactivar"><Eye className="w-4 h-4" /></button>
-                            <button onClick={() => handleDelete(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title="Eliminar permanentemente"><Trash2 className="w-4 h-4" /></button>
-                          </>
-                        ) : (
-                          <button onClick={() => handleToggleActive(u, false)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-orange" title="Desactivar"><EyeOff className="w-4 h-4" /></button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <React.Fragment key={u.id}>
+                    <tr
+                      className="border-b border-[#E5E5E7] last:border-0 hover:bg-[#F5F5F7]/50 cursor-pointer"
+                      onClick={() => toggleExpanded(u.id)}
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="sm" fallbackClassName="bg-corporate/10 text-corporate text-xs" />
+                          <span className="text-sm font-medium text-[#1D1D1F]">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[#86868B]">{u.email}</td>
+                      <td className="px-4 py-3"><span className="text-xs px-2 py-1 rounded-full bg-[#F5F5F7] text-[#1D1D1F]">{roleLabels[u.role] || u.role}</span></td>
+                      <td className="px-4 py-3 text-sm text-[#86868B]">{u.department?.replace(/_/g, ' ')}</td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setProfileUser(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Ver perfil"><User className="w-4 h-4" /></button>
+                          <button onClick={() => handleEdit(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate" title="Editar"><Pencil className="w-4 h-4" /></button>
+                          {(showInactive || u.invitationPending || (!u.authUid && u.isActive)) && (
+                            <button onClick={() => handleResendInvitation(u)} disabled={resendingId === u.id} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-corporate disabled:opacity-50" title="Reenviar invitacion">
+                              {resendingId === u.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                            </button>
+                          )}
+                          {showInactive ? (
+                            <>
+                              <button onClick={() => handleToggleActive(u, true)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-green" title="Reactivar"><Eye className="w-4 h-4" /></button>
+                              <button onClick={() => handleDelete(u)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-red" title="Eliminar permanentemente"><Trash2 className="w-4 h-4" /></button>
+                            </>
+                          ) : (
+                            <button onClick={() => handleToggleActive(u, false)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-apple-orange" title="Desactivar"><EyeOff className="w-4 h-4" /></button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedUserId === u.id && (
+                      <tr className="border-b border-[#E5E5E7] bg-[#F5F5F7]/30">
+                        <td colSpan={5} className="px-4 py-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                            <div>
+                              <p className="text-xs text-[#86868B]">Email</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.email || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Telefono</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.phone || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Posicion</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.position || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Nivel</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.level || 7}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.joinDate || '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Estado</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.isActive !== false ? 'Activo' : 'Inactivo'}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-[#86868B]">Invitacion</p>
+                              <p className="text-[#1D1D1F] font-medium">{u.invitationPending ? 'Pendiente' : u.authUid ? 'Aceptada' : 'No enviada'}</p>
+                            </div>
+                          </div>
+                          <div className="mt-4 flex justify-end">
+                            <Button size="sm" onClick={() => handleEdit(u)}><Pencil className="w-3.5 h-3.5 mr-1.5" /> Editar usuario</Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Profile Modal */}
+      {profileUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setProfileUser(null)}>
+          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-[#1D1D1F]">Perfil de usuario</h3>
+              <button onClick={() => setProfileUser(null)} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="flex items-center gap-4 mb-5">
+              <UserAvatar name={profileUser.name} photoUrl={profileUser.photoURL || profileUser.avatar} size="lg" fallbackClassName="bg-corporate/10 text-corporate text-lg" />
+              <div>
+                <p className="text-lg font-semibold text-[#1D1D1F]">{profileUser.name}</p>
+                <p className="text-sm text-[#86868B]">{profileUser.email}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-[#86868B]">Rol</p>
+                <p className="text-[#1D1D1F] font-medium">{roleLabels[profileUser.role] || profileUser.role}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#86868B]">Departamento</p>
+                <p className="text-[#1D1D1F] font-medium">{profileUser.department?.replace(/_/g, ' ') || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#86868B]">Posicion</p>
+                <p className="text-[#1D1D1F] font-medium">{profileUser.position || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#86868B]">Nivel</p>
+                <p className="text-[#1D1D1F] font-medium">{profileUser.level || 7}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#86868B]">Telefono</p>
+                <p className="text-[#1D1D1F] font-medium">{profileUser.phone || '-'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
+                <p className="text-[#1D1D1F] font-medium">{profileUser.joinDate || '-'}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setProfileUser(null)}>Cerrar</Button>
+              <Button onClick={() => { setProfileUser(null); handleEdit(profileUser); }}>Editar</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -814,10 +1024,12 @@ function ModulosTab() {
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-      <div className="mb-4 p-3 rounded-xl bg-corporate/5 border border-corporate/10">
-        <p className="text-xs text-[#1D1D1F]">
-          <strong>En desarrollo:</strong> solo quienes tienen acceso a Develops ven el modulo. Se lanza a produccion solo cuando esta completamente operativo.
-          <strong> En vivo:</strong> visible segun permisos y visibilidad normales.
+      <div className="mb-4 p-4 rounded-xl bg-corporate/5 border border-corporate/10">
+        <p className="text-sm text-[#1D1D1F] leading-relaxed">
+          Desde aqui administras los modulos disponibles en WaveOps. Cada modulo puede estar <strong>En vivo</strong> (visible para quienes tengan permiso),
+          <strong> En desarrollo</strong> (solo visible para quienes tienen acceso a Develops) o <strong>desactivado</strong>.
+          Tambien puedes controlar su visibilidad en el menu y encenderlo/apagarlo sin perder la configuracion.
+          Los cambios se aplican de inmediato, asi que revisa el impacto antes de desactivar un modulo que el equipo este usando.
         </p>
       </div>
       <div className="space-y-3">
@@ -1234,115 +1446,62 @@ function PermDescription({ permKey, checked }: { permKey: string; checked: boole
   return <span className="text-[10px] text-gray-400 mt-0.5 block leading-tight">{checked ? desc.on : desc.off}</span>;
 }
 
-function useRolePermissions(roleTemplates: any[]) {
-  const [openRole, setOpenRole] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, Set<string>>>({});
-  const [dirtyRoles, setDirtyRoles] = useState<Set<string>>(new Set());
-
-  const initDraft = useCallback((roleId: string, perms: string[]) => {
-    setDrafts(prev => { if (prev[roleId]) return prev; return { ...prev, [roleId]: new Set(perms) }; });
-  }, []);
-
-  const toggleRole = useCallback((roleId: string, perms: string[]) => {
-    setOpenRole(prev => { const n = prev === roleId ? null : roleId; if (n) initDraft(n, perms); return n; });
-  }, [initDraft]);
-
-  const togglePerm = useCallback((roleId: string, permKey: string) => {
-    setDrafts(prev => { const d = new Set(prev[roleId]||[]); d.has(permKey) ? d.delete(permKey) : d.add(permKey); return {...prev,[roleId]:d}; });
-    setDirtyRoles(prev => new Set(prev).add(roleId));
-  }, []);
-
-  const cancelRole = useCallback((roleId: string, originalPerms: string[]) => {
-    setDrafts(prev => ({ ...prev, [roleId]: new Set(originalPerms) }));
-    setDirtyRoles(prev => { const n = new Set(prev); n.delete(roleId); return n; });
-  }, []);
-
-  return { openRole, drafts, dirtyRoles, setDirtyRoles, toggleRole, togglePerm, cancelRole, initDraft };
-}
-
-function Toggle({ checked, onChange }: { checked: boolean; onChange: () => void }) {
-  return (
-    <button onClick={e => { e.stopPropagation(); onChange(); }} className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${checked ? "bg-gray-700" : "bg-gray-200"}`}>
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform duration-200 ${checked ? "translate-x-[18px]" : "translate-x-[2px]"}`} />
-    </button>
-  );
-}
-
 function RolesTab() {
   const { roleTemplates } = useAppConfig();
-  const { logAction } = useAudit();
-  const { openRole, drafts, dirtyRoles, setDirtyRoles, toggleRole, togglePerm, cancelRole } = useRolePermissions(roleTemplates);
-
-  const handleSave = useCallback(async (roleId: string, roleName: string) => {
-    const perms = Array.from(drafts[roleId] || []).filter((p): p is string => typeof p === "string");
-    await updateDoc(doc(db, "roleTemplates", roleId), { permissions: perms, updatedAt: new Date().toISOString() });
-    await logAction({ action: "ROLE_UPDATED", targetType: "role", targetId: roleId, targetName: roleName, impactLevel: "major", description: `Permisos actualizados para rol "${roleName}"` });
-    setDirtyRoles((prev: Set<string>) => { const n = new Set(prev); n.delete(roleId); return n; });
-  }, [drafts, logAction]);
-
-  const [savingRole, setSavingRole] = useState<string | null>(null);
+  const [openRole, setOpenRole] = useState<string | null>(null);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold text-[#1D1D1F]">Roles y Permisos</h3>
-        <span className="text-sm text-[#86868B]">{roleTemplates.length} roles configurados</span>
+      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <p className="text-sm text-[#1D1D1F] leading-relaxed">
+          Vista de solo lectura de los roles configurados en el sistema y los permisos que incluye cada uno.
+          La creacion y edicion de roles estara disponible en una proxima actualizacion.
+        </p>
       </div>
-      <p className="text-xs text-[#86868B]">Activa o desactiva cada permiso y presiona Guardar cambios. Los cambios se aplican inmediatamente a los usuarios que tengan este rol asignado.</p>
       <div className="space-y-3">
         {roleTemplates.map((role: any) => {
           const isOpen = openRole === role.id;
-          const isDirty = dirtyRoles.has(role.id);
-          const currentPerms = drafts[role.id] || new Set(role.permissions || []);
+          const currentPerms = new Set(role.permissions || []);
           return (
-            <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-gray-300 shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
-              <button onClick={() => toggleRole(role.id, role.permissions || [])} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-gray-50/50 transition-colors rounded-2xl gap-3">
+            <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-[#E5E5E7] shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
+              <button onClick={() => setOpenRole((prev) => (prev === role.id ? null : role.id))} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-[#F5F5F7]/50 transition-colors rounded-2xl gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <RoleIcon name={role.name} />
                   <div className="min-w-0 text-left">
                     <div className="font-semibold text-[#1D1D1F] text-[15px] truncate">{role.name}</div>
-                    <div className="text-xs text-[#86868B] mt-0.5">{role.permissions?.length || 0} permisos asignados</div>
+                    <div className="text-xs text-[#86868B] mt-0.5">{role.permissions?.length || 0} permisos asignados · Rol base {role.baseRole || role.id}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${levelColor(role.level || 1)}`}>Nivel {role.level || 1}</span>
-                  {isDirty && <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">Modificado</span>}
                   {isOpen ? <ChevronUp size={18} className="text-[#86868B]" /> : <ChevronDown size={18} className="text-[#86868B]" />}
                 </div>
               </button>
               {isOpen && (
                 <div className="px-5 pb-5 pt-1 border-t border-[#E5E5E7]">
-                  {isDirty && (
-                    <div className="flex items-center justify-end gap-2 mb-4 mt-3">
-                      <button onClick={() => cancelRole(role.id, role.permissions || [])} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-[#86868B] hover:bg-gray-100 transition-colors"><X size={14} /> Cancelar</button>
-                      <button onClick={async () => { setSavingRole(role.id); await handleSave(role.id, role.name); setSavingRole(null); }} disabled={savingRole === role.id} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#007AFF] hover:bg-[#0071E3] disabled:opacity-60 transition-colors">
-                        {savingRole === role.id ? <><span className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />Guardando...</> : <><Save size={14} /> Guardar cambios</>}
-                      </button>
-                    </div>
-                  )}
                   <div className="space-y-3">
                     {PERMISSION_CATEGORIES.map((cat) => {
                       const permsList = cat.perms;
                       const activeInCat = permsList.filter((p) => currentPerms.has(p.key)).length;
                       return (
                         <div key={cat.key} className="rounded-xl border border-[#E5E5E7]">
-                          <div className="flex items-center justify-between p-3.5">
+                          <div className="flex items-center p-3.5">
                             <div className="flex items-center gap-3">
-                              <span className="text-gray-400">{cat.icon}</span>
+                              <span className="text-[#86868B]">{cat.icon}</span>
                               <span className="text-sm font-medium text-[#1D1D1F]">{cat.label}</span>
-                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${activeInCat === permsList.length ? "bg-gray-100 text-gray-500" : activeInCat > 0 ? "bg-gray-200 text-gray-600" : "bg-gray-100 text-gray-500"}`}>{activeInCat}/{permsList.length}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium border ${activeInCat === permsList.length ? "bg-corporate/10 text-corporate border-corporate/20" : activeInCat > 0 ? "bg-[#F5F5F7] text-[#1D1D1F] border-[#E5E5E7]" : "bg-[#F5F5F7] text-[#86868B] border-[#E5E5E7]"}`}>{activeInCat}/{permsList.length}</span>
                             </div>
                           </div>
-                          <div className="px-3.5 pb-3.5 pt-1 border-t border-[#E5E5E7] bg-gray-50/30">
+                          <div className="px-3.5 pb-3.5 pt-1 border-t border-[#E5E5E7] bg-[#F5F5F7]/30">
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               {permsList.map((perm) => {
                                 const checked = currentPerms.has(perm.key);
                                 return (
-                                  <div key={perm.key} className={`p-2.5 rounded-lg border transition-all ${checked ? "border-gray-300 bg-gray-50" : "border-[#E5E5E7] bg-white hover:border-gray-300"}`}>
-                                    <label className="flex items-center justify-between cursor-pointer">
-                                      <span className={`text-xs font-medium ${checked ? "text-gray-700" : "text-[#3A3A3C]"}`}>{perm.label}</span>
-                                      <Toggle checked={checked} onChange={() => togglePerm(role.id, perm.key)} />
-                                    </label>
+                                  <div key={perm.key} className={`p-2.5 rounded-lg border ${checked ? "border-corporate/20 bg-corporate/5" : "border-[#E5E5E7] bg-white opacity-60"}`}>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`w-1.5 h-1.5 rounded-full ${checked ? 'bg-corporate' : 'bg-[#C7C7CC]'}`} />
+                                      <span className="text-xs font-medium text-[#1D1D1F]">{perm.label}</span>
+                                    </div>
                                     <PermDescription permKey={perm.key} checked={checked} />
                                   </div>
                                 );
@@ -1380,6 +1539,7 @@ function PosicionesTab() {
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
 
   const usageCount = useCallback((positionName: string) => {
     return users.filter((u: any) => u.position === positionName && u.isActive !== false).length;
@@ -1504,10 +1664,26 @@ function PosicionesTab() {
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
             />
           </div>
-          <label className="flex items-center gap-2 text-sm text-[#86868B] cursor-pointer">
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-[#E5E5E7]" />
-            Mostrar inactivas
-          </label>
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-[#86868B] cursor-pointer">
+              <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-[#E5E5E7]" />
+              Mostrar inactivas
+            </label>
+            <div className="flex items-center bg-[#F5F5F7] rounded-xl p-1">
+              <button
+                onClick={() => setViewMode('list')}
+                className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all', viewMode === 'list' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]')}
+              >
+                <List className="w-4 h-4" /> Lista
+              </button>
+              <button
+                onClick={() => setViewMode('cards')}
+                className={cn('flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all', viewMode === 'cards' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]')}
+              >
+                <LayoutGrid className="w-4 h-4" /> Tarjetas
+              </button>
+            </div>
+          </div>
         </div>
 
         {loading ? (
@@ -1517,6 +1693,51 @@ function PosicionesTab() {
             <Briefcase className="mx-auto mb-3 h-10 w-10 opacity-30" />
             <p className="text-sm">No hay posiciones registradas.</p>
             <button onClick={openCreate} className="mt-3 rounded-lg bg-corporate px-4 py-2 text-sm text-white hover:bg-corporate/90 transition">Crear primera posicion</button>
+          </div>
+        ) : viewMode === 'list' ? (
+          <div className="border border-[#E5E5E7] rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-[#F5F5F7] text-[#86868B]">
+                <tr>
+                  <th className="text-left px-4 py-3 font-medium">Nombre</th>
+                  <th className="text-left px-4 py-3 font-medium">Nivel</th>
+                  <th className="text-left px-4 py-3 font-medium hidden sm:table-cell">Departamento</th>
+                  <th className="text-left px-4 py-3 font-medium">Usuarios</th>
+                  <th className="text-left px-4 py-3 font-medium">Estado</th>
+                  <th className="text-right px-4 py-3 font-medium">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5E5E7]">
+                {filteredPositions.map((pos) => {
+                  const count = usageCount(pos.name);
+                  return (
+                    <tr key={pos.id} className="hover:bg-[#F5F5F7]/50">
+                      <td className="px-4 py-3 font-medium text-[#1D1D1F]">{pos.name}</td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-corporate/5 px-2 py-0.5 border border-corporate/10 text-xs">
+                          Nivel {pos.level}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[#86868B] hidden sm:table-cell">{pos.department || 'Transversal'}</td>
+                      <td className="px-4 py-3 text-[#86868B]">{count}</td>
+                      <td className="px-4 py-3">
+                        {pos.isActive === false ? (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Inactiva</span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Activa</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openEdit(pos)} className="rounded p-1.5 text-[#86868B] hover:bg-[#F5F5F7] hover:text-corporate transition"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => handleDelete(pos)} className="rounded p-1.5 text-[#86868B] hover:bg-red-50 hover:text-[#FF3B30] transition"><Trash2 className="h-4 w-4" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -1603,6 +1824,21 @@ function AuditoriaTab() {
     return Array.from(set).sort();
   }, [logs]);
 
+  const impactCounts = useMemo(() => {
+    const counts: Record<string, number> = { critical: 0, major: 0, sensitive: 0, minor: 0 };
+    logs.forEach((l) => { counts[l.impactLevel] = (counts[l.impactLevel] || 0) + 1; });
+    return counts;
+  }, [logs]);
+
+  const actionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    logs.forEach((l) => { counts[l.action] = (counts[l.action] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  }, [logs]);
+
+  const deletedDepartments = useMemo(() => logs.filter((l) => l.action === 'DEPARTMENT_DELETED').length, [logs]);
+  const deletedUsers = useMemo(() => logs.filter((l) => l.action === 'USER_DELETED').length, [logs]);
+
   const filtered = useMemo(() => {
     let list = [...logs];
     if (filter) {
@@ -1628,6 +1864,54 @@ function AuditoriaTab() {
 
   return (
     <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Registros criticos</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.critical}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Registros mayores</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.major}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Registros sensibles</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.sensitive}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Registros menores</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{impactCounts.minor}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Departamentos eliminados</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{deletedDepartments}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Usuarios eliminados</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{deletedUsers}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Total de registros</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{logs.length}</p>
+        </div>
+      </div>
+
+      {actionCounts.length > 0 && (
+        <div className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <h4 className="text-sm font-semibold text-[#1D1D1F] mb-3">Acciones mas frecuentes</h4>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {actionCounts.map(([action, count]) => (
+              <div key={action} className="rounded-xl border border-[#E5E5E7] p-3">
+                <p className="text-[10px] text-[#86868B] truncate" title={action}>{action}</p>
+                <p className="text-lg font-semibold text-[#1D1D1F]">{count}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B]" />
@@ -1690,18 +1974,95 @@ function AuditoriaTab() {
 // ═══════════════════════════════════════════════════════════════════
 
 function SeguridadTab() {
-  const { settings, roleTemplates } = useAppConfig();
+  const { settings } = useAppConfig();
   const { users } = useFirestoreUsers();
-  const { departmentOptions, departmentTreeOptions } = useDynamicDepartments();
   const { logAction } = useAudit();
   const [email, setEmail] = useState('');
   const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
   const sec = settings.security;
   const access = settings.developAccess;
+  const [draft, setDraft] = useState(sec);
+
+  useEffect(() => { setDraft(sec); }, [sec]);
+
+  const policyDefinitions: { key: keyof typeof sec; label: string; description: string; editable: boolean; type: 'number' | 'boolean' }[] = [
+    {
+      key: 'passwordMinLength',
+      label: 'Longitud minima de contraseña',
+      description: 'Numero minimo de caracteres que debe tener una contraseña. Actualmente se respeta en el modal de cambio de contraseña (minimo 8). El login y la pagina de invitacion aun usan un minimo fijo de 6.',
+      editable: true,
+      type: 'number',
+    },
+    {
+      key: 'passwordRequireUppercase',
+      label: 'Requerir mayusculas',
+      description: 'Si esta activo, las contraseñas deben incluir al menos una letra mayuscula. Se aplica en ChangePasswordModal; el login y la invitacion no validan mayusculas.',
+      editable: true,
+      type: 'boolean',
+    },
+    {
+      key: 'passwordRequireNumbers',
+      label: 'Requerir numeros',
+      description: 'Si esta activo, las contraseñas deben incluir al menos un numero. Se aplica en ChangePasswordModal; el login y la invitacion no validan numeros.',
+      editable: true,
+      type: 'boolean',
+    },
+    {
+      key: 'requirePasswordForSensitiveActions',
+      label: 'Pedir contraseña en acciones sensibles',
+      description: 'Cuando esta activo, el sistema solicitara la contraseña del usuario para confirmar acciones criticas o sensibles. La logica de confirmacion ya solicita contraseña a partir de nivel sensible; este flag centraliza la politica.',
+      editable: true,
+      type: 'boolean',
+    },
+    {
+      key: 'maxLoginAttempts',
+      label: 'Intentos maximos de inicio de sesion',
+      description: 'Cantidad de intentos fallidos consecutivos antes de bloquear temporalmente el acceso. Esta politica aun no se aplica en el flujo de login.',
+      editable: false,
+      type: 'number',
+    },
+    {
+      key: 'sessionTimeoutMinutes',
+      label: 'Timeout de sesion (minutos)',
+      description: 'Tiempo de inactividad despues del cual la sesion deberia cerrarse automaticamente. Esta politica aun no se aplica en la app.',
+      editable: false,
+      type: 'number',
+    },
+    {
+      key: 'auditLogRetentionDays',
+      label: 'Retencion de logs (dias)',
+      description: 'Dias que se conservaran los registros de auditoria antes de su eliminacion automatica. Actualmente los logs se mantienen indefinidamente.',
+      editable: false,
+      type: 'number',
+    },
+  ];
 
   const dgUsers = useMemo(() => {
     return [...new Set(access.allowedUserIds)].map((email) => users.find((u) => u.email === email)).filter(Boolean) as typeof users;
   }, [users, access.allowedUserIds]);
+
+  const handleSavePolicies = async () => {
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, 'appSettings', 'global'), {
+        security: draft,
+        updatedAt: new Date().toISOString(),
+      });
+      await logAction({
+        action: 'SECURITY_POLICY_CHANGED',
+        targetType: 'settings',
+        targetId: 'global',
+        targetName: 'Seguridad',
+        impactLevel: 'sensitive',
+        description: 'Politicas de seguridad actualizadas',
+      });
+    } catch (err) {
+      alert('Error al guardar politicas: ' + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleAddByEmail = async () => {
     if (!email.trim()) return;
@@ -1757,32 +2118,46 @@ function SeguridadTab() {
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-        <h3 className="font-semibold text-[#1D1D1F] mb-4">Politicas de seguridad</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-[#1D1D1F]">Politicas de seguridad</h3>
+          <Button onClick={handleSavePolicies} disabled={saving || JSON.stringify(draft) === JSON.stringify(sec)} className="bg-corporate hover:bg-corporate/90">
+            {saving ? 'Guardando...' : 'Guardar cambios'}
+          </Button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Minimo de caracteres</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordMinLength}</p>
-          </div>
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Requiere mayusculas</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireUppercase ? 'Si' : 'No'}</p>
-          </div>
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Requiere numeros</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.passwordRequireNumbers ? 'Si' : 'No'}</p>
-          </div>
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Intentos maximos de login</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.maxLoginAttempts}</p>
-          </div>
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Timeout de sesion (min)</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.sessionTimeoutMinutes}</p>
-          </div>
-          <div className="p-4 rounded-xl border border-[#E5E5E7]">
-            <p className="text-xs text-[#86868B] mb-1">Retencion de logs (dias)</p>
-            <p className="text-lg font-semibold text-[#1D1D1F]">{sec.auditLogRetentionDays}</p>
-          </div>
+          {policyDefinitions.map((policy) => {
+            const value = draft[policy.key];
+            return (
+              <div key={policy.key} className={cn('p-4 rounded-xl border', policy.editable ? 'border-[#E5E5E7]' : 'border-[#E5E5E7] bg-[#F5F5F7]/50')}>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-sm font-medium text-[#1D1D1F]">{policy.label}</p>
+                  {!policy.editable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E5E5E7] text-[#86868B]">No modificable</span>}
+                </div>
+                <p className="text-xs text-[#86868B] mb-3">{policy.description}</p>
+                {policy.type === 'boolean' ? (
+                  <button
+                    disabled={!policy.editable}
+                    onClick={() => policy.editable && setDraft((prev) => ({ ...prev, [policy.key]: !prev[policy.key] }))}
+                    className={cn(
+                      "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200",
+                      value ? 'bg-corporate' : 'bg-[#E5E5E7]',
+                      !policy.editable && 'opacity-60 cursor-not-allowed'
+                    )}
+                  >
+                    <div className={cn("w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200", value ? 'translate-x-5' : 'translate-x-0')} />
+                  </button>
+                ) : (
+                  <input
+                    type="number"
+                    disabled={!policy.editable}
+                    value={Number(value)}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, [policy.key]: Number(e.target.value) }))}
+                    className="w-24 px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm disabled:bg-[#F5F5F7] disabled:text-[#86868B] disabled:cursor-not-allowed"
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -1927,10 +2302,7 @@ function PapeleraTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold text-[#1D1D1F]">Papelera</h3>
-        <span className="text-sm text-[#86868B]">{totalItems} elementos</span>
-      </div>
+      <h3 className="text-lg font-semibold text-[#1D1D1F]">Papelera</h3>
 
       {/* Turnos eliminados */}
       {trashedShifts.length > 0 && (
@@ -2120,8 +2492,7 @@ function FeedbackTab() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard title="Total" value={counts.total} icon={MessageSquare} color="text-corporate" />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <StatCard title="Sugerencias" value={counts.sugerencias} icon={CheckCircle} color="text-apple-blue" />
         <StatCard title="Problemas" value={counts.problemas} icon={AlertTriangle} color="text-apple-red" />
         <StatCard title="Nuevos" value={counts.nuevos} icon={Clock} color="text-apple-orange" />
@@ -2273,61 +2644,9 @@ export default function DevelopsModule() {
   const activeTabConfig = TABS.find((t) => t.id === activeTab) || TABS[0];
 
   const headerStats = useMemo(() => {
-    switch (activeTab) {
-      case 'general':
-        return [
-          { title: 'Modulos', value: modules.length, icon: Puzzle, color: 'text-corporate' },
-          { title: 'Feature flags', value: Object.keys(settings.featureFlags).length, icon: ToggleRight, color: 'text-apple-blue' },
-        ];
-      case 'usuarios':
-        return [
-          { title: 'Roles', value: roleTemplates.length, icon: UserCog, color: 'text-apple-blue' },
-          { title: 'Audit logs', value: logs.length, icon: ClipboardList, color: 'text-apple-green' },
-        ];
-      case 'modulos':
-        return [
-          { title: 'En vivo', value: modules.filter((m) => m.status === 'live').length, icon: CheckCircle, color: 'text-emerald-500' },
-          { title: 'En desarrollo', value: modules.filter((m) => m.status === 'development').length, icon: Code2, color: 'text-slate-500' },
-        ];
-      case 'departamentos':
-        return [
-          { title: 'Departamentos', value: modules.length, icon: Building2, color: 'text-corporate' },
-          { title: 'Activos', value: modules.filter((m) => m.isActive).length, icon: Activity, color: 'text-apple-green' },
-        ];
-      case 'roles':
-        return [
-          { title: 'Roles', value: roleTemplates.length, icon: UserCog, color: 'text-apple-blue' },
-          { title: 'Permisos', value: Object.values(PERMISSION_CATEGORIES).reduce((acc, cat) => acc + cat.perms.length, 0), icon: Shield, color: 'text-apple-purple' },
-        ];
-      case 'posiciones':
-        return [
-          { title: 'Activas', value: positions.filter((p) => p.isActive !== false).length, icon: Briefcase, color: 'text-corporate' },
-          { title: 'Inactivas', value: positions.filter((p) => p.isActive === false).length, icon: Briefcase, color: 'text-[#86868B]' },
-        ];
-      case 'auditoria':
-        return [
-          { title: 'Registros', value: logs.length, icon: ClipboardList, color: 'text-apple-green' },
-        ];
-      case 'seguridad':
-        return [
-          { title: 'Politicas', value: 6, icon: Lock, color: 'text-apple-red' },
-        ];
-      case 'papelera':
-        return [
-          { title: 'Eliminados', value: 0, icon: Trash2, color: 'text-[#FF3B30]' },
-        ];
-      case 'turnos':
-        return [
-          { title: 'Turnos', value: modules.length, icon: Clock, color: 'text-corporate' },
-        ];
-      case 'feedback':
-        return [
-          { title: 'Sugerencias', value: modules.length, icon: MessageSquare, color: 'text-apple-blue' },
-        ];
-      default:
-        return [];
-    }
-  }, [activeTab, modules, settings, roleTemplates, logs, positions]);
+    // Las tarjetas resumen se muestran dentro de cada pestana para mantener el contexto.
+    return [];
+  }, [activeTab]);
 
   return (
     <Layout title="Develops" showDate={false}>

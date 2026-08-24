@@ -68,6 +68,69 @@
 
 ---
 
+## Rediseño completo del panel Develops
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Estructura general**:
+  - Se eliminaron las tarjetas de resumen globales del header dinamico; ahora cada pestaña muestra sus propias tarjetas/contexto.
+  - Se mantuvo la sidebar en desktop y tabs scrolleables en mobile.
+- **Pestaña General**:
+  - Nuevo bloque descriptivo al inicio.
+  - Nombre de la app (WaveOps) ahora es un campo fijo/desactivado con explicacion.
+  - Nombre de la empresa sigue siendo editable.
+  - Color principal renombrado y documentado como color de marca de la empresa.
+  - Logo de la empresa ahora usa un input tipo file con preview local (`URL.createObjectURL`); se dejo preparado para subir a Storage en el futuro.
+  - Feature flags con nombres legibles, descripciones condicionales activado/desactivado y estado destacado.
+- **Pestaña Usuarios**:
+  - Nuevas tarjetas: Director General, RRHH, Gerente de Operaciones, activos, inactivos e invitaciones pendientes.
+  - Al hacer click en una fila se expande para ver detalles y editar.
+  - Icono de ojo reemplazado por icono de persona (`User`) que abre un modal con el perfil sin navegar.
+  - Se conservan invitar, reactivar, desactivar y eliminar.
+- **Pestaña Módulos**:
+  - Texto descriptivo ampliado sobre estados y visibilidad.
+  - Se mantienen controles de estado, visibilidad, activo y edición.
+- **Pestaña Departamentos (`DepartamentosTab.tsx`)**:
+  - Nuevas tarjetas: departamentos padre, independientes, sub-departamentos y departamento principal.
+  - Click en tarjeta expande/colapsa hijos.
+  - El popup de equipo se abre desde un boton de acciones.
+  - En el popup de equipo se agregaron botones de editar y eliminar en el header.
+- **Pestaña Roles**:
+  - Modo visualización de solo lectura.
+  - Se eliminaron toggles de edición y guardado; se deja preparado para futura edición.
+- **Pestaña Posiciones**:
+  - Toggle para alternar entre vista lista (default) y vista tarjetas.
+  - Se conserva crear, editar y eliminar.
+- **Pestaña Auditoría**:
+  - Nuevas tarjetas: registros por impacto (critical/major/sensitive/minor), departamentos eliminados, usuarios eliminados y acciones más frecuentes.
+  - Se mantiene la tabla de logs con filtros.
+- **Pestaña Seguridad**:
+  - Cada política tiene descripción clara y nota sobre dónde realmente se aplica.
+  - Políticas editables: longitud mínima, mayúsculas, números y requerir contraseña en acciones sensibles.
+  - Políticas deshabilitadas (aún no aplicadas): intentos de login, timeout de sesión y retención de logs.
+  - Se agregó botón para guardar cambios en las políticas editables.
+- **Pestaña Papelera**:
+  - Se eliminó la tarjeta superior de total.
+  - Se mantienen restaurar y eliminar permanentemente usuarios, turnos y departamentos.
+- **Pestaña Turnos (`TurnosTab.tsx`)**:
+  - Vista lista establecida como default.
+- **Pestaña Feedback**:
+  - Se eliminó la tarjeta "Total".
+  - Se corrigió/elimimó la tarjeta "Sugerencias" duplicada del header; ahora solo quedan Sugerencias, Problemas y Nuevos.
+
+### Archivos modificados
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `src/components/modules/TurnosTab.tsx`
+- `MASTER_RESUME.md`
+
+### Build
+- `npm run build` exitoso sin errores de TypeScript.
+- Sin deploy ni commit (solo cambios locales listos).
+
+---
+
 ## Subfase 7.5: Develops estable y usable
 
 **Estado:** COMPLETADO

@@ -56,7 +56,7 @@ export function TurnosTab() {
   const [showModal, setShowModal] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [filterDept, setFilterDept] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('list');
   const [expandedShiftIds, setExpandedShiftIds] = useState<Set<string>>(new Set());
 
   const [form, setForm] = useState({

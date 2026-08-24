@@ -119,6 +119,8 @@ export function DepartamentosTab() {
 
   const rootDepts = useMemo(() => departments.filter((d: any) => !d.parentId).sort((a: any, b: any) => a.name.localeCompare(b.name)), [departments]);
   const childDepts = useMemo(() => departments.filter((d: any) => d.parentId), [departments]);
+  const independentDepts = useMemo(() => rootDepts.filter((d: any) => childrenOf(d.id).length === 0), [rootDepts]);
+  const mainDept = useMemo(() => departments.find((d: any) => d.code === 'OPERACIONES') || rootDepts[0], [departments, rootDepts]);
   const deptsById = useMemo(() => { const m = new Map<string, any>(); departments.forEach((d: any) => m.set(d.id, d)); return m; }, [departments]);
   const childrenOf = (parentId: string) => childDepts.filter((c: any) => c.parentId === parentId).sort((a: any, b: any) => a.name.localeCompare(b.name));
   const getDescendantIds = (parentId: string | null, depts: any[]): string[] => {
@@ -491,7 +493,15 @@ export function DepartamentosTab() {
               <h3 className="text-lg font-semibold text-slate-100">{selectedDept.name}</h3>
               <p className="text-xs text-slate-400">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {isOperationalDepartment(selectedDept.code) ? "Operacional" : "No operacional"}</p>
             </div>
-            <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+            <div className="flex items-center gap-1">
+              {!PROTECTED_DEPT_CODES.includes(selectedDept.code) && (
+                <>
+                  <button onClick={() => { closeTeamModal(); openEdit(selectedDept); }} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-sky-400" title="Editar departamento"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => { handleDelete(selectedDept); closeTeamModal(); }} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-900/20 hover:text-red-400" title="Eliminar departamento"><Trash2 className="h-4 w-4" /></button>
+                </>
+              )}
+              <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+            </div>
           </div>
 
           {myChildren.length > 0 && (
@@ -731,7 +741,7 @@ export function DepartamentosTab() {
       <div
         className="group relative flex items-start gap-3 rounded-xl border bg-white p-4 shadow-sm transition hover:shadow-md cursor-pointer select-none"
         style={{ marginLeft: `${level * 28}px` }}
-        onClick={() => openTeam(dept)}
+        onClick={() => toggleExpanded(dept.id)}
       >
         {/* Línea de conexión jerárquica */}
         {level > 0 && (
@@ -775,14 +785,10 @@ export function DepartamentosTab() {
             {isParent && (
               <>
                 <span className="hidden sm:inline">·</span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); toggleExpanded(dept.id); }}
-                  className="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700 font-medium"
-                >
+                <span className="inline-flex items-center gap-1 text-sky-600 font-medium">
                   {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                   {myChildren.length} sub-departamento{myChildren.length !== 1 ? 's' : ''}
-                </button>
+                </span>
               </>
             )}
           </div>
@@ -798,6 +804,7 @@ export function DepartamentosTab() {
               {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
             </button>
           )}
+          <button onClick={() => openTeam(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600" title="Ver equipo"><Users className="h-4 w-4" /></button>
           {!PROTECTED_DEPT_CODES.includes(dept.code) && (
             <>
               <button onClick={() => openEdit(dept)} className="rounded p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-sky-600"><Pencil className="h-4 w-4" /></button>
@@ -830,12 +837,31 @@ export function DepartamentosTab() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-slate-800">Departamentos</h3>
           <p className="text-sm text-slate-500">{departments.length} departamentos · {users.filter((u: any) => u.department && u.isActive !== false).length} usuarios asignados</p>
         </div>
         <Button onClick={openCreate} className="bg-sky-600 hover:bg-sky-700"><Plus className="mr-1.5 h-4 w-4" />Crear departamento</Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Departamentos padre</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{rootDepts.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Independientes</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{independentDepts.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Sub-departamentos</p>
+          <p className="text-xl font-semibold text-[#1D1D1F]">{childDepts.length}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+          <p className="text-xs text-[#86868B] mb-1">Departamento principal</p>
+          <p className="text-sm font-semibold text-[#1D1D1F] truncate">{mainDept ? mainDept.name : '-'}</p>
+        </div>
       </div>
 
       {loading ? (
