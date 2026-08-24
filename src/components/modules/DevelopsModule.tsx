@@ -11,6 +11,8 @@ import {
   Search, Filter, RefreshCw, CheckCircle, XCircle,
   LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
   Briefcase, User, Upload, List,
+  Phone, MapPin, Calendar, Globe, Droplets, Pill, Award, CreditCard, Camera,
+  Check, Heart, UserCircle, Flag, Droplet, BadgeCheck, IdCard, Edit3,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -394,12 +396,19 @@ function UsuariosTab() {
   const [showInactive, setShowInactive] = useState(false);
   const [resendingId, setResendingId] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
-  const [profileUser, setProfileUser] = useState<any>(null);
-  const [profileEditMode, setProfileEditMode] = useState(false);
+  const [editingExpandedUserId, setEditingExpandedUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '',
     position: '', level: 0, isActive: true, phone: '', password: generateTempPassword(),
+  });
+  const [profileFormData, setProfileFormData] = useState({
+    name: '', displayName: '', email: '', phone: '', phoneCountry: '+593', nationality: '',
+    birthDate: '', cedula: '', passport: '', address: '', bloodType: '', allergies: '',
+    medications: '', emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelation: '',
+    certificationNumber: '', certificationExpiry: '', apneaCert: '', bankCountry: '', bankName: '',
+    accountType: '', accountNumber: '', routingNumber: '', photoURL: '', role: '', department: '',
+    position: '', level: 7, joinDate: '', isActive: true,
   });
 
   const roleLabels: Record<string, string> = {};
@@ -479,53 +488,115 @@ function UsuariosTab() {
   const handleNew = () => { setEditingUser(null); setSendInvite(false); setFormData({ name: '', lastName: '', email: '', role: '', department: '',
     joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() }); setCreatedPassword(null); setInvitationLink(null); setShowForm(true); };
 
-  const openProfile = (u: any, editMode = false) => {
-    setProfileUser(u);
-    const isDirector = user?.role === Role.DIRECTOR_GENERAL;
-    setProfileEditMode(editMode && isDirector);
-    setFormData({
-      name: u.name?.split(' ')[0] || '', lastName: u.name?.split(' ').slice(1).join(' ') || '', email: u.email || '', role: u.role || 'STAFF',
-      department: u.department || 'DIVE_SHOP', joinDate: u.joinDate || '', position: u.position || '',
-      level: u.level || 0, isActive: u.isActive !== false, phone: u.phone || '', password: '',
+  const loadProfileFormData = (u: any) => {
+    setProfileFormData({
+      name: u.name || '',
+      displayName: u.displayName || '',
+      email: u.email || '',
+      phone: u.phone || '',
+      phoneCountry: u.phone?.split(' ')[0] || '+593',
+      nationality: u.nationality || '',
+      birthDate: u.birthDate || '',
+      cedula: u.cedula || '',
+      passport: u.passport || '',
+      address: u.address || '',
+      bloodType: u.bloodType || '',
+      allergies: u.allergies || '',
+      medications: u.medications || '',
+      emergencyContactName: u.emergencyContactName || '',
+      emergencyContactPhone: u.emergencyContactPhone || '',
+      emergencyContactRelation: u.emergencyContactRelation || '',
+      certificationNumber: u.certificationNumber || '',
+      certificationExpiry: u.certificationExpiry || '',
+      apneaCert: u.apneaCert || '',
+      bankCountry: u.bankCountry || '',
+      bankName: u.bankName || '',
+      accountType: u.accountType || '',
+      accountNumber: u.accountNumber || '',
+      routingNumber: u.routingNumber || '',
+      photoURL: u.photoURL || u.avatar || '',
+      role: u.role || '',
+      department: u.department || '',
+      position: u.position || '',
+      level: u.level || 7,
+      joinDate: u.joinDate || '',
+      isActive: u.isActive !== false,
     });
   };
 
-  const closeProfile = () => {
-    setProfileUser(null);
-    setProfileEditMode(false);
-    setFormData({ name: '', lastName: '', email: '', role: '', department: '',
-      joinDate: '', position: '', level: 0, isActive: true, phone: '', password: generateTempPassword() });
+  const openProfile = (u: any) => {
+    setExpandedUserId(u.id);
+    setEditingExpandedUserId(null);
+    loadProfileFormData(u);
   };
 
-  const handleProfileSave = async () => {
-    if (!profileUser) return;
+  const startInlineEdit = (u: any) => {
+    setExpandedUserId(u.id);
+    setEditingExpandedUserId(u.id);
+    loadProfileFormData(u);
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingExpandedUserId(null);
+    const u = users.find((x) => x.id === expandedUserId);
+    if (u) loadProfileFormData(u);
+  };
+
+  const handleProfileSave = async (u: any) => {
     try {
-      const fullName = (formData.name + (formData.lastName ? " " + formData.lastName : "")).trim();
-      const updates = {
-        name: fullName,
-        email: formData.email,
-        role: formData.role,
-        department: formData.department,
-        position: formData.position,
-        joinDate: formData.joinDate,
-        level: Number(formData.level),
-        isActive: formData.isActive,
-        phone: formData.phone,
+      const updates: any = {
+        name: profileFormData.name,
+        displayName: profileFormData.displayName,
+        email: profileFormData.email,
+        phone: profileFormData.phone,
+        nationality: profileFormData.nationality,
+        birthDate: profileFormData.birthDate,
+        cedula: profileFormData.cedula,
+        passport: profileFormData.passport,
+        address: profileFormData.address,
+        bloodType: profileFormData.bloodType,
+        allergies: profileFormData.allergies,
+        medications: profileFormData.medications,
+        emergencyContactName: profileFormData.emergencyContactName,
+        emergencyContactPhone: profileFormData.emergencyContactPhone,
+        emergencyContactRelation: profileFormData.emergencyContactRelation,
+        certificationNumber: profileFormData.certificationNumber,
+        certificationExpiry: profileFormData.certificationExpiry,
+        apneaCert: profileFormData.apneaCert,
+        bankCountry: profileFormData.bankCountry,
+        bankName: profileFormData.bankName,
+        accountType: profileFormData.accountType,
+        accountNumber: profileFormData.accountNumber,
+        routingNumber: profileFormData.routingNumber,
+        photoURL: profileFormData.photoURL,
+        position: profileFormData.position,
+        updatedAt: new Date().toISOString(),
       };
-      await updateUser(profileUser.id, updates as any);
+      if (user?.role === Role.DIRECTOR_GENERAL) {
+        updates.role = profileFormData.role;
+        updates.department = profileFormData.department;
+        updates.level = Number(profileFormData.level);
+        updates.joinDate = profileFormData.joinDate;
+        updates.isActive = profileFormData.isActive;
+      }
+      await updateUser(u.id, updates);
       await logAction({
-        action: 'USER_UPDATED', targetType: 'user', targetId: profileUser.id,
-        targetName: fullName, impactLevel: 'major',
-        description: `Usuario "${fullName}" actualizado desde perfil`,
+        action: 'USER_UPDATED', targetType: 'user', targetId: u.id,
+        targetName: profileFormData.name, impactLevel: 'major',
+        description: `Usuario "${profileFormData.name}" actualizado desde Develops`,
       });
-      closeProfile();
+      setEditingExpandedUserId(null);
     } catch (err) {
       alert('Error: ' + (err as Error).message);
     }
   };
 
+  const canEditPersonal = (u: any) => {
+    return user?.id === u.id || user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.DIRECTOR;
+  };
+
   const handleEdit = (u: any) => {
-    openProfile(u, true);
+    startInlineEdit(u);
   };
 
   const handleToggleActive = async (u: any, makeActive: boolean) => {
@@ -622,6 +693,79 @@ function UsuariosTab() {
       {sortField === field && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
     </span>
   );
+
+  const BLOOD_TYPE_COLORS: Record<string, string> = {
+    'A+': 'bg-red-100 text-red-700', 'A-': 'bg-red-50 text-red-600',
+    'B+': 'bg-blue-100 text-blue-700', 'B-': 'bg-blue-50 text-blue-600',
+    'AB+': 'bg-purple-100 text-purple-700', 'AB-': 'bg-purple-50 text-purple-600',
+    'O+': 'bg-green-100 text-green-700', 'O-': 'bg-green-50 text-green-600',
+  };
+
+  const getAge = (birthDate?: string) => {
+    if (!birthDate) return null;
+    const birth = new Date(birthDate);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const InfoRow = ({ icon: Icon, label, value, missing = 'No registrado' }: any) => (
+    <div className="flex items-start gap-3 py-2">
+      <div className="w-8 h-8 rounded-lg bg-[#F5F5F7] flex items-center justify-center flex-shrink-0">
+        <Icon className="w-4 h-4 text-[#86868B]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-[#86868B]">{label}</p>
+        <p className="text-sm font-medium text-[#1D1D1F] truncate">{value || missing}</p>
+      </div>
+    </div>
+  );
+
+  const Section = ({ title, icon: Icon, children, color = 'bg-corporate' }: any) => (
+    <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] overflow-hidden">
+      <div className={`h-1 ${color}`} />
+      <div className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-[#F5F5F7] flex items-center justify-center">
+            <Icon className="w-4 h-4 text-corporate" />
+          </div>
+          <h3 className="font-semibold text-[#1D1D1F]">{title}</h3>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+
+  const EditableField = ({ label, field, type = 'text', placeholder = '', selectOptions = null }: any) => {
+    const rawValue = profileFormData[field as keyof typeof profileFormData];
+    const value = rawValue === undefined || rawValue === null ? '' : String(rawValue);
+    return (
+      <div className="space-y-1.5">
+        <Label className="text-xs text-[#86868B]">{label}</Label>
+        {selectOptions ? (
+          <select
+            value={value}
+            onChange={e => setProfileFormData(prev => ({ ...prev, [field]: e.target.value }))}
+            className="w-full h-10 rounded-xl border border-[#E5E5E7] px-3 text-sm bg-white text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+          >
+            {selectOptions.map((opt: any) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        ) : (
+          <Input
+            type={type}
+            value={value}
+            onChange={e => setProfileFormData(prev => ({ ...prev, [field]: e.target.value }))}
+            placeholder={placeholder}
+            className="h-10 rounded-xl border-[#E5E5E7] text-[#1D1D1F] focus:ring-corporate/20"
+          />
+        )}
+      </div>
+    );
+  };
 
   if (loading) return <div className="text-center py-8 text-[#86868B]">Cargando usuarios...</div>;
 
@@ -910,39 +1054,278 @@ function UsuariosTab() {
                     {expandedUserId === u.id && (
                       <tr className="border-b border-[#E5E5E7] bg-[#F5F5F7]/30">
                         <td colSpan={5} className="px-4 py-4">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            <div className="min-w-0">
-                              <p className="text-xs text-[#86868B]">Email</p>
-                              <p className="text-[#1D1D1F] font-medium break-all">{u.email || '-'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Telefono</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.phone || '-'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Posicion</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.position || '-'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Nivel</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.level || 7}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.joinDate || '-'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Estado</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.isActive !== false ? 'Activo' : 'Inactivo'}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs text-[#86868B]">Invitacion</p>
-                              <p className="text-[#1D1D1F] font-medium">{u.invitationPending ? 'Pendiente' : u.authUid ? 'Aceptada' : 'No enviada'}</p>
+                          <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5 mb-4">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                              <UserAvatar name={u.name} photoUrl={u.photoURL || u.avatar} size="lg" fallbackClassName="bg-corporate/10 text-corporate text-lg" />
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-lg font-semibold text-[#1D1D1F]">{u.name}</h3>
+                                <p className="text-sm text-[#86868B]">{roleLabels[u.role] || u.role}</p>
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F5F5F7] text-xs text-[#86868B]">
+                                    <Building2 className="w-3 h-3" /> {u.department?.replace(/_/g, ' ') || 'Sin departamento'}
+                                  </span>
+                                  {u.bloodType && (
+                                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${BLOOD_TYPE_COLORS[u.bloodType] || 'bg-gray-100 text-gray-700'}`}>
+                                      <Droplet className="w-3 h-3" /> {u.bloodType}
+                                    </span>
+                                  )}
+                                  {getAge(u.birthDate) !== null && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#F5F5F7] text-xs text-[#86868B]">
+                                      <Calendar className="w-3 h-3" /> {getAge(u.birthDate)} años
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {editingExpandedUserId === u.id ? (
+                                  <>
+                                    <Button variant="outline" size="sm" onClick={cancelInlineEdit}><X className="w-3.5 h-3.5 mr-1" /> Cancelar</Button>
+                                    <Button size="sm" onClick={() => handleProfileSave(u)}><Save className="w-3.5 h-3.5 mr-1" /> Guardar cambios</Button>
+                                  </>
+                                ) : (
+                                  canEditPersonal(u) && (
+                                    <Button variant="outline" size="sm" onClick={() => startInlineEdit(u)}><Edit3 className="w-3.5 h-3.5 mr-1" /> Editar</Button>
+                                  )
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div className="mt-4 flex justify-end">
-                            <Button size="sm" onClick={() => handleEdit(u)}><Pencil className="w-3.5 h-3.5 mr-1.5" /> Editar usuario</Button>
-                          </div>
+
+                          {editingExpandedUserId === u.id ? (
+                            <div className="space-y-4">
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Información Personal</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField label="Nombre completo" field="name" />
+                                  <EditableField label="Nombre para mostrar" field="displayName" placeholder="Como le gusta que le llamen" />
+                                  <EditableField label="Nacionalidad" field="nationality" placeholder="Ej: Ecuatoriana" />
+                                  <EditableField label="Fecha de nacimiento" field="birthDate" type="date" />
+                                  <EditableField label="Cedula / ID" field="cedula" placeholder="1712345678" />
+                                  <EditableField label="Pasaporte" field="passport" placeholder="PA123456" />
+                                  <div className="md:col-span-2">
+                                    <EditableField label="Direccion" field="address" placeholder="Av. Charles Darwin, Puerto Ayora" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Contacto</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField label="Telefono" field="phone" placeholder="+593 987654321" />
+                                  <EditableField label="Email" field="email" type="email" />
+                                </div>
+                              </div>
+
+                              {user?.role === Role.DIRECTOR_GENERAL && (
+                                <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                  <h4 className="font-semibold text-[#1D1D1F] mb-4">Información laboral</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <EditableField
+                                      label="Rol"
+                                      field="role"
+                                      selectOptions={[
+                                        { value: '', label: 'Seleccionar' },
+                                        { value: Role.DIRECTOR_GENERAL, label: 'Director General' },
+                                        { value: Role.DIRECTOR, label: 'Director' },
+                                        { value: Role.RRHH, label: 'RRHH' },
+                                        { value: Role.GERENTE_OPERACIONES, label: 'Gerente de Operaciones' },
+                                        { value: Role.GERENTE_DEPARTAMENTO, label: 'Gerente de Departamento' },
+                                        { value: Role.SUPERVISOR, label: 'Supervisor' },
+                                        { value: Role.STAFF, label: 'Staff' },
+                                      ]}
+                                    />
+                                    <EditableField
+                                      label="Departamento"
+                                      field="department"
+                                      selectOptions={[
+                                        { value: '', label: 'Seleccionar' },
+                                        ...departmentTreeOptions.map((d) => ({ value: d.code, label: d.name })),
+                                      ]}
+                                    />
+                                    <EditableField
+                                      label="Posicion"
+                                      field="position"
+                                      selectOptions={[
+                                        { value: '', label: 'Seleccionar' },
+                                        ...positions.map((p) => ({ value: p.name, label: p.name })),
+                                      ]}
+                                    />
+                                    <EditableField label="Fecha de ingreso" field="joinDate" type="date" />
+                                    <EditableField
+                                      label="Nivel"
+                                      field="level"
+                                      selectOptions={[
+                                        { value: 1, label: '1 - Director General' },
+                                        { value: 2, label: '2 - Director' },
+                                        { value: 3, label: '3 - RRHH' },
+                                        { value: 4, label: '4 - Gerente de Operaciones' },
+                                        { value: 5, label: '5 - Gerente de Departamento' },
+                                        { value: 6, label: '6 - Supervisor' },
+                                        { value: 7, label: '7 - Staff' },
+                                      ]}
+                                    />
+                                    <div className="flex items-center gap-2 md:col-span-2">
+                                      <input
+                                        type="checkbox"
+                                        id={`isActive-${u.id}`}
+                                        checked={profileFormData.isActive}
+                                        onChange={(e) => setProfileFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                                        className="rounded border-[#E5E5E7]"
+                                      />
+                                      <Label htmlFor={`isActive-${u.id}`} className="text-sm text-[#1D1D1F]">Usuario activo</Label>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Salud</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField
+                                    label="Tipo de sangre"
+                                    field="bloodType"
+                                    selectOptions={[
+                                      { value: '', label: 'Seleccionar' },
+                                      { value: 'A+', label: 'A+' }, { value: 'A-', label: 'A-' },
+                                      { value: 'B+', label: 'B+' }, { value: 'B-', label: 'B-' },
+                                      { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB-' },
+                                      { value: 'O+', label: 'O+' }, { value: 'O-', label: 'O-' },
+                                    ]}
+                                  />
+                                  <EditableField label="Alergias" field="allergies" placeholder="Ninguna" />
+                                  <div className="md:col-span-2">
+                                    <EditableField label="Medicamentos" field="medications" placeholder="Ninguno" />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Contacto de Emergencia</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField label="Nombre" field="emergencyContactName" placeholder="Nombre completo" />
+                                  <EditableField label="Telefono" field="emergencyContactPhone" placeholder="+593 987654321" />
+                                  <EditableField
+                                    label="Relacion"
+                                    field="emergencyContactRelation"
+                                    selectOptions={[
+                                      { value: '', label: 'Seleccionar' },
+                                      { value: 'Esposo/a', label: 'Esposo/a' },
+                                      { value: 'Padre', label: 'Padre' },
+                                      { value: 'Madre', label: 'Madre' },
+                                      { value: 'Hijo/a', label: 'Hijo/a' },
+                                      { value: 'Hermano/a', label: 'Hermano/a' },
+                                      { value: 'Tio/a', label: 'Tio/a' },
+                                      { value: 'Primo/a', label: 'Primo/a' },
+                                      { value: 'Amigo/a', label: 'Amigo/a' },
+                                      { value: 'Otro', label: 'Otro' },
+                                    ]}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Certificaciones</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField label="Certificación de buceo" field="certificationNumber" placeholder="PADI #123456" />
+                                  <EditableField label="Vencimiento" field="certificationExpiry" type="date" />
+                                  <EditableField label="Certificación apnea" field="apneaCert" placeholder="AIDA #123456" />
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                <h4 className="font-semibold text-[#1D1D1F] mb-4">Datos Bancarios</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <EditableField
+                                    label="Pais del banco"
+                                    field="bankCountry"
+                                    selectOptions={[
+                                      { value: '', label: 'Seleccionar' },
+                                      { value: 'EC', label: 'Ecuador' },
+                                      { value: 'US', label: 'USA' },
+                                      { value: 'PA', label: 'Panama' },
+                                      { value: 'CO', label: 'Colombia' },
+                                      { value: 'PE', label: 'Peru' },
+                                      { value: 'CL', label: 'Chile' },
+                                      { value: 'AR', label: 'Argentina' },
+                                      { value: 'BR', label: 'Brasil' },
+                                      { value: 'MX', label: 'Mexico' },
+                                      { value: 'ES', label: 'España' },
+                                      { value: 'GB', label: 'Reino Unido' },
+                                      { value: 'DE', label: 'Alemania' },
+                                    ]}
+                                  />
+                                  <EditableField label="Nombre del banco" field="bankName" placeholder="Banco Pichincha" />
+                                  <EditableField
+                                    label="Tipo de cuenta"
+                                    field="accountType"
+                                    selectOptions={[
+                                      { value: '', label: 'Seleccionar' },
+                                      { value: 'ahorros', label: 'Ahorros / Savings' },
+                                      { value: 'corriente', label: 'Corriente / Checking' },
+                                    ]}
+                                  />
+                                  <EditableField label="Numero de cuenta" field="accountNumber" placeholder="1234567890" />
+                                  {profileFormData.bankCountry === 'US' && (
+                                    <EditableField label="Routing Number" field="routingNumber" placeholder="021000021" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <Section title="Información Personal" icon={User} color="bg-corporate">
+                                <InfoRow icon={User} label="Nombre completo" value={u.name} />
+                                {u.displayName && <InfoRow icon={UserCircle} label="Le llaman" value={`"${u.displayName}"`} />}
+                                <InfoRow icon={Flag} label="Nacionalidad" value={u.nationality} />
+                                <InfoRow icon={Calendar} label="Fecha de nacimiento" value={u.birthDate ? `${u.birthDate} (${getAge(u.birthDate)} años)` : ''} />
+                                <InfoRow icon={IdCard} label="Cedula" value={u.cedula} />
+                                <InfoRow icon={Globe} label="Pasaporte" value={u.passport} />
+                                <InfoRow icon={MapPin} label="Direccion" value={u.address} />
+                              </Section>
+
+                              <Section title="Contacto" icon={Phone} color="bg-blue-500">
+                                <InfoRow icon={Phone} label="Telefono" value={u.phone} />
+                                <InfoRow icon={Mail} label="Email" value={u.email} />
+                              </Section>
+
+                              <Section title="Información laboral" icon={Briefcase} color="bg-indigo-500">
+                                <InfoRow icon={Shield} label="Rol" value={u.role?.replace(/_/g, ' ') || ''} />
+                                <InfoRow icon={Building2} label="Departamento" value={u.department?.replace(/_/g, ' ') || ''} />
+                                <InfoRow icon={Award} label="Posicion" value={u.position || ''} />
+                                <InfoRow icon={Calendar} label="Fecha de ingreso" value={u.joinDate || ''} />
+                                <InfoRow icon={User} label="Nivel" value={u.level ? String(u.level) : ''} />
+                                <InfoRow icon={BadgeCheck} label="Estado" value={u.isActive !== false ? 'Activo' : 'Inactivo'} />
+                              </Section>
+
+                              <Section title="Salud" icon={Heart} color="bg-red-500">
+                                <InfoRow icon={Droplet} label="Tipo de sangre" value={u.bloodType} missing="No registrado" />
+                                <InfoRow icon={AlertTriangle} label="Alergias" value={u.allergies} missing="Ninguna" />
+                                <InfoRow icon={Pill} label="Medicamentos" value={u.medications} missing="Ninguno" />
+                              </Section>
+
+                              <Section title="Contacto de Emergencia" icon={Shield} color="bg-orange-500">
+                                <InfoRow icon={User} label="Nombre" value={u.emergencyContactName} />
+                                <InfoRow icon={Phone} label="Telefono" value={u.emergencyContactPhone} />
+                                <InfoRow icon={Heart} label="Relacion" value={u.emergencyContactRelation} />
+                              </Section>
+
+                              <Section title="Certificaciones" icon={Award} color="bg-purple-500">
+                                <InfoRow icon={BadgeCheck} label="Buceo" value={u.certificationNumber} />
+                                <InfoRow icon={Calendar} label="Vencimiento" value={u.certificationExpiry} />
+                                <InfoRow icon={BadgeCheck} label="Apnea" value={u.apneaCert} />
+                              </Section>
+
+                              <Section title="Datos Bancarios" icon={CreditCard} color="bg-emerald-500">
+                                <InfoRow icon={Flag} label="Pais" value={u.bankCountry} />
+                                <InfoRow icon={Building2} label="Banco" value={u.bankName} />
+                                <InfoRow icon={CreditCard} label="Tipo" value={u.accountType} />
+                                <InfoRow icon={IdCard} label="Cuenta" value={u.accountNumber} />
+                                {u.bankCountry === 'US' && (
+                                  <InfoRow icon={IdCard} label="Routing" value={u.routingNumber} />
+                                )}
+                              </Section>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )}
@@ -954,165 +1337,6 @@ function UsuariosTab() {
         </div>
       </div>
 
-      {/* Profile Modal */}
-      {profileUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={closeProfile}>
-          <div className="bg-white rounded-2xl p-6 shadow-2xl w-full max-w-[95vw] sm:max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-[#1D1D1F]">{profileEditMode ? 'Editar perfil' : 'Perfil de usuario'}</h3>
-              <button onClick={closeProfile} className="text-[#86868B] hover:text-[#1D1D1F]"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="flex items-center gap-4 mb-5">
-              <UserAvatar name={profileUser.name} photoUrl={profileUser.photoURL || profileUser.avatar} size="lg" fallbackClassName="bg-corporate/10 text-corporate text-lg" />
-              <div className="min-w-0">
-                <p className="text-lg font-semibold text-[#1D1D1F] truncate">{profileUser.name}</p>
-                <p className="text-sm text-[#86868B] break-all">{profileUser.email}</p>
-              </div>
-            </div>
-
-            {profileEditMode && user?.role === Role.DIRECTOR_GENERAL ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Nombre</label>
-                  <input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Apellido</label>
-                  <input value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Email</label>
-                  <input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Rol</label>
-                  <select value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
-                    {roleTemplates.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Departamento</label>
-                  <select value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
-                    {departmentTreeOptions.map(opt => (
-                      <option key={opt.code} value={opt.code}>{opt.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Posicion</label>
-                  <select
-                    value={formData.position}
-                    onChange={async (e) => {
-                      const value = e.target.value;
-                      if (value === '__create__') {
-                        const name = window.prompt('Nombre de la nueva posicion:');
-                        if (!name || !name.trim()) {
-                          setFormData((prev) => ({ ...prev, position: '' }));
-                          return;
-                        }
-                        const id = await createPosition(
-                          { name: name.trim(), level: formData.level || 7, department: formData.department || null, isActive: true },
-                          user?.id || 'system'
-                        );
-                        if (id) {
-                          setFormData((prev) => ({ ...prev, position: name.trim() }));
-                        } else {
-                          alert('Error al crear la posicion');
-                          setFormData((prev) => ({ ...prev, position: '' }));
-                        }
-                      } else {
-                        setFormData((prev) => ({ ...prev, position: value }));
-                      }
-                    }}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
-                  >
-                    <option value="">Seleccionar posicion</option>
-                    {positions.map((p) => (
-                      <option key={p.id} value={p.name}>{p.name}</option>
-                    ))}
-                    <option value="__create__">+ Crear nueva posicion</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Fecha de ingreso</label>
-                  <input type="date" value={formData.joinDate || ''} onChange={e => setFormData({...formData, joinDate: e.target.value})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-[#86868B] mb-1">Nivel</label>
-                  <select value={formData.level || ''} onChange={e => setFormData({...formData, level: Number(e.target.value)})}
-                    className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
-                    <option value={1}>1 - Director General</option>
-                    <option value={2}>2 - Director</option>
-                    <option value={3}>3 - RRHH / Alta Gerencia</option>
-                    <option value={4}>4 - Gerente</option>
-                    <option value={5}>5 - Gerente Departamento</option>
-                    <option value={6}>6 - Supervisor</option>
-                    <option value={7}>7 - Staff</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2 flex items-center gap-2">
-                  <input type="checkbox" checked={formData.isActive} onChange={e => setFormData({...formData, isActive: e.target.checked})}
-                    className="w-4 h-4 rounded border-[#E5E5E7]" />
-                  <label className="text-sm text-[#1D1D1F]">Usuario activo</label>
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-[#86868B]">Rol</p>
-                  <p className="text-[#1D1D1F] font-medium">{roleLabels[profileUser.role] || profileUser.role}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Departamento</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.department?.replace(/_/g, ' ') || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Posicion</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.position || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Nivel</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.level || 7}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Telefono</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.phone || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Fecha de ingreso</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.joinDate || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#86868B]">Estado</p>
-                  <p className="text-[#1D1D1F] font-medium">{profileUser.isActive !== false ? 'Activo' : 'Inactivo'}</p>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-6 flex justify-end gap-2">
-              {profileEditMode && user?.role === Role.DIRECTOR_GENERAL ? (
-                <>
-                  <Button variant="outline" onClick={() => setProfileEditMode(false)}>Cancelar</Button>
-                  <Button onClick={handleProfileSave}>Guardar cambios</Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={closeProfile}>Cerrar</Button>
-                  {user?.role === Role.DIRECTOR_GENERAL && (
-                    <Button onClick={() => setProfileEditMode(true)}>Editar</Button>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

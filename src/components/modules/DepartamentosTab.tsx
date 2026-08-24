@@ -391,33 +391,33 @@ export function DepartamentosTab() {
     if (!showFormModal) return null;
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeFormModal(); }}>
-        <div className="w-full max-w-[95vw] sm:max-w-lg rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
+        <div className="w-full max-w-[95vw] sm:max-w-lg rounded-2xl border border-[#E5E5E7] bg-white p-6 shadow-2xl">
           <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-100">{editingId ? "Editar departamento" : "Nuevo departamento"}</h3>
-            <button onClick={closeFormModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+            <h3 className="text-lg font-semibold text-[#1D1D1F]">{editingId ? "Editar departamento" : "Nuevo departamento"}</h3>
+            <button onClick={closeFormModal} className="rounded-lg p-1.5 text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"><X className="h-5 w-5" /></button>
           </div>
           <div className="space-y-4">
             {isEditingProtected && (
               <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
-                <p className="text-xs text-amber-200">
+                <p className="text-xs text-amber-700">
                   <strong>Departamento base:</strong> solo puedes cambiar el color y el icono. El nombre, descripción, departamento padre y estado están protegidos.
                 </p>
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Nombre *</Label>
-              <Input value={form.name} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Operaciones" className="border-slate-600 bg-slate-700 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed" />
+              <Label className="text-[#86868B]">Nombre *</Label>
+              <Input value={form.name} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Ej: Operaciones" className="border-[#E5E5E7] bg-white text-[#1D1D1F] disabled:opacity-50 disabled:cursor-not-allowed" />
               {editingId && originalName && originalName !== form.name && !isEditingProtected && (
-                <p className="text-[11px] text-amber-400">Se sincronizara en usuarios, tareas y turnos.</p>
+                <p className="text-[11px] text-amber-600">Se sincronizara en usuarios, tareas y turnos.</p>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Descripcion</Label>
-              <Input value={form.description} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-slate-600 bg-slate-700 text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed" />
+              <Label className="text-[#86868B]">Descripcion</Label>
+              <Input value={form.description} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Ej: Gestion de operaciones diarias" className="border-[#E5E5E7] bg-white text-[#1D1D1F] disabled:opacity-50 disabled:cursor-not-allowed" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Departamento Padre</Label>
-              <select value={form.parentId || ""} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-md border border-slate-600 bg-slate-700 px-3 py-2 text-sm text-slate-100 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Label className="text-[#86868B]">Departamento Padre</Label>
+              <select value={form.parentId || ""} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, parentId: e.target.value || null }))} className="w-full rounded-xl border border-[#E5E5E7] bg-white px-3 py-2 text-sm text-[#1D1D1F] disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-corporate/20">
                 <option value="">Ninguno (departamento raíz)</option>
                 {departments
                   .filter((d: any) => d.id !== editingId)
@@ -427,25 +427,25 @@ export function DepartamentosTab() {
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
               </select>
-              <p className="text-[11px] text-slate-400">Si está en el subárbol de Operaciones, se considerará operacional automáticamente.</p>
+              <p className="text-[11px] text-[#86868B]">Si está en el subárbol de Operaciones, se considerará operacional automáticamente.</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Color</Label>
+              <Label className="text-[#86868B]">Color</Label>
               <div className="flex flex-wrap gap-1.5">
                 {CORPORATE_COLORS.map((c) => (
                   <button
                     key={c.value}
                     onClick={() => setForm(f => ({ ...f, color: c.value }))}
                     title={c.label}
-                    className={`h-7 w-7 rounded-full border-2 transition ${form.color === c.value ? "border-white scale-110" : "border-transparent hover:scale-105"}`}
+                    className={`h-7 w-7 rounded-full border-2 transition ${form.color === c.value ? "border-[#1D1D1F] scale-110" : "border-transparent hover:scale-105"}`}
                     style={{ backgroundColor: c.value }}
                   />
                 ))}
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-slate-300">Icono</Label>
-              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-lg border border-slate-600 bg-slate-700 p-2">
+              <Label className="text-[#86868B]">Icono</Label>
+              <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-40 overflow-y-auto rounded-lg border border-[#E5E5E7] bg-white p-2">
                 {ICON_OPTIONS.map((opt) => {
                   const Icon = opt.icon;
                   const isUsed = departments.some((d: any) => d.id !== editingId && d.icon === opt.value && d.isActive !== false);
@@ -457,7 +457,7 @@ export function DepartamentosTab() {
                       title={`${opt.label}${isUsed ? ' (en uso)' : ''}`}
                       disabled={isUsed}
                       onClick={() => setForm(f => ({ ...f, icon: opt.value }))}
-                      className={`flex h-8 w-8 items-center justify-center rounded-md border transition ${isSelected ? 'border-white bg-slate-500 text-white' : 'border-slate-600 text-slate-300 hover:bg-slate-600'} ${isUsed ? 'opacity-30 cursor-not-allowed' : ''}`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-md border transition ${isSelected ? 'border-corporate bg-corporate/10 text-corporate' : 'border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7]'} ${isUsed ? 'opacity-30 cursor-not-allowed' : ''}`}
                     >
                       <Icon className="h-4 w-4" />
                     </button>
@@ -466,12 +466,12 @@ export function DepartamentosTab() {
               </div>
             </div>
             <div className="flex items-center gap-2 pt-2">
-              <input type="checkbox" checked={form.isActive} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded border-slate-500 disabled:opacity-50 disabled:cursor-not-allowed" />
-              <Label className="text-sm text-slate-300">Activo</Label>
+              <input type="checkbox" checked={form.isActive} disabled={isEditingProtected} onChange={(e) => setForm(f => ({ ...f, isActive: e.target.checked }))} className="rounded border-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed" />
+              <Label className="text-sm text-[#1D1D1F]">Activo</Label>
             </div>
           </div>
           <div className="mt-6 flex gap-2 justify-end">
-            <Button variant="ghost" onClick={closeFormModal} className="text-slate-300 hover:text-slate-100">Cancelar</Button>
+            <Button variant="ghost" onClick={closeFormModal} className="text-[#86868B] hover:text-[#1D1D1F]">Cancelar</Button>
             <Button onClick={handleSave} disabled={saving} className="bg-sky-600 hover:bg-sky-700">{editingId ? "Guardar cambios" : "Crear departamento"}</Button>
           </div>
         </div>
@@ -487,29 +487,29 @@ export function DepartamentosTab() {
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeTeamModal(); }}>
-        <div className="w-full max-w-[95vw] sm:max-w-3xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="w-full max-w-[95vw] sm:max-w-[95vw] rounded-2xl border border-[#E5E5E7] bg-white p-6 shadow-2xl max-h-[85vh] overflow-y-auto">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-slate-100">{selectedDept.name}</h3>
-              <p className="text-xs text-slate-400">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {isOperationalDepartment(selectedDept.code) ? "Operacional" : "No operacional"}</p>
+              <h3 className="text-lg font-semibold text-[#1D1D1F]">{selectedDept.name}</h3>
+              <p className="text-xs text-[#86868B]">{selectedDept.description || "Sin descripcion"} · {sortedUsers.length} usuarios · {isOperationalDepartment(selectedDept.code) ? "Operacional" : "No operacional"}</p>
             </div>
             <div className="flex items-center gap-1">
               {!PROTECTED_DEPT_CODES.includes(selectedDept.code) && (
                 <>
-                  <button onClick={() => { closeTeamModal(); openEdit(selectedDept); }} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-sky-400" title="Editar departamento"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => { handleDelete(selectedDept); closeTeamModal(); }} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-900/20 hover:text-red-400" title="Eliminar departamento"><Trash2 className="h-4 w-4" /></button>
+                  <button onClick={() => { closeTeamModal(); openEdit(selectedDept); }} className="rounded-lg p-1.5 text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-sky-600" title="Editar departamento"><Pencil className="h-4 w-4" /></button>
+                  <button onClick={() => { handleDelete(selectedDept); closeTeamModal(); }} className="rounded-lg p-1.5 text-[#86868B] transition hover:bg-red-50 hover:text-red-500" title="Eliminar departamento"><Trash2 className="h-4 w-4" /></button>
                 </>
               )}
-              <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+              <button onClick={closeTeamModal} className="rounded-lg p-1.5 text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"><X className="h-5 w-5" /></button>
             </div>
           </div>
 
           {myChildren.length > 0 && (
-            <div className="mb-4 rounded-lg border border-slate-700 bg-slate-900/50 p-3">
-              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Sub-departamentos ({myChildren.length})</h4>
+            <div className="mb-4 rounded-lg border border-[#E5E5E7] bg-[#F5F5F7]/50 p-3">
+              <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-[#86868B]">Sub-departamentos ({myChildren.length})</h4>
               <div className="flex flex-wrap gap-2">
                 {myChildren.map(c => (
-                  <button key={c.id} onClick={() => { setSelectedDept(c); setEditingUserId(null); }} className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-xs text-slate-300 transition hover:bg-slate-700 hover:text-white">
+                  <button key={c.id} onClick={() => { setSelectedDept(c); setEditingUserId(null); }} className="rounded-lg border border-[#E5E5E7] bg-white px-3 py-1.5 text-xs text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]">
                     {c.name}
                   </button>
                 ))}
@@ -517,15 +517,15 @@ export function DepartamentosTab() {
             </div>
           )}
 
-          <div className="rounded-lg border border-slate-700 bg-slate-900/30">
-            <h4 className="px-4 pt-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Equipo</h4>
+          <div className="rounded-lg border border-[#E5E5E7] bg-white">
+            <h4 className="px-4 pt-4 text-xs font-semibold uppercase tracking-wider text-[#86868B]">Equipo</h4>
             {sortedUsers.length === 0 ? (
-              <p className="px-4 py-6 text-center text-xs text-slate-500">No hay usuarios asignados.</p>
+              <p className="px-4 py-6 text-center text-xs text-[#86868B]">No hay usuarios asignados.</p>
             ) : (
               <div className="overflow-x-auto p-4">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-[#E5E5E7] text-left text-xs text-[#86868B] uppercase tracking-wider">
                       <th className="pb-3 pr-4">Nombre</th>
                       <th className="pb-3 pr-4">Email</th>
                       <th className="pb-3 pr-4">Nivel</th>
@@ -534,7 +534,7 @@ export function DepartamentosTab() {
                       <th className="pb-3"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody className="divide-y divide-[#E5E5E7]/50">
                     {sortedUsers.map((u: any) => {
                       const badge = getLevelBadge(u.level || 7);
                       const BadgeIcon = badge.icon;
@@ -543,13 +543,13 @@ export function DepartamentosTab() {
                         <tr key={u.id} className="group">
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-700 text-[10px] font-bold text-slate-300">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F5F5F7] text-[10px] font-bold text-[#86868B]">
                                 {(u.name || "?").charAt(0).toUpperCase()}
                               </div>
-                              <span className="font-medium text-slate-200">{u.name || "Sin nombre"}</span>
+                              <span className="font-medium text-[#1D1D1F]">{u.name || "Sin nombre"}</span>
                             </div>
                           </td>
-                          <td className="py-3 pr-4 text-xs text-slate-400">{u.email}</td>
+                          <td className="py-3 pr-4 text-xs text-[#86868B]">{u.email}</td>
                           <td className="py-3 pr-4">
                             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${badge.className}`}>
                               <BadgeIcon className="h-3 w-3" />{badge.label}
@@ -557,12 +557,12 @@ export function DepartamentosTab() {
                           </td>
                           <td className="py-3 pr-4">
                             {isEditing ? (
-                              <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
+                              <select value={editRole} onChange={(e) => setEditRole(e.target.value)} className="rounded border border-[#E5E5E7] bg-white px-2 py-1 text-xs text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20">
                                 <option value="">Seleccionar rol</option>
                                 {ROLES_LIST.map(r => (<option key={r.value} value={r.value}>{r.label}</option>))}
                               </select>
                             ) : (
-                              <span className="text-slate-300">{u.role || "Sin rol"}</span>
+                              <span className="text-[#86868B]">{u.role || "Sin rol"}</span>
                             )}
                           </td>
                           <td className="py-3 pr-4">
@@ -592,7 +592,7 @@ export function DepartamentosTab() {
                                       setEditPosition(value);
                                     }
                                   }}
-                                  className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200"
+                                  className="w-full rounded border border-[#E5E5E7] bg-white px-2 py-1 text-xs text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
                                 >
                                   <option value="">Posicion</option>
                                   {positions.map((p) => (
@@ -600,25 +600,25 @@ export function DepartamentosTab() {
                                   ))}
                                   <option value="__create__">+ Nueva</option>
                                 </select>
-                                <select value={editLevel} onChange={(e) => setEditLevel(Number(e.target.value))} className="w-28 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200">
+                                <select value={editLevel} onChange={(e) => setEditLevel(Number(e.target.value))} className="w-full rounded border border-[#E5E5E7] bg-white px-2 py-1 text-xs text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20">
                                   {LEVELS.map(l => (<option key={l.value} value={l.value}>{l.label}</option>))}
                                 </select>
                               </div>
                             ) : (
-                              <div className="text-slate-400">
+                              <div className="text-[#86868B]">
                                 <div>{u.position || "-"}</div>
-                                <div className="text-[10px] text-slate-500">Nivel {u.level || 7}</div>
+                                <div className="text-[10px] text-[#86868B]/70">Nivel {u.level || 7}</div>
                               </div>
                             )}
                           </td>
                           <td className="py-3 text-right">
                             {isEditing ? (
                               <div className="flex items-center gap-1 justify-end">
-                                <button onClick={() => handleUpdateUser(u.id)} className="rounded p-1 text-green-400 hover:bg-green-900/20"><Save className="h-3.5 w-3.5" /></button>
-                                <button onClick={() => { setEditingUserId(null); setEditRole(""); setEditLevel(7); setEditPosition(""); }} className="rounded p-1 text-red-400 hover:bg-red-900/20"><X className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => handleUpdateUser(u.id)} className="rounded p-1 text-emerald-600 hover:bg-emerald-50"><Save className="h-3.5 w-3.5" /></button>
+                                <button onClick={() => { setEditingUserId(null); setEditRole(""); setEditLevel(7); setEditPosition(""); }} className="rounded p-1 text-red-500 hover:bg-red-50"><X className="h-3.5 w-3.5" /></button>
                               </div>
                             ) : (
-                              <button onClick={() => startEditUser(u)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-sky-400 hover:bg-sky-900/20"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => startEditUser(u)} className="rounded p-1 text-[#86868B] opacity-0 group-hover:opacity-100 transition hover:text-sky-600 hover:bg-sky-50"><Pencil className="h-3.5 w-3.5" /></button>
                             )}
                           </td>
                         </tr>
@@ -631,9 +631,9 @@ export function DepartamentosTab() {
           </div>
 
           {/* Plantillas de tareas específicas */}
-          <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/30">
+          <div className="mt-4 rounded-lg border border-[#E5E5E7] bg-white">
             <div className="flex items-center justify-between px-4 pt-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Plantillas de tareas específicas ({deptTemplates.length})</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-[#86868B]">Plantillas de tareas específicas ({deptTemplates.length})</h4>
               <Button
                 size="sm"
                 onClick={() => openTemplateModal(selectedDept)}
@@ -643,19 +643,19 @@ export function DepartamentosTab() {
               </Button>
             </div>
             {deptTemplates.length === 0 ? (
-              <p className="px-4 py-6 text-center text-xs text-slate-500">No hay plantillas de tareas específicas para este departamento.</p>
+              <p className="px-4 py-6 text-center text-xs text-[#86868B]">No hay plantillas de tareas específicas para este departamento.</p>
             ) : (
               <div className="overflow-x-auto p-4">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400 uppercase tracking-wider">
+                    <tr className="border-b border-[#E5E5E7] text-left text-xs text-[#86868B] uppercase tracking-wider">
                       <th className="pb-3 pr-4">Título</th>
                       <th className="pb-3 pr-4">Turnos</th>
                       <th className="pb-3 pr-4">Asignadas</th>
                       <th className="pb-3"></th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-700/50">
+                  <tbody className="divide-y divide-[#E5E5E7]/50">
                     {deptTemplates.map((template: any) => {
                       const shiftNames = (template.shiftIds || (template.shiftId ? [template.shiftId] : []))
                         .map((sid: string) => shifts.find((s: any) => s.id === sid)?.name || sid)
@@ -664,21 +664,21 @@ export function DepartamentosTab() {
                         <tr key={template.id} className="group">
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
-                              <LayoutTemplate className="h-4 w-4 text-slate-500" />
-                              <span className="font-medium text-slate-200">{template.title}</span>
+                              <LayoutTemplate className="h-4 w-4 text-[#86868B]" />
+                              <span className="font-medium text-[#1D1D1F]">{template.title}</span>
                             </div>
                           </td>
-                          <td className="py-3 pr-4 text-xs text-slate-400">{shiftNames || "-"}</td>
+                          <td className="py-3 pr-4 text-xs text-[#86868B]">{shiftNames || "-"}</td>
                           <td className="py-3 pr-4">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-300 border border-slate-700">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#F5F5F7] px-2 py-0.5 text-[11px] text-[#86868B] border border-[#E5E5E7]">
                               <Clock className="h-3 w-3" />
                               {templateCounts[template.id] ?? 0}
                             </span>
                           </td>
                           <td className="py-3 text-right">
                             <div className="flex items-center gap-1 justify-end">
-                              <button onClick={() => openTemplateModal(selectedDept, template)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-sky-400 hover:bg-sky-900/20"><Pencil className="h-3.5 w-3.5" /></button>
-                              <button onClick={() => handleDeleteTemplate(template.id)} className="rounded p-1 text-slate-500 opacity-0 group-hover:opacity-100 transition hover:text-red-400 hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => openTemplateModal(selectedDept, template)} className="rounded p-1 text-[#86868B] opacity-0 group-hover:opacity-100 transition hover:text-sky-600 hover:bg-sky-50"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button onClick={() => handleDeleteTemplate(template.id)} className="rounded p-1 text-[#86868B] opacity-0 group-hover:opacity-100 transition hover:text-red-500 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </td>
                         </tr>
@@ -698,10 +698,10 @@ export function DepartamentosTab() {
     if (!showTemplateModal) return null;
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={(e) => { if (e.target === e.currentTarget) closeTemplateModal(); }}>
-        <div className="w-full max-w-[95vw] sm:max-w-2xl rounded-2xl border border-slate-700 bg-slate-800 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div className="w-full max-w-[95vw] sm:max-w-2xl rounded-2xl border border-[#E5E5E7] bg-white p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
           <div className="mb-5 flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-slate-100">{editingTemplateId ? "Editar plantilla" : "Nueva plantilla"}</h3>
-            <button onClick={closeTemplateModal} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-slate-200"><X className="h-5 w-5" /></button>
+            <h3 className="text-lg font-semibold text-[#1D1D1F]">{editingTemplateId ? "Editar plantilla" : "Nueva plantilla"}</h3>
+            <button onClick={closeTemplateModal} className="rounded-lg p-1.5 text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"><X className="h-5 w-5" /></button>
           </div>
           <SpecificTaskForm
             form={templateForm}

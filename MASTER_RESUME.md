@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Fixes post-7.5: TDZ departamentos, edición de perfil, auditoría unificada)
+> Última actualización: 2026-08-24 (Unificación perfil en Usuarios y popups claros en Departamentos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -14,6 +14,35 @@ Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contra
 - Las reglas de contraseña, reautenticación y límites de sesión están hardcodeadas en los componentes actuales.
 - Se debe programar una fase futura para leer estas políticas desde `appSettings.global.security` y aplicarlas en login, cambio de contraseña, acciones sensibles y retención de auditoría.
 - Esta tarea queda registrada para no olvidarse al avanzar a las siguientes fases.
+
+---
+
+## Unificación de perfil en Develops > Usuarios (24 de agosto)
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Develops > Usuarios — perfil inline**:
+  - Se eliminó el modal de perfil; ahora el perfil se muestra y edita dentro de la fila expandida de la tabla.
+  - El botón lápiz expande la fila y activa el modo edición inline.
+  - El botón con icono de persona expande la fila en modo lectura.
+  - La expansión muestra el perfil completo con las mismas 7 secciones de `ProfilePage.tsx`: Información Personal, Contacto, Información laboral, Salud, Contacto de Emergencia, Certificaciones y Datos Bancarios.
+  - En modo edición se pueden modificar todos los campos personales.
+  - La sección **Información laboral** solo se muestra y edita si el usuario actual es `DIRECTOR_GENERAL`.
+  - Los selects de departamento y posición se cargan desde Firebase (`useDynamicDepartments` y `useFirestorePositions`).
+- **Develops > Departamentos — popups claros y anchos**:
+  - Los modales de crear/editar departamento y ver equipo cambiaron del tema oscuro al tema claro corporativo (`bg-white`, texto `[#1D1D1F]`, bordes `[#E5E5E7]`).
+  - El popup de equipo se amplió para ocupar casi todo el ancho en desktop (`sm:max-w-[95vw]`), eliminando el scroll horizontal de la tabla.
+  - Se mantuvieron intactas la lógica y funcionalidad de guardar, eliminar, editar usuarios y plantillas.
+
+### Archivos modificados
+- `src/components/modules/DevelopsModule.tsx`
+- `src/components/modules/DepartamentosTab.tsx`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
