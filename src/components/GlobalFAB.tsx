@@ -264,6 +264,7 @@ function ReminderCard({
   onConvert,
   onToggleItem,
   onArchive,
+  onDelete,
   canConvert,
 }: {
   reminder: FirestoreReminder;
@@ -272,6 +273,7 @@ function ReminderCard({
   onConvert: () => void;
   onToggleItem: (itemId: string) => void;
   onArchive: () => void;
+  onDelete: () => void;
   canConvert: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -379,7 +381,7 @@ function ReminderCard({
                   </button>
                 )}
                 <button
-                  onClick={(e) => { e.stopPropagation(); onArchive(); }}
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -507,7 +509,7 @@ function ReminderCard({
             </button>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onArchive(); }}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-500 bg-red-500/5 hover:bg-red-500/10 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -547,6 +549,7 @@ export function GlobalFAB() {
     renameList,
     addList,
     deleteList,
+    deleteReminder,
     cleanupOldCompleted,
   } = useFirestoreReminders(user?.id);
 
@@ -560,6 +563,7 @@ export function GlobalFAB() {
   const [showRemindersPanel, setShowRemindersPanel] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedListFilter, setSelectedListFilter] = useState<string>('all');
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string | null>(null);
   const [reminderView, setReminderView] = useState<'cards' | 'list'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -940,6 +944,19 @@ export function GlobalFAB() {
     return Array.from(existing).sort();
   }, [activeReminders, userLists]);
 
+  const topTags = useMemo(() => {
+    const freq: Record<string, number> = {};
+    reminders.forEach((r) => {
+      r.tags.forEach((tag) => {
+        freq[tag] = (freq[tag] || 0) + 1;
+      });
+    });
+    return Object.entries(freq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag]) => tag);
+  }, [reminders]);
+
   const counts = useMemo(() => {
     const today = todayISO();
     return {
@@ -954,8 +971,10 @@ export function GlobalFAB() {
 
   const filteredDisplayReminders = useMemo(() => {
     let result = [...activeReminders];
-    // Filtros y listas son mutuamente excluyentes
-    if (selectedListFilter !== 'all') {
+    // Filtros, listas y etiquetas son mutuamente excluyentes
+    if (selectedTagFilter) {
+      result = result.filter((r) => r.tags.includes(selectedTagFilter));
+    } else if (selectedListFilter !== 'all') {
       result = result.filter((r) => r.list === selectedListFilter);
     } else if (selectedCategory !== 'all') {
       switch (selectedCategory) {
@@ -987,7 +1006,7 @@ export function GlobalFAB() {
       );
     }
     return result;
-  }, [activeReminders, reminders, selectedCategory, selectedListFilter, searchQuery]);
+  }, [activeReminders, reminders, selectedCategory, selectedListFilter, selectedTagFilter, searchQuery]);
 
   const actions: FabAction[] = [
     {
@@ -1242,6 +1261,7 @@ export function GlobalFAB() {
                         onClick={() => {
                           setSelectedCategory(cat.id);
                           setSelectedListFilter('all');
+                          setSelectedTagFilter(null);
                         }}
                         className={cn(
                           'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
@@ -1273,6 +1293,7 @@ export function GlobalFAB() {
                       onClick={() => {
                         setSelectedCategory(cat.id);
                         setSelectedListFilter('all');
+                        setSelectedTagFilter(null);
                       }}
                       className={cn(
                         'flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-colors',
@@ -1339,6 +1360,7 @@ export function GlobalFAB() {
                         const trimmed = name.trim();
                         setSelectedListFilter(trimmed);
                         setSelectedCategory('all');
+                        setSelectedTagFilter(null);
                         addList(trimmed).catch(() => {});
                       }
                     }}
@@ -1352,6 +1374,7 @@ export function GlobalFAB() {
                     onClick={() => {
                       setSelectedListFilter('all');
                       setSelectedCategory('all');
+                      setSelectedTagFilter(null);
                     }}
                     className={cn(
                       'flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm transition-colors',
@@ -1373,6 +1396,7 @@ export function GlobalFAB() {
                         onClick={() => {
                           setSelectedListFilter(listName);
                           setSelectedCategory('all');
+                          setSelectedTagFilter(null);
                         }}
                         className="flex items-center gap-2 flex-1 text-left"
                       >
@@ -1418,6 +1442,33 @@ export function GlobalFAB() {
                   ))}
                 </div>
               </div>
+
+              {/* Filtro de etiquetas */}
+              {topTags.length > 0 && (
+                <div className="hidden lg:block p-4 border-t border-[#E5E5E7]">
+                  <h2 className="text-xs font-semibold text-[#86868B] uppercase tracking-wider mb-2 px-2">Etiquetas</h2>
+                  <div className="flex flex-wrap gap-1.5">
+                    {topTags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => {
+                          setSelectedTagFilter(selectedTagFilter === tag ? null : tag);
+                          setSelectedCategory('all');
+                          setSelectedListFilter('all');
+                        }}
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
+                          selectedTagFilter === tag
+                            ? 'bg-corporate text-white border-corporate'
+                            : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-corporate/5'
+                        )}
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </aside>
 
             {/* Contenido */}
@@ -1428,6 +1479,7 @@ export function GlobalFAB() {
                   onClick={() => {
                     setSelectedListFilter('all');
                     setSelectedCategory('all');
+                    setSelectedTagFilter(null);
                   }}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
@@ -1444,6 +1496,7 @@ export function GlobalFAB() {
                     onClick={() => {
                       setSelectedListFilter(listName);
                       setSelectedCategory('all');
+                      setSelectedTagFilter(null);
                     }}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
@@ -1456,6 +1509,30 @@ export function GlobalFAB() {
                   </button>
                 ))}
               </div>
+
+              {/* Mobile: filtros de etiquetas */}
+              {topTags.length > 0 && (
+                <div className="lg:hidden flex items-center gap-2 overflow-x-auto pb-3 mb-3 scrollbar-hide">
+                  {topTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => {
+                        setSelectedTagFilter(selectedTagFilter === tag ? null : tag);
+                        setSelectedCategory('all');
+                        setSelectedListFilter('all');
+                      }}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors border',
+                        selectedTagFilter === tag
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white text-[#1D1D1F] border-[#E5E5E7]'
+                      )}
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {filteredDisplayReminders.length === 0 && (
                 <div className="flex flex-col items-center justify-center h-64 text-[#86868B] space-y-3">
@@ -1482,6 +1559,7 @@ export function GlobalFAB() {
                     onConvert={() => startConvert(reminder)}
                     onToggleItem={(itemId) => toggleReminderItem(reminder.id, itemId)}
                     onArchive={() => archiveReminder(reminder.id, { userId: user?.id || '', userName: user?.name || '' })}
+                    onDelete={() => deleteReminder(reminder.id)}
                     canConvert={!!canConvert}
                   />
                 ))}
@@ -1661,6 +1739,24 @@ export function GlobalFAB() {
                     }}
                   />
                 </div>
+                {topTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    <span className="text-xs text-[#86868B] py-1">Más usadas:</span>
+                    {topTags
+                      .filter((tag) => !tags.includes(tag))
+                      .slice(0, 6)
+                      .map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => setTags((prev) => [...prev, tag])}
+                          className="px-2 py-1 rounded-full text-xs font-medium border border-[#E5E5E7] text-[#1D1D1F] hover:bg-corporate/5 hover:border-corporate transition-colors"
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                  </div>
+                )}
               </div>
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#E5E5E7]">
                 <div className="flex items-center gap-3">

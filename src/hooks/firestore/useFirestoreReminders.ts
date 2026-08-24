@@ -279,6 +279,16 @@ export function useFirestoreReminders(userId: string | undefined) {
     }
   }, [userId]);
 
+  const deleteReminder = useCallback(async (id: string): Promise<void> => {
+    try {
+      const docRef = doc(db, COLLECTION_NAME, id);
+      await deleteDoc(docRef);
+    } catch (err: any) {
+      console.error('Error al eliminar recordatorio:', err);
+      throw err;
+    }
+  }, []);
+
   const markReminderConverted = useCallback(async (id: string, taskId: string, actor?: { userId: string; userName?: string }): Promise<void> => {
     try {
       const docRef = doc(db, COLLECTION_NAME, id);
@@ -454,6 +464,7 @@ export function useFirestoreReminders(userId: string | undefined) {
     updateReminder,
     toggleReminderItem,
     archiveReminder,
+    deleteReminder,
     markReminderConverted,
     addList,
     deleteList,

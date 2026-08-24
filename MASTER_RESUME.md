@@ -1,9 +1,39 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-23 (fix eliminar tareas y limpieza automática de recordatorios terminados)
+> Última actualización: 2026-08-24 (etiquetas inteligentes y eliminar recordatorios inmediatamente)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Etiquetas inteligentes y eliminar recordatorios inmediatamente
+
+**Estado:** COMPLETADO
+
+### Cambios realizados
+- **Sección #Etiquetas en el panel de Recordatorios**:
+  - Nueva sección en la sidebar izquierda (desktop) y chips horizontales (mobile) con las etiquetas más usadas por el usuario.
+  - Las etiquetas se calculan en tiempo real a partir de todos los recordatorios del usuario.
+  - Al presionar una etiqueta se filtran los recordatorios que la contienen, de forma mutuamente excluyente con filtros de categoría y listas.
+  - Se muestran hasta 10 etiquetas principales con contador de uso.
+- **Etiquetas rápidas en el editor**:
+  - En el popup de nuevo/editar recordatorio se agregó la sección "Más usadas" con las etiquetas existentes.
+  - El usuario puede seleccionarlas con un clic o seguir escribiendo etiquetas nuevas.
+- **Eliminar recordatorio inmediatamente**:
+  - El botón **Eliminar** de las tarjetas (vista lista y vista tarjetas) ahora elimina el documento de Firestore de forma inmediata mediante `deleteDoc`.
+  - Se mantiene el botón de check principal para archivar/completar y mover al filtro **Terminados**.
+  - Eliminación reflejada en tiempo real gracias al listener `onSnapshot`.
+
+### Archivos modificados
+- `src/components/GlobalFAB.tsx`
+- `src/hooks/firestore/useFirestoreReminders.ts`
+- `MASTER_RESUME.md`
+
+### Build + Deploy
+- `npm run build` exitoso.
+- Commit y push a `fix-horarios-provider`.
+- Deploy a Firebase Hosting realizado.
 
 ---
 
