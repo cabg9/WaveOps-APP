@@ -37,6 +37,9 @@
 - **.firebaserc:** default = wve-b3db5, staging = wve-pruebas-b3db5.
 - **Limitacion conocida de la gemela:** el service worker de FCM sigue apuntando a produccion (las push web no funcionaran en staging hasta parametrizarlo). Storage requiere plan Blaze (tarjeta) — sin Blaze las fotos no subiran en staging.
 - **Faltan 3 habilitaciones manuales en consola del proyecto nuevo:** Firestore (crear base de datos), Authentication (Email/Password) y, opcionalmente, Storage (requiere Blaze).
+- **Habilitaciones completadas por el usuario (13 sep):** Firestore, Authentication (Email/Password) y plan Blaze.
+- **Datos de prueba cargados (13 sep):** `scripts/restore-to-staging.cjs` restaura un backup JSON en staging y crea las cuentas de Authentication con los mismos UIDs. Ejecutado: 239 documentos restaurados + 8 usuarios Auth creados en `wve-pruebas-b3db5`. Contraseña temporal de todas las cuentas de prueba: `WaveOps2026!`.
+- **Reglas de Firestore desplegadas en staging** (`firestore deploy --only firestore:rules -P staging`). Storage en staging pendiente de inicializar en consola (1 clic: "Comenzar" en la pantalla de Storage) para poder desplegar sus reglas.
 
 ---
 
