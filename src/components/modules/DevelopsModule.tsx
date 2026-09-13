@@ -38,12 +38,15 @@ import type { AppModule } from '@/types/develops';
 import { Role } from '@/types';
 import { DepartamentosTab } from './DepartamentosTab';
 import { TurnosTab } from './TurnosTab';
+import { UbicacionesTab } from './UbicacionesTab';
+import { CatalogosTab } from './CatalogosTab';
+import { ControlesTab } from './ControlesTab';
 
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS
 // ═══════════════════════════════════════════════════════════════════
 
-type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'posiciones' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos' | 'feedback';
+type DevelopTab = 'general' | 'usuarios' | 'modulos' | 'departamentos' | 'roles' | 'posiciones' | 'auditoria' | 'seguridad' | 'papelera' | 'turnos' | 'feedback' | 'ubicaciones' | 'catalogos' | 'controles';
 
 interface TabConfig {
   id: DevelopTab;
@@ -51,6 +54,9 @@ interface TabConfig {
   icon: React.ElementType;
   description: string;
   impact: 'low' | 'medium' | 'high';
+  // Feature flag que controla la visibilidad de la pestaña (solo si aplica).
+  // Si el flag no existe o está apagado, la pestaña queda oculta.
+  flag?: string;
 }
 
 type SortField = 'name' | 'email' | 'role' | 'department' | 'isActive';
@@ -82,6 +88,9 @@ const TABS: TabConfig[] = [
   { id: 'papelera', label: 'Papelera', icon: Trash2, description: 'Elementos eliminados', impact: 'medium' },
   { id: 'turnos', label: 'Turnos', icon: Clock, description: 'Gestion de turnos por departamento', impact: 'high' },
   { id: 'feedback', label: 'Feedback', icon: MessageSquare, description: 'Sugerencias y problemas reportados por usuarios', impact: 'low' },
+  { id: 'ubicaciones', label: 'Ubicaciones', icon: MapPin, description: 'Tipos, grupos y ubicaciones del sistema (infraestructura transversal)', impact: 'high', flag: 'enableUbicaciones' },
+  { id: 'catalogos', label: 'Catalogos', icon: Briefcase, description: 'Catalogos maestros: proveedores, productos, centros de costo, canales de venta y clientes', impact: 'high', flag: 'enableCatalogosMaestros' },
+  { id: 'controles', label: 'Controles', icon: BadgeCheck, description: 'Catalogo dinamico de controles: licencias, pruebas y certificados con alertas de vencimiento', impact: 'high', flag: 'enableCatalogoControles' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -191,6 +200,21 @@ const FEATURE_FLAG_META: Record<string, { name: string; on: string; off: string 
     name: 'Modulo de Develops',
     on: 'El modulo Develops (configuracion avanzada) esta visible para quienes tengan permiso.',
     off: 'El modulo Develops esta oculto; solo se podra acceder si se reactiva desde otro canal.',
+  },
+  enableUbicaciones: {
+    name: 'Pestana Ubicaciones (Develops)',
+    on: 'Se muestra la pestana Ubicaciones en Develops: tipos, grupos y ubicaciones que usaran los modulos de Inventario y Compras. Solo afecta a quienes tienen acceso a Develops; los usuarios normales no ven nada nuevo.',
+    off: 'La pestana Ubicaciones queda oculta. Las ubicaciones ya creadas no se borran; solo se ocultan hasta reactivar esta opcion.',
+  },
+  enableCatalogosMaestros: {
+    name: 'Pestana Catalogos maestros (Develops)',
+    on: 'Se muestra la pestana Catalogos en Develops: proveedores, productos, centros de costo, canales de venta y clientes. Son los datos base para Inventario y Compras; solo los ve quien tiene acceso a Develops.',
+    off: 'La pestana Catalogos queda oculta. Los catalogos ya creados se conservan; solo se ocultan hasta reactivar esta opcion.',
+  },
+  enableCatalogoControles: {
+    name: 'Pestana Controles (Develops)',
+    on: 'Se muestra la pestana Controles en Develops: tipos de control configurables (licencias, pruebas, certificados) y controles asignados a personas con alertas de vencimiento. Solo afecta a quienes tienen acceso a Develops.',
+    off: 'La pestana Controles queda oculta. Los controles y su historial se conservan; solo se ocultan hasta reactivar esta opcion.',
   },
 };
 
@@ -3037,7 +3061,7 @@ const MOBILE_ONLY_TABS: DevelopTab[] = ['usuarios', 'departamentos', 'roles', 't
 export default function DevelopsModule() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { modules, settings, roleTemplates } = useAppConfig();
+  const { modules, settings, roleTemplates, isFeatureEnabled } = useAppConfig();
   const { logs } = useAudit();
   const { positions } = useFirestorePositions();
   const [activeTab, setActiveTab] = useState<DevelopTab>('general');
@@ -3051,8 +3075,10 @@ export default function DevelopsModule() {
   }, []);
 
   const visibleTabs = useMemo(() => {
-    return isMobile ? TABS.filter((t) => MOBILE_ONLY_TABS.includes(t.id)) : TABS;
-  }, [isMobile]);
+    const base = isMobile ? TABS.filter((t) => MOBILE_ONLY_TABS.includes(t.id)) : TABS;
+    // Las pestanas nuevas de Fase 0 viven detras de su feature flag (apagado por defecto)
+    return base.filter((t) => !t.flag || isFeatureEnabled(t.flag));
+  }, [isMobile, isFeatureEnabled]);
 
   // Si la pestaña activa no está disponible en móvil, forzar la primera visible
   useEffect(() => {
@@ -3073,6 +3099,9 @@ export default function DevelopsModule() {
     papelera: <PapeleraTab />,
     turnos: <TurnosTab />,
     feedback: <FeedbackTab />,
+    ubicaciones: <UbicacionesTab />,
+    catalogos: <CatalogosTab />,
+    controles: <ControlesTab />,
   };
 
   const activeTabConfig = TABS.find((t) => t.id === activeTab) || TABS[0];

@@ -1,9 +1,60 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-12 (WAVEOPS_DESIGN.md v20 copiado como plano maestro — inicio de módulos nuevos)
+> Última actualización: 2026-09-13 (FASE 0 entregada en gemela de pruebas — pendiente validación del usuario)
 > Branch activo: `fix-horarios-provider`
-> Proyecto Firebase: `wve-b3db5`
+> Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 0 — Cimientos en Develops (13 de septiembre) — ENTREGADA EN STAGING, PENDIENTE VALIDACIÓN
+
+**Estado:** DESPLEGADA EN LA GEMELA (https://wve-pruebas-b3db5.web.app) — esperando checklist de validación del usuario. Nada se ha tocado en producción salvo el commit+push del código (los flags nuevos están apagados por defecto, así que en producción no se vería nada aunque se desplegara).
+
+**Qué se construyó (todo detrás de feature flag APAGADO por defecto, solo visible para quien tiene acceso a Develops):**
+
+- **A) Pestaña Ubicaciones** (`src/components/modules/UbicacionesTab.tsx`): 3 entidades con CRUD completo y activar/desactivar (nunca se borra historial): Tipos de Ubicación (con módulos permitidos), Grupos de Ubicación y Ubicaciones (tipo, grupo, país, ciudad, provincia, dirección, responsable usuario+departamento, módulos asociados, observaciones). Botón "Cargar iniciales" idempotente con semillas: tipos (Administrativa, Almacenaje, Operativa, Externa), grupos (Compras & Pagos, Almacenaje, Operación, Externos) y ubicaciones (Quito, Guayaquil, The Warehouse, Dive Shop, Embarcaciones, Movilidad, Proveedores externos). Colecciones: `locationTypes`, `locationGroups`, `locations`.
+- **B) Pestaña Catálogos** (`src/components/modules/CatalogosTab.tsx`): 6 sub-secciones con el mismo patrón CRUD + activar/desactivar: Proveedores (RUC, contacto, datos bancarios, condiciones), Productos (categoría y unidad de medida como catálogos dinámicos, SKU, rentable/consumible, foto, nombre es/en), Categorías y Unidades de medida, Centros de Costo (con departamento asociado), Canales de Venta (semillas: Mostrador, Renta Externa, Agencia/Operador, Público General) y Clientes (persona/empresa/interno, deduplicación por identificación/email, botón "Generar clientes internos" que crea uno por cada departamento). Colecciones: `suppliers`, `products`, `productCategories`, `unitsOfMeasure`, `costCenters`, `salesChannels`, `clients`.
+- **C) Pestaña Controles** (`src/components/modules/ControlesTab.tsx`): el Catálogo Dinámico de Controles. Tipos de control configurables (nombre es/en, a qué aplica: personas/equipos/vehículos/embarcaciones/ubicaciones, roles, vigencia en meses, campos personalizados, días de alerta, obligatorio/opcional, quién verifica) + Controles asignados (instancia con fecha de emisión, vencimiento calculado, foto del documento, estado vigente/por vencer/vencido/verificado, historial). Alertas automáticas a la campana (notificación al usuario asignado + RRHH, dedupe de 24h). Semillas: PADI Open Water, Licencia de conducir, Prueba hidrostática de tanque, Seguro de guía, Manipulación de alimentos, Revisión técnica vehicular. Colecciones: `controlTypes`, `controlAssignments`.
+- **D) Roles nuevos** (semilla en staging vía `scripts/seed-fase0.cjs`): plantillas `Conductor` y `Restaurante` en Develops → Roles, con TODOS los toggles desactivados por defecto. Se activarán con Movilidad (Fase 6) y Cocina (Fase 3).
+- **E) Renombres de solo presentación** (staging, misma semilla): "Requisiciones" → "Inventario / Requisiciones" y "Ordenes de Pago" → "Compras & Pagos". Ids y rutas intactos. En producción se aplicará SOLO tras la aprobación del usuario.
+- **E) Reglas Firestore aditivas** (`firestore.rules`): las 12 colecciones nuevas solo las escriben DIRECTOR_GENERAL y RRHH (cualquier autenticado lee); además RRHH/Directorio/Gerente Ops pueden crear notificaciones (antes era `if false` — cambio aditivo necesario para las alertas de controles).
+
+**Feature flags nuevos** (en Develops → General, apagados por defecto; sin ellos las pestañas ni aparecen):
+- `enableUbicaciones` → pestaña Ubicaciones
+- `enableCatalogosMaestros` → pestaña Catálogos
+- `enableCatalogoControles` → pestaña Controles
+
+**Cimientos transversales:**
+- `src/lib/tenant.ts`: `getCurrentTenantId()` (hoy siempre 'default'; preparación multi-tenancy). Toda colección nueva guarda `tenantId`.
+- `src/lib/i18n.ts`: sistema mínimo de traducciones (`t()`, `registerI18nKeys`, ES por defecto / EN fallback). Toda UI nueva pasa por claves; cada pestaña registra las suyas.
+- `src/types/catalogs.ts`: tipos TypeScript de las 12 entidades nuevas.
+- `src/types/develops.ts`: union `AuditAction` ampliado con las acciones de auditoría de Fase 0 (cambio solo aditivo).
+- Semilla de datos: `scripts/seed-fase0.cjs <serviceAccount.json>` (roles + renombres, idempotente).
+
+**Archivos modificados:** `DevelopsModule.tsx` (3 pestañas registradas + gating por flag + metadatos de flags), `firestore.rules`, `src/types/develops.ts`. **Archivos nuevos:** los 3 `*Tab.tsx`, `src/lib/tenant.ts`, `src/lib/i18n.ts`, `src/types/catalogs.ts`, `scripts/seed-fase0.cjs`.
+
+**Decisiones tomadas:**
+- Las pestañas nuevas son solo de escritorio (no se agregaron a `MOBILE_ONLY_TABS` de Develops). Cualquier rol que no sea DG/RRHH las ve en solo lectura.
+- Estado de vencimiento de controles se calcula (fecha vs. hoy), no se guarda como verdad absoluta.
+- Las alertas usan el `NotificationType` existente `TASK_OVERDUE` como tipo genérico (no existe 'system'); el email de alertas queda pendiente (hoy solo campana in-app).
+
+**Problemas conocidos / pendientes:**
+- El service worker FCM sigue apuntando a producción (las push no llegarán en staging).
+- Email de alertas de controles: pendiente (hoy solo notificación in-app).
+- Reglas de Storage en staging aún no desplegadas (las fotos de productos/controles suben a Storage de staging, que ya está habilitado; si fallara, habría que `firebase deploy --only storage -P staging`).
+- Para pasar a producción falta: aprobación del usuario → deploy hosting prod + `firebase deploy --only firestore:rules` prod + semilla `seed-fase0.cjs` contra el service account de producción.
+
+**Build:** `index-6YSakI1l.js` (2026-09-13), `tsc -b && vite build` sin errores.
+
+**Checklist de validación entregada al usuario** (probar en la gemela con admin):
+
+1. Activar los 3 flags en Develops → General (Ubicaciones, Catálogos maestros, Controles) y confirmar que aparecen las 3 pestañas nuevas.
+2. Develops → Ubicaciones: cargar iniciales → crear/editar/desactivar una ubicación; verificar que las semillas quedan editables.
+3. Develops → Catálogos: cargar iniciales (unidades y canales), crear un producto con foto, crear un proveedor, generar clientes internos, probar que la deduplicación de clientes bloquea un duplicado.
+4. Develops → Controles: cargar iniciales, crear un tipo de control nuevo desde cero, asignarlo a un usuario con foto y fecha, verificar el estado calculado y verificarlo; revisar que llega la notificación a la campana (usuario asignado + RRHH) cuando está por vencer/vencido.
+5. Lista de supervivencia: login, Tasks, Horarios (turnos + solicitudes), Recordatorios, Develops (usuarios/departamentos/roles) funcionan igual que antes.
+6. Confirmar que en Develops → Roles aparecen Conductor y Restaurante con toggles apagados, y que los módulos se llaman ahora "Inventario / Requisiciones" y "Compras & Pagos".
 
 ---
 

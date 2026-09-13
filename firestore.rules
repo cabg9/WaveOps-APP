@@ -22,6 +22,66 @@ service cloud.firestore {
       allow read: if false;
       allow write: if request.auth != null;
     }
+    // ═══ FASE 0 — Catálogos maestros y Ubicaciones (aditivo) ═══
+    // Solo Director General y RRHH administran los catálogos; cualquier
+    // usuario autenticado puede leerlos (los módulos futuros los consultan).
+    function isCatalogAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['DIRECTOR_GENERAL', 'RRHH'];
+    }
+    match /locationTypes/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /locationGroups/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /locations/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /suppliers/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /products/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /productCategories/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /unitsOfMeasure/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /costCenters/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /salesChannels/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /clients/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /controlTypes/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    match /controlAssignments/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    // ═══ FASE 0 — Alertas de controles: RRHH/Directorio pueden crear notificaciones ═══
+    match /notifications/{notificationId} {
+      allow create: if request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['DIRECTOR_GENERAL', 'DIRECTOR', 'RRHH', 'GERENTE_OPERACIONES'];
+    }
     match /{collection}/{documentId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;
