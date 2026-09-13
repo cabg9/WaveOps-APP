@@ -105,6 +105,7 @@ registerI18nKeys({
     'controls.type.nameInputPlaceholder': 'Escribe un nombre y pulsa Agregar',
     'controls.type.noSelection': 'Sin selección',
     'controls.detail.targetSelections': 'Selección por destino',
+    'controls.type.scopeTabsHint': 'Activa una o varias para indicar a quiénes aplica este control.',
     'controls.targets.title': '¿A qué se le puede asignar un control?',
     'controls.targets.subtitle': 'Tipos de destino: personas, departamentos, equipos, vehículos, embarcaciones o ubicaciones. Crea aquí cualquier tipo de cosa que necesite documentos o controles.',
     'controls.targets.add': 'Agregar',
@@ -251,6 +252,7 @@ registerI18nKeys({
     'controls.type.nameInputPlaceholder': 'Type a name and press Add',
     'controls.type.noSelection': 'No selection',
     'controls.detail.targetSelections': 'Selection by target',
+    'controls.type.scopeTabsHint': 'Turn on one or more to indicate who this control applies to.',
     'controls.targets.title': 'What can a control be assigned to?',
     'controls.targets.subtitle': 'Target types: people, departments, teams, vehicles, vessels or locations. Create here any kind of thing that needs documents or controls.',
     'controls.targets.add': 'Add',
@@ -510,6 +512,7 @@ interface TypeFormState {
   description: string;
   appliesTo: string[]; // ids del catálogo dinámico controlTargetTypes
   targetSelections: Record<string, string[]>; // selección específica por id de appliesTo
+  rolesTabVisible: boolean; // pestaña ROLES activa (solo UI; no se persiste)
   roleIds: string[];
   positionIds: string[]; // ids de positions
   validityMonths: string; // string para input; vacío = no vence
@@ -525,6 +528,7 @@ const EMPTY_TYPE_FORM: TypeFormState = {
   description: '',
   appliesTo: [],
   targetSelections: {},
+  rolesTabVisible: false,
   roleIds: [],
   positionIds: [],
   validityMonths: '',
@@ -803,6 +807,7 @@ export function ControlesTab() {
       description: ct.description || '',
       appliesTo: [...ct.appliesTo],
       targetSelections: { ...(ct.targetSelections || {}) },
+      rolesTabVisible: (ct.roleIds || []).length > 0,
       roleIds: [...ct.roleIds],
       positionIds: [...(ct.positionIds || [])],
       validityMonths: ct.validityMonths != null ? String(ct.validityMonths) : '',
@@ -2079,7 +2084,48 @@ export function ControlesTab() {
             <div className="space-y-2">
               <Label>{t('controls.type.appliesTo')} *</Label>
               <div className="flex flex-wrap gap-1.5">
-                {activeTargetTypes.map(tt => (
+                {/* Tres pestañas acumulables e independientes: PERSONAS | ROLES | DEPARTAMENTOS.
+                    PERSONAS/DEPARTAMENTOS viven en appliesTo; al apagarse conservan su
+                    targetSelections. ROLES es solo bandera de UI (rolesTabVisible). */}
+                <button
+                  type="button"
+                  onClick={() => toggleAppliesTo('personas')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                    typeForm.appliesTo.includes('personas')
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  {t('controls.applies.personas')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTypeForm(prev => ({ ...prev, rolesTabVisible: !prev.rolesTabVisible }))}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                    typeForm.rolesTabVisible
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  {t('controls.detail.roles')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleAppliesTo('departamentos')}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                    typeForm.appliesTo.includes('departamentos')
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  {t('controls.applies.departamentos')}
+                </button>
+                {activeTargetTypes
+                  .filter(tt => tt.id !== 'personas' && tt.id !== 'departamentos')
+                  .map(tt => (
                   <button
                     key={tt.id}
                     type="button"
@@ -2111,6 +2157,7 @@ export function ControlesTab() {
                     </button>
                   ))}
               </div>
+              <p className="text-[11px] text-[#86868B]">{t('controls.type.scopeTabsHint')}</p>
             </div>
 
             {/* Selectores dependientes del destino: un bloque por cada chip activo
@@ -2225,29 +2272,33 @@ export function ControlesTab() {
               );
             })}
 
-            <div className="space-y-2">
-              <Label>{t('controls.type.roles')}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {roleTemplates.length === 0 ? (
-                  <span className="text-xs text-[#86868B]">—</span>
-                ) : roleTemplates.map(rt => (
-                  <button
-                    key={rt.id}
-                    type="button"
-                    onClick={() => toggleRoleId(rt.id)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
-                      typeForm.roleIds.includes(rt.id)
-                        ? 'bg-corporate text-white border-corporate'
-                        : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
-                    )}
-                  >
-                    {rt.name}
-                  </button>
-                ))}
+            {/* Bloque de la pestaña ROLES: multi-select de roleIds (se guarda igual en
+                roleIds). Puede estar visible aunque roleIds esté vacío. */}
+            {typeForm.rolesTabVisible && (
+              <div className="space-y-2 rounded-xl border border-[#E5E5E7] p-3">
+                <Label>{t('controls.type.roles')}</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {roleTemplates.length === 0 ? (
+                    <span className="text-xs text-[#86868B]">—</span>
+                  ) : roleTemplates.map(rt => (
+                    <button
+                      key={rt.id}
+                      type="button"
+                      onClick={() => toggleRoleId(rt.id)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                        typeForm.roleIds.includes(rt.id)
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {rt.name}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#86868B]">{t('controls.type.rolesHint')}</p>
               </div>
-              <p className="text-[11px] text-[#86868B]">{t('controls.type.rolesHint')}</p>
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label>{t('controls.type.positions')}</Label>

@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2 y 0.3 desplegadas en gemela — pendiente cierre del usuario)
+> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2, 0.3 + mini-ajuste de cierre desplegados en gemela — pendiente cierre del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -18,6 +18,18 @@
 **Tipos:** `ControlType.targetSelections?: Record<string, string[]>`.
 
 **Build:** limpio (exit 0); deploy hosting staging hecho.
+
+### Mini-ajuste de cierre de ronda 3 — Chips acumulables PERSONAS | ROLES | DEPARTAMENTOS
+
+El bloque "Aplica a" del formulario de Tipo de control ahora arranca con TRES chips independientes y acumulables:
+
+- **PERSONAS** y **DEPARTAMENTOS** son chips-toggles: se encienden/apagan con un clic y MANTIENEN sus selecciones al apagarse (el toggle nunca toca `targetSelections`). Ambos se excluyen del listado del catálogo de destinos para no duplicarlas.
+- **ROLES** es un chip de UI propio (bandera `rolesTabVisible` en el estado del formulario; al editar se activa automáticamente si `roleIds` tiene valores). El bloque "Roles a los que aplica" se reubicó DENTRO de este chip (guarda igual en `roleIds`).
+- Las tres se pueden tener activadas a la vez; los valores guardados precargan al editar.
+- Texto de ayuda con clave i18n `controls.type.scopeTabsHint`.
+- Nota: `appliesTo` sigue siendo obligatorio al guardar — si solo se activa ROLES sin destino, el formulario pedirá elegir un destino.
+
+**Archivos:** `ControlesTab.tsx` (solo este). **Build:** limpio (exit 0); deploy hosting staging hecho.
 
 ---
 
