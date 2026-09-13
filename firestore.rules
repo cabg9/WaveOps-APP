@@ -77,6 +77,10 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isCatalogAdmin();
     }
+    match /controlTargetTypes/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
     // ═══ FASE 0 — Alertas de controles: RRHH/Directorio pueden crear notificaciones ═══
     match /notifications/{notificationId} {
       allow create: if request.auth != null &&

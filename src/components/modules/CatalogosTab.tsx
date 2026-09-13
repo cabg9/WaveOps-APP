@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import {
   Plus, Pencil, Package, Truck, Layers, Calculator, Megaphone, Users,
   Eye, EyeOff, Upload, Sparkles, Building2, Info, Lock, Tags, Scale,
+  Search, Trash2, ArrowUpDown, Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -24,7 +25,7 @@ import { registerI18nKeys, t } from '@/lib/i18n';
 import { Role } from '@/types';
 import type { AuditAction } from '@/types/develops';
 import type {
-  CatalogBase, Supplier, Product, ProductCategory, UnitOfMeasure,
+  CatalogBase, Supplier, SupplierBankAccount, Product, ProductCategory, UnitOfMeasure,
   CostCenter, SalesChannel, Client, ClientType,
 } from '@/types/catalogs';
 
@@ -71,7 +72,16 @@ registerI18nKeys({
     'catalogs.suppliers.bank': 'Banco',
     'catalogs.suppliers.accountType': 'Tipo de cuenta',
     'catalogs.suppliers.accountNumber': 'Número de cuenta',
-    'catalogs.suppliers.bankData': 'Datos bancarios',
+    'catalogs.suppliers.bankAccounts': 'Cuentas bancarias',
+    'catalogs.suppliers.addAccount': 'Agregar cuenta',
+    'catalogs.suppliers.removeAccount': 'Quitar cuenta',
+    'catalogs.suppliers.primary': 'Principal',
+    'catalogs.suppliers.noAccounts': 'Sin cuentas registradas',
+    'catalogs.suppliers.accountsLine': '{count} cuenta(s) · Principal: {primary}',
+    'catalogs.suppliers.suppliedCategories': 'Categorías que suministra',
+    'catalogs.suppliers.frequentCostCenters': 'Centros de costo frecuentes',
+    'catalogs.suppliers.noCategories': 'No hay categorías activas',
+    'catalogs.suppliers.noCostCenters': 'No hay centros de costo activos',
     'catalogs.suppliers.paymentTerms': 'Condiciones de pago',
     'catalogs.suppliers.notes': 'Notas',
     'catalogs.products.title': 'Productos',
@@ -91,6 +101,17 @@ registerI18nKeys({
     'catalogs.products.selectUnit': 'Selecciona una unidad',
     'catalogs.products.yes': 'Sí',
     'catalogs.products.no': 'No',
+    'catalogs.products.preferredSupplier': 'Proveedor preferido',
+    'catalogs.products.selectSupplier': 'Selecciona un proveedor',
+    'catalogs.products.searchPlaceholder': 'Buscar por nombre o SKU',
+    'catalogs.products.allCategories': 'Todas las categorías',
+    'catalogs.products.sortBy': 'Ordenar por',
+    'catalogs.products.sortNameAsc': 'Nombre A-Z',
+    'catalogs.products.sortNameDesc': 'Nombre Z-A',
+    'catalogs.products.sortSku': 'SKU',
+    'catalogs.products.groupByCategory': 'Agrupar por categoría',
+    'catalogs.products.noCategory': 'Sin categoría',
+    'catalogs.products.noResults': 'Sin resultados para los filtros aplicados',
     'catalogs.categories.title': 'Categorías y unidades',
     'catalogs.categories.categories': 'Categorías de producto',
     'catalogs.categories.units': 'Unidades de medida',
@@ -101,6 +122,8 @@ registerI18nKeys({
     'catalogs.categories.name': 'Nombre',
     'catalogs.categories.nameEn': 'Nombre (inglés)',
     'catalogs.categories.abbreviation': 'Abreviatura',
+    'catalogs.categories.categoryCount': '{count} categoría(s)',
+    'catalogs.categories.unitCount': '{count} unidad(es)',
     'catalogs.costCenters.title': 'Centros de costo',
     'catalogs.costCenters.count': '{count} centro(s)',
     'catalogs.costCenters.new': 'Nuevo centro de costo',
@@ -176,7 +199,16 @@ registerI18nKeys({
     'catalogs.suppliers.bank': 'Bank',
     'catalogs.suppliers.accountType': 'Account type',
     'catalogs.suppliers.accountNumber': 'Account number',
-    'catalogs.suppliers.bankData': 'Bank data',
+    'catalogs.suppliers.bankAccounts': 'Bank accounts',
+    'catalogs.suppliers.addAccount': 'Add account',
+    'catalogs.suppliers.removeAccount': 'Remove account',
+    'catalogs.suppliers.primary': 'Primary',
+    'catalogs.suppliers.noAccounts': 'No accounts registered',
+    'catalogs.suppliers.accountsLine': '{count} account(s) · Primary: {primary}',
+    'catalogs.suppliers.suppliedCategories': 'Categories supplied',
+    'catalogs.suppliers.frequentCostCenters': 'Frequent cost centers',
+    'catalogs.suppliers.noCategories': 'No active categories',
+    'catalogs.suppliers.noCostCenters': 'No active cost centers',
     'catalogs.suppliers.paymentTerms': 'Payment terms',
     'catalogs.suppliers.notes': 'Notes',
     'catalogs.products.title': 'Products',
@@ -196,6 +228,17 @@ registerI18nKeys({
     'catalogs.products.selectUnit': 'Select a unit',
     'catalogs.products.yes': 'Yes',
     'catalogs.products.no': 'No',
+    'catalogs.products.preferredSupplier': 'Preferred supplier',
+    'catalogs.products.selectSupplier': 'Select a supplier',
+    'catalogs.products.searchPlaceholder': 'Search by name or SKU',
+    'catalogs.products.allCategories': 'All categories',
+    'catalogs.products.sortBy': 'Sort by',
+    'catalogs.products.sortNameAsc': 'Name A-Z',
+    'catalogs.products.sortNameDesc': 'Name Z-A',
+    'catalogs.products.sortSku': 'SKU',
+    'catalogs.products.groupByCategory': 'Group by category',
+    'catalogs.products.noCategory': 'Uncategorized',
+    'catalogs.products.noResults': 'No results for the applied filters',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -206,6 +249,8 @@ registerI18nKeys({
     'catalogs.categories.name': 'Name',
     'catalogs.categories.nameEn': 'Name (English)',
     'catalogs.categories.abbreviation': 'Abbreviation',
+    'catalogs.categories.categoryCount': '{count} category(ies)',
+    'catalogs.categories.unitCount': '{count} unit(s)',
     'catalogs.costCenters.title': 'Cost centers',
     'catalogs.costCenters.count': '{count} cost center(s)',
     'catalogs.costCenters.new': 'New cost center',
@@ -488,44 +533,98 @@ interface SupplierFormState {
   contactName: string;
   email: string;
   phone: string;
-  bank: string;
-  accountType: string;
-  accountNumber: string;
+  bankAccounts: SupplierBankAccount[];
+  productCategoryIds: string[];
+  costCenterIds: string[];
   paymentTerms: string;
   notes: string;
 }
 
 const EMPTY_SUPPLIER: SupplierFormState = {
   identification: '', name: '', contactName: '', email: '', phone: '',
-  bank: '', accountType: '', accountNumber: '', paymentTerms: '', notes: '',
+  bankAccounts: [], productCategoryIds: [], costCenterIds: [], paymentTerms: '', notes: '',
 };
+
+function newAccountId(): string {
+  return `acc_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
 
 function SuppliersSection({ canWrite }: { canWrite: boolean }) {
   const { user } = useAuth();
   const { logAction } = useAudit();
   const { items: suppliers } = useCatalog<Supplier>('suppliers');
+  const { items: productCategories } = useCatalog<ProductCategory>('productCategories');
+  const { items: costCenters } = useCatalog<CostCenter>('costCenters');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierFormState>(EMPTY_SUPPLIER);
   const [saving, setSaving] = useState(false);
 
+  const activeCategories = useMemo(() => productCategories.filter((c) => c.isActive), [productCategories]);
+  const activeCostCenters = useMemo(() => costCenters.filter((c) => c.isActive), [costCenters]);
+
   const openCreate = () => { setEditing(null); setForm(EMPTY_SUPPLIER); setShowModal(true); };
 
   const openEdit = (s: Supplier) => {
     setEditing(s);
+    // Migración legacy: si no hay bankAccounts pero sí bankData, migrarlo como cuenta principal
+    const existingAccounts: SupplierBankAccount[] =
+      s.bankAccounts && s.bankAccounts.length > 0
+        ? s.bankAccounts
+        : s.bankData && (s.bankData.bank || s.bankData.accountType || s.bankData.accountNumber)
+          ? [{
+              id: newAccountId(),
+              bank: s.bankData.bank || '',
+              accountType: s.bankData.accountType || '',
+              accountNumber: s.bankData.accountNumber || '',
+              isPrimary: true,
+            }]
+          : [];
     setForm({
       identification: s.identification || '',
       name: s.name || '',
       contactName: s.contactName || '',
       email: s.email || '',
       phone: s.phone || '',
-      bank: s.bankData?.bank || '',
-      accountType: s.bankData?.accountType || '',
-      accountNumber: s.bankData?.accountNumber || '',
+      bankAccounts: existingAccounts,
+      productCategoryIds: s.productCategoryIds ? [...s.productCategoryIds] : [],
+      costCenterIds: s.costCenterIds ? [...s.costCenterIds] : [],
       paymentTerms: s.paymentTerms || '',
       notes: s.notes || '',
     });
     setShowModal(true);
+  };
+
+  const addAccount = () =>
+    setForm((f) => ({
+      ...f,
+      bankAccounts: [
+        ...f.bankAccounts,
+        { id: newAccountId(), bank: '', accountType: '', accountNumber: '', isPrimary: f.bankAccounts.length === 0 },
+      ],
+    }));
+
+  const updateAccount = (id: string, patch: Partial<SupplierBankAccount>) =>
+    setForm((f) => ({ ...f, bankAccounts: f.bankAccounts.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
+
+  const removeAccount = (id: string) =>
+    setForm((f) => ({ ...f, bankAccounts: f.bankAccounts.filter((a) => a.id !== id) }));
+
+  // Solo una cuenta puede ser principal: al marcar una se desmarcan las demás
+  const setPrimaryAccount = (id: string) =>
+    setForm((f) => ({ ...f, bankAccounts: f.bankAccounts.map((a) => ({ ...a, isPrimary: a.id === id })) }));
+
+  const toggleInList = (list: string[], id: string) =>
+    list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+
+  const accountsLine = (s: Supplier): string => {
+    const accs = s.bankAccounts || [];
+    if (accs.length === 0) return '';
+    const primary = accs.find((a) => a.isPrimary) || accs[0];
+    return fmt('catalogs.suppliers.accountsLine', {
+      count: accs.length,
+      primary: [primary.bank, primary.accountNumber].filter(Boolean).join(' · ') || '—',
+    });
   };
 
   const handleSave = async () => {
@@ -541,11 +640,18 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       contactName: form.contactName.trim() || null,
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
-      bankData: {
-        bank: form.bank.trim() || null,
-        accountType: form.accountType.trim() || null,
-        accountNumber: form.accountNumber.trim() || null,
-      },
+      bankAccounts: form.bankAccounts
+        .filter((a) => (a.bank || '').trim() || (a.accountType || '').trim() || (a.accountNumber || '').trim())
+        .map((a) => ({
+          id: a.id,
+          bank: (a.bank || '').trim() || null,
+          accountType: (a.accountType || '').trim() || null,
+          accountNumber: (a.accountNumber || '').trim() || null,
+          isPrimary: !!a.isPrimary,
+        })),
+      bankData: null, // legacy migrado a bankAccounts
+      productCategoryIds: [...form.productCategoryIds],
+      costCenterIds: [...form.costCenterIds],
       paymentTerms: form.paymentTerms.trim() || null,
       notes: form.notes.trim() || null,
     };
@@ -587,7 +693,7 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
     if (!user?.id) return;
     const next = !s.isActive;
     const done = await executeWithConfirm({
-      level: 'major',
+      level: 'important',
       title: next ? t('catalogs.common.confirmActivateTitle') : t('catalogs.common.confirmDeactivateTitle'),
       message: fmt(next ? 'catalogs.common.confirmActivate' : 'catalogs.common.confirmDeactivate', { name: s.name }),
       action: async () => {
@@ -627,7 +733,7 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
             <EntityCard
               key={s.id}
               name={s.name}
-              lines={[s.identification, [s.contactName, s.phone].filter(Boolean).join(' · '), s.email]}
+              lines={[s.identification, [s.contactName, s.phone].filter(Boolean).join(' · '), s.email, accountsLine(s)]}
               icon={<Truck className="w-5 h-5" />}
               isActive={s.isActive}
               canWrite={canWrite}
@@ -671,11 +777,94 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>{t('catalogs.suppliers.bankData')}</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-[#F5F5F7] rounded-xl p-3">
-                <Input placeholder={t('catalogs.suppliers.bank')} value={form.bank} onChange={set('bank')} />
-                <Input placeholder={t('catalogs.suppliers.accountType')} value={form.accountType} onChange={set('accountType')} />
-                <Input placeholder={t('catalogs.suppliers.accountNumber')} value={form.accountNumber} onChange={set('accountNumber')} />
+              <div className="flex items-center justify-between">
+                <Label>{t('catalogs.suppliers.bankAccounts')}</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addAccount} className="flex items-center gap-1.5 h-8 text-xs">
+                  <Plus className="w-3.5 h-3.5" /> {t('catalogs.suppliers.addAccount')}
+                </Button>
+              </div>
+              {form.bankAccounts.length === 0 ? (
+                <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl p-3">{t('catalogs.suppliers.noAccounts')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {form.bankAccounts.map((acc) => (
+                    <div key={acc.id} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-[#F5F5F7] rounded-xl p-3">
+                      <Input placeholder={t('catalogs.suppliers.bank')} value={acc.bank || ''} onChange={(e) => updateAccount(acc.id, { bank: e.target.value })} className="sm:flex-1" />
+                      <Input placeholder={t('catalogs.suppliers.accountType')} value={acc.accountType || ''} onChange={(e) => updateAccount(acc.id, { accountType: e.target.value })} className="sm:flex-1" />
+                      <Input placeholder={t('catalogs.suppliers.accountNumber')} value={acc.accountNumber || ''} onChange={(e) => updateAccount(acc.id, { accountNumber: e.target.value })} className="sm:flex-1" />
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setPrimaryAccount(acc.id)}
+                          title={t('catalogs.suppliers.primary')}
+                          className={cn(
+                            'flex items-center gap-1 px-2.5 h-9 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                            acc.isPrimary ? 'bg-corporate text-white' : 'bg-white border border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                          )}
+                        >
+                          <Star className={cn('w-3.5 h-3.5', acc.isPrimary && 'fill-current')} />
+                          {t('catalogs.suppliers.primary')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeAccount(acc.id)}
+                          title={t('catalogs.suppliers.removeAccount')}
+                          className="p-2 rounded-lg hover:bg-white text-[#86868B] hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.suppliers.suppliedCategories')}</Label>
+              <div className="flex flex-wrap gap-1.5 bg-[#F5F5F7] rounded-xl p-3">
+                {activeCategories.length === 0 && (
+                  <p className="text-xs text-[#86868B]">{t('catalogs.suppliers.noCategories')}</p>
+                )}
+                {activeCategories.map((c) => {
+                  const selected = form.productCategoryIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, productCategoryIds: toggleInList(form.productCategoryIds, c.id) })}
+                      className={cn(
+                        'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                        selected ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.suppliers.frequentCostCenters')}</Label>
+              <div className="flex flex-wrap gap-1.5 bg-[#F5F5F7] rounded-xl p-3">
+                {activeCostCenters.length === 0 && (
+                  <p className="text-xs text-[#86868B]">{t('catalogs.suppliers.noCostCenters')}</p>
+                )}
+                {activeCostCenters.map((c) => {
+                  const selected = form.costCenterIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, costCenterIds: toggleInList(form.costCenterIds, c.id) })}
+                      className={cn(
+                        'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                        selected ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="space-y-2">
@@ -714,6 +903,7 @@ interface ProductFormState {
   sku: string;
   isRentable: boolean;
   isConsumable: boolean;
+  preferredSupplierId: string;
 }
 
 function ProductsSection({ canWrite }: { canWrite: boolean }) {
@@ -722,22 +912,58 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const { items: products } = useCatalog<Product>('products');
   const { items: categories } = useCatalog<ProductCategory>('productCategories');
   const { items: units } = useCatalog<UnitOfMeasure>('unitsOfMeasure');
+  const { items: suppliers } = useCatalog<Supplier>('suppliers');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<ProductFormState>({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true });
+  const [form, setForm] = useState<ProductFormState>({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '' });
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const { uploadImage, uploading } = useStorageUpload();
   const [saving, setSaving] = useState(false);
 
+  // Vista escalable: búsqueda, filtro, ordenamiento y agrupación (todo en memoria)
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [sortBy, setSortBy] = useState<'nameAsc' | 'nameDesc' | 'sku'>('nameAsc');
+  const [groupByCategory, setGroupByCategory] = useState(true);
+
   const activeCategories = useMemo(() => categories.filter((c) => c.isActive), [categories]);
   const activeUnits = useMemo(() => units.filter((u) => u.isActive), [units]);
+  const activeSuppliers = useMemo(() => suppliers.filter((s) => s.isActive), [suppliers]);
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name || '';
   const unitName = (id: string) => units.find((u) => u.id === id)?.name || '';
+  const supplierName = (id?: string) => (id ? suppliers.find((s) => s.id === id)?.name || '' : '');
+
+  const visibleProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = products.filter((p) => {
+      if (categoryFilter && p.categoryId !== categoryFilter) return false;
+      if (q && !(p.name || '').toLowerCase().includes(q) && !(p.sku || '').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    return [...list].sort((a, b) => {
+      if (sortBy === 'sku') return (a.sku || '').localeCompare(b.sku || '') || (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'nameDesc') return (b.name || '').localeCompare(a.name || '');
+      return (a.name || '').localeCompare(b.name || '');
+    });
+  }, [products, search, categoryFilter, sortBy]);
+
+  const groupedProducts = useMemo(() => {
+    const map = new Map<string, Product[]>();
+    for (const p of visibleProducts) {
+      const key = p.categoryId || '';
+      const bucket = map.get(key);
+      if (bucket) bucket.push(p);
+      else map.set(key, [p]);
+    }
+    const labelFor = (id: string) => categoryName(id) || t('catalogs.products.noCategory');
+    return [...map.entries()].sort((a, b) => labelFor(a[0]).localeCompare(labelFor(b[0])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleProducts, categories]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true });
+    setForm({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '' });
     setPhotoUrl('');
     setPhotoFile(null);
     setShowModal(true);
@@ -753,6 +979,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       sku: p.sku || '',
       isRentable: !!p.isRentable,
       isConsumable: !!p.isConsumable,
+      preferredSupplierId: p.preferredSupplierId || '',
     });
     setPhotoUrl(p.photoUrl || '');
     setPhotoFile(null);
@@ -786,6 +1013,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
         sku: form.sku.trim() || null,
         isRentable: form.isRentable,
         isConsumable: form.isConsumable,
+        preferredSupplierId: form.preferredSupplierId || null,
         photoUrl: finalPhotoUrl || null,
       };
       if (editing) {
@@ -824,7 +1052,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
     if (!user?.id) return;
     const next = !p.isActive;
     const done = await executeWithConfirm({
-      level: 'major',
+      level: 'important',
       title: next ? t('catalogs.common.confirmActivateTitle') : t('catalogs.common.confirmDeactivateTitle'),
       message: fmt(next ? 'catalogs.common.confirmActivate' : 'catalogs.common.confirmDeactivate', { name: p.name }),
       action: async () => {
@@ -844,6 +1072,68 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
     }
   };
 
+  const renderProductCard = (p: Product) => (
+    <div
+      key={p.id}
+      className={cn(
+        'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-start gap-4 transition-opacity',
+        !p.isActive && 'opacity-60'
+      )}
+    >
+      {p.photoUrl ? (
+        <img src={p.photoUrl} alt={p.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
+      ) : (
+        <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
+          <Package className="w-5 h-5" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <h3 className="font-medium text-[#1D1D1F] truncate">{p.name}</h3>
+          <span
+            className={cn(
+              'text-[10px] font-medium px-2 py-0.5 rounded-full',
+              p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
+            )}
+          >
+            {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+          </span>
+        </div>
+        <div className="mt-1 space-y-0.5">
+          <p className="text-xs text-[#86868B] truncate">{[categoryName(p.categoryId), unitName(p.unitId)].filter(Boolean).join(' · ')}</p>
+          {p.sku && <p className="text-xs text-[#86868B] truncate">SKU: {p.sku}</p>}
+          {p.preferredSupplierId && supplierName(p.preferredSupplierId) && (
+            <p className="text-xs text-[#86868B] truncate">
+              {t('catalogs.products.preferredSupplier')}: {supplierName(p.preferredSupplierId)}
+            </p>
+          )}
+          <div className="flex gap-1.5 pt-1">
+            {p.isRentable && (
+              <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.isRentable')}</span>
+            )}
+            {p.isConsumable && (
+              <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.isConsumable')}</span>
+            )}
+          </div>
+        </div>
+      </div>
+      {canWrite && (
+        <div className="flex gap-0.5 shrink-0">
+          <button onClick={() => openEdit(p)} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => handleToggle(p)}
+            title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
+            className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
+          >
+            {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       <SectionHeader
@@ -856,64 +1146,71 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       {products.length === 0 ? (
         <EmptyState icon={<Package className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {products.map((p) => (
-            <div
-              key={p.id}
-              className={cn(
-                'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-start gap-4 transition-opacity',
-                !p.isActive && 'opacity-60'
-              )}
-            >
-              {p.photoUrl ? (
-                <img src={p.photoUrl} alt={p.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
-              ) : (
-                <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
-                  <Package className="w-5 h-5" />
-                </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-[#1D1D1F] truncate">{p.name}</h3>
-                  <span
-                    className={cn(
-                      'text-[10px] font-medium px-2 py-0.5 rounded-full',
-                      p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
-                    )}
-                  >
-                    {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
-                  </span>
-                </div>
-                <div className="mt-1 space-y-0.5">
-                  <p className="text-xs text-[#86868B] truncate">{[categoryName(p.categoryId), unitName(p.unitId)].filter(Boolean).join(' · ')}</p>
-                  {p.sku && <p className="text-xs text-[#86868B] truncate">SKU: {p.sku}</p>}
-                  <div className="flex gap-1.5 pt-1">
-                    {p.isRentable && (
-                      <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.isRentable')}</span>
-                    )}
-                    {p.isConsumable && (
-                      <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.isConsumable')}</span>
-                    )}
+        <>
+          {/* Buscador, filtros y ordenamiento (en memoria) */}
+          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#86868B] pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('catalogs.products.searchPlaceholder')}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={cn(SELECT_CLASS, 'lg:w-48')}>
+                <option value="">{t('catalogs.products.allCategories')}</option>
+                {activeCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="w-4 h-4 text-[#86868B] shrink-0" />
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'nameAsc' | 'nameDesc' | 'sku')} className={cn(SELECT_CLASS, 'lg:w-36')}>
+                  <option value="nameAsc">{t('catalogs.products.sortNameAsc')}</option>
+                  <option value="nameDesc">{t('catalogs.products.sortNameDesc')}</option>
+                  <option value="sku">{t('catalogs.products.sortSku')}</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => setGroupByCategory((v) => !v)}
+                className={cn(
+                  'flex items-center justify-center gap-2 h-10 px-4 rounded-lg text-sm font-medium transition-colors whitespace-nowrap',
+                  groupByCategory ? 'bg-corporate text-white' : 'bg-white border border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                )}
+              >
+                <Layers className="w-4 h-4" />
+                {t('catalogs.products.groupByCategory')}
+              </button>
+            </div>
+          </div>
+
+          {visibleProducts.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center text-sm text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              {t('catalogs.products.noResults')}
+            </div>
+          ) : groupByCategory ? (
+            <div className="space-y-6">
+              {groupedProducts.map(([catId, items]) => (
+                <div key={catId || 'none'} className="space-y-3">
+                  <div className="flex items-center gap-2 px-1">
+                    <h3 className="text-sm font-semibold text-[#1D1D1F]">
+                      {categoryName(catId) || t('catalogs.products.noCategory')}
+                    </h3>
+                    <span className="text-xs text-[#86868B]">{items.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {items.map(renderProductCard)}
                   </div>
                 </div>
-              </div>
-              {canWrite && (
-                <div className="flex gap-0.5 shrink-0">
-                  <button onClick={() => openEdit(p)} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
-                    <Pencil className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => handleToggle(p)}
-                    title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
-                    className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
-                  >
-                    {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {visibleProducts.map(renderProductCard)}
+            </div>
+          )}
+        </>
       )}
 
       <Dialog open={showModal} onOpenChange={setShowModal}>
@@ -965,6 +1262,17 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
               <div className="space-y-2">
                 <Label>{t('catalogs.products.sku')}</Label>
                 <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('catalogs.products.preferredSupplier')}</Label>
+                <select
+                  value={form.preferredSupplierId}
+                  onChange={(e) => setForm({ ...form, preferredSupplierId: e.target.value })}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">{t('catalogs.products.selectSupplier')}</option>
+                  {activeSuppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1178,7 +1486,7 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
         <div className="space-y-3">
           <SectionHeader
             title={t('catalogs.categories.categories')}
-            subtitle={fmt('catalogs.products.count', { count: categories.length })}
+            subtitle={fmt('catalogs.categories.categoryCount', { count: categories.length })}
             canWrite={canWrite}
             onNew={openCreateCategory}
             newLabel={t('catalogs.categories.newCategory')}
@@ -1207,7 +1515,7 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
         <div className="space-y-3">
           <SectionHeader
             title={t('catalogs.categories.units')}
-            subtitle={fmt('catalogs.products.count', { count: units.length })}
+            subtitle={fmt('catalogs.categories.unitCount', { count: units.length })}
             canWrite={canWrite}
             onNew={openCreateUnit}
             newLabel={t('catalogs.categories.newUnit')}

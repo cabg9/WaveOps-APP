@@ -46,17 +46,29 @@ export interface Location extends CatalogBase {
 
 // ─── Catálogos maestros (2.6 del plano maestro) ───
 
+export interface SupplierBankAccount {
+  id: string;
+  bank?: string;
+  accountType?: string;
+  accountNumber?: string;
+  isPrimary?: boolean; // una sola cuenta marcable como principal
+}
+
 export interface Supplier extends CatalogBase {
   identification: string; // RUC / identificación
   name: string;
   contactName?: string;
   email?: string;
   phone?: string;
+  /** @deprecated campo único legacy — usar bankAccounts */
   bankData?: {
     bank?: string;
     accountType?: string;
     accountNumber?: string;
   };
+  bankAccounts?: SupplierBankAccount[]; // cuentas bancarias múltiples
+  productCategoryIds?: string[]; // categorías de producto que suministra
+  costCenterIds?: string[]; // centros de costo frecuentes
   paymentTerms?: string; // condiciones de pago
   notes?: string;
 }
@@ -80,6 +92,7 @@ export interface Product extends CatalogBase {
   isRentable: boolean; // es rentable
   isConsumable: boolean; // es consumible
   photoUrl?: string;
+  preferredSupplierId?: string; // proveedor preferido (ref suppliers, opcional)
 }
 
 export interface CostCenter extends CatalogBase {
@@ -118,6 +131,13 @@ export type ControlAppliesTo =
   | 'embarcaciones'
   | 'ubicaciones';
 
+/** Catálogo dinámico "Aplica a" — CRUD desde la pestaña Controles */
+export interface ControlTargetTypeItem extends CatalogBase {
+  name: string;
+  nameEn?: string;
+  icon?: string; // nombre de icono lucide opcional
+}
+
 export type ControlFieldType = 'texto' | 'fecha' | 'numero' | 'seleccion';
 
 export interface ControlCustomField {
@@ -131,7 +151,9 @@ export interface ControlType extends CatalogBase {
   name: string;
   nameEn?: string;
   description?: string;
-  appliesTo: ControlAppliesTo[];
+  /** ids del catálogo dinámico controlTargetTypes (ej. 'personas', 'equipos').
+   * Valores legacy ('personas','equipos','vehiculos','embarcaciones','ubicaciones') siguen válidos. */
+  appliesTo: string[];
   roleIds: string[]; // roles a los que aplica (ids de roleTemplates o Role)
   validityMonths?: number | null; // vigencia en meses (null = no vence)
   frequencyDays?: number | null; // frecuencia en días alternativa
@@ -143,10 +165,10 @@ export interface ControlType extends CatalogBase {
 
 export type ControlAssignmentStatus = 'vigente' | 'por_vencer' | 'vencido' | 'verificado';
 
-export type ControlTargetType = 'user' | 'equipo' | 'vehiculo' | 'embarcacion' | 'ubicacion';
+export type ControlTargetType = 'user' | 'departamento' | 'equipo' | 'vehiculo' | 'embarcacion' | 'ubicacion';
 
 export interface ControlHistoryEntry {
-  action: 'creado' | 'emitido' | 'verificado' | 'editado' | 'desactivado' | 'alerta_enviada';
+  action: 'creado' | 'emitido' | 'verificado' | 'editado' | 'desactivado' | 'alerta_enviada' | 'estado_auto';
   by: string;
   byName: string;
   at: string;
@@ -187,4 +209,5 @@ export const CATALOG_COLLECTIONS = {
   clients: 'clients',
   controlTypes: 'controlTypes',
   controlAssignments: 'controlAssignments',
+  controlTargetTypes: 'controlTargetTypes',
 } as const;

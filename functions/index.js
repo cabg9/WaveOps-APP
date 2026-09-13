@@ -26,6 +26,12 @@ const {
   cleanupOldNotifications,
 } = require("./src/notifications/triggers");
 
+const {
+  checkControlExpirations,
+  checkControlsNow,
+  notifyControlAssigned,
+} = require("./src/notifications/controls");
+
 exports.createAuthUser = createAuthUser;
 exports.sendInvitationEmail = sendInvitationEmail;
 exports.acceptInvitation = acceptInvitation;
@@ -50,6 +56,11 @@ exports.notifyUserDeactivated = notifyUserDeactivated;
 exports.notifyRoleChanged = notifyRoleChanged;
 exports.checkOverdueTasks = checkOverdueTasks;
 exports.cleanupOldNotifications = cleanupOldNotifications;
+
+// Fase 0 — Catálogo Dinámico de Controles
+exports.checkControlExpirations = checkControlExpirations;
+exports.checkControlsNow = checkControlsNow;
+exports.notifyControlAssigned = notifyControlAssigned;
 
 // Admin
 const { resetDemoData } = require("./src/admin/resetDemoData");

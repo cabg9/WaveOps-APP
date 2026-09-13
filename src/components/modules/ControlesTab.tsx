@@ -1,13 +1,18 @@
 // CONTROLES TAB - Catálogo Dinámico de Controles (Fase 0)
 // Motor configurable: licencias, pruebas y certificados son REGISTROS
-// creados en la app (colecciones 'controlTypes' y 'controlAssignments'),
-// nada hardcodeado. Cubre personas, equipos, vehículos, embarcaciones y
-// ubicaciones. Estado calculado en render (vigente/por_vencer/vencido/verificado).
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '@/firebase-config';
+// creados en la app (colecciones 'controlTypes', 'controlAssignments' y
+// 'controlTargetTypes'), nada hardcodeado. Cubre personas, departamentos,
+// equipos, vehículos, embarcaciones y ubicaciones. Estado calculado en render
+// (vigente/por_vencer/vencido/verificado). Las alertas de vencimiento las
+// generan Cloud Functions (programada cada 15 min + inmediata al asignar):
+// el cliente solo muestra estado y dispara la callable 'checkControlsNow'.
+import { useState, useEffect, useMemo } from 'react';
+import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/firebase-config';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
@@ -19,19 +24,19 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Role, NotificationType } from '@/types';
+import { Role } from '@/types';
 import type { AuditAction } from '@/types/develops';
 import type {
   ControlType,
   ControlAssignment,
-  ControlAppliesTo,
+  ControlTargetTypeItem,
   ControlFieldType,
   ControlAssignmentStatus,
   ControlHistoryEntry,
 } from '@/types/catalogs';
 import {
   Plus, Pencil, ShieldCheck, ChevronDown, ChevronRight, Search, ClipboardList,
-  Layers, ImagePlus, AlertTriangle, CheckCircle2, XCircle, Clock, Power, FileCheck2,
+  Layers, ImagePlus, AlertTriangle, CheckCircle2, XCircle, Clock, Power, FileCheck2, RefreshCw,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -58,6 +63,7 @@ registerI18nKeys({
     'controls.type.description': 'Descripción',
     'controls.type.appliesTo': 'Aplica a',
     'controls.type.roles': 'Roles a los que aplica',
+    'controls.type.rolesHint': 'Define qué roles están obligados a tener este documento',
     'controls.type.validityMonths': 'Vigencia (meses)',
     'controls.type.validityHint': 'Vacío = no vence',
     'controls.type.alertDaysBefore': 'Alertar días antes del vencimiento',
@@ -83,12 +89,23 @@ registerI18nKeys({
     'controls.type.deactivate': 'Desactivar',
     'controls.type.activate': 'Activar',
     'controls.applies.personas': 'Personas',
+    'controls.applies.departamentos': 'Departamentos',
     'controls.applies.equipos': 'Equipos',
     'controls.applies.vehiculos': 'Vehículos',
     'controls.applies.embarcaciones': 'Embarcaciones',
     'controls.applies.ubicaciones': 'Ubicaciones',
+    'controls.targets.title': 'Aplica a (catálogo)',
+    'controls.targets.subtitle': 'destinos posibles para los controles',
+    'controls.targets.add': 'Agregar',
+    'controls.targets.newPlaceholder': 'Nuevo destino...',
+    'controls.targets.loadSeeds': 'Cargar iniciales',
+    'controls.targets.seedsLoaded': 'Catálogo de destinos cargado',
+    'controls.targets.empty': 'Sin destinos en el catálogo. Carga el catálogo inicial o agrega uno.',
+    'controls.targets.renamed': 'Destino actualizado',
     'controls.assignments.title': 'Controles asignados',
     'controls.assignments.new': 'Nuevo control',
+    'controls.assignments.checkNow': 'Verificar vencimientos ahora',
+    'controls.assignments.checkNowResult': '{checked} controles revisados, {updated} estados actualizados, {alerts} alertas enviadas',
     'controls.assignments.empty': 'No hay controles asignados',
     'controls.assignments.search': 'Buscar por nombre...',
     'controls.assignments.filterStatus': 'Estado',
@@ -108,6 +125,9 @@ registerI18nKeys({
     'controls.assignment.targetName.vehiculos': 'Nombre del vehículo',
     'controls.assignment.targetName.embarcaciones': 'Nombre de la embarcación',
     'controls.assignment.targetName.ubicaciones': 'Nombre de la ubicación',
+    'controls.assignment.targetName.generic': 'Nombre del equipo/vehículo/embarcación/ubicación',
+    'controls.assignment.targetDepartment': 'Departamento',
+    'controls.assignment.selectDepartment': 'Selecciona un departamento',
     'controls.assignment.targetNamePlaceholder': 'Ej: Compresor principal',
     'controls.assignment.issueDate': 'Fecha de emisión',
     'controls.assignment.expiryDate': 'Fecha de vencimiento',
@@ -147,10 +167,6 @@ registerI18nKeys({
     'controls.error.save': 'Error al guardar',
     'controls.error.load': 'Error al cargar datos',
     'controls.loading': 'Cargando controles...',
-    'controls.notification.porVencer': 'Control por vencer',
-    'controls.notification.vencido': 'Control vencido',
-    'controls.notification.body': 'vence el',
-    'controls.alert.sent': 'Alertas de vencimiento enviadas',
   },
   en: {
     'controls.tab.types': 'Control types',
@@ -171,6 +187,7 @@ registerI18nKeys({
     'controls.type.description': 'Description',
     'controls.type.appliesTo': 'Applies to',
     'controls.type.roles': 'Roles it applies to',
+    'controls.type.rolesHint': 'Defines which roles are required to have this document',
     'controls.type.validityMonths': 'Validity (months)',
     'controls.type.validityHint': 'Empty = never expires',
     'controls.type.alertDaysBefore': 'Alert days before expiry',
@@ -196,12 +213,23 @@ registerI18nKeys({
     'controls.type.deactivate': 'Deactivate',
     'controls.type.activate': 'Activate',
     'controls.applies.personas': 'People',
+    'controls.applies.departamentos': 'Departments',
     'controls.applies.equipos': 'Equipment',
     'controls.applies.vehiculos': 'Vehicles',
     'controls.applies.embarcaciones': 'Vessels',
     'controls.applies.ubicaciones': 'Locations',
+    'controls.targets.title': 'Applies to (catalog)',
+    'controls.targets.subtitle': 'possible targets for controls',
+    'controls.targets.add': 'Add',
+    'controls.targets.newPlaceholder': 'New target...',
+    'controls.targets.loadSeeds': 'Load initial set',
+    'controls.targets.seedsLoaded': 'Target catalog loaded',
+    'controls.targets.empty': 'No targets in the catalog. Load the initial set or add one.',
+    'controls.targets.renamed': 'Target updated',
     'controls.assignments.title': 'Assigned controls',
     'controls.assignments.new': 'New control',
+    'controls.assignments.checkNow': 'Check expirations now',
+    'controls.assignments.checkNowResult': '{checked} controls checked, {updated} statuses updated, {alerts} alerts sent',
     'controls.assignments.empty': 'No assigned controls',
     'controls.assignments.search': 'Search by name...',
     'controls.assignments.filterStatus': 'Status',
@@ -221,6 +249,9 @@ registerI18nKeys({
     'controls.assignment.targetName.vehiculos': 'Vehicle name',
     'controls.assignment.targetName.embarcaciones': 'Vessel name',
     'controls.assignment.targetName.ubicaciones': 'Location name',
+    'controls.assignment.targetName.generic': 'Equipment/vehicle/vessel/location name',
+    'controls.assignment.targetDepartment': 'Department',
+    'controls.assignment.selectDepartment': 'Select a department',
     'controls.assignment.targetNamePlaceholder': 'E.g.: Main compressor',
     'controls.assignment.issueDate': 'Issue date',
     'controls.assignment.expiryDate': 'Expiry date',
@@ -260,10 +291,6 @@ registerI18nKeys({
     'controls.error.save': 'Error saving',
     'controls.error.load': 'Error loading data',
     'controls.loading': 'Loading controls...',
-    'controls.notification.porVencer': 'Control expiring soon',
-    'controls.notification.vencido': 'Control expired',
-    'controls.notification.body': 'expires on',
-    'controls.alert.sent': 'Expiry alerts sent',
   },
 });
 
@@ -271,16 +298,23 @@ registerI18nKeys({
 // CONSTANTES Y UTILIDADES
 // ═══════════════════════════════════════════════════════════════════
 
-const APPLIES_TO_OPTIONS: ControlAppliesTo[] = ['personas', 'equipos', 'vehiculos', 'embarcaciones', 'ubicaciones'];
-
-const ALERT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+// Semillas del catálogo dinámico "Aplica a" (controlTargetTypes).
+// ids deterministas → setDoc idempotente; nunca se borran documentos.
+const SEED_TARGET_TYPES: Array<{ id: string; name: string }> = [
+  { id: 'personas', name: 'Personas' },
+  { id: 'departamentos', name: 'Departamentos' },
+  { id: 'equipos', name: 'Equipos' },
+  { id: 'vehiculos', name: 'Vehículos' },
+  { id: 'embarcaciones', name: 'Embarcaciones' },
+  { id: 'ubicaciones', name: 'Ubicaciones' },
+];
 
 // Semillas del catálogo inicial (ids deterministas → setDoc idempotente)
 const SEED_CONTROL_TYPES: Array<{
   id: string;
   name: string;
   description: string;
-  appliesTo: ControlAppliesTo[];
+  appliesTo: string[];
   validityMonths: number | null;
 }> = [
   { id: 'padi-open-water', name: 'PADI Open Water', description: 'Certificación PADI Open Water para buzos.', appliesTo: ['personas'], validityMonths: 24 },
@@ -300,6 +334,9 @@ const AUDIT_ACTIONS = {
   assignmentUpdated: 'CONTROL_ASSIGNMENT_UPDATED' as AuditAction,
   assignmentDeactivated: 'CONTROL_ASSIGNMENT_DEACTIVATED' as AuditAction,
   assignmentVerified: 'CONTROL_ASSIGNMENT_VERIFIED' as AuditAction,
+  targetCreated: 'CONTROL_TARGET_CREATED' as AuditAction,
+  targetUpdated: 'CONTROL_TARGET_UPDATED' as AuditAction,
+  targetSeedsLoaded: 'CONTROL_TARGETS_SEEDED' as AuditAction,
 };
 
 function toIso(value: any): string {
@@ -389,6 +426,21 @@ function docToControlAssignment(id: string, data: any): ControlAssignment {
   };
 }
 
+function docToControlTargetType(id: string, data: any): ControlTargetTypeItem {
+  return {
+    id,
+    tenantId: data.tenantId || 'default',
+    isActive: data.isActive !== false,
+    createdAt: toIso(data.createdAt),
+    createdBy: data.createdBy || '',
+    updatedAt: data.updatedAt ? toIso(data.updatedAt) : undefined,
+    updatedBy: data.updatedBy,
+    name: data.name || '',
+    nameEn: data.nameEn,
+    icon: data.icon,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // FORM STATE
 // ═══════════════════════════════════════════════════════════════════
@@ -397,7 +449,7 @@ interface TypeFormState {
   name: string;
   nameEn: string;
   description: string;
-  appliesTo: ControlAppliesTo[];
+  appliesTo: string[]; // ids del catálogo dinámico controlTargetTypes
   roleIds: string[];
   validityMonths: string; // string para input; vacío = no vence
   alertDaysBefore: string;
@@ -421,8 +473,9 @@ const EMPTY_TYPE_FORM: TypeFormState = {
 
 interface AssignmentFormState {
   controlTypeId: string;
-  appliesToSel: ControlAppliesTo | '';
+  appliesToSel: string; // id del catálogo controlTargetTypes
   targetUserId: string;
+  targetDeptId: string; // solo cuando appliesToSel === 'departamentos'
   targetName: string;
   issueDate: string;
   expiryDate: string; // solo cuando el tipo no tiene validityMonths
@@ -434,6 +487,7 @@ const EMPTY_ASSIGNMENT_FORM: AssignmentFormState = {
   controlTypeId: '',
   appliesToSel: '',
   targetUserId: '',
+  targetDeptId: '',
   targetName: '',
   issueDate: todayInputValue(),
   expiryDate: '',
@@ -455,14 +509,21 @@ const STATUS_STYLE: Record<ControlAssignmentStatus, { bg: string; text: string; 
 export function ControlesTab() {
   const { user: currentUser } = useAuth();
   const { users } = useFirestoreUsers();
+  const { departments: dynamicDepartments } = useDynamicDepartments();
   const { roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
   const { uploadImage, uploading: uploadingPhoto } = useStorageUpload();
 
   const [controlTypes, setControlTypes] = useState<ControlType[]>([]);
   const [assignments, setAssignments] = useState<ControlAssignment[]>([]);
+  const [targetTypes, setTargetTypes] = useState<ControlTargetTypeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingTargets, setSavingTargets] = useState(false);
+  const [checkingNow, setCheckingNow] = useState(false);
+  const [newTargetName, setNewTargetName] = useState('');
+  const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
+  const [editingTargetName, setEditingTargetName] = useState('');
 
   const [tab, setTab] = useState<'types' | 'assignments'>('types');
   const [search, setSearch] = useState('');
@@ -484,12 +545,23 @@ export function ControlesTab() {
   const [verifying, setVerifying] = useState(false);
 
   const tenantId = getCurrentTenantId();
-  const alertingRef = useRef<Set<string>>(new Set());
 
   const canWrite = currentUser?.role === Role.DIRECTOR_GENERAL || currentUser?.role === Role.RRHH;
   const activeUsers = useMemo(() => users.filter(u => u.isActive !== false), [users]);
+  const activeDepartments = useMemo(() => dynamicDepartments.filter(d => d.isActive), [dynamicDepartments]);
   const activeTypes = useMemo(() => controlTypes.filter(ct => ct.isActive), [controlTypes]);
   const activeAssignments = useMemo(() => assignments.filter(a => a.isActive), [assignments]);
+  const activeTargetTypes = useMemo(() => targetTypes.filter(x => x.isActive), [targetTypes]);
+
+  // Nombre legible de un id del catálogo "Aplica a". Compatibilidad legacy:
+  // ids antiguos sin doc en el catálogo caen a la clave i18n, y si tampoco
+  // existe, se muestra el id tal cual.
+  const targetTypeName = (id: string): string => {
+    const item = targetTypes.find(x => x.id === id);
+    if (item) return item.name;
+    const legacy = t(`controls.applies.${id}`);
+    return legacy !== `controls.applies.${id}` ? legacy : id;
+  };
 
   // ═══════════════════════════════════════════════════════════════════
   // LISTENERS FIRESTORE
@@ -530,69 +602,26 @@ export function ControlesTab() {
     return () => unsub();
   }, [tenantId]);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // ALERTAS AUTOMÁTICAS (por_vencer / vencido → notificaciones, 1 vez / 24h)
-  // Solo DIRECTOR_GENERAL o RRHH dispara el write; fallos solo log en consola.
-  // ═══════════════════════════════════════════════════════════════════
-
+  // Catálogo dinámico "Aplica a" (controlTargetTypes)
   useEffect(() => {
-    if (!currentUser) return;
-    if (currentUser.role !== Role.DIRECTOR_GENERAL && currentUser.role !== Role.RRHH) return;
+    const q = query(collection(db, 'controlTargetTypes'), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const items = snap.docs
+          .map(d => docToControlTargetType(d.id, d.data()))
+          .filter(x => !x.tenantId || x.tenantId === tenantId);
+        setTargetTypes(items);
+      },
+      (err) => console.error('[ControlesTab] controlTargetTypes:', err)
+    );
+    return () => unsub();
+  }, [tenantId]);
 
-    const now = Date.now();
-    activeAssignments.forEach((assignment) => {
-      const type = controlTypes.find(ct => ct.id === assignment.controlTypeId);
-      const status = computeStatus(assignment, type);
-      if (status !== 'por_vencer' && status !== 'vencido') return;
-      if (assignment.lastAlertAt && now - new Date(assignment.lastAlertAt).getTime() < ALERT_COOLDOWN_MS) return;
-      if (alertingRef.current.has(assignment.id)) return;
-      alertingRef.current.add(assignment.id);
-
-      (async () => {
-        try {
-          const title = status === 'vencido'
-            ? `${t('controls.notification.vencido')}: ${assignment.controlTypeName || type?.name || ''}`
-            : `${t('controls.notification.porVencer')}: ${assignment.controlTypeName || type?.name || ''}`;
-          const body = `${assignment.controlTypeName || type?.name || ''} · ${assignment.targetName} · ${t('controls.notification.body')} ${assignment.expiryDate}`;
-
-          const recipients = new Set<string>();
-          if (assignment.targetType === 'user' && assignment.targetId) recipients.add(assignment.targetId);
-          users
-            .filter(u => u.role === Role.RRHH && u.isActive !== false)
-            .forEach(u => recipients.add(u.id));
-
-          for (const userId of recipients) {
-            await addDoc(collection(db, 'notifications'), {
-              userId,
-              type: NotificationType.TASK_OVERDUE, // tipo genérico existente (no hay 'system')
-              title,
-              body,
-              data: {},
-              read: false,
-              createdAt: new Date().toISOString(),
-              priority: 'high',
-            });
-          }
-
-          const historyEntry: ControlHistoryEntry = {
-            action: 'alerta_enviada',
-            by: currentUser.id,
-            byName: currentUser.name,
-            at: new Date().toISOString(),
-            note: title,
-          };
-          await updateDoc(doc(db, 'controlAssignments', assignment.id), {
-            lastAlertAt: new Date().toISOString(),
-            history: [...(assignment.history || []), historyEntry],
-          });
-        } catch (err) {
-          console.error('[ControlesTab] Error enviando alerta de control:', err);
-        } finally {
-          alertingRef.current.delete(assignment.id);
-        }
-      })();
-    });
-  }, [activeAssignments, controlTypes, users, currentUser]);
+  // NOTA: las alertas de vencimiento (por_vencer / vencido) las generan las
+  // Cloud Functions (revisión programada cada 15 min + notificación inmediata
+  // al asignar). El cliente ya NO crea notificaciones: aquí solo se calcula
+  // el estado para mostrarlo (vigente/por_vencer/vencido/verificado).
 
   // ═══════════════════════════════════════════════════════════════════
   // HELPERS
@@ -659,7 +688,7 @@ export function ControlesTab() {
     setTypeModalOpen(true);
   };
 
-  const toggleAppliesTo = (opt: ControlAppliesTo) => {
+  const toggleAppliesTo = (opt: string) => {
     setTypeForm(prev => ({
       ...prev,
       appliesTo: prev.appliesTo.includes(opt)
@@ -826,6 +855,151 @@ export function ControlesTab() {
   };
 
   // ═══════════════════════════════════════════════════════════════════
+  // CATÁLOGO "APLICA A" (controlTargetTypes): CRUD + SEMILLAS
+  // ═══════════════════════════════════════════════════════════════════
+
+  const handleCreateTarget = async () => {
+    if (!currentUser || !canWrite || !newTargetName.trim()) return;
+    setSavingTargets(true);
+    try {
+      await addDoc(collection(db, 'controlTargetTypes'), {
+        tenantId,
+        name: newTargetName.trim(),
+        isActive: true,
+        createdAt: new Date().toISOString(),
+        createdBy: currentUser.name,
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.targetCreated,
+        targetType: 'control_target',
+        targetId: 'new',
+        targetName: newTargetName.trim(),
+        impactLevel: 'minor',
+        description: `Destino de control creado: ${newTargetName.trim()}`,
+      });
+      setNewTargetName('');
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTargets(false);
+    }
+  };
+
+  const handleRenameTarget = async () => {
+    if (!currentUser || !canWrite || !editingTargetId || !editingTargetName.trim()) return;
+    setSavingTargets(true);
+    try {
+      await updateDoc(doc(db, 'controlTargetTypes', editingTargetId), {
+        name: editingTargetName.trim(),
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.targetUpdated,
+        targetType: 'control_target',
+        targetId: editingTargetId,
+        targetName: editingTargetName.trim(),
+        impactLevel: 'minor',
+        description: `Destino de control renombrado: ${editingTargetName.trim()}`,
+      });
+      toast.success(t('controls.targets.renamed'));
+      setEditingTargetId(null);
+      setEditingTargetName('');
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTargets(false);
+    }
+  };
+
+  const handleToggleTargetActive = async (tt: ControlTargetTypeItem) => {
+    if (!currentUser || !canWrite) return;
+    try {
+      await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
+        isActive: !tt.isActive,
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.targetUpdated,
+        targetType: 'control_target',
+        targetId: tt.id,
+        targetName: tt.name,
+        impactLevel: 'minor',
+        description: tt.isActive ? `Destino de control desactivado: ${tt.name}` : `Destino de control activado: ${tt.name}`,
+      });
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    }
+  };
+
+  // Idempotente: setDoc con ids deterministas. Si el doc ya existe NO se pisa
+  // el nombre (el usuario pudo renombrarlo): solo se asegura que tenga name.
+  const handleLoadTargetSeeds = async () => {
+    if (!currentUser || !canWrite) return;
+    setSavingTargets(true);
+    try {
+      const now = new Date().toISOString();
+      for (const seed of SEED_TARGET_TYPES) {
+        const ref = doc(db, 'controlTargetTypes', seed.id);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          if (!snap.data()?.name) {
+            await setDoc(ref, { name: seed.name }, { merge: true });
+          }
+        } else {
+          await setDoc(ref, {
+            tenantId,
+            name: seed.name,
+            isActive: true,
+            createdAt: now,
+            createdBy: currentUser.name,
+            updatedAt: now,
+            updatedBy: currentUser.name,
+          }, { merge: true });
+        }
+      }
+      await logAction({
+        action: AUDIT_ACTIONS.targetSeedsLoaded,
+        targetType: 'control_target',
+        targetId: 'initial-catalog',
+        targetName: 'Catálogo inicial de destinos',
+        impactLevel: 'minor',
+        description: `Catálogo inicial de destinos cargado (${SEED_TARGET_TYPES.length} destinos)`,
+      });
+      toast.success(t('controls.targets.seedsLoaded'));
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTargets(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // VERIFICACIÓN MANUAL DE VENCIMIENTOS (Cloud Function callable)
+  // ═══════════════════════════════════════════════════════════════════
+
+  const handleCheckNow = async () => {
+    if (!currentUser || !canWrite || checkingNow) return;
+    setCheckingNow(true);
+    try {
+      const fn = httpsCallable(functions, 'checkControlsNow');
+      const res = await fn();
+      const data = (res?.data || {}) as { checked?: number; updated?: number; alerts?: number };
+      toast.success(
+        t('controls.assignments.checkNowResult')
+          .replace('{checked}', String(data.checked ?? 0))
+          .replace('{updated}', String(data.updated ?? 0))
+          .replace('{alerts}', String(data.alerts ?? 0))
+      );
+    } catch (err: any) {
+      toast.error(err?.message || String(err));
+    } finally {
+      setCheckingNow(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
   // CONTROLES ASIGNADOS: CRUD + VERIFICACIÓN
   // ═══════════════════════════════════════════════════════════════════
 
@@ -838,12 +1012,18 @@ export function ControlesTab() {
   };
 
   const openEditAssignment = (a: ControlAssignment) => {
+    const targetTypeStr = a.targetType as string;
     setEditingAssignment(a);
     setAssignmentForm({
       controlTypeId: a.controlTypeId,
-      appliesToSel: a.targetType === 'user' ? 'personas' : (a.targetType === 'equipo' ? 'equipos' : a.targetType === 'vehiculo' ? 'vehiculos' : a.targetType === 'embarcacion' ? 'embarcaciones' : 'ubicaciones'),
+      appliesToSel: targetTypeStr === 'departamento' ? 'departamentos'
+        : a.targetType === 'user' ? 'personas'
+        : a.targetType === 'equipo' ? 'equipos'
+        : a.targetType === 'vehiculo' ? 'vehiculos'
+        : a.targetType === 'embarcacion' ? 'embarcaciones' : 'ubicaciones',
       targetUserId: a.targetType === 'user' ? a.targetId : '',
-      targetName: a.targetType === 'user' ? '' : a.targetName,
+      targetDeptId: targetTypeStr === 'departamento' ? a.targetId : '',
+      targetName: a.targetType === 'user' || targetTypeStr === 'departamento' ? '' : a.targetName,
       issueDate: a.issueDate || todayInputValue(),
       expiryDate: a.expiryDate || '',
       customValues: Object.fromEntries(Object.entries(a.customValues || {}).map(([k, v]) => [k, String(v)])),
@@ -859,6 +1039,7 @@ export function ControlesTab() {
       controlTypeId,
       appliesToSel: ct && ct.appliesTo.length === 1 ? ct.appliesTo[0] : '',
       targetUserId: '',
+      targetDeptId: '',
       targetName: '',
       customValues: {},
     }));
@@ -886,11 +1067,16 @@ export function ControlesTab() {
     }
     const appliesToSel = assignmentForm.appliesToSel || ct.appliesTo[0];
     const isPerson = appliesToSel === 'personas';
+    const isDepartment = appliesToSel === 'departamentos';
     if (isPerson && !assignmentForm.targetUserId) {
       toast.error(t('controls.validation.targetRequired'));
       return;
     }
-    if (!isPerson && !assignmentForm.targetName.trim()) {
+    if (isDepartment && !assignmentForm.targetDeptId) {
+      toast.error(t('controls.validation.targetRequired'));
+      return;
+    }
+    if (!isPerson && !isDepartment && !assignmentForm.targetName.trim()) {
       toast.error(t('controls.validation.targetRequired'));
       return;
     }
@@ -916,8 +1102,12 @@ export function ControlesTab() {
       });
 
       const targetUser = isPerson ? activeUsers.find(u => u.id === assignmentForm.targetUserId) : undefined;
-      const targetTypeMap: Record<string, 'user' | 'equipo' | 'vehiculo' | 'embarcacion' | 'ubicacion'> = {
+      const targetDept = isDepartment ? activeDepartments.find(d => d.id === assignmentForm.targetDeptId) : undefined;
+      // Mapeo id del catálogo → targetType. Ids nuevos del catálogo caen a
+      // 'equipo' como genérico (los conocidos conservan su tipo específico).
+      const targetTypeMap: Record<string, ControlAssignment['targetType']> = {
         personas: 'user',
+        departamentos: 'departamento' as ControlAssignment['targetType'],
         equipos: 'equipo',
         vehiculos: 'vehiculo',
         embarcaciones: 'embarcacion',
@@ -949,7 +1139,7 @@ export function ControlesTab() {
         });
         toast.success(t('controls.common.save'));
       } else {
-        const targetType = targetTypeMap[appliesToSel] || 'user';
+        const targetType = targetTypeMap[appliesToSel] || ('equipo' as ControlAssignment['targetType']);
         const newAssignment: Omit<ControlAssignment, 'id'> = {
           tenantId,
           isActive: true,
@@ -958,9 +1148,9 @@ export function ControlesTab() {
           controlTypeId: ct.id,
           controlTypeName: ct.name,
           targetType,
-          targetId: isPerson ? assignmentForm.targetUserId : assignmentForm.targetName.trim(),
-          targetName: isPerson ? (targetUser?.name || '') : assignmentForm.targetName.trim(),
-          targetDepartmentId: targetUser?.department,
+          targetId: isPerson ? assignmentForm.targetUserId : isDepartment ? (targetDept?.id || '') : assignmentForm.targetName.trim(),
+          targetName: isPerson ? (targetUser?.name || '') : isDepartment ? (targetDept?.name || '') : assignmentForm.targetName.trim(),
+          targetDepartmentId: isDepartment ? (targetDept?.id || '') : targetUser?.department,
           issueDate: assignmentForm.issueDate,
           expiryDate,
           customValues,
@@ -1146,6 +1336,110 @@ export function ControlesTab() {
             )}
           </div>
 
+          {/* Catálogo dinámico "Aplica a" (controlTargetTypes) */}
+          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('controls.targets.title')}</h3>
+                <p className="text-xs text-[#86868B]">{t('controls.targets.subtitle')}</p>
+              </div>
+              {canWrite && (
+                <Button
+                  variant="outline"
+                  onClick={handleLoadTargetSeeds}
+                  disabled={savingTargets}
+                  className="flex items-center gap-2 whitespace-nowrap"
+                >
+                  <FileCheck2 className="w-4 h-4" />
+                  {t('controls.targets.loadSeeds')}
+                </Button>
+              )}
+            </div>
+            {targetTypes.length === 0 ? (
+              <p className="text-xs text-[#86868B] mt-3">{t('controls.targets.empty')}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                {targetTypes.map(tt => editingTargetId === tt.id ? (
+                  <span key={tt.id} className="inline-flex items-center gap-1">
+                    <Input
+                      value={editingTargetName}
+                      onChange={e => setEditingTargetName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameTarget(); }}
+                      className="h-8 w-40"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleRenameTarget}
+                      disabled={savingTargets}
+                      className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
+                      title={t('controls.common.save')}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setEditingTargetId(null); setEditingTargetName(''); }}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                      title={t('controls.common.cancel')}
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </span>
+                ) : (
+                  <span
+                    key={tt.id}
+                    className={cn(
+                      'inline-flex items-center gap-0.5 pl-3 pr-1.5 py-1 rounded-full text-xs font-medium border',
+                      tt.isActive
+                        ? 'bg-white text-[#1D1D1F] border-[#E5E5E7]'
+                        : 'bg-[#F5F5F7] text-[#86868B] border-[#F5F5F7] opacity-60'
+                    )}
+                  >
+                    {tt.name}
+                    {canWrite && (
+                      <>
+                        <button
+                          onClick={() => { setEditingTargetId(tt.id); setEditingTargetName(tt.name); }}
+                          title={t('controls.type.modalEdit')}
+                          className="p-1 rounded-full hover:bg-[#F5F5F7] text-[#86868B]"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleTargetActive(tt)}
+                          title={tt.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
+                          className="p-1 rounded-full hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                        >
+                          <Power className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
+            {canWrite && (
+              <div className="flex items-center gap-2 mt-3">
+                <Input
+                  value={newTargetName}
+                  onChange={e => setNewTargetName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateTarget(); }}
+                  placeholder={t('controls.targets.newPlaceholder')}
+                  className="h-9 sm:w-64"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreateTarget}
+                  disabled={savingTargets || !newTargetName.trim()}
+                  className="flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {t('controls.targets.add')}
+                </Button>
+              </div>
+            )}
+          </div>
+
           {activeTypes.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
               <Layers className="mx-auto mb-3 h-12 w-12 opacity-30" />
@@ -1182,7 +1476,7 @@ export function ControlesTab() {
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {ct.appliesTo.map(opt => (
                       <span key={opt} className="px-2 py-0.5 rounded-full bg-[#F5F5F7] text-xs text-[#1D1D1F]">
-                        {t(`controls.applies.${opt}`)}
+                        {targetTypeName(opt)}
                       </span>
                     ))}
                     <span className={cn(
@@ -1247,6 +1541,17 @@ export function ControlesTab() {
                 <option value="vencido">{t('controls.assignments.filterVencido')}</option>
                 <option value="verificado">{t('controls.assignments.filterVerificado')}</option>
               </select>
+              {canWrite && (
+                <Button
+                  variant="outline"
+                  onClick={handleCheckNow}
+                  disabled={checkingNow}
+                  className="flex items-center gap-2 whitespace-nowrap"
+                >
+                  <RefreshCw className={cn('w-4 h-4', checkingNow && 'animate-spin')} />
+                  {t('controls.assignments.checkNow')}
+                </Button>
+              )}
               {canWrite && (
                 <Button onClick={openCreateAssignment} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 whitespace-nowrap">
                   <Plus className="w-4 h-4" />
@@ -1408,21 +1713,37 @@ export function ControlesTab() {
             <div className="space-y-2">
               <Label>{t('controls.type.appliesTo')} *</Label>
               <div className="flex flex-wrap gap-1.5">
-                {APPLIES_TO_OPTIONS.map(opt => (
+                {activeTargetTypes.map(tt => (
                   <button
-                    key={opt}
+                    key={tt.id}
                     type="button"
-                    onClick={() => toggleAppliesTo(opt)}
+                    onClick={() => toggleAppliesTo(tt.id)}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
-                      typeForm.appliesTo.includes(opt)
+                      typeForm.appliesTo.includes(tt.id)
                         ? 'bg-corporate text-white border-corporate'
                         : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
                     )}
                   >
-                    {t(`controls.applies.${opt}`)}
+                    {tt.name}
                   </button>
                 ))}
+                {/* Compatibilidad: ids legacy que ya no están en el catálogo */}
+                {typeForm.appliesTo
+                  .filter(id => !activeTargetTypes.some(tt => tt.id === id))
+                  .map(id => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggleAppliesTo(id)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                        'bg-corporate text-white border-corporate'
+                      )}
+                    >
+                      {targetTypeName(id)}
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -1447,6 +1768,7 @@ export function ControlesTab() {
                   </button>
                 ))}
               </div>
+              <p className="text-[11px] text-[#86868B]">{t('controls.type.rolesHint')}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1608,12 +1930,12 @@ export function ControlesTab() {
                 <Label>{t('controls.assignment.targetCategory')}</Label>
                 <select
                   value={assignmentForm.appliesToSel}
-                  onChange={e => setAssignmentForm({ ...assignmentForm, appliesToSel: e.target.value as ControlAppliesTo, targetUserId: '', targetName: '' })}
+                  onChange={e => setAssignmentForm({ ...assignmentForm, appliesToSel: e.target.value, targetUserId: '', targetDeptId: '', targetName: '' })}
                   className="w-full h-10 rounded-lg border border-[#E5E5E7] px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20"
                 >
                   <option value="">—</option>
                   {selectedAssignType.appliesTo.map(opt => (
-                    <option key={opt} value={opt}>{t(`controls.applies.${opt}`)}</option>
+                    <option key={opt} value={opt}>{targetTypeName(opt)}</option>
                   ))}
                 </select>
               </div>
@@ -1636,10 +1958,27 @@ export function ControlesTab() {
                       ))}
                     </select>
                   </div>
+                ) : (assignmentForm.appliesToSel || selectedAssignType.appliesTo[0]) === 'departamentos' ? (
+                  <div className="space-y-2">
+                    <Label>{t('controls.assignment.targetDepartment')} *</Label>
+                    <select
+                      value={assignmentForm.targetDeptId}
+                      onChange={e => setAssignmentForm({ ...assignmentForm, targetDeptId: e.target.value })}
+                      disabled={!!editingAssignment}
+                      className="w-full h-10 rounded-lg border border-[#E5E5E7] px-3 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20 disabled:opacity-60"
+                    >
+                      <option value="">{t('controls.assignment.selectDepartment')}</option>
+                      {activeDepartments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     <Label>
-                      {t(`controls.assignment.targetName.${(assignmentForm.appliesToSel || selectedAssignType.appliesTo[0]) as ControlAppliesTo}`)} *
+                      {(['equipos', 'vehiculos', 'embarcaciones', 'ubicaciones'] as string[]).includes(assignmentForm.appliesToSel || selectedAssignType.appliesTo[0])
+                        ? t(`controls.assignment.targetName.${assignmentForm.appliesToSel || selectedAssignType.appliesTo[0]}`)
+                        : t('controls.assignment.targetName.generic')} *
                     </Label>
                     <Input
                       value={assignmentForm.targetName}

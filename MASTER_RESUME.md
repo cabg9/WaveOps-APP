@@ -1,9 +1,41 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (FASE 0 entregada en gemela de pruebas — pendiente validación del usuario)
+> Última actualización: 2026-09-13 (Fase 0 + corrección de validación 0.1 desplegadas en gemela — pendiente validación del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 0.1 — Corrección de validación (13 de septiembre) — DESPLEGADA EN STAGING
+
+**Estado:** EN GEMELA, pendiente re-validación del usuario.
+
+**P1 — Bug de alertas de vencimiento (raíz encontrada):** las notificaciones reales las crean Cloud Functions con Admin SDK (las reglas de producción PROHÍBEN crear notificaciones desde el cliente, y el intento cliente de la Fase 0 no era fiable). Se construyó la vía correcta:
+- `functions/src/notifications/controls.js` con 3 funciones (desplegadas en staging):
+  - `checkControlExpirations` — programada cada 15 min: calcula estados (vigente/por_vencer/vencido), los persiste en el control, y envía notificación (campana + push + email SendGrid) al asignado y a RRHH con dedupe de 20h (`lastAlertAt`).
+  - `notifyControlAssigned` — trigger al crear un control asignado: aviso inmediato a la persona (campana + push + email).
+  - `checkControlsNow` — callable para el botón "Verificar vencimientos ahora" (solo DG/RRHH; devuelve {checked, updated, alerts}).
+- La pestaña Controles YA NO crea notificaciones desde el cliente (efecto eliminado; la función programada lo hace).
+- Reglas: colección nueva `controlTargetTypes` agregada (mismo patrón DG/RRHH).
+- Secreto `SENDGRID_API_KEY` creado en staging con valor temporal (el email real solo funcionará en producción, donde ya existe el secreto real; en staging el email se omite con warning en logs). **Pendiente:** reconfigurar el secreto real en staging si se quiere probar email.
+
+**P2 — Roles como catálogo dinámico:** ya eran datos (`roleTemplates`), faltaba la UI. RolesTab ahora permite crear (nombre, descripción, nivel 1-7, rol base), renombrar/editar, activar/desactivar (los inactivos se muestran con "Mostrar inactivos") y eliminar (solo no-sistema, bloqueado si hay usuarios asignados, confirmación crítica). Los toggles de permisos por grupo se conservan intactos. La jerarquía base de 7 niveles no cambia.
+
+**P3 — Conexiones:**
+1. Productos: proveedor preferido (select), foto actual visible al editar, vista escalable (buscador nombre/SKU, filtro por categoría, ordenamiento, agrupación por categoría con toggle), activar/desactivar con confirmación.
+2. Proveedores: cuentas bancarias múltiples (lista con una marcable como principal; migra `bankData` legacy al editar), "Categorías que suministra" (multi-select) y "Centros de costo frecuentes" (multi-select).
+3. Controles: "Aplica a" ahora es catálogo dinámico (`controlTargetTypes`, CRUD en pestaña, semillas Personas/Departamentos/Equipos/Vehículos/Embarcaciones/Ubicaciones; ids legacy compatibles), selector de destino por tipo (personas→usuario, departamentos→departamento, otros→texto), texto de ayuda bajo "Roles a los que aplica".
+
+**P4 — Detalles:** Ubicaciones con texto de ayuda en "Módulos relacionados" y tarjetas expandibles al clic (todos los datos). Texto "producto(s)" → "unidad(es)" en contadores de unidades.
+
+**Tipos ampliados (aditivo):** `Supplier.bankAccounts/productCategoryIds/costCenterIds`, `Product.preferredSupplierId`, `ControlTargetTypeItem`, `ControlTargetType` + 'departamento', `ControlHistoryEntry` + 'estado_auto'.
+
+**Archivos:** nuevos `functions/src/notifications/controls.js`; modificados `functions/index.js`, `CatalogosTab.tsx`, `ControlesTab.tsx`, `DevelopsModule.tsx` (RolesTab), `UbicacionesTab.tsx`, `src/types/catalogs.ts`, `firestore.rules`.
+
+**Build/deploy:** build limpio (`index-Cz_IU9D_`); staging: hosting + firestore:rules + 3 functions.
+
+**Cómo probar en caliente las alertas (P1):** gemela → Develops → Controles → "Controles asignados" → botón "Verificar vencimientos ahora" → toast con "X controles revisados, Y estados actualizados, Z alertas enviadas". Para forzar: crear una asignación con vencimiento a 3 días (y alertar 30 días antes) → estará "por vencer" → el botón dispara la campana al asignado + RRHH. La notificación inmediata "Se te asignó el control X" llega sola al crear la asignación.
 
 ---
 

@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Pencil, Power, MapPin, Layers, Tag, Database, ShieldAlert } from 'lucide-react';
+import { Plus, Pencil, Power, MapPin, Layers, Tag, Database, ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Role } from '@/types';
 import type { LocationType, LocationGroup, Location } from '@/types/catalogs';
@@ -182,6 +182,7 @@ export function UbicacionesTab() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [locForm, setLocForm] = useState<LocationFormState>(EMPTY_LOCATION_FORM);
+  const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
 
   const [seeding, setSeeding] = useState(false);
 
@@ -620,6 +621,14 @@ export function UbicacionesTab() {
     else openCreateLocation();
   };
 
+  // Fila de detalle para la tarjeta expandible de ubicaciones
+  const detailRow = (label: string, value: string | undefined) => (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wide text-[#86868B]">{label}</p>
+      <p className="text-xs text-[#1D1D1F] mt-0.5 break-words">{value?.trim() ? value : t('loc.noOption')}</p>
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       {/* Aviso de solo lectura */}
@@ -757,53 +766,81 @@ export function UbicacionesTab() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {locations.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center shrink-0">
-                      <MapPin className="w-5 h-5 text-corporate" />
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
-                      {(item.city || item.country) && (
-                        <p className="text-xs text-[#86868B] truncate">
-                          {[item.city, item.country].filter(Boolean).join(', ')}
-                        </p>
+            {locations.map((item) => {
+              const isExpanded = expandedLocationId === item.id;
+              const responsibleDeptName = departmentOptions.find((d) => d.code === item.responsibleDepartmentId)?.name || '';
+              const relatedModuleNames = item.relatedModules.map((m) => moduleLabel(m)).filter(Boolean).join(', ');
+              return (
+                <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-start justify-between gap-2">
+                    <button
+                      onClick={() => setExpandedLocationId((prev) => (prev === item.id ? null : item.id))}
+                      className="flex items-center gap-3 min-w-0 text-left flex-1"
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center shrink-0">
+                        <MapPin className="w-5 h-5 text-corporate" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
+                        {(item.city || item.country) && (
+                          <p className="text-xs text-[#86868B] truncate">
+                            {[item.city, item.country].filter(Boolean).join(', ')}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={cn(
+                        'text-[11px] font-medium px-2 py-0.5 rounded-full',
+                        item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
+                      )}>
+                        {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
+                      </span>
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-[#86868B]" />
                       )}
                     </div>
                   </div>
-                  <span className={cn(
-                    'text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ml-2',
-                    item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
-                  )}>
-                    {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-4">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs text-[#1D1D1F]">
-                    <Tag className="w-3 h-3 text-corporate" /> {typeName(item.typeId) || t('loc.noOption')}
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs text-[#1D1D1F]">
-                    <Layers className="w-3 h-3 text-corporate" /> {groupName(item.groupId) || t('loc.noOption')}
-                  </span>
-                </div>
-                {item.responsibleUserId && (
-                  <p className="text-xs text-[#86868B] mt-3">{t('loc.fieldResponsibleUser')}: {userName(item.responsibleUserId)}</p>
-                )}
-                {canManage && (
-                  <div className="flex justify-end gap-0.5 mt-4 pt-3 border-t border-[#F5F5F7]">
-                    <button onClick={() => openEditLocation(item)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
-                    <button
-                      onClick={() => handleToggleActive('locations', item, 'location', item.isActive ? 'LOCATION_DEACTIVATED' : 'LOCATION_ACTIVATED')}
-                      className={cn('p-1.5 rounded-lg text-[#86868B]', item.isActive ? 'hover:bg-red-50 hover:text-red-500' : 'hover:bg-green-50 hover:text-green-600')}
-                    >
-                      <Power className="w-4 h-4" />
-                    </button>
+                  <div className="flex flex-wrap gap-1.5 mt-4">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs text-[#1D1D1F]">
+                      <Tag className="w-3 h-3 text-corporate" /> {typeName(item.typeId) || t('loc.noOption')}
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-[#F5F5F7] text-xs text-[#1D1D1F]">
+                      <Layers className="w-3 h-3 text-corporate" /> {groupName(item.groupId) || t('loc.noOption')}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
+                  {isExpanded && (
+                    <div className="mt-4 pt-3 border-t border-[#F5F5F7] grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-left">
+                      {detailRow(t('loc.fieldType'), typeName(item.typeId))}
+                      {detailRow(t('loc.fieldGroup'), groupName(item.groupId))}
+                      {detailRow(t('loc.fieldCountry'), item.country)}
+                      {detailRow(t('loc.fieldCity'), item.city)}
+                      {detailRow(t('loc.fieldProvince'), item.province)}
+                      {detailRow(t('loc.fieldAddress'), item.address)}
+                      {detailRow(t('loc.fieldResponsibleUser'), item.responsibleUserId ? userName(item.responsibleUserId) : undefined)}
+                      {detailRow(t('loc.fieldResponsibleDepartment'), responsibleDeptName)}
+                      {detailRow(t('loc.fieldRelatedModules'), relatedModuleNames)}
+                      {detailRow(t('loc.fieldNotes'), item.notes)}
+                      {detailRow(t('loc.fieldCreatedAt'), new Date(item.createdAt).toLocaleString('es-EC'))}
+                      {item.updatedAt && detailRow(t('loc.fieldUpdatedAt'), new Date(item.updatedAt).toLocaleString('es-EC'))}
+                    </div>
+                  )}
+                  {canManage && (
+                    <div className="flex justify-end gap-0.5 mt-4 pt-3 border-t border-[#F5F5F7]">
+                      <button onClick={() => openEditLocation(item)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"><Pencil className="w-4 h-4" /></button>
+                      <button
+                        onClick={() => handleToggleActive('locations', item, 'location', item.isActive ? 'LOCATION_DEACTIVATED' : 'LOCATION_ACTIVATED')}
+                        className={cn('p-1.5 rounded-lg text-[#86868B]', item.isActive ? 'hover:bg-red-50 hover:text-red-500' : 'hover:bg-green-50 hover:text-green-600')}
+                      >
+                        <Power className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )
       )}
@@ -957,6 +994,7 @@ export function UbicacionesTab() {
             </div>
             <div className="space-y-2">
               <Label>{t('loc.fieldRelatedModules')}</Label>
+              <p className="text-xs text-[#86868B]">{t('loc.relatedModulesHelp')}</p>
               {activeModules.length === 0 ? (
                 <p className="text-sm text-[#86868B]">{t('loc.emptyModules')}</p>
               ) : (
@@ -1023,6 +1061,7 @@ registerI18nKeys({
     'loc.fieldDescription': 'Descripción',
     'loc.fieldAllowedModules': 'Módulos permitidos',
     'loc.fieldRelatedModules': 'Módulos relacionados',
+    'loc.relatedModulesHelp': 'Selecciona qué módulos podrán usar esta ubicación. Por ejemplo: Inventario para bodegas, Compras & Pagos para oficinas.',
     'loc.fieldType': 'Tipo',
     'loc.fieldGroup': 'Grupo',
     'loc.fieldCountry': 'País',
@@ -1032,6 +1071,8 @@ registerI18nKeys({
     'loc.fieldResponsibleUser': 'Responsable',
     'loc.fieldResponsibleDepartment': 'Departamento responsable',
     'loc.fieldNotes': 'Notas',
+    'loc.fieldCreatedAt': 'Fecha de creación',
+    'loc.fieldUpdatedAt': 'Última edición',
     'loc.selectType': 'Selecciona un tipo',
     'loc.selectGroup': 'Selecciona un grupo',
     'loc.modalNewType': 'Nuevo tipo de ubicación',
@@ -1092,6 +1133,7 @@ registerI18nKeys({
     'loc.fieldDescription': 'Description',
     'loc.fieldAllowedModules': 'Allowed modules',
     'loc.fieldRelatedModules': 'Related modules',
+    'loc.relatedModulesHelp': 'Select which modules will be able to use this location. For example: Inventory for warehouses, Purchases & Payments for offices.',
     'loc.fieldType': 'Type',
     'loc.fieldGroup': 'Group',
     'loc.fieldCountry': 'Country',
@@ -1101,6 +1143,8 @@ registerI18nKeys({
     'loc.fieldResponsibleUser': 'Responsible person',
     'loc.fieldResponsibleDepartment': 'Responsible department',
     'loc.fieldNotes': 'Notes',
+    'loc.fieldCreatedAt': 'Creation date',
+    'loc.fieldUpdatedAt': 'Last updated',
     'loc.selectType': 'Select a type',
     'loc.selectGroup': 'Select a group',
     'loc.modalNewType': 'New location type',

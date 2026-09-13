@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Shield, Users, Puzzle, UserCog, ClipboardList, Lock, Trash2, Building2,
   Activity, Settings, AlertTriangle, ToggleRight, LayoutDashboard,
-  ChevronDown, ChevronUp, Pencil, Plus, X, Eye, EyeOff, Mail,
+  ChevronDown, ChevronUp, Pencil, Plus, Power, X, Eye, EyeOff, Mail,
   Search, Filter, RefreshCw, CheckCircle, XCircle,
   LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
   Briefcase, User, Upload, List,
@@ -31,6 +31,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { UserAvatar } from '@/components/UserAvatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { executeWithConfirm, getImpactLevelForAction } from '@/lib/confirm-action';
 import { CORPORATE_COLORS } from '@/lib/colors';
 import { ICON_OPTIONS, normalizeIconKey, getIconByValue } from '@/lib/icons';
@@ -70,6 +72,16 @@ const LEVELS = [
   { value: 5, label: '5 - Gerente Departamento' },
   { value: 6, label: '6 - Supervisor' },
   { value: 7, label: '7 - Staff' },
+];
+
+const BASE_ROLES = [
+  { value: 'DIRECTOR_GENERAL', label: 'Director General' },
+  { value: 'DIRECTOR', label: 'Director' },
+  { value: 'RRHH', label: 'RRHH' },
+  { value: 'GERENTE_OPERACIONES', label: 'Gerente de Operaciones' },
+  { value: 'GERENTE_DEPARTAMENTO', label: 'Gerente de Departamento' },
+  { value: 'SUPERVISOR', label: 'Supervisor' },
+  { value: 'STAFF', label: 'Staff' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1882,10 +1894,178 @@ function PermDescription({ permKey, checked }: { permKey: string; checked: boole
 }
 
 function RolesTab() {
-  const { roleTemplates } = useAppConfig();
   const { logAction } = useAudit();
+  const { user } = useAuth();
   const [openRole, setOpenRole] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  // Escucha directa de roleTemplates: useAppConfig filtra los inactivos, pero aqui
+  // necesitamos verlos y poder reactivarlos.
+  const [roleTemplates, setRoleTemplates] = useState<any[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [showInactive, setShowInactive] = useState(false);
+  const [showRoleModal, setShowRoleModal] = useState(false);
+  const [editingRole, setEditingRole] = useState<any | null>(null);
+  const [savingRole, setSavingRole] = useState(false);
+  const [roleForm, setRoleForm] = useState({ name: '', description: '', level: 7, baseRole: 'STAFF' });
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'roleTemplates'), (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      items.sort((a: any, b: any) => (a.level || 7) - (b.level || 7) || String(a.name || '').localeCompare(String(b.name || '')));
+      setRoleTemplates(items);
+      setRolesLoading(false);
+    }, (err) => {
+      console.error('[RolesTab] Error cargando roleTemplates:', err);
+      setRolesLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  const visibleRoles = useMemo(
+    () => roleTemplates.filter((r) => showInactive || r.isActive !== false),
+    [roleTemplates, showInactive],
+  );
+
+  const openCreateRole = () => {
+    setEditingRole(null);
+    setRoleForm({ name: '', description: '', level: 7, baseRole: 'STAFF' });
+    setShowRoleModal(true);
+  };
+
+  const openEditRole = (role: any) => {
+    setEditingRole(role);
+    setRoleForm({
+      name: role.name || '',
+      description: role.description || '',
+      level: role.level || 7,
+      baseRole: role.baseRole || 'STAFF',
+    });
+    setShowRoleModal(true);
+  };
+
+  const handleSaveRole = async () => {
+    if (!roleForm.name.trim()) {
+      toast.error('El nombre del rol es obligatorio');
+      return;
+    }
+    setSavingRole(true);
+    const now = new Date().toISOString();
+    const uid = user?.id || 'system';
+    try {
+      if (editingRole) {
+        const payload = {
+          name: roleForm.name.trim(),
+          description: roleForm.description.trim() || undefined,
+          level: Number(roleForm.level),
+          baseRole: roleForm.baseRole,
+          updatedAt: now,
+          updatedBy: uid,
+        };
+        await updateDoc(doc(db, 'roleTemplates', editingRole.id), payload);
+        await logAction({
+          action: 'ROLE_UPDATED',
+          targetType: 'role',
+          targetId: editingRole.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          previousValue: {
+            name: editingRole.name,
+            description: editingRole.description,
+            level: editingRole.level,
+            baseRole: editingRole.baseRole,
+          },
+          newValue: payload,
+          description: `Rol actualizado: ${payload.name}`,
+        });
+        toast.success('Rol actualizado');
+      } else {
+        const payload = {
+          name: roleForm.name.trim(),
+          description: roleForm.description.trim() || undefined,
+          baseRole: roleForm.baseRole,
+          level: Number(roleForm.level),
+          permissions: [],
+          moduleAccess: [],
+          isSystem: false,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+          createdBy: uid,
+          updatedBy: uid,
+        };
+        const ref = await addDoc(collection(db, 'roleTemplates'), payload);
+        await logAction({
+          action: 'ROLE_CREATED',
+          targetType: 'role',
+          targetId: ref.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          newValue: payload,
+          description: `Rol creado: ${payload.name}`,
+        });
+        toast.success('Rol creado');
+      }
+      setShowRoleModal(false);
+      setEditingRole(null);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setSavingRole(false);
+    }
+  };
+
+  const handleToggleRoleActive = async (role: any) => {
+    const deactivating = role.isActive !== false;
+    await executeWithConfirm({
+      level: 'important',
+      title: deactivating ? 'Desactivar rol' : 'Activar rol',
+      message: deactivating
+        ? `El rol "${role.name}" quedara inactivo y desaparecera de la app hasta reactivarlo.`
+        : `El rol "${role.name}" volvera a estar activo.`,
+    }, async () => {
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, 'roleTemplates', role.id), {
+        isActive: !deactivating,
+        updatedAt: now,
+        updatedBy: user?.id || 'system',
+      });
+      await logAction({
+        action: 'ROLE_UPDATED',
+        targetType: 'role',
+        targetId: role.id,
+        targetName: role.name,
+        impactLevel: 'major',
+        newValue: { isActive: !deactivating },
+        description: `Rol ${deactivating ? 'desactivado' : 'activado'}: ${role.name}`,
+      });
+      toast.success(deactivating ? 'Rol desactivado' : 'Rol activado');
+    });
+  };
+
+  const handleDeleteRole = async (role: any) => {
+    if (role.isSystem === true) return;
+    await executeWithConfirm({
+      level: 'critical',
+      title: 'Eliminar rol',
+      message: `Se eliminara el rol "${role.name}" de forma permanente. Esta accion no se puede deshacer.`,
+    }, async () => {
+      const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', role.id)));
+      if (!usersSnap.empty) {
+        toast.error(`No se puede eliminar "${role.name}": hay ${usersSnap.size} usuario(s) con este rol asignado.`);
+        return;
+      }
+      await deleteDoc(doc(db, 'roleTemplates', role.id));
+      await logAction({
+        action: 'ROLE_DELETED',
+        targetType: 'role',
+        targetId: role.id,
+        targetName: role.name,
+        impactLevel: 'critical',
+        description: `Rol eliminado: ${role.name}`,
+      });
+      toast.success('Rol eliminado');
+    });
+  };
 
   const togglePermission = async (role: any, permKey: string, currentPerms: Set<string>) => {
     const isAdding = !currentPerms.has(permKey);
@@ -1920,16 +2100,36 @@ function RolesTab() {
     <div className="space-y-4">
       <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
         <p className="text-sm text-[#1D1D1F] leading-relaxed">
-          Desde aqui puedes activar o desactivar los permisos de cada rol. Los cambios se guardan directamente en la plantilla del rol y <strong>afectan de inmediato</strong> a todos los usuarios que tengan ese rol asignado.
+          Desde aqui puedes crear roles personalizados y activar o desactivar los permisos de cada rol. Los cambios se guardan directamente en la plantilla del rol y <strong>afectan de inmediato</strong> a todos los usuarios que tengan ese rol asignado.
         </p>
       </div>
+      <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm text-[#86868B]">
+          {roleTemplates.filter((r) => r.isActive !== false).length} activos · {roleTemplates.length} total
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-[#86868B] cursor-pointer">
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-[#E5E5E7]" />
+            Mostrar inactivos
+          </label>
+          <Button onClick={openCreateRole} className="bg-corporate hover:bg-corporate/90"><Plus className="mr-1.5 h-4 w-4" />Nuevo rol</Button>
+        </div>
+      </div>
+      {rolesLoading ? (
+        <div className="flex items-center justify-center py-12"><div className="h-8 w-8 animate-spin rounded-full border-4 border-corporate/20 border-t-corporate" /></div>
+      ) : visibleRoles.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-[#E5E5E7] bg-white p-10 text-center text-[#86868B]">
+          <UserCog className="mx-auto mb-3 h-10 w-10 opacity-30" />
+          <p className="text-sm">No hay roles para mostrar.</p>
+        </div>
+      ) : (
       <div className="space-y-3">
-        {roleTemplates.map((role: any) => {
+        {visibleRoles.map((role: any) => {
           const isOpen = openRole === role.id;
           const currentPerms = new Set<string>(role.permissions || []);
           return (
-            <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-[#E5E5E7] shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"}`}>
-              <button onClick={() => setOpenRole((prev) => (prev === role.id ? null : role.id))} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-[#F5F5F7]/50 transition-colors rounded-2xl gap-3">
+            <div key={role.id} className={`rounded-2xl border transition-all duration-300 ${isOpen ? "border-[#E5E5E7] shadow-[0_2px_12px_rgba(0,0,0,0.06)]" : "border-[#E5E5E7] shadow-[0_2px_8px_rgba(0,0,0,0.04)]"} ${role.isActive === false ? "opacity-60" : ""}`}>
+              <div onClick={() => setOpenRole((prev) => (prev === role.id ? null : role.id))} className="flex w-full flex-col sm:flex-row sm:items-center justify-between p-5 text-left hover:bg-[#F5F5F7]/50 transition-colors rounded-2xl gap-3 cursor-pointer">
                 <div className="flex items-center gap-3 min-w-0">
                   <RoleIcon name={role.name} />
                   <div className="min-w-0 text-left">
@@ -1938,10 +2138,30 @@ function RolesTab() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-end">
+                  {role.isActive === false && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">Inactivo</span>
+                  )}
                   <span className={`px-3 py-1 rounded-full text-xs font-medium border ${levelColor(role.level || 1)}`}>Nivel {role.level || 1}</span>
+                  <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => openEditRole(role)} title="Editar rol" className="rounded p-1.5 text-[#86868B] hover:bg-[#F5F5F7] hover:text-corporate transition">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleToggleRoleActive(role)}
+                      title={role.isActive === false ? 'Activar rol' : 'Desactivar rol'}
+                      className={cn('rounded p-1.5 text-[#86868B] transition', role.isActive === false ? 'hover:bg-green-50 hover:text-green-600' : 'hover:bg-red-50 hover:text-[#FF3B30]')}
+                    >
+                      <Power className="h-4 w-4" />
+                    </button>
+                    {role.isSystem !== true && (
+                      <button onClick={() => handleDeleteRole(role)} title="Eliminar rol" className="rounded p-1.5 text-[#86868B] hover:bg-red-50 hover:text-[#FF3B30] transition">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
                   {isOpen ? <ChevronUp size={18} className="text-[#86868B]" /> : <ChevronDown size={18} className="text-[#86868B]" />}
                 </div>
-              </button>
+              </div>
               {isOpen && (
                 <div className="px-5 pb-5 pt-1 border-t border-[#E5E5E7]">
                   <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
@@ -1996,6 +2216,44 @@ function RolesTab() {
           );
         })}
       </div>
+      )}
+
+      <Dialog open={showRoleModal} onOpenChange={(open) => { setShowRoleModal(open); if (!open) setEditingRole(null); }}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingRole ? 'Editar rol' : 'Nuevo rol'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm text-[#1D1D1F]">Nombre *</Label>
+              <Input value={roleForm.name} onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))} placeholder="Ej: Analista de calidad" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-[#1D1D1F]">Descripcion</Label>
+              <Input value={roleForm.description} onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))} placeholder="Describe el proposito de este rol" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-[#1D1D1F]">Nivel</Label>
+              <select value={roleForm.level} onChange={(e) => setRoleForm((f) => ({ ...f, level: Number(e.target.value) }))} className="w-full rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                {LEVELS.map((l) => (<option key={l.value} value={l.value}>{l.label}</option>))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm text-[#1D1D1F]">Rol base</Label>
+              <select value={roleForm.baseRole} onChange={(e) => setRoleForm((f) => ({ ...f, baseRole: e.target.value }))} className="w-full rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20">
+                {BASE_ROLES.map((r) => (<option key={r.value} value={r.value}>{r.label}</option>))}
+              </select>
+              <p className="text-[11px] text-[#86868B] mt-1">Define el comportamiento base del rol antes de ajustar permisos especificos.</p>
+            </div>
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="ghost" onClick={() => setShowRoleModal(false)}>Cancelar</Button>
+              <Button onClick={handleSaveRole} disabled={savingRole} className="bg-corporate hover:bg-corporate/90">
+                {savingRole ? 'Guardando...' : editingRole ? 'Guardar cambios' : 'Crear rol'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
