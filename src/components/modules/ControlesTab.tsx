@@ -38,7 +38,7 @@ import type {
 } from '@/types/catalogs';
 import {
   Plus, Pencil, ShieldCheck, ChevronDown, ChevronUp, Search, ClipboardList,
-  Layers, ImagePlus, AlertTriangle, CheckCircle2, XCircle, Clock, Power, FileCheck2, RefreshCw,
+  Layers, ImagePlus, AlertTriangle, CheckCircle2, XCircle, Clock, Power, FileCheck2, RefreshCw, MapPin,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -48,6 +48,7 @@ import {
 registerI18nKeys({
   es: {
     'controls.tab.types': 'Tipos de control',
+    'controls.tab.destinations': 'Destinos',
     'controls.tab.assignments': 'Controles asignados',
     'controls.readOnly': 'Solo lectura. Solo Dirección General y RRHH pueden gestionar controles.',
     'controls.types.title': 'Tipos de control',
@@ -106,13 +107,39 @@ registerI18nKeys({
     'controls.type.noSelection': 'Sin selección',
     'controls.detail.targetSelections': 'Selección por destino',
     'controls.type.scopeTabsHint': 'Activa una o varias para indicar a quiénes aplica este control.',
-    'controls.targets.title': '¿A qué se le puede asignar un control?',
+    'controls.type.semanticsHint': 'Personas: selecciona usuarios específicos. · Roles: aplica a todos los usuarios con ese rol. · Posiciones: aplica a todos los usuarios con esa posición. · Departamentos: aplica a todos los usuarios del departamento. · Destinos personalizados: aplica a las instancias (ítems) que agregues, por ejemplo cada embarcación o equipo.',
+    'controls.type.noActiveItems': 'Sin ítems activos',
+    'controls.destinations.baseTitle': 'Destinos base',
+    'controls.destinations.baseSubtitle': 'Destinos base del sistema, ya conectados a usuarios, roles, posiciones y departamentos.',
+    'controls.destinations.base.personas': 'Personas',
+    'controls.destinations.base.roles': 'Roles',
+    'controls.destinations.base.posiciones': 'Posiciones',
+    'controls.destinations.base.departamentos': 'Departamentos',
+    'controls.destinations.default.personas': 'Usuarios específicos de la empresa.',
+    'controls.destinations.default.roles': 'Todos los usuarios con un rol determinado.',
+    'controls.destinations.default.posiciones': 'Todos los usuarios con una posición determinada.',
+    'controls.destinations.default.departamentos': 'Todos los usuarios de un departamento determinado.',
+    'controls.destinations.saved': 'Descripción guardada',
+    'controls.targets.customTitle': 'Destinos personalizados',
     'controls.targets.subtitle': 'Tipos de destino: personas, departamentos, equipos, vehículos, embarcaciones o ubicaciones. Crea aquí cualquier tipo de cosa que necesite documentos o controles.',
     'controls.targets.add': 'Agregar',
     'controls.targets.newPlaceholder': 'Nuevo destino...',
-    'controls.seeds.confirmTitle': 'Cargar catálogo inicial',
-    'controls.seeds.confirmDesc': 'Se crearán los destinos y tipos de control iniciales que falten. Los existentes no se modifican.',
-    'controls.seeds.summary': '{targets} destinos y {types} tipos cargados ({existing} ya existían)',
+    'controls.targets.seedsConfirmTitle': 'Cargar destinos iniciales',
+    'controls.targets.seedsConfirmDesc': 'Se crearán los destinos personalizados iniciales que falten. Los existentes no se modifican.',
+    'controls.targets.seedsSummary': '{created} destinos cargados ({existing} ya existían)',
+    'controls.targets.itemsEmpty': 'Sin ítems registrados',
+    'controls.targets.items': 'Ítems',
+    'controls.targets.addItem': 'Agregar ítem',
+    'controls.targets.itemName': 'Nombre del ítem',
+    'controls.targets.itemNameEn': 'Nombre en inglés (opcional)',
+    'controls.targets.itemNameRequired': 'El nombre del ítem es obligatorio',
+    'controls.targets.itemAdded': 'Ítem agregado',
+    'controls.targets.itemRemoved': 'Ítem eliminado',
+    'controls.targets.itemDeleteTitle': 'Eliminar ítem',
+    'controls.targets.itemDeleteDesc': 'El ítem se quitará de este destino. Esta acción no se puede deshacer.',
+    'controls.seeds.confirmTitle': 'Cargar tipos iniciales',
+    'controls.seeds.confirmDesc': 'Se crearán los tipos de control iniciales que falten. Los existentes no se modifican.',
+    'controls.seeds.summary': '{types} tipos cargados ({existing} ya existían)',
     'controls.targets.empty': 'Sin destinos en el catálogo. Carga el catálogo inicial o agrega uno.',
     'controls.targets.renamed': 'Destino actualizado',
     'controls.assignments.title': 'Controles asignados',
@@ -195,6 +222,7 @@ registerI18nKeys({
   },
   en: {
     'controls.tab.types': 'Control types',
+    'controls.tab.destinations': 'Destinations',
     'controls.tab.assignments': 'Assigned controls',
     'controls.readOnly': 'Read only. Only General Management and HR can manage controls.',
     'controls.types.title': 'Control types',
@@ -253,13 +281,39 @@ registerI18nKeys({
     'controls.type.noSelection': 'No selection',
     'controls.detail.targetSelections': 'Selection by target',
     'controls.type.scopeTabsHint': 'Turn on one or more to indicate who this control applies to.',
-    'controls.targets.title': 'What can a control be assigned to?',
+    'controls.type.semanticsHint': 'People: select specific users. · Roles: applies to all users with that role. · Positions: applies to all users with that position. · Departments: applies to all users in the department. · Custom targets: applies to the instances (items) you add, for example each vessel or piece of equipment.',
+    'controls.type.noActiveItems': 'No active items',
+    'controls.destinations.baseTitle': 'Base targets',
+    'controls.destinations.baseSubtitle': 'System targets, already connected to users, roles, positions and departments.',
+    'controls.destinations.base.personas': 'People',
+    'controls.destinations.base.roles': 'Roles',
+    'controls.destinations.base.posiciones': 'Positions',
+    'controls.destinations.base.departamentos': 'Departments',
+    'controls.destinations.default.personas': 'Specific users of the company.',
+    'controls.destinations.default.roles': 'All users with a given role.',
+    'controls.destinations.default.posiciones': 'All users with a given position.',
+    'controls.destinations.default.departamentos': 'All users of a given department.',
+    'controls.destinations.saved': 'Description saved',
+    'controls.targets.customTitle': 'Custom targets',
     'controls.targets.subtitle': 'Target types: people, departments, teams, vehicles, vessels or locations. Create here any kind of thing that needs documents or controls.',
     'controls.targets.add': 'Add',
     'controls.targets.newPlaceholder': 'New target...',
-    'controls.seeds.confirmTitle': 'Load initial catalog',
-    'controls.seeds.confirmDesc': 'Missing initial targets and control types will be created. Existing ones will not be modified.',
-    'controls.seeds.summary': '{targets} targets and {types} types loaded ({existing} already existed)',
+    'controls.targets.seedsConfirmTitle': 'Load initial targets',
+    'controls.targets.seedsConfirmDesc': 'Missing initial custom targets will be created. Existing ones will not be modified.',
+    'controls.targets.seedsSummary': '{created} targets loaded ({existing} already existed)',
+    'controls.targets.itemsEmpty': 'No items registered',
+    'controls.targets.items': 'Items',
+    'controls.targets.addItem': 'Add item',
+    'controls.targets.itemName': 'Item name',
+    'controls.targets.itemNameEn': 'English name (optional)',
+    'controls.targets.itemNameRequired': 'Item name is required',
+    'controls.targets.itemAdded': 'Item added',
+    'controls.targets.itemRemoved': 'Item removed',
+    'controls.targets.itemDeleteTitle': 'Delete item',
+    'controls.targets.itemDeleteDesc': 'The item will be removed from this target. This action cannot be undone.',
+    'controls.seeds.confirmTitle': 'Load initial control types',
+    'controls.seeds.confirmDesc': 'Missing initial control types will be created. Existing ones will not be modified.',
+    'controls.seeds.summary': '{types} types loaded ({existing} already existed)',
     'controls.targets.empty': 'No targets in the catalog. Load the initial set or add one.',
     'controls.targets.renamed': 'Target updated',
     'controls.assignments.title': 'Assigned controls',
@@ -347,15 +401,34 @@ registerI18nKeys({
 // ═══════════════════════════════════════════════════════════════════
 
 // Semillas del catálogo dinámico "Aplica a" (controlTargetTypes).
+// SOLO destinos personalizados de ejemplo: los destinos base (personas, roles,
+// posiciones, departamentos) ya no son documentos del catálogo; viven como
+// tarjetas protegidas en la pestaña Destinos.
 // ids deterministas → setDoc idempotente; nunca se borran documentos.
 const SEED_TARGET_TYPES: Array<{ id: string; name: string }> = [
-  { id: 'personas', name: 'Personas' },
-  { id: 'departamentos', name: 'Departamentos' },
   { id: 'equipos', name: 'Equipos' },
   { id: 'vehiculos', name: 'Vehículos' },
   { id: 'embarcaciones', name: 'Embarcaciones' },
   { id: 'ubicaciones', name: 'Ubicaciones' },
 ];
+
+// Destinos base protegidos: nunca se crean/eliminan/renombran en el catálogo;
+// solo admiten descripción (persistida en controlSettings/baseDestinations).
+const BASE_DESTINATION_IDS = ['personas', 'roles', 'posiciones', 'departamentos'] as const;
+type BaseDestinationId = (typeof BASE_DESTINATION_IDS)[number];
+
+// Ítem (instancia) de un destino personalizado, guardado en el array `items`
+// del documento del destino en controlTargetTypes.
+interface ControlTargetItemEntry {
+  id: string;
+  name: string;
+  nameEn?: string;
+  isActive: boolean;
+}
+
+// ControlTargetTypeItem extendido localmente con sus ítems; el tipo base vive
+// en types/catalogs y no se modifica desde este archivo.
+type TargetTypeWithItems = ControlTargetTypeItem & { items: ControlTargetItemEntry[] };
 
 // Semillas del catálogo inicial (ids deterministas → setDoc idempotente)
 const SEED_CONTROL_TYPES: Array<{
@@ -487,7 +560,7 @@ function docToControlAssignment(id: string, data: any): ControlAssignment {
   };
 }
 
-function docToControlTargetType(id: string, data: any): ControlTargetTypeItem {
+function docToControlTargetType(id: string, data: any): TargetTypeWithItems {
   return {
     id,
     tenantId: data.tenantId || 'default',
@@ -499,6 +572,16 @@ function docToControlTargetType(id: string, data: any): ControlTargetTypeItem {
     name: data.name || '',
     nameEn: data.nameEn,
     icon: data.icon,
+    items: Array.isArray(data.items)
+      ? data.items
+          .filter((it: any) => it && typeof it === 'object')
+          .map((it: any) => ({
+            id: typeof it.id === 'string' && it.id ? it.id : Math.random().toString(36).slice(2),
+            name: it.name || '',
+            nameEn: it.nameEn,
+            isActive: it.isActive !== false,
+          }))
+      : [],
   };
 }
 
@@ -596,7 +679,7 @@ export function ControlesTab() {
 
   const [controlTypes, setControlTypes] = useState<ControlType[]>([]);
   const [assignments, setAssignments] = useState<ControlAssignment[]>([]);
-  const [targetTypes, setTargetTypes] = useState<ControlTargetTypeItem[]>([]);
+  const [targetTypes, setTargetTypes] = useState<TargetTypeWithItems[]>([]);
   const [locations, setLocations] = useState<Array<{ id: string; name: string; isActive: boolean; tenantId?: string }>>([]);
   const [targetNameInputs, setTargetNameInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -607,10 +690,26 @@ export function ControlesTab() {
   const [editingTargetId, setEditingTargetId] = useState<string | null>(null);
   const [editingTargetName, setEditingTargetName] = useState('');
 
-  const [tab, setTab] = useState<'types' | 'assignments'>('types');
+  const [tab, setTab] = useState<'types' | 'destinations' | 'assignments'>('types');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | ControlAssignmentStatus>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Descripciones de los destinos base: se cargan de controlSettings/
+  // baseDestinations ({ descriptions: { personas, roles, posiciones,
+  // departamentos } }) y se editan por tarjeta. Vacío = descripción por
+  // defecto i18n.
+  const [baseDescriptions, setBaseDescriptions] = useState<Record<BaseDestinationId, string>>({
+    personas: '',
+    roles: '',
+    posiciones: '',
+    departamentos: '',
+  });
+
+  // Mini-formularios de ítems: en la pestaña Destinos (por id de destino) y
+  // dentro del modal de tipo de control (mismo shape, estado aparte).
+  const [newItemForms, setNewItemForms] = useState<Record<string, { name: string; nameEn: string }>>({});
+  const [typeItemForms, setTypeItemForms] = useState<Record<string, { name: string; nameEn: string }>>({});
 
   // Modales de tipo de control
   const [typeModalOpen, setTypeModalOpen] = useState(false);
@@ -752,6 +851,28 @@ export function ControlesTab() {
     );
     return () => unsub();
   }, [tenantId]);
+
+  // Descripciones de los destinos base (controlSettings/baseDestinations).
+  // Carga única al montar; no es un listener (cambian poco y las edita solo
+  // Dirección General / RRHH desde la propia pestaña Destinos).
+  useEffect(() => {
+    let cancelled = false;
+    getDoc(doc(db, 'controlSettings', 'baseDestinations'))
+      .then(snap => {
+        if (cancelled) return;
+        const descriptions = snap.data()?.descriptions;
+        if (descriptions && typeof descriptions === 'object') {
+          setBaseDescriptions(prev => ({
+            personas: typeof descriptions.personas === 'string' ? descriptions.personas : prev.personas,
+            roles: typeof descriptions.roles === 'string' ? descriptions.roles : prev.roles,
+            posiciones: typeof descriptions.posiciones === 'string' ? descriptions.posiciones : prev.posiciones,
+            departamentos: typeof descriptions.departamentos === 'string' ? descriptions.departamentos : prev.departamentos,
+          }));
+        }
+      })
+      .catch(err => console.error('[ControlesTab] baseDestinations:', err));
+    return () => { cancelled = true; };
+  }, []);
 
   // NOTA: las alertas de vencimiento (por_vencer / vencido) las generan las
   // Cloud Functions (revisión programada cada 15 min + notificación inmediata
@@ -1002,10 +1123,10 @@ export function ControlesTab() {
     }
   };
 
-  // UN SOLO botón "Cargar iniciales": primero los destinos (controlTargetTypes)
-  // y después los tipos de control ligados a ellos. Idempotente: los docs que
-  // ya existen con nombre NO se pisan (el usuario pudo renombrarlos/editarlos).
-  const handleLoadInitialCatalog = async () => {
+  // Botón "Cargar iniciales" de la pestaña Tipos: SOLO los tipos de control.
+  // Idempotente: los docs que ya existen con nombre NO se pisan (el usuario
+  // pudo renombrarlos/editarlos).
+  const handleLoadInitialTypes = async () => {
     if (!currentUser || !canWrite) return;
     await executeWithConfirm({
       level: 'major',
@@ -1015,31 +1136,6 @@ export function ControlesTab() {
         setSaving(true);
         try {
           const now = new Date().toISOString();
-
-          // 1) Destinos
-          let targetsCreated = 0;
-          let targetsExisting = 0;
-          for (const seed of SEED_TARGET_TYPES) {
-            const ref = doc(db, 'controlTargetTypes', seed.id);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-              if (!snap.data()?.name) await setDoc(ref, { name: seed.name }, { merge: true });
-              targetsExisting++;
-            } else {
-              await setDoc(ref, {
-                tenantId,
-                name: seed.name,
-                isActive: true,
-                createdAt: now,
-                createdBy: currentUser.name,
-                updatedAt: now,
-                updatedBy: currentUser.name,
-              }, { merge: true });
-              targetsCreated++;
-            }
-          }
-
-          // 2) Tipos de control ligados a los destinos
           let typesCreated = 0;
           let typesExisting = 0;
           for (const seed of SEED_CONTROL_TYPES) {
@@ -1078,18 +1174,73 @@ export function ControlesTab() {
             targetId: 'initial-catalog',
             targetName: 'Catálogo inicial de controles',
             impactLevel: 'major',
-            description: `Catálogo inicial cargado: ${targetsCreated} destinos y ${typesCreated} tipos nuevos (${targetsExisting + typesExisting} ya existían)`,
+            description: `Tipos de control iniciales cargados: ${typesCreated} nuevos (${typesExisting} ya existían)`,
           });
           toast.success(
             t('controls.seeds.summary')
-              .replace('{targets}', String(targetsCreated))
               .replace('{types}', String(typesCreated))
-              .replace('{existing}', String(targetsExisting + typesExisting))
+              .replace('{existing}', String(typesExisting))
           );
         } catch (err: any) {
           toast.error(`${t('controls.error.save')}: ${err.message}`);
         } finally {
           setSaving(false);
+        }
+      },
+    });
+  };
+
+  // Botón "Cargar iniciales" de la pestaña Destinos: SOLO los destinos
+  // personalizados de SEED_TARGET_TYPES (los base nunca se crean aquí).
+  const handleLoadInitialTargets = async () => {
+    if (!currentUser || !canWrite) return;
+    await executeWithConfirm({
+      level: 'major',
+      title: t('controls.targets.seedsConfirmTitle'),
+      description: t('controls.targets.seedsConfirmDesc'),
+      action: async () => {
+        setSavingTargets(true);
+        try {
+          const now = new Date().toISOString();
+          let targetsCreated = 0;
+          let targetsExisting = 0;
+          for (const seed of SEED_TARGET_TYPES) {
+            const ref = doc(db, 'controlTargetTypes', seed.id);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              if (!snap.data()?.name) await setDoc(ref, { name: seed.name }, { merge: true });
+              targetsExisting++;
+            } else {
+              await setDoc(ref, {
+                tenantId,
+                name: seed.name,
+                isActive: true,
+                createdAt: now,
+                createdBy: currentUser.name,
+                updatedAt: now,
+                updatedBy: currentUser.name,
+              }, { merge: true });
+              targetsCreated++;
+            }
+          }
+
+          await logAction({
+            action: AUDIT_ACTIONS.seedsLoaded,
+            targetType: 'control_target',
+            targetId: 'initial-targets',
+            targetName: 'Destinos iniciales de controles',
+            impactLevel: 'major',
+            description: `Destinos iniciales cargados: ${targetsCreated} nuevos (${targetsExisting} ya existían)`,
+          });
+          toast.success(
+            t('controls.targets.seedsSummary')
+              .replace('{created}', String(targetsCreated))
+              .replace('{existing}', String(targetsExisting))
+          );
+        } catch (err: any) {
+          toast.error(`${t('controls.error.save')}: ${err.message}`);
+        } finally {
+          setSavingTargets(false);
         }
       },
     });
@@ -1153,7 +1304,7 @@ export function ControlesTab() {
     }
   };
 
-  const handleToggleTargetActive = async (tt: ControlTargetTypeItem) => {
+  const handleToggleTargetActive = async (tt: TargetTypeWithItems) => {
     if (!currentUser || !canWrite) return;
     try {
       await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
@@ -1171,6 +1322,153 @@ export function ControlesTab() {
       });
     } catch (err: any) {
       toast.error(`${t('controls.error.save')}: ${err.message}`);
+    }
+  };
+
+  // Guarda la descripción de UN destino base en controlSettings/baseDestinations
+  // (merge). El resto de las descripciones viajan con el estado actual para no
+  // pisar las demás al hacer merge superficial del documento.
+  const handleSaveBaseDescription = async (id: BaseDestinationId) => {
+    if (!currentUser || !canWrite) return;
+    try {
+      await setDoc(doc(db, 'controlSettings', 'baseDestinations'), {
+        descriptions: { ...baseDescriptions },
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      }, { merge: true });
+      await logAction({
+        action: AUDIT_ACTIONS.targetUpdated,
+        targetType: 'control_target',
+        targetId: `base:${id}`,
+        targetName: t(`controls.destinations.base.${id}`),
+        impactLevel: 'minor',
+        description: `Descripción de destino base actualizada: ${id}`,
+      });
+      toast.success(t('controls.destinations.saved'));
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    }
+  };
+
+  // ÍTEMS de destinos personalizados: cada doc de controlTargetTypes puede
+  // tener `items: Array<{ id, name, nameEn?, isActive }>`. Los toggles y el
+  // borrado reescriben el array completo del documento.
+  const handleAddTargetItem = async (tt: TargetTypeWithItems) => {
+    if (!currentUser || !canWrite) return;
+    const form = newItemForms[tt.id] || { name: '', nameEn: '' };
+    const name = form.name.trim();
+    if (!name) {
+      toast.error(t('controls.targets.itemNameRequired'));
+      return;
+    }
+    setSavingTargets(true);
+    try {
+      const item: ControlTargetItemEntry = {
+        id: doc(collection(db, 'controlTargetTypes')).id,
+        name,
+        nameEn: form.nameEn.trim() || undefined,
+        isActive: true,
+      };
+      await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
+        items: [...(tt.items || []), item],
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.targetUpdated,
+        targetType: 'control_target',
+        targetId: tt.id,
+        targetName: tt.name,
+        impactLevel: 'minor',
+        description: `Ítem agregado al destino ${tt.name}: ${name}`,
+      });
+      toast.success(t('controls.targets.itemAdded'));
+      setNewItemForms(prev => ({ ...prev, [tt.id]: { name: '', nameEn: '' } }));
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTargets(false);
+    }
+  };
+
+  const handleToggleTargetItem = async (tt: TargetTypeWithItems, itemId: string) => {
+    if (!currentUser || !canWrite) return;
+    try {
+      await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
+        items: (tt.items || []).map(i => (i.id === itemId ? { ...i, isActive: !i.isActive } : i)),
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      });
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    }
+  };
+
+  const handleRemoveTargetItem = async (tt: TargetTypeWithItems, itemId: string) => {
+    if (!currentUser || !canWrite) return;
+    const item = (tt.items || []).find(i => i.id === itemId);
+    await executeWithConfirm({
+      level: 'minor',
+      title: t('controls.targets.itemDeleteTitle'),
+      description: t('controls.targets.itemDeleteDesc'),
+      action: async () => {
+        try {
+          await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
+            items: (tt.items || []).filter(i => i.id !== itemId),
+            updatedAt: new Date().toISOString(),
+            updatedBy: currentUser.name,
+          });
+          await logAction({
+            action: AUDIT_ACTIONS.targetUpdated,
+            targetType: 'control_target',
+            targetId: tt.id,
+            targetName: tt.name,
+            impactLevel: 'minor',
+            description: `Ítem eliminado del destino ${tt.name}: ${item?.name || itemId}`,
+          });
+          toast.success(t('controls.targets.itemRemoved'));
+        } catch (err: any) {
+          toast.error(`${t('controls.error.save')}: ${err.message}`);
+        }
+      },
+    });
+  };
+
+  // "+ Agregar ítem" dentro del modal de tipo de control: crea el ítem en el
+  // doc del destino y lo agrega de una vez a la selección (se guarda el NAME,
+  // coherente con lo que ya se persistía en targetSelections).
+  const handleAddTargetItemFromTypeForm = async (tt: TargetTypeWithItems) => {
+    if (!currentUser || !canWrite) return;
+    const form = typeItemForms[tt.id] || { name: '', nameEn: '' };
+    const name = form.name.trim();
+    if (!name) {
+      toast.error(t('controls.targets.itemNameRequired'));
+      return;
+    }
+    setSavingTargets(true);
+    try {
+      const item: ControlTargetItemEntry = {
+        id: doc(collection(db, 'controlTargetTypes')).id,
+        name,
+        nameEn: form.nameEn.trim() || undefined,
+        isActive: true,
+      };
+      await updateDoc(doc(db, 'controlTargetTypes', tt.id), {
+        items: [...(tt.items || []), item],
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.name,
+      });
+      setTypeForm(prev => {
+        const current = prev.targetSelections[tt.id] || [];
+        if (current.includes(name)) return prev;
+        return { ...prev, targetSelections: { ...prev.targetSelections, [tt.id]: [...current, name] } };
+      });
+      toast.success(t('controls.targets.itemAdded'));
+      setTypeItemForms(prev => ({ ...prev, [tt.id]: { name: '', nameEn: '' } }));
+    } catch (err: any) {
+      toast.error(`${t('controls.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTargets(false);
     }
   };
 
@@ -1488,6 +1786,16 @@ export function ControlesTab() {
             {t('controls.tab.types')}
           </button>
           <button
+            onClick={() => setTab('destinations')}
+            className={cn(
+              'flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all',
+              tab === 'destinations' ? 'bg-corporate text-white shadow-sm' : 'text-[#86868B] hover:text-[#1D1D1F]'
+            )}
+          >
+            <MapPin className="w-4 h-4" />
+            {t('controls.tab.destinations')}
+          </button>
+          <button
             onClick={() => setTab('assignments')}
             className={cn(
               'flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all',
@@ -1520,7 +1828,7 @@ export function ControlesTab() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleLoadInitialCatalog}
+                  onClick={handleLoadInitialTypes}
                   disabled={saving}
                   className="flex items-center gap-2 whitespace-nowrap"
                 >
@@ -1530,138 +1838,6 @@ export function ControlesTab() {
                 <Button onClick={openCreateType} className="bg-corporate hover:bg-corporate/90 flex items-center gap-2 whitespace-nowrap">
                   <Plus className="w-4 h-4" />
                   {t('controls.types.new')}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Catálogo dinámico "Aplica a" (controlTargetTypes) */}
-          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('controls.targets.title')}</h3>
-                <p className="text-xs text-[#86868B] mt-0.5 max-w-2xl">{t('controls.targets.subtitle')}</p>
-              </div>
-            </div>
-            {targetTypes.length === 0 ? (
-              <p className="text-xs text-[#86868B] mt-3">{t('controls.targets.empty')}</p>
-            ) : (
-              <div className="space-y-2 mt-3">
-                {targetTypes.map(tt => editingTargetId === tt.id ? (
-                  <div key={tt.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-xl p-2">
-                    <Input
-                      value={editingTargetName}
-                      onChange={e => setEditingTargetName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') handleRenameTarget(); }}
-                      className="h-8 w-40"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleRenameTarget}
-                      disabled={savingTargets}
-                      className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
-                      title={t('controls.common.save')}
-                    >
-                      <CheckCircle2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => { setEditingTargetId(null); setEditingTargetName(''); }}
-                      className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
-                      title={t('controls.common.cancel')}
-                    >
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    key={tt.id}
-                    className={cn(
-                      'bg-white rounded-xl border p-3 transition-shadow',
-                      tt.isActive ? 'border-[#E5E5E7]' : 'border-[#F5F5F7] opacity-70',
-                      expandedIds.has(tt.id) && 'shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
-                    )}
-                  >
-                    <div
-                      className="flex items-center justify-between gap-2 cursor-pointer"
-                      onClick={() => toggleExpanded(tt.id)}
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className={cn(
-                          'px-2 py-0.5 rounded-full text-xs font-medium',
-                          tt.isActive ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'bg-[#F5F5F7] text-[#86868B]'
-                        )}>
-                          {tt.name}
-                        </span>
-                        <span className="text-[11px] text-[#86868B]">
-                          {tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-0.5 shrink-0">
-                        {canWrite && (
-                          <>
-                            <button
-                              onClick={e => { e.stopPropagation(); setEditingTargetId(tt.id); setEditingTargetName(tt.name); }}
-                              title={t('controls.type.modalEdit')}
-                              className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={e => { e.stopPropagation(); handleToggleTargetActive(tt); }}
-                              title={tt.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
-                            >
-                              <Power className="w-3.5 h-3.5" />
-                            </button>
-                          </>
-                        )}
-                        {expandedIds.has(tt.id)
-                          ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
-                          : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
-                      </div>
-                    </div>
-                    {expandedIds.has(tt.id) && (
-                      <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-1.5">
-                        <DetailRow label={t('controls.detail.id')} value={tt.id} />
-                        <DetailRow label={t('controls.type.name')} value={tt.name} />
-                        <DetailRow label={t('controls.detail.nameEn')} value={tt.nameEn} />
-                        <DetailRow label={t('controls.detail.icon')} value={tt.icon} />
-                        <DetailRow
-                          label={t('controls.detail.state')}
-                          value={tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
-                        />
-                        <DetailRow
-                          label={t('controls.detail.created')}
-                          value={`${tt.createdBy || '—'} · ${new Date(tt.createdAt).toLocaleString()}`}
-                        />
-                        <DetailRow
-                          label={t('controls.detail.updated')}
-                          value={tt.updatedAt ? `${tt.updatedBy || '—'} · ${new Date(tt.updatedAt).toLocaleString()}` : undefined}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-            {canWrite && (
-              <div className="flex items-center gap-2 mt-3">
-                <Input
-                  value={newTargetName}
-                  onChange={e => setNewTargetName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleCreateTarget(); }}
-                  placeholder={t('controls.targets.newPlaceholder')}
-                  className="h-9 sm:w-64"
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleCreateTarget}
-                  disabled={savingTargets || !newTargetName.trim()}
-                  className="flex items-center gap-1 whitespace-nowrap"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  {t('controls.targets.add')}
                 </Button>
               </div>
             )}
@@ -1813,6 +1989,304 @@ export function ControlesTab() {
               ))}
             </div>
           )}
+        </>
+      )}
+
+      {/* ═══════════ PESTAÑA: DESTINOS ═══════════ */}
+      {tab === 'destinations' && (
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div>
+              <h2 className="text-lg font-semibold text-[#1D1D1F]">{t('controls.tab.destinations')}</h2>
+              <p className="text-sm text-[#86868B]">
+                {BASE_DESTINATION_IDS.length + targetTypes.length} · {t('controls.destinations.baseSubtitle')}
+              </p>
+            </div>
+            {canWrite && (
+              <Button
+                variant="outline"
+                onClick={handleLoadInitialTargets}
+                disabled={savingTargets}
+                className="flex items-center gap-2 whitespace-nowrap"
+              >
+                <FileCheck2 className="w-4 h-4" />
+                {t('controls.types.loadSeeds')}
+              </Button>
+            )}
+          </div>
+
+          {/* Destinos base: tarjetas protegidas, solo editables en descripción */}
+          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div>
+              <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('controls.destinations.baseTitle')}</h3>
+              <p className="text-xs text-[#86868B] mt-0.5 max-w-2xl">{t('controls.destinations.baseSubtitle')}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 items-start">
+              {BASE_DESTINATION_IDS.map(id => (
+                <div
+                  key={id}
+                  className={cn(
+                    'bg-white rounded-xl border border-[#E5E5E7] p-3 transition-shadow',
+                    expandedIds.has(`base:${id}`) && 'shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
+                  )}
+                >
+                  <div
+                    className="flex items-center justify-between gap-2 cursor-pointer"
+                    onClick={() => toggleExpanded(`base:${id}`)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-corporate/10 text-corporate">
+                        {t(`controls.destinations.base.${id}`)}
+                      </span>
+                      <MapPin className="w-3.5 h-3.5 text-[#86868B] shrink-0" />
+                    </div>
+                    {expandedIds.has(`base:${id}`)
+                      ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                      : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
+                  </div>
+                  {expandedIds.has(`base:${id}`) && (
+                    <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-2">
+                      <p className="text-xs text-[#86868B]">
+                        {baseDescriptions[id] || t(`controls.destinations.default.${id}`)}
+                      </p>
+                      {canWrite && (
+                        <>
+                          <textarea
+                            value={baseDescriptions[id]}
+                            onChange={e => setBaseDescriptions(prev => ({ ...prev, [id]: e.target.value }))}
+                            placeholder={t(`controls.destinations.default.${id}`)}
+                            rows={2}
+                            className="w-full rounded-lg border border-[#E5E5E7] px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20 resize-none"
+                          />
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleSaveBaseDescription(id)}
+                            className="flex items-center gap-1 whitespace-nowrap"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {t('controls.common.save')}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Destinos personalizados (controlTargetTypes): CRUD completo */}
+          <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('controls.targets.customTitle')}</h3>
+                <p className="text-xs text-[#86868B] mt-0.5 max-w-2xl">{t('controls.targets.subtitle')}</p>
+              </div>
+            </div>
+            {targetTypes.length === 0 ? (
+              <p className="text-xs text-[#86868B] mt-3">{t('controls.targets.empty')}</p>
+            ) : (
+              <div className="space-y-2 mt-3">
+                {targetTypes.map(tt => editingTargetId === tt.id ? (
+                  <div key={tt.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-xl p-2">
+                    <Input
+                      value={editingTargetName}
+                      onChange={e => setEditingTargetName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleRenameTarget(); }}
+                      className="h-8 w-40"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleRenameTarget}
+                      disabled={savingTargets}
+                      className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600"
+                      title={t('controls.common.save')}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => { setEditingTargetId(null); setEditingTargetName(''); }}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                      title={t('controls.common.cancel')}
+                    >
+                      <XCircle className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    key={tt.id}
+                    className={cn(
+                      'bg-white rounded-xl border p-3 transition-shadow',
+                      tt.isActive ? 'border-[#E5E5E7]' : 'border-[#F5F5F7] opacity-70',
+                      expandedIds.has(tt.id) && 'shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
+                    )}
+                  >
+                    <div
+                      className="flex items-center justify-between gap-2 cursor-pointer"
+                      onClick={() => toggleExpanded(tt.id)}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-medium',
+                          tt.isActive ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'bg-[#F5F5F7] text-[#86868B]'
+                        )}>
+                          {tt.name}
+                        </span>
+                        <span className="text-[11px] text-[#86868B]">
+                          {(tt.items || []).length} {t('controls.targets.items')}
+                        </span>
+                        <span className="text-[11px] text-[#86868B]">
+                          {tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingTargetId(tt.id); setEditingTargetName(tt.name); }}
+                              title={t('controls.type.modalEdit')}
+                              className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleToggleTargetActive(tt); }}
+                              title={tt.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                            >
+                              <Power className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {expandedIds.has(tt.id)
+                          ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                          : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
+                      </div>
+                    </div>
+                    {expandedIds.has(tt.id) && (
+                      <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-3">
+                        <div className="space-y-1.5">
+                          <DetailRow label={t('controls.detail.id')} value={tt.id} />
+                          <DetailRow label={t('controls.type.name')} value={tt.name} />
+                          <DetailRow label={t('controls.detail.nameEn')} value={tt.nameEn} />
+                          <DetailRow label={t('controls.detail.icon')} value={tt.icon} />
+                          <DetailRow
+                            label={t('controls.detail.state')}
+                            value={tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
+                          />
+                          <DetailRow
+                            label={t('controls.detail.created')}
+                            value={`${tt.createdBy || '—'} · ${new Date(tt.createdAt).toLocaleString()}`}
+                          />
+                          <DetailRow
+                            label={t('controls.detail.updated')}
+                            value={tt.updatedAt ? `${tt.updatedBy || '—'} · ${new Date(tt.updatedAt).toLocaleString()}` : undefined}
+                          />
+                        </div>
+
+                        {/* Ítems del destino (instancias seleccionables) */}
+                        <div className="space-y-2">
+                          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">
+                            {t('controls.targets.items')}
+                          </h4>
+                          {(tt.items || []).length === 0 ? (
+                            <p className="text-xs text-[#86868B]">{t('controls.targets.itemsEmpty')}</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {(tt.items || []).map(item => (
+                                <span
+                                  key={item.id}
+                                  className={cn(
+                                    'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                                    item.isActive
+                                      ? 'bg-corporate/10 text-corporate border-corporate/20'
+                                      : 'bg-[#F5F5F7] text-[#86868B] border-[#E5E5E7] opacity-70'
+                                  )}
+                                >
+                                  {item.name}
+                                  {canWrite && (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleTargetItem(tt, item.id)}
+                                        title={item.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
+                                        className="p-0.5 rounded-full hover:bg-white/60"
+                                      >
+                                        <Power className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRemoveTargetItem(tt, item.id)}
+                                        title={t('controls.targets.itemDeleteTitle')}
+                                        className="p-0.5 rounded-full hover:bg-red-50 hover:text-red-600"
+                                      >
+                                        <XCircle className="w-3 h-3" />
+                                      </button>
+                                    </>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {canWrite && (
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                              <Input
+                                value={(newItemForms[tt.id] || {}).name || ''}
+                                onChange={e => setNewItemForms(prev => ({ ...prev, [tt.id]: { name: e.target.value, nameEn: (prev[tt.id] || {}).nameEn || '' } }))}
+                                onKeyDown={e => { if (e.key === 'Enter') handleAddTargetItem(tt); }}
+                                placeholder={t('controls.targets.itemName')}
+                                className="h-8 sm:w-48"
+                              />
+                              <Input
+                                value={(newItemForms[tt.id] || {}).nameEn || ''}
+                                onChange={e => setNewItemForms(prev => ({ ...prev, [tt.id]: { name: (prev[tt.id] || {}).name || '', nameEn: e.target.value } }))}
+                                onKeyDown={e => { if (e.key === 'Enter') handleAddTargetItem(tt); }}
+                                placeholder={t('controls.targets.itemNameEn')}
+                                className="h-8 sm:w-48"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleAddTargetItem(tt)}
+                                disabled={savingTargets || !((newItemForms[tt.id] || {}).name || '').trim()}
+                                className="flex items-center gap-1 whitespace-nowrap"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                {t('controls.targets.addItem')}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {canWrite && (
+              <div className="flex items-center gap-2 mt-3">
+                <Input
+                  value={newTargetName}
+                  onChange={e => setNewTargetName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateTarget(); }}
+                  placeholder={t('controls.targets.newPlaceholder')}
+                  className="h-9 sm:w-64"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreateTarget}
+                  disabled={savingTargets || !newTargetName.trim()}
+                  className="flex items-center gap-1 whitespace-nowrap"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {t('controls.targets.add')}
+                </Button>
+              </div>
+            )}
+          </div>
         </>
       )}
 
@@ -2188,6 +2662,7 @@ export function ControlesTab() {
                   ))}
               </div>
               <p className="text-[11px] text-[#86868B]">{t('controls.type.scopeTabsHint')}</p>
+              <p className="text-[11px] text-[#86868B] bg-[#F5F5F7] rounded-lg p-2.5">{t('controls.type.semanticsHint')}</p>
             </div>
 
             {/* Selectores dependientes del destino: un bloque por cada chip activo
@@ -2259,43 +2734,119 @@ export function ControlesTab() {
                   </div>
                 );
               }
-              // Cualquier otro destino del catálogo sin catálogo propio: nombres con chips
+              // Cualquier otro destino personalizado del catálogo: lista de ítems
+              // (chips seleccionables, solo activos) + mini-form "+ Agregar ítem"
+              // que crea el ítem en Firestore y lo agrega a la selección.
+              // Compatibilidad: los nombres guardados que ya no son ítems del
+              // destino siguen mostrándose como chips seleccionados.
+              const tt = targetTypes.find(x => x.id === targetId);
+              const activeItems = (tt?.items || []).filter(i => i.isActive);
+              const activeNames = new Set(activeItems.map(i => i.name));
+              const legacyNames = selected.filter(v => !activeNames.has(v));
+              // Destino legacy sin documento en el catálogo: se conserva el
+              // input de nombre libre como respaldo.
+              if (!tt) {
+                return (
+                  <div key={targetId} className={blockCls}>
+                    <Label>{t('controls.type.targetSelection')}: {targetTypeName(targetId)}</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={targetNameInputs[targetId] || ''}
+                        onChange={e => setTargetNameInputs(prev => ({ ...prev, [targetId]: e.target.value }))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTargetName(targetId); } }}
+                        placeholder={t('controls.type.nameInputPlaceholder')}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => addTargetName(targetId)}
+                        disabled={!(targetNameInputs[targetId] || '').trim()}
+                        className="flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {t('controls.type.addName')}
+                      </Button>
+                    </div>
+                    {selected.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selected.map(name => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => removeTargetName(targetId, name)}
+                            title={t('controls.common.cancel')}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-corporate/10 text-corporate text-xs font-medium border border-corporate/20 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                          >
+                            {name}
+                            <XCircle className="w-3 h-3" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              const itemForm = typeItemForms[tt.id] || { name: '', nameEn: '' };
               return (
                 <div key={targetId} className={blockCls}>
-                  <Label>{t('controls.type.targetSelection')}: {targetTypeName(targetId)}</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={targetNameInputs[targetId] || ''}
-                      onChange={e => setTargetNameInputs(prev => ({ ...prev, [targetId]: e.target.value }))}
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTargetName(targetId); } }}
-                      placeholder={t('controls.type.nameInputPlaceholder')}
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={() => addTargetName(targetId)}
-                      disabled={!(targetNameInputs[targetId] || '').trim()}
-                      className="flex items-center gap-1 whitespace-nowrap"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      {t('controls.type.addName')}
-                    </Button>
+                  <Label>{t('controls.type.targetSelection')}: {tt.name}</Label>
+                  {activeItems.length === 0 && legacyNames.length === 0 && (
+                    <p className="text-xs text-[#86868B]">{t('controls.type.noActiveItems')}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5">
+                    {activeItems.map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => toggleTargetSelectionValue(targetId, item.name)}
+                        className={chipCls(selected.includes(item.name))}
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                    {/* Selección guardada que ya no coincide con ítems activos:
+                        se muestra como chip seleccionado para no perder datos. */}
+                    {legacyNames.map(name => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => toggleTargetSelectionValue(targetId, name)}
+                        title={t('controls.common.cancel')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-corporate/10 text-corporate text-xs font-medium border border-corporate/20 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                      >
+                        {name}
+                        <XCircle className="w-3 h-3" />
+                      </button>
+                    ))}
                   </div>
-                  {selected.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selected.map(name => (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => removeTargetName(targetId, name)}
-                          title={t('controls.common.cancel')}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-corporate/10 text-corporate text-xs font-medium border border-corporate/20 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
-                        >
-                          {name}
-                          <XCircle className="w-3 h-3" />
-                        </button>
-                      ))}
+                  {canWrite && (
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                      <Input
+                        value={itemForm.name}
+                        onChange={e => setTypeItemForms(prev => ({ ...prev, [tt.id]: { name: e.target.value, nameEn: (prev[tt.id] || {}).nameEn || '' } }))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTargetItemFromTypeForm(tt); } }}
+                        placeholder={t('controls.targets.itemName')}
+                        className="h-8 sm:w-44"
+                      />
+                      <Input
+                        value={itemForm.nameEn}
+                        onChange={e => setTypeItemForms(prev => ({ ...prev, [tt.id]: { name: (prev[tt.id] || {}).name || '', nameEn: e.target.value } }))}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddTargetItemFromTypeForm(tt); } }}
+                        placeholder={t('controls.targets.itemNameEn')}
+                        className="h-8 sm:w-44"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleAddTargetItemFromTypeForm(tt)}
+                        disabled={savingTargets || !itemForm.name.trim()}
+                        className="flex items-center gap-1 whitespace-nowrap"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {t('controls.targets.addItem')}
+                      </Button>
                     </div>
                   )}
                 </div>

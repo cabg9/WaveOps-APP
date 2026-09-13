@@ -1,13 +1,40 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1 a 0.3 + mini-ajustes y mini-fix de chips desplegados en gemela — pendiente cierre del usuario)
+> Última actualización: 2026-09-13 (Fase 0 — corrección "Estructura final" del módulo Controles desplegada en gemela — pendiente re-prueba del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
 
 ---
 
-## FASE 0.3 — Tercera y última ronda (13 de septiembre) — DESPLEGADA EN STAGING
+## FASE 0.4 — Corrección: ESTRUCTURA FINAL del módulo Controles (13 de septiembre) — DESPLEGADA EN STAGING
+
+**Estado:** EN GEMELA, pendiente re-prueba del usuario.
+
+**Datos (depurados en la gemela con Admin SDK ANTES del cambio de código):**
+- El catálogo `controlTargetTypes` quedó SOLO con los 4 personalizados: `equipos`, `vehiculos`, `embarcaciones`, `ubicaciones`. Se ELIMINARON los docs `personas` y `departamentos` (los 4 destinos base YA NO son documentos del catálogo — eran la causa de la duplicación de chips cuando el render caía al bloque legacy).
+- Verificado que ningún `controlTypes.appliesTo` referencia ids fuera del catálogo.
+- Script de soporte: `functions/dedupe-target-types.cjs` (lista, siembra si el catálogo está vacío, deduplica por nombre con remap de referencias; `--apply` para ejecutar).
+
+**Tres pestañas en Controles:** "Tipos de control" | "Destinos" | "Controles asignados" (nueva pill con icono MapPin, clave `controls.tab.destinations`).
+
+**Pestaña Destinos:**
+- **Destinos base** (4 tarjetas protegidas: PERSONAS, ROLES, POSICIONES, DEPARTAMENTOS): no se eliminan ni renombran; solo descripción editable (textarea + Guardar, solo canWrite), persistida en el doc `controlSettings/baseDestinations` shape `{ descriptions: { personas, roles, posiciones, departamentos } }` (getDoc al montar, setDoc merge). Descripciones por defecto i18n (`controls.destinations.default.*`). Ayuda: "Destinos base del sistema, ya conectados a usuarios, roles, posiciones y departamentos."
+- **Destinos personalizados** (CRUD de `controlTargetTypes` movido aquí): crear (id autogenerado), renombrar inline, activar/desactivar, tarjetas expandibles. "Cargar iniciales" crea SOLO los 4 de ejemplo, nunca los base. Los personalizados existentes (Equipos, Vehículos, Embarcaciones, Ubicaciones) pasaron a vivir aquí como entradas normales.
+- **Ítems por destino**: `items: [{ id, name, nameEn?, isActive }]` en el doc; CRUD completo en la tarjeta expandida (agregar con nombre/es-en, activar-desactivar, eliminar). Los docs sin `items` quedan con array vacío (migración sin pérdida).
+
+**Formulario de Tipo de control:**
+- Chips en orden PERSONAS | ROLES | POSICIONES | DEPARTAMENTOS y después los personalizados activos; filtros anti-duplicado por id+nombre intactos; solo persisten selecciones de chips activos; al editar precargan activos los chips con datos.
+- Bloques de personalizados: chips de los ítems ACTIVOS del destino + mini-form "+ Agregar ítem" (crea el ítem en Firestore y lo agrega a la selección guardando el NAME, coherente con datos existentes). Compatibilidad: nombres guardados que ya no son ítems activos siguen mostrándose seleccionados; destino sin doc en catálogo (id legacy) conserva el input de nombre libre como respaldo.
+- Hint de semántica visible (`controls.type.semanticsHint`): personas=usuarios específicos, roles=todos los del rol, posiciones=todos los de la posición, departamentos=todos los del departamento, personalizados=instancias (ítems).
+
+**Tipos locales:** `ControlTargetItemEntry { id, name, nameEn?, isActive }`; `TargetTypeWithItems`; `docToControlTargetType` parsea `items`.
+
+**NO tocado:** pestaña assignments (asignaciones, alertas, estados), campana, functions, reglas.
+
+**Archivos:** `src/components/modules/ControlesTab.tsx` (único). **Build:** verificado por el coordinador, exit 0; deploy hosting staging hecho.
+
+---
 
 **Estado:** EN GEMELA. Con la aprobación del usuario se CIERRA la Fase 0 y se puede pasar a producción (hosting + reglas + índices + functions + semilla `seed-fase0.cjs`).
 
