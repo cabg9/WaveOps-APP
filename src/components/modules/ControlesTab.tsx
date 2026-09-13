@@ -512,7 +512,8 @@ interface TypeFormState {
   description: string;
   appliesTo: string[]; // ids del catálogo dinámico controlTargetTypes
   targetSelections: Record<string, string[]>; // selección específica por id de appliesTo
-  rolesTabVisible: boolean; // pestaña ROLES activa (solo UI; no se persiste)
+  rolesTabVisible: boolean; // chip ROLES activo (solo UI; no se persiste)
+  positionsTabVisible: boolean; // chip POSICIONES activo (solo UI; no se persiste)
   roleIds: string[];
   positionIds: string[]; // ids de positions
   validityMonths: string; // string para input; vacío = no vence
@@ -529,6 +530,7 @@ const EMPTY_TYPE_FORM: TypeFormState = {
   appliesTo: [],
   targetSelections: {},
   rolesTabVisible: false,
+  positionsTabVisible: false,
   roleIds: [],
   positionIds: [],
   validityMonths: '',
@@ -808,6 +810,7 @@ export function ControlesTab() {
       appliesTo: [...ct.appliesTo],
       targetSelections: { ...(ct.targetSelections || {}) },
       rolesTabVisible: (ct.roleIds || []).length > 0,
+      positionsTabVisible: (ct.positionIds || []).length > 0,
       roleIds: [...ct.roleIds],
       positionIds: [...(ct.positionIds || [])],
       validityMonths: ct.validityMonths != null ? String(ct.validityMonths) : '',
@@ -924,9 +927,14 @@ export function ControlesTab() {
         nameEn: typeForm.nameEn.trim() || null,
         description: typeForm.description.trim() || null,
         appliesTo: typeForm.appliesTo,
-        targetSelections: typeForm.targetSelections,
-        roleIds: typeForm.roleIds,
-        positionIds: typeForm.positionIds,
+        // Solo se persisten las selecciones de los chips ACTIVOS (personas/
+        // departamentos/otros destinos viven en appliesTo; roles/posiciones
+        // dependen de su chip de UI).
+        targetSelections: Object.fromEntries(
+          Object.entries(typeForm.targetSelections).filter(([k]) => typeForm.appliesTo.includes(k))
+        ),
+        roleIds: typeForm.rolesTabVisible ? typeForm.roleIds : [],
+        positionIds: typeForm.positionsTabVisible ? typeForm.positionIds : [],
         validityMonths,
         alertDaysBefore,
         isRequired: typeForm.isRequired,
@@ -2084,9 +2092,9 @@ export function ControlesTab() {
             <div className="space-y-2">
               <Label>{t('controls.type.appliesTo')} *</Label>
               <div className="flex flex-wrap gap-1.5">
-                {/* Tres pestañas acumulables e independientes: PERSONAS | ROLES | DEPARTAMENTOS.
+                {/* Chips fijos acumulables: PERSONAS | ROLES | POSICIONES | DEPARTAMENTOS.
                     PERSONAS/DEPARTAMENTOS viven en appliesTo; al apagarse conservan su
-                    targetSelections. ROLES es solo bandera de UI (rolesTabVisible). */}
+                    targetSelections. ROLES y POSICIONES son solo banderas de UI. */}
                 <button
                   type="button"
                   onClick={() => toggleAppliesTo('personas')}
@@ -2113,6 +2121,18 @@ export function ControlesTab() {
                 </button>
                 <button
                   type="button"
+                  onClick={() => setTypeForm(prev => ({ ...prev, positionsTabVisible: !prev.positionsTabVisible }))}
+                  className={cn(
+                    'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                    typeForm.positionsTabVisible
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                  )}
+                >
+                  {t('controls.type.positions')}
+                </button>
+                <button
+                  type="button"
                   onClick={() => toggleAppliesTo('departamentos')}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
@@ -2129,7 +2149,7 @@ export function ControlesTab() {
                     const name = tt.name.trim().toLowerCase();
                     // Excluir los chips fijos por id Y por nombre (el usuario pudo
                     // crear entradas del catálogo duplicadas con id autogenerado).
-                    return !['personas', 'departamentos', 'roles'].some(
+                    return !['personas', 'departamentos', 'roles', 'posiciones'].some(
                       fixed => key === fixed || name === fixed
                     );
                   })
@@ -2148,9 +2168,11 @@ export function ControlesTab() {
                     {tt.name}
                   </button>
                 ))}
-                {/* Compatibilidad: ids legacy que ya no están en el catálogo */}
+                {/* Compatibilidad: ids legacy que ya no están en el catálogo.
+                    NUNCA duplicar los chips fijos, aunque el catálogo esté vacío. */}
                 {typeForm.appliesTo
                   .filter(id => !activeTargetTypes.some(tt => tt.id === id))
+                  .filter(id => id !== 'personas' && id !== 'departamentos')
                   .map(id => (
                     <button
                       key={id}
@@ -2308,28 +2330,32 @@ export function ControlesTab() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>{t('controls.type.positions')}</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {positions.length === 0 ? (
-                  <span className="text-xs text-[#86868B]">—</span>
-                ) : positions.map(pos => (
-                  <button
-                    key={pos.id}
-                    type="button"
-                    onClick={() => togglePositionId(pos.id)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
-                      typeForm.positionIds.includes(pos.id)
-                        ? 'bg-corporate text-white border-corporate'
-                        : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
-                    )}
-                  >
-                    {pos.name}
-                  </button>
-                ))}
+            {/* Bloque de la pestaña POSICIONES: multi-select de positionIds (se guarda
+                igual en positionIds). Puede estar visible aunque positionIds esté vacío. */}
+            {typeForm.positionsTabVisible && (
+              <div className="space-y-2 rounded-xl border border-[#E5E5E7] p-3">
+                <Label>{t('controls.type.positions')}</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {positions.length === 0 ? (
+                    <span className="text-xs text-[#86868B]">—</span>
+                  ) : positions.map(pos => (
+                    <button
+                      key={pos.id}
+                      type="button"
+                      onClick={() => togglePositionId(pos.id)}
+                      className={cn(
+                        'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                        typeForm.positionIds.includes(pos.id)
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {pos.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">

@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2, 0.3 + mini-ajuste y mini-fix de cierre desplegados en gemela — pendiente cierre del usuario)
+> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1 a 0.3 + mini-ajustes y mini-fix de chips desplegados en gemela — pendiente cierre del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -38,6 +38,21 @@ El bloque "Aplica a" del formulario de Tipo de control ahora arranca con TRES ch
 **Corrección:** el filtro del listado del catálogo ahora excluye las entradas fijas por id Y por nombre (insensible a mayúsculas/minúsculas): `personas`, `departamentos`, `roles`. Cada chip aparece una sola vez, en el orden PERSONAS | ROLES | DEPARTAMENTOS | demás destinos, tanto al crear como al editar.
 
 **Archivos:** `ControlesTab.tsx` (solo este). **Build:** limpio (exit 0); deploy hosting staging hecho.
+
+### Mini-fix — Chips duplicados de raíz + chip POSICIONES + comportamiento uniforme
+
+**Causa raíz (verificada en la gemela con Admin SDK):** la colección `controlTargetTypes` estaba **vacía** en staging. Con el catálogo vacío, el bloque de "compatibilidad legacy" pintaba TAMBIÉN los ids fijos `personas`/`departamentos` de los tipos guardados, duplicando los chips fijos. No había entradas repetidas que borrar; faltaban todas.
+
+**Datos (script `functions/dedupe-target-types.cjs`, dry-run + `--apply`):**
+- Creadas las 6 semillas de destinos con ids deterministas (`personas`, `departamentos`, `equipos`, `vehiculos`, `embarcaciones`, `ubicaciones`), mismo shape que el botón "Cargar iniciales" de la UI.
+- Verificado que ningún `controlTypes.appliesTo` referencia ids fuera del catálogo.
+
+**Código (`ControlesTab.tsx`):**
+- El bloque legacy ahora **nunca** duplica los chips fijos: excluye `personas`/`departamentos` aunque el catálogo esté vacío (defensa en profundidad, además del filtro por id+nombre del catálogo).
+- Nuevo chip fijo **POSICIONES** entre ROLES y DEPARTAMENTOS (bandera de UI `positionsTabVisible`; al editar se activa si `positionIds` tiene datos). El bloque de posiciones quedó envuelto por su chip con el mismo estilo de bloque que los demás.
+- Comportamiento uniforme: al guardar solo se persisten selecciones de chips activos — `targetSelections` filtrado a los ids de `appliesTo`, `roleIds` solo si el chip ROLES está activo, `positionIds` solo si POSICIONES está activo. Al editar se precargan activos los chips con datos guardados.
+
+**Build:** limpio (exit 0); deploy hosting staging hecho.
 
 ---
 
