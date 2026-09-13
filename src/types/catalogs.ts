@@ -156,6 +156,9 @@ export interface ControlType extends CatalogBase {
   appliesTo: string[];
   roleIds: string[]; // roles a los que aplica (ids de roleTemplates o Role)
   positionIds?: string[]; // posiciones a las que aplica (ref positions)
+  /** Selecciones específicas por destino: { [appliesToId]: [targetIds o nombres] }.
+   * Ej.: { personas: [uid1, uid2], departamentos: [deptId1], equipos: ['Tanque HP100'] } */
+  targetSelections?: Record<string, string[]>;
   validityMonths?: number | null; // vigencia en meses (null = no vence)
   frequencyDays?: number | null; // frecuencia en días alternativa
   customFields: ControlCustomField[];

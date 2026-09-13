@@ -1,9 +1,23 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 + correcciones 0.1 y 0.2 desplegadas en gemela — pendiente validación del usuario)
+> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2 y 0.3 desplegadas en gemela — pendiente cierre del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 0.3 — Tercera y última ronda (13 de septiembre) — DESPLEGADA EN STAGING
+
+**Estado:** EN GEMELA. Con la aprobación del usuario se CIERRA la Fase 0 y se puede pasar a producción (hosting + reglas + índices + functions + semilla `seed-fase0.cjs`).
+
+1. **Foto en tarjetas expandidas:** productos muestran su foto ampliada en el detalle (clic abre en pestaña nueva); asignaciones de controles igual.
+2. **Layout al expandir:** `items-start` en todos los grids de tarjetas (Ubicaciones, Catálogos, Controles) — las vecinas conservan su alto natural, solo la expandida crece.
+3. **Selectores dependientes del destino en Tipos de control:** por cada valor de "Aplica a" aparece su bloque: Personas → usuarios agrupados por departamento (chips multi-select) + roles + posiciones; Departamentos → departamentos multi-select; Ubicaciones → ubicaciones multi-select; Equipos/Vehículos/Embarcaciones/otros → nombres con chips de texto. Guardado en `ControlType.targetSelections` (persiste al crear y precarga al editar); la tarjeta expandida resuelve ids a nombres.
+
+**Tipos:** `ControlType.targetSelections?: Record<string, string[]>`.
+
+**Build:** limpio (exit 0); deploy hosting staging hecho.
 
 ---
 

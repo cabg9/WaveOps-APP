@@ -694,7 +694,7 @@ export function UbicacionesTab() {
             <p className="text-sm">{t('loc.emptyTypes')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             {types.map((item) => {
               const isExpanded = expandedIds.has(item.id);
               return (
@@ -770,7 +770,7 @@ export function UbicacionesTab() {
             <p className="text-sm">{t('loc.emptyGroups')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             {groups.map((item) => {
               const isExpanded = expandedIds.has(item.id);
               return (
@@ -841,7 +841,7 @@ export function UbicacionesTab() {
             <p className="text-sm">{t('loc.emptyLocations')}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
             {locations.map((item) => {
               const isExpanded = expandedIds.has(item.id);
               const responsibleDeptName = departmentOptions.find((d) => d.code === item.responsibleDepartmentId)?.name || '';

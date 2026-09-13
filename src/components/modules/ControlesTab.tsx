@@ -96,6 +96,15 @@ registerI18nKeys({
     'controls.applies.vehiculos': 'Vehículos',
     'controls.applies.embarcaciones': 'Embarcaciones',
     'controls.applies.ubicaciones': 'Ubicaciones',
+    'controls.type.targetSelection': 'Selección específica',
+    'controls.type.selectUsers': 'Personas incluidas',
+    'controls.type.selectDepartments': 'Departamentos incluidos',
+    'controls.type.selectLocations': 'Ubicaciones incluidas',
+    'controls.type.noDepartment': 'Sin departamento',
+    'controls.type.addName': 'Agregar',
+    'controls.type.nameInputPlaceholder': 'Escribe un nombre y pulsa Agregar',
+    'controls.type.noSelection': 'Sin selección',
+    'controls.detail.targetSelections': 'Selección por destino',
     'controls.targets.title': '¿A qué se le puede asignar un control?',
     'controls.targets.subtitle': 'Tipos de destino: personas, departamentos, equipos, vehículos, embarcaciones o ubicaciones. Crea aquí cualquier tipo de cosa que necesite documentos o controles.',
     'controls.targets.add': 'Agregar',
@@ -233,6 +242,15 @@ registerI18nKeys({
     'controls.applies.vehiculos': 'Vehicles',
     'controls.applies.embarcaciones': 'Vessels',
     'controls.applies.ubicaciones': 'Locations',
+    'controls.type.targetSelection': 'Specific selection',
+    'controls.type.selectUsers': 'Included people',
+    'controls.type.selectDepartments': 'Included departments',
+    'controls.type.selectLocations': 'Included locations',
+    'controls.type.noDepartment': 'No department',
+    'controls.type.addName': 'Add',
+    'controls.type.nameInputPlaceholder': 'Type a name and press Add',
+    'controls.type.noSelection': 'No selection',
+    'controls.detail.targetSelections': 'Selection by target',
     'controls.targets.title': 'What can a control be assigned to?',
     'controls.targets.subtitle': 'Target types: people, departments, teams, vehicles, vessels or locations. Create here any kind of thing that needs documents or controls.',
     'controls.targets.add': 'Add',
@@ -425,6 +443,9 @@ function docToControlType(id: string, data: any): ControlType {
     nameEn: data.nameEn,
     description: data.description,
     appliesTo: Array.isArray(data.appliesTo) ? data.appliesTo : [],
+    targetSelections: data.targetSelections && typeof data.targetSelections === 'object'
+      ? data.targetSelections
+      : undefined,
     roleIds: Array.isArray(data.roleIds) ? data.roleIds : [],
     positionIds: Array.isArray(data.positionIds) ? data.positionIds : [],
     validityMonths: typeof data.validityMonths === 'number' ? data.validityMonths : null,
@@ -488,6 +509,7 @@ interface TypeFormState {
   nameEn: string;
   description: string;
   appliesTo: string[]; // ids del catálogo dinámico controlTargetTypes
+  targetSelections: Record<string, string[]>; // selección específica por id de appliesTo
   roleIds: string[];
   positionIds: string[]; // ids de positions
   validityMonths: string; // string para input; vacío = no vence
@@ -502,6 +524,7 @@ const EMPTY_TYPE_FORM: TypeFormState = {
   nameEn: '',
   description: '',
   appliesTo: [],
+  targetSelections: {},
   roleIds: [],
   positionIds: [],
   validityMonths: '',
@@ -568,6 +591,8 @@ export function ControlesTab() {
   const [controlTypes, setControlTypes] = useState<ControlType[]>([]);
   const [assignments, setAssignments] = useState<ControlAssignment[]>([]);
   const [targetTypes, setTargetTypes] = useState<ControlTargetTypeItem[]>([]);
+  const [locations, setLocations] = useState<Array<{ id: string; name: string; isActive: boolean; tenantId?: string }>>([]);
+  const [targetNameInputs, setTargetNameInputs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingTargets, setSavingTargets] = useState(false);
@@ -603,6 +628,26 @@ export function ControlesTab() {
   const activeTypes = useMemo(() => controlTypes.filter(ct => ct.isActive), [controlTypes]);
   const activeAssignments = useMemo(() => assignments.filter(a => a.isActive), [assignments]);
   const activeTargetTypes = useMemo(() => targetTypes.filter(x => x.isActive), [targetTypes]);
+  const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
+
+  // Usuarios activos agrupados por departamento (encabezados ordenados alfabéticamente)
+  const usersByDepartment = useMemo(() => {
+    const groups = new Map<string, typeof activeUsers>();
+    activeUsers.forEach(u => {
+      const dept = u.department || '';
+      if (!groups.has(dept)) groups.set(dept, []);
+      groups.get(dept)!.push(u);
+    });
+    return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [activeUsers]);
+
+  // Resuelve ids/nombres guardados en targetSelections a nombres legibles
+  const resolveSelectionNames = (targetId: string, values: string[]): string[] => {
+    if (targetId === 'personas') return values.map(v => activeUsers.find(u => u.id === v)?.name || v);
+    if (targetId === 'departamentos') return values.map(v => dynamicDepartments.find(d => d.id === v)?.name || v);
+    if (targetId === 'ubicaciones') return values.map(v => locations.find(l => l.id === v)?.name || v);
+    return values; // nombres de texto tal cual
+  };
 
   // Nombre legible de un id del catálogo "Aplica a". Compatibilidad legacy:
   // ids antiguos sin doc en el catálogo caen a la clave i18n, y si tampoco
@@ -677,6 +722,31 @@ export function ControlesTab() {
     return () => unsub();
   }, [tenantId]);
 
+  // Ubicaciones activas (colección 'locations'): alimenta el selector dependiente
+  // del destino 'ubicaciones' en el formulario de tipo de control.
+  useEffect(() => {
+    const q = query(collection(db, 'locations'), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const items = snap.docs
+          .map(d => {
+            const data = d.data();
+            return {
+              id: d.id,
+              name: data.name || '',
+              isActive: data.isActive !== false,
+              tenantId: data.tenantId,
+            };
+          })
+          .filter(x => !x.tenantId || x.tenantId === tenantId);
+        setLocations(items);
+      },
+      (err) => console.error('[ControlesTab] locations:', err)
+    );
+    return () => unsub();
+  }, [tenantId]);
+
   // NOTA: las alertas de vencimiento (por_vencer / vencido) las generan las
   // Cloud Functions (revisión programada cada 15 min + notificación inmediata
   // al asignar). El cliente ya NO crea notificaciones: aquí solo se calcula
@@ -732,6 +802,7 @@ export function ControlesTab() {
       nameEn: ct.nameEn || '',
       description: ct.description || '',
       appliesTo: [...ct.appliesTo],
+      targetSelections: { ...(ct.targetSelections || {}) },
       roleIds: [...ct.roleIds],
       positionIds: [...(ct.positionIds || [])],
       validityMonths: ct.validityMonths != null ? String(ct.validityMonths) : '',
@@ -775,6 +846,41 @@ export function ControlesTab() {
     }));
   };
 
+  // Selectores dependientes del destino: agregar/quitar un valor (id o nombre)
+  // en targetSelections[targetId]. Los valores se conservan aunque el bloque se
+  // oculte al quitar el chip de "Aplica a".
+  const toggleTargetSelectionValue = (targetId: string, value: string) => {
+    setTypeForm(prev => {
+      const current = prev.targetSelections[targetId] || [];
+      const next = current.includes(value)
+        ? current.filter(v => v !== value)
+        : [...current, value];
+      return { ...prev, targetSelections: { ...prev.targetSelections, [targetId]: next } };
+    });
+  };
+
+  // Destinos sin catálogo propio (equipos, vehículos, etc.): nombres libres con chips
+  const addTargetName = (targetId: string) => {
+    const name = (targetNameInputs[targetId] || '').trim();
+    if (!name) return;
+    setTypeForm(prev => {
+      const current = prev.targetSelections[targetId] || [];
+      if (current.includes(name)) return prev;
+      return { ...prev, targetSelections: { ...prev.targetSelections, [targetId]: [...current, name] } };
+    });
+    setTargetNameInputs(prev => ({ ...prev, [targetId]: '' }));
+  };
+
+  const removeTargetName = (targetId: string, name: string) => {
+    setTypeForm(prev => ({
+      ...prev,
+      targetSelections: {
+        ...prev.targetSelections,
+        [targetId]: (prev.targetSelections[targetId] || []).filter(v => v !== name),
+      },
+    }));
+  };
+
   const updateCustomField = (index: number, patch: Partial<TypeFormState['customFields'][number]>) => {
     setTypeForm(prev => ({
       ...prev,
@@ -813,6 +919,7 @@ export function ControlesTab() {
         nameEn: typeForm.nameEn.trim() || null,
         description: typeForm.description.trim() || null,
         appliesTo: typeForm.appliesTo,
+        targetSelections: typeForm.targetSelections,
         roleIds: typeForm.roleIds,
         positionIds: typeForm.positionIds,
         validityMonths,
@@ -1554,7 +1661,7 @@ export function ControlesTab() {
               <p className="text-xs mt-1">{t('controls.types.emptyHint')}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 items-start">
               {activeTypes.map(ct => (
                 <div key={ct.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                   <div
@@ -1640,6 +1747,17 @@ export function ControlesTab() {
                         label={t('controls.type.appliesTo')}
                         value={ct.appliesTo.map(targetTypeName).join(', ')}
                       />
+                      {ct.appliesTo.map(targetId => {
+                        const values = (ct.targetSelections || {})[targetId] || [];
+                        if (values.length === 0) return null;
+                        return (
+                          <DetailRow
+                            key={targetId}
+                            label={`${t('controls.detail.targetSelections')} · ${targetTypeName(targetId)}`}
+                            value={resolveSelectionNames(targetId, values).join(', ')}
+                          />
+                        );
+                      })}
                       <DetailRow
                         label={t('controls.detail.roles')}
                         value={ct.roleIds.length > 0 ? ct.roleIds.map(roleName).join(', ') : undefined}
@@ -1857,7 +1975,22 @@ export function ControlesTab() {
                           />
                           <DetailRow
                             label={t('controls.assignment.photo')}
-                            value={a.photoUrl ? <a href={a.photoUrl} target="_blank" rel="noreferrer" className="text-corporate underline">{a.photoUrl}</a> : undefined}
+                            value={
+                              a.photoUrl ? (
+                                <a
+                                  href={a.photoUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block mt-1"
+                                >
+                                  <img
+                                    src={a.photoUrl}
+                                    alt={a.controlTypeName || ''}
+                                    className="h-24 rounded-xl border border-[#E5E5E7] object-cover"
+                                  />
+                                </a>
+                              ) : undefined
+                            }
                           />
                           <DetailRow
                             label={t('controls.assignment.verifiedBy')}
@@ -1979,6 +2112,118 @@ export function ControlesTab() {
                   ))}
               </div>
             </div>
+
+            {/* Selectores dependientes del destino: un bloque por cada chip activo
+                en "Aplica a". Al quitar un chip su bloque desaparece, pero sus
+                valores se conservan en targetSelections del estado del formulario. */}
+            {typeForm.appliesTo.map(targetId => {
+              const selected = typeForm.targetSelections[targetId] || [];
+              const blockCls = 'space-y-2 rounded-xl border border-[#E5E5E7] p-3';
+              const chipCls = (on: boolean) => cn(
+                'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                on
+                  ? 'bg-corporate text-white border-corporate'
+                  : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+              );
+              if (targetId === 'personas') {
+                return (
+                  <div key={targetId} className={blockCls}>
+                    <Label>{t('controls.type.targetSelection')}: {targetTypeName(targetId)}</Label>
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-[#F5F5F7] divide-y divide-[#F5F5F7]">
+                      {usersByDepartment.map(([dept, deptUsers]) => (
+                        <div key={dept || 'none'} className="p-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] px-1 mb-1.5">
+                            {dept || t('controls.type.noDepartment')}
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {deptUsers.map(u => (
+                              <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => toggleTargetSelectionValue(targetId, u.id)}
+                                className={chipCls(selected.includes(u.id))}
+                              >
+                                {u.name}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {activeUsers.length === 0 && (
+                        <p className="text-xs text-[#86868B] p-3">{t('controls.type.noSelection')}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              if (targetId === 'departamentos' || targetId === 'ubicaciones') {
+                const options = targetId === 'departamentos' ? activeDepartments : activeLocations;
+                const labelKey = targetId === 'departamentos'
+                  ? 'controls.type.selectDepartments'
+                  : 'controls.type.selectLocations';
+                return (
+                  <div key={targetId} className={blockCls}>
+                    <Label>{t(labelKey)}</Label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {options.map(opt => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => toggleTargetSelectionValue(targetId, opt.id)}
+                          className={chipCls(selected.includes(opt.id))}
+                        >
+                          {opt.name}
+                        </button>
+                      ))}
+                      {options.length === 0 && (
+                        <span className="text-xs text-[#86868B]">{t('controls.type.noSelection')}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              // Cualquier otro destino del catálogo sin catálogo propio: nombres con chips
+              return (
+                <div key={targetId} className={blockCls}>
+                  <Label>{t('controls.type.targetSelection')}: {targetTypeName(targetId)}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={targetNameInputs[targetId] || ''}
+                      onChange={e => setTargetNameInputs(prev => ({ ...prev, [targetId]: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTargetName(targetId); } }}
+                      placeholder={t('controls.type.nameInputPlaceholder')}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => addTargetName(targetId)}
+                      disabled={!(targetNameInputs[targetId] || '').trim()}
+                      className="flex items-center gap-1 whitespace-nowrap"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      {t('controls.type.addName')}
+                    </Button>
+                  </div>
+                  {selected.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {selected.map(name => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => removeTargetName(targetId, name)}
+                          title={t('controls.common.cancel')}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-corporate/10 text-corporate text-xs font-medium border border-corporate/20 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                        >
+                          {name}
+                          <XCircle className="w-3 h-3" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             <div className="space-y-2">
               <Label>{t('controls.type.roles')}</Label>

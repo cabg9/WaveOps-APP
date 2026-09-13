@@ -64,6 +64,7 @@ registerI18nKeys({
     'catalogs.common.confirmDeactivate': '¿Desactivar "{name}"? Quedará oculto pero no se eliminará.',
     'catalogs.common.loadInitial': 'Cargar iniciales',
     'catalogs.common.loadInitialDone': 'Semillas cargadas: {created} nuevas, {existing} ya existían',
+    'catalogs.common.openImage': 'Abrir imagen en pestaña nueva',
     'catalogs.suppliers.title': 'Proveedores',
     'catalogs.suppliers.count': '{count} proveedor(es)',
     'catalogs.suppliers.new': 'Nuevo proveedor',
@@ -197,6 +198,7 @@ registerI18nKeys({
     'catalogs.common.confirmDeactivate': 'Deactivate "{name}"? It will be hidden but not deleted.',
     'catalogs.common.loadInitial': 'Load initial data',
     'catalogs.common.loadInitialDone': 'Seeds loaded: {created} new, {existing} already existed',
+    'catalogs.common.openImage': 'Open image in new tab',
     'catalogs.suppliers.title': 'Suppliers',
     'catalogs.suppliers.count': '{count} supplier(s)',
     'catalogs.suppliers.new': 'New supplier',
@@ -803,7 +805,7 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       {suppliers.length === 0 ? (
         <EmptyState icon={<Truck className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
           {suppliers.map((s) => {
             const accounts = s.bankAccounts || [];
             const suppliedCategories = categoryNamesFor(s.productCategoryIds);
@@ -1286,7 +1288,13 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       {expandedIds.has(p.id) && (
         <div className="mt-4 pt-4 border-t border-[#F5F5F7]">
           {p.photoUrl && (
-            <img src={p.photoUrl} alt={p.name} className="h-16 w-16 rounded-xl object-cover mb-3" />
+            <a href={p.photoUrl} target="_blank" rel="noreferrer" title={t('catalogs.common.openImage')}>
+              <img
+                src={p.photoUrl}
+                alt={p.name}
+                className="h-32 w-32 rounded-xl object-cover mb-3 hover:opacity-90 transition-opacity"
+              />
+            </a>
           )}
           <DetailsGrid>
             <DetailItem label={t('catalogs.products.category')}>{categoryName(p.categoryId)}</DetailItem>
@@ -1372,14 +1380,14 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                     </h3>
                     <span className="text-xs text-[#86868B]">{items.length}</span>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
                     {items.map(renderProductCard)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
               {visibleProducts.map(renderProductCard)}
             </div>
           )}
@@ -1900,7 +1908,7 @@ function CostCentersSection({ canWrite }: { canWrite: boolean }) {
       {costCenters.length === 0 ? (
         <EmptyState icon={<Calculator className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
           {costCenters.map((c) => (
             <EntityCard
               key={c.id}
@@ -2100,7 +2108,7 @@ function SalesChannelsSection({ canWrite }: { canWrite: boolean }) {
       {channels.length === 0 ? (
         <EmptyState icon={<Megaphone className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
           {channels.map((c) => (
             <EntityCard
               key={c.id}
@@ -2375,7 +2383,7 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
       {clients.length === 0 ? (
         <EmptyState icon={<Users className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
           {clients.map((c) => (
             <EntityCard
               key={c.id}
