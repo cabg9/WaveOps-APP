@@ -1,9 +1,38 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 + corrección de validación 0.1 desplegadas en gemela — pendiente validación del usuario)
+> Última actualización: 2026-09-13 (Fase 0 + correcciones 0.1 y 0.2 desplegadas en gemela — pendiente validación del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 0.2 — Segunda ronda de validación (13 de septiembre) — DESPLEGADA EN STAGING
+
+**Estado:** EN GEMELA, probada E2E por desarrollo, pendiente re-validación del usuario.
+
+**BUG 1 — Campana no mostraba notificaciones (RAÍZ REAL ENCONTRADA):** la campana consulta `notifications` con `where(userId==) + orderBy(createdAt desc)`, lo que REQUIERE un índice compuesto que existía en `firestore.indexes.json` pero **nunca se había desplegado a la gemela** (`firebase deploy --only firestore:indexes -P staging` nunca se había corrido) — la consulta fallaba en silencio y la campana quedaba vacía. Corregido desplegando índices. **Verificación E2E real hecha por desarrollo** (`functions/test-control-alerts.cjs`, ejecuta la MISMA lógica de la Cloud Function): se creó un control con vencimiento a +3 días, el chequeo creó la notificación con los campos exactos que lee la campana (`userId`, `type: CONTROL_EXPIRING`, `read:false`, `priority`, `createdAt`, `data.link`), se notificó también a RRHH y el estado quedó persistido como `por_vencer`. Además se verificó que el UID de Auth coincide con el id del doc users (requerido por las reglas de lectura). El trigger `notifyControlAssigned` también se disparó en la prueba (aviso inmediato "Control asignado").
+
+**BUG 2 — Storage "User does not have permission" en fotos:** las reglas de Storage (`storage.rules`, abierto a autenticados) **nunca se habían desplegado a la gemela** (Storage se habilitó en consola pero sin reglas queda en denegación por defecto). Corregido con `firebase deploy --only storage -P staging`. **Verificación real hecha por desarrollo** (`scripts/test-storage-upload.mjs`): login con token personalizado + subida/descarga/eliminación de un archivo en `products/` — todo OK.
+
+**Decisión de diseño (usuario) — Roles vs Posiciones documentada e implementada:**
+- Roles = SOLO permisos (texto de ayuda en Develops → Roles); Conductor/Restaurante = perfiles de acceso limitado para usuarios externos.
+- Develops → Posiciones: botón "Cargar iniciales" con 8 posiciones semilla (Guía de buceo, Instructor de buceo, Instructor de surf, Capitán, Marinero, Salonero, Conductor (interno), Cocinero/Restaurantero).
+- Controles → Tipos de control: nuevo campo "Posiciones a las que aplica" (multi-select de posiciones, `positionIds`).
+
+**UX Controles:** sección renombrada a "¿A qué se le puede asignar un control?" con texto de ayuda; UN SOLO botón "Cargar iniciales" que carga destinos y luego tipos ligados; campo posiciones con chips.
+
+**Tarjetas expandibles globales (patrón aplicado en toda Fase 0):** clic en el encabezado expande con toda la información; estado por `Set<string>` — varias tarjetas expandidas a la vez, independientes. Aplicado en: Ubicaciones (tipos, grupos, ubicaciones), Controles (tipos, destinos, asignados con historial), Catálogos (proveedores con cuentas/categorías/centros/productos donde es preferido, productos, clientes, centros de costo, canales, categorías, unidades).
+
+**Ubicaciones:** textos de ayuda para los 3 conceptos (tipos/grupos/ubicaciones).
+
+**Infra adicional desplegada en staging:** índices de Firestore (todos los de `firestore.indexes.json`) y reglas de Storage. Secreto `SENDGRID_API_KEY` creado en staging con valor temporal (email real solo en producción).
+
+**Nota de proceso:** `npx tsc --noEmit` en la raíz NO chequea nada (tsconfig raíz tiene `files: []`); la validación real es `npm run build` (`tsc -b`). Se corrigió un `</>` faltante en UbicacionesTab (sub-pestaña Grupos) que los agentes no detectaron por esto.
+
+**Scripts de verificación nuevos:** `functions/test-control-alerts.cjs` (alertas E2E), `scripts/test-storage-upload.mjs` (subida Storage E2E).
+
+**Build:** limpio (exit 0) — deploy hosting staging hecho.
 
 ---
 

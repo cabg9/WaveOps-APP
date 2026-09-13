@@ -155,6 +155,7 @@ export interface ControlType extends CatalogBase {
    * Valores legacy ('personas','equipos','vehiculos','embarcaciones','ubicaciones') siguen válidos. */
   appliesTo: string[];
   roleIds: string[]; // roles a los que aplica (ids de roleTemplates o Role)
+  positionIds?: string[]; // posiciones a las que aplica (ref positions)
   validityMonths?: number | null; // vigencia en meses (null = no vence)
   frequencyDays?: number | null; // frecuencia en días alternativa
   customFields: ControlCustomField[];

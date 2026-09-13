@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import {
   Plus, Pencil, Package, Truck, Layers, Calculator, Megaphone, Users,
   Eye, EyeOff, Upload, Sparkles, Building2, Info, Lock, Tags, Scale,
-  Search, Trash2, ArrowUpDown, Star,
+  Search, Trash2, ArrowUpDown, Star, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -52,6 +52,10 @@ registerI18nKeys({
     'catalogs.common.deactivate': 'Desactivar',
     'catalogs.common.active': 'Activo',
     'catalogs.common.inactive': 'Inactivo',
+    'catalogs.common.status': 'Estado',
+    'catalogs.common.createdAt': 'Fecha de creación',
+    'catalogs.common.updatedAt': 'Última edición',
+    'catalogs.common.none': 'Ninguno',
     'catalogs.common.empty': 'No hay registros todavía',
     'catalogs.common.required': 'Completa los campos obligatorios',
     'catalogs.common.confirmActivateTitle': 'Activar registro',
@@ -84,6 +88,8 @@ registerI18nKeys({
     'catalogs.suppliers.noCostCenters': 'No hay centros de costo activos',
     'catalogs.suppliers.paymentTerms': 'Condiciones de pago',
     'catalogs.suppliers.notes': 'Notas',
+    'catalogs.suppliers.preferredProducts': 'Productos donde es proveedor preferido',
+    'catalogs.suppliers.preferredProductsNone': 'No es proveedor preferido de ningún producto',
     'catalogs.products.title': 'Productos',
     'catalogs.products.count': '{count} producto(s)',
     'catalogs.products.new': 'Nuevo producto',
@@ -179,6 +185,10 @@ registerI18nKeys({
     'catalogs.common.deactivate': 'Deactivate',
     'catalogs.common.active': 'Active',
     'catalogs.common.inactive': 'Inactive',
+    'catalogs.common.status': 'Status',
+    'catalogs.common.createdAt': 'Created at',
+    'catalogs.common.updatedAt': 'Last edited',
+    'catalogs.common.none': 'None',
     'catalogs.common.empty': 'No records yet',
     'catalogs.common.required': 'Please fill in the required fields',
     'catalogs.common.confirmActivateTitle': 'Activate record',
@@ -211,6 +221,8 @@ registerI18nKeys({
     'catalogs.suppliers.noCostCenters': 'No active cost centers',
     'catalogs.suppliers.paymentTerms': 'Payment terms',
     'catalogs.suppliers.notes': 'Notes',
+    'catalogs.suppliers.preferredProducts': 'Products where preferred supplier',
+    'catalogs.suppliers.preferredProductsNone': 'Not the preferred supplier of any product',
     'catalogs.products.title': 'Products',
     'catalogs.products.count': '{count} product(s)',
     'catalogs.products.new': 'New product',
@@ -323,6 +335,37 @@ function fmt(key: string, vars: Record<string, string | number>): string {
   return out;
 }
 
+// Fecha legible para las tarjetas expandibles (ISO string -> locale)
+function fmtDate(iso?: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// Toggle genérico para el Set de tarjetas expandidas (varias a la vez)
+function toggleId(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+// Fila de detalle: etiqueta gris + valor, para los paneles expandibles
+function DetailItem({ label, children }: { label: string; children?: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-[#86868B]">{label}</p>
+      <div className="mt-0.5 text-sm text-[#1D1D1F] break-words">{children ?? '—'}</div>
+    </div>
+  );
+}
+
+// Grid de detalle: 2 columnas en desktop, 1 en móvil
+function DetailsGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">{children}</div>;
+}
+
 // Hook genérico: escucha una colección de catálogo en tiempo real
 function useCatalog<T extends CatalogBase & { name?: string }>(collectionName: string) {
   const [items, setItems] = useState<T[]>([]);
@@ -395,51 +438,74 @@ interface EntityCardProps {
   canWrite: boolean;
   onEdit: () => void;
   onToggle: () => void;
+  expanded?: boolean;
+  onToggleExpand?: () => void;
+  details?: React.ReactNode;
 }
 
-function EntityCard({ name, lines, icon, isActive, canWrite, onEdit, onToggle }: EntityCardProps) {
+function EntityCard({ name, lines, icon, isActive, canWrite, onEdit, onToggle, expanded, onToggleExpand, details }: EntityCardProps) {
   return (
     <div
       className={cn(
-        'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-start gap-4 transition-opacity',
+        'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-opacity',
         !isActive && 'opacity-60'
       )}
     >
-      <div className="h-10 w-10 rounded-xl bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium text-[#1D1D1F] truncate">{name}</h3>
-          <span
-            className={cn(
-              'text-[10px] font-medium px-2 py-0.5 rounded-full',
-              isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
+      <div className="flex items-start gap-4">
+        {/* Encabezado clickeable: expande/colapsa el detalle */}
+        <div
+          onClick={onToggleExpand}
+          className={cn('min-w-0 flex-1 flex items-start gap-4', onToggleExpand && 'cursor-pointer select-none')}
+        >
+          <div className="h-10 w-10 rounded-xl bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-[#1D1D1F] truncate">{name}</h3>
+              <span
+                className={cn(
+                  'text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0',
+                  isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
+                )}
+              >
+                {isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+              </span>
+            </div>
+            {lines && lines.filter(Boolean).length > 0 && (
+              <div className="mt-1 space-y-0.5">
+                {lines.filter(Boolean).map((line, i) => (
+                  <p key={i} className="text-xs text-[#86868B] truncate">{line}</p>
+                ))}
+              </div>
             )}
-          >
-            {isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
-          </span>
+          </div>
+          {onToggleExpand && (
+            <span className="shrink-0 text-[#86868B] mt-0.5">
+              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </span>
+          )}
         </div>
-        {lines && lines.filter(Boolean).length > 0 && (
-          <div className="mt-1 space-y-0.5">
-            {lines.filter(Boolean).map((line, i) => (
-              <p key={i} className="text-xs text-[#86868B] truncate">{line}</p>
-            ))}
+        {/* Botones de acción: fuera del área clickeable */}
+        {canWrite && (
+          <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button onClick={onEdit} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onToggle}
+              title={isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
+              className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !isActive && 'hover:text-emerald-600')}
+            >
+              {isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         )}
       </div>
-      {canWrite && (
-        <div className="flex gap-0.5 shrink-0">
-          <button onClick={onEdit} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
-            <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            onClick={onToggle}
-            title={isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
-            className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !isActive && 'hover:text-emerald-600')}
-          >
-            {isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+      {/* Detalle completo del registro */}
+      {expanded && details && (
+        <div className="mt-4 pt-4 border-t border-[#F5F5F7]">
+          {details}
         </div>
       )}
     </div>
@@ -553,12 +619,14 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
   const { user } = useAuth();
   const { logAction } = useAudit();
   const { items: suppliers } = useCatalog<Supplier>('suppliers');
+  const { items: products } = useCatalog<Product>('products');
   const { items: productCategories } = useCatalog<ProductCategory>('productCategories');
   const { items: costCenters } = useCatalog<CostCenter>('costCenters');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [form, setForm] = useState<SupplierFormState>(EMPTY_SUPPLIER);
   const [saving, setSaving] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const activeCategories = useMemo(() => productCategories.filter((c) => c.isActive), [productCategories]);
   const activeCostCenters = useMemo(() => costCenters.filter((c) => c.isActive), [costCenters]);
@@ -626,6 +694,13 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       primary: [primary.bank, primary.accountNumber].filter(Boolean).join(' · ') || '—',
     });
   };
+
+  const categoryNamesFor = (ids?: string[]) =>
+    (ids || []).map((id) => productCategories.find((c) => c.id === id)?.name).filter(Boolean) as string[];
+  const costCenterNamesFor = (ids?: string[]) =>
+    (ids || []).map((id) => costCenters.find((c) => c.id === id)?.name).filter(Boolean) as string[];
+  const preferredProductsFor = (supplierId: string) =>
+    products.filter((p) => p.preferredSupplierId === supplierId).map((p) => p.name).filter(Boolean);
 
   const handleSave = async () => {
     if (!user?.id) return;
@@ -729,18 +804,81 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
         <EmptyState icon={<Truck className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {suppliers.map((s) => (
-            <EntityCard
-              key={s.id}
-              name={s.name}
-              lines={[s.identification, [s.contactName, s.phone].filter(Boolean).join(' · '), s.email, accountsLine(s)]}
-              icon={<Truck className="w-5 h-5" />}
-              isActive={s.isActive}
-              canWrite={canWrite}
-              onEdit={() => openEdit(s)}
-              onToggle={() => handleToggle(s)}
-            />
-          ))}
+          {suppliers.map((s) => {
+            const accounts = s.bankAccounts || [];
+            const suppliedCategories = categoryNamesFor(s.productCategoryIds);
+            const frequentCostCenters = costCenterNamesFor(s.costCenterIds);
+            const preferredProducts = preferredProductsFor(s.id);
+            return (
+              <EntityCard
+                key={s.id}
+                name={s.name}
+                lines={[s.identification, [s.contactName, s.phone].filter(Boolean).join(' · '), s.email, accountsLine(s)]}
+                icon={<Truck className="w-5 h-5" />}
+                isActive={s.isActive}
+                canWrite={canWrite}
+                onEdit={() => openEdit(s)}
+                onToggle={() => handleToggle(s)}
+                expanded={expandedIds.has(s.id)}
+                onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, s.id))}
+                details={
+                  <DetailsGrid>
+                    <DetailItem label={t('catalogs.suppliers.identification')}>{s.identification}</DetailItem>
+                    <DetailItem label={t('catalogs.suppliers.contactName')}>{s.contactName}</DetailItem>
+                    <DetailItem label={t('catalogs.suppliers.email')}>{s.email}</DetailItem>
+                    <DetailItem label={t('catalogs.suppliers.phone')}>{s.phone}</DetailItem>
+                    <DetailItem label={t('catalogs.suppliers.paymentTerms')}>{s.paymentTerms}</DetailItem>
+                    <DetailItem label={t('catalogs.common.status')}>
+                      {s.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                    </DetailItem>
+                    <div className="sm:col-span-2">
+                      <DetailItem label={t('catalogs.suppliers.bankAccounts')}>
+                        {accounts.length === 0 ? (
+                          t('catalogs.suppliers.noAccounts')
+                        ) : (
+                          <div className="space-y-1.5">
+                            {accounts.map((acc) => (
+                              <div key={acc.id} className="flex items-center gap-2 flex-wrap">
+                                <span>{[acc.bank, acc.accountType, acc.accountNumber].filter(Boolean).join(' · ') || '—'}</span>
+                                {!!acc.isPrimary && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-corporate/10 text-corporate">
+                                    <Star className="w-3 h-3 fill-current" />
+                                    {t('catalogs.suppliers.primary')}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </DetailItem>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <DetailItem label={t('catalogs.suppliers.suppliedCategories')}>
+                        {suppliedCategories.length > 0 ? suppliedCategories.join(' · ') : t('catalogs.common.none')}
+                      </DetailItem>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <DetailItem label={t('catalogs.suppliers.frequentCostCenters')}>
+                        {frequentCostCenters.length > 0 ? frequentCostCenters.join(' · ') : t('catalogs.common.none')}
+                      </DetailItem>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <DetailItem label={t('catalogs.suppliers.preferredProducts')}>
+                        {preferredProducts.length > 0 ? preferredProducts.join(' · ') : t('catalogs.suppliers.preferredProductsNone')}
+                      </DetailItem>
+                    </div>
+                    {s.notes && (
+                      <div className="sm:col-span-2">
+                        <DetailItem label={t('catalogs.suppliers.notes')}>{s.notes}</DetailItem>
+                      </div>
+                    )}
+                    <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(s.createdAt)}</DetailItem>
+                    <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(s.updatedAt)}</DetailItem>
+                  </DetailsGrid>
+                }
+              />
+            );
+          })}
         </div>
       )}
 
@@ -920,6 +1058,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const { uploadImage, uploading } = useStorageUpload();
   const [saving, setSaving] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Vista escalable: búsqueda, filtro, ordenamiento y agrupación (todo en memoria)
   const [search, setSearch] = useState('');
@@ -1076,59 +1215,93 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
     <div
       key={p.id}
       className={cn(
-        'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-start gap-4 transition-opacity',
+        'bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-opacity',
         !p.isActive && 'opacity-60'
       )}
     >
-      {p.photoUrl ? (
-        <img src={p.photoUrl} alt={p.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
-      ) : (
-        <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
-          <Package className="w-5 h-5" />
-        </div>
-      )}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <h3 className="font-medium text-[#1D1D1F] truncate">{p.name}</h3>
-          <span
-            className={cn(
-              'text-[10px] font-medium px-2 py-0.5 rounded-full',
-              p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
-            )}
-          >
-            {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+      <div className="flex items-start gap-4">
+        {/* Encabezado clickeable: expande/colapsa el detalle */}
+        <div
+          onClick={() => setExpandedIds((prev) => toggleId(prev, p.id))}
+          className="min-w-0 flex-1 flex items-start gap-4 cursor-pointer select-none"
+        >
+          {p.photoUrl ? (
+            <img src={p.photoUrl} alt={p.name} className="h-10 w-10 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="h-10 w-10 rounded-full bg-[#F5F5F7] flex items-center justify-center shrink-0 text-[#86868B]">
+              <Package className="w-5 h-5" />
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-[#1D1D1F] truncate">{p.name}</h3>
+              <span
+                className={cn(
+                  'text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0',
+                  p.isActive ? 'bg-emerald-50 text-emerald-600' : 'bg-[#F5F5F7] text-[#86868B]'
+                )}
+              >
+                {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+              </span>
+            </div>
+            <div className="mt-1 space-y-0.5">
+              <p className="text-xs text-[#86868B] truncate">{[categoryName(p.categoryId), unitName(p.unitId)].filter(Boolean).join(' · ')}</p>
+              {p.sku && <p className="text-xs text-[#86868B] truncate">SKU: {p.sku}</p>}
+              {p.preferredSupplierId && supplierName(p.preferredSupplierId) && (
+                <p className="text-xs text-[#86868B] truncate">
+                  {t('catalogs.products.preferredSupplier')}: {supplierName(p.preferredSupplierId)}
+                </p>
+              )}
+              <div className="flex gap-1.5 pt-1">
+                {p.isRentable && (
+                  <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.isRentable')}</span>
+                )}
+                {p.isConsumable && (
+                  <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.isConsumable')}</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <span className="shrink-0 text-[#86868B] mt-0.5">
+            {expandedIds.has(p.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </span>
         </div>
-        <div className="mt-1 space-y-0.5">
-          <p className="text-xs text-[#86868B] truncate">{[categoryName(p.categoryId), unitName(p.unitId)].filter(Boolean).join(' · ')}</p>
-          {p.sku && <p className="text-xs text-[#86868B] truncate">SKU: {p.sku}</p>}
-          {p.preferredSupplierId && supplierName(p.preferredSupplierId) && (
-            <p className="text-xs text-[#86868B] truncate">
-              {t('catalogs.products.preferredSupplier')}: {supplierName(p.preferredSupplierId)}
-            </p>
-          )}
-          <div className="flex gap-1.5 pt-1">
-            {p.isRentable && (
-              <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.isRentable')}</span>
-            )}
-            {p.isConsumable && (
-              <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.isConsumable')}</span>
-            )}
+        {/* Botones de acción: fuera del área clickeable */}
+        {canWrite && (
+          <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => openEdit(p)} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => handleToggle(p)}
+              title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
+              className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
+            >
+              {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
-        </div>
+        )}
       </div>
-      {canWrite && (
-        <div className="flex gap-0.5 shrink-0">
-          <button onClick={() => openEdit(p)} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
-            <Pencil className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => handleToggle(p)}
-            title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
-            className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
-          >
-            {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
+      {/* Detalle completo del producto */}
+      {expandedIds.has(p.id) && (
+        <div className="mt-4 pt-4 border-t border-[#F5F5F7]">
+          {p.photoUrl && (
+            <img src={p.photoUrl} alt={p.name} className="h-16 w-16 rounded-xl object-cover mb-3" />
+          )}
+          <DetailsGrid>
+            <DetailItem label={t('catalogs.products.category')}>{categoryName(p.categoryId)}</DetailItem>
+            <DetailItem label={t('catalogs.products.unit')}>{unitName(p.unitId)}</DetailItem>
+            <DetailItem label={t('catalogs.products.sku')}>{p.sku}</DetailItem>
+            <DetailItem label={t('catalogs.products.preferredSupplier')}>{supplierName(p.preferredSupplierId)}</DetailItem>
+            <DetailItem label={t('catalogs.products.isRentable')}>{p.isRentable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
+            <DetailItem label={t('catalogs.products.isConsumable')}>{p.isConsumable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
+            <DetailItem label={t('catalogs.common.status')}>
+              {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+            </DetailItem>
+            {p.nameEn && <DetailItem label={t('catalogs.products.nameEn')}>{p.nameEn}</DetailItem>}
+            <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(p.createdAt)}</DetailItem>
+            <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(p.updatedAt)}</DetailItem>
+          </DetailsGrid>
         </div>
       )}
     </div>
@@ -1332,6 +1505,8 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
   const [editingUnit, setEditingUnit] = useState<UnitOfMeasure | null>(null);
   const [unitForm, setUnitForm] = useState({ name: '', abbreviation: '' });
   const [seeding, setSeeding] = useState(false);
+  const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
+  const [expandedUnitIds, setExpandedUnitIds] = useState<Set<string>>(new Set());
 
   const openCreateCategory = () => { setEditingCategory(null); setCategoryForm({ name: '', nameEn: '' }); setShowCategoryModal(true); };
   const openEditCategory = (c: ProductCategory) => {
@@ -1505,6 +1680,18 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
                   canWrite={canWrite}
                   onEdit={() => openEditCategory(c)}
                   onToggle={makeToggle('productCategories', c, 'product_category', c.name)}
+                  expanded={expandedCategoryIds.has(c.id)}
+                  onToggleExpand={() => setExpandedCategoryIds((prev) => toggleId(prev, c.id))}
+                  details={
+                    <DetailsGrid>
+                      <DetailItem label={t('catalogs.categories.nameEn')}>{c.nameEn}</DetailItem>
+                      <DetailItem label={t('catalogs.common.status')}>
+                        {c.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                      </DetailItem>
+                      <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(c.createdAt)}</DetailItem>
+                      <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(c.updatedAt)}</DetailItem>
+                    </DetailsGrid>
+                  }
                 />
               ))}
             </div>
@@ -1544,6 +1731,18 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
                   canWrite={canWrite}
                   onEdit={() => openEditUnit(u)}
                   onToggle={makeToggle('unitsOfMeasure', u, 'unit_of_measure', u.name)}
+                  expanded={expandedUnitIds.has(u.id)}
+                  onToggleExpand={() => setExpandedUnitIds((prev) => toggleId(prev, u.id))}
+                  details={
+                    <DetailsGrid>
+                      <DetailItem label={t('catalogs.categories.abbreviation')}>{u.abbreviation}</DetailItem>
+                      <DetailItem label={t('catalogs.common.status')}>
+                        {u.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                      </DetailItem>
+                      <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(u.createdAt)}</DetailItem>
+                      <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(u.updatedAt)}</DetailItem>
+                    </DetailsGrid>
+                  }
                 />
               ))}
             </div>
@@ -1622,6 +1821,7 @@ function CostCentersSection({ canWrite }: { canWrite: boolean }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<CostCenter | null>(null);
   const [form, setForm] = useState({ name: '', departmentId: '' });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const deptName = (id: string) => activeDepartments.find((d) => d.id === id)?.name || '';
 
@@ -1711,6 +1911,20 @@ function CostCentersSection({ canWrite }: { canWrite: boolean }) {
               canWrite={canWrite}
               onEdit={() => openEdit(c)}
               onToggle={() => handleToggle(c)}
+              expanded={expandedIds.has(c.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, c.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.costCenters.department')}>
+                    {c.departmentId ? deptName(c.departmentId) : t('catalogs.costCenters.noDepartment')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {c.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(c.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(c.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
             />
           ))}
         </div>
@@ -1761,6 +1975,7 @@ function SalesChannelsSection({ canWrite }: { canWrite: boolean }) {
   const [editing, setEditing] = useState<SalesChannel | null>(null);
   const [form, setForm] = useState({ name: '', nameEn: '' });
   const [seeding, setSeeding] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const openCreate = () => { setEditing(null); setForm({ name: '', nameEn: '' }); setShowModal(true); };
   const openEdit = (c: SalesChannel) => {
@@ -1896,6 +2111,18 @@ function SalesChannelsSection({ canWrite }: { canWrite: boolean }) {
               canWrite={canWrite}
               onEdit={() => openEdit(c)}
               onToggle={() => handleToggle(c)}
+              expanded={expandedIds.has(c.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, c.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.salesChannels.nameEn')}>{c.nameEn}</DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {c.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(c.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(c.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
             />
           ))}
         </div>
@@ -1969,6 +2196,7 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
     businessName: '', taxId: '', address: '', departmentId: '',
   });
   const [generating, setGenerating] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const deptName = (id: string) => activeDepartments.find((d) => d.id === id)?.name || '';
 
@@ -2162,6 +2390,34 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
               canWrite={canWrite}
               onEdit={() => openEdit(c)}
               onToggle={() => handleToggle(c)}
+              expanded={expandedIds.has(c.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, c.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.clients.type')}>{clientTypeLabel(c.type)}</DetailItem>
+                  <DetailItem label={t('catalogs.clients.identification')}>{c.identification}</DetailItem>
+                  <DetailItem label={t('catalogs.clients.contactName')}>{c.contactName}</DetailItem>
+                  <DetailItem label={t('catalogs.clients.email')}>{c.email}</DetailItem>
+                  <DetailItem label={t('catalogs.clients.phone')}>{c.phone}</DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {c.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  {c.type === 'interno' && (
+                    <DetailItem label={t('catalogs.clients.department')}>
+                      {c.departmentId ? deptName(c.departmentId) : t('catalogs.clients.selectDepartment')}
+                    </DetailItem>
+                  )}
+                  {c.billingData && (c.billingData.businessName || c.billingData.taxId || c.billingData.address) && (
+                    <div className="sm:col-span-2">
+                      <DetailItem label={t('catalogs.clients.billingData')}>
+                        {[c.billingData.businessName, c.billingData.taxId, c.billingData.address].filter(Boolean).join(' · ')}
+                      </DetailItem>
+                    </div>
+                  )}
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(c.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(c.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
             />
           ))}
         </div>

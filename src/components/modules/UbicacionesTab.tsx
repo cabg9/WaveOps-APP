@@ -182,7 +182,16 @@ export function UbicacionesTab() {
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
   const [locForm, setLocForm] = useState<LocationFormState>(EMPTY_LOCATION_FORM);
-  const [expandedLocationId, setExpandedLocationId] = useState<string | null>(null);
+  // Tarjetas expandibles al clic: varias pueden estar expandidas a la vez (tipos, grupos y ubicaciones)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const [seeding, setSeeding] = useState(false);
 
@@ -674,26 +683,45 @@ export function UbicacionesTab() {
 
       {/* ─── SUB-PESTAÑA: TIPOS ─── */}
       {subTab === 'types' && (
-        types.length === 0 ? (
+        <>
+        <div>
+          <h2 className="text-base font-semibold text-[#1D1D1F]">{t('loc.tabTypes')}</h2>
+          <p className="text-sm text-[#86868B] mt-0.5">{t('loc.helpTypes')}</p>
+        </div>
+        {types.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <Tag className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">{t('loc.emptyTypes')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {types.map((item) => (
+            {types.map((item) => {
+              const isExpanded = expandedIds.has(item.id);
+              return (
               <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
-                    <p className="text-xs text-[#86868B] mt-1 line-clamp-2">{item.description || t('loc.noDescription')}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <button onClick={() => toggleExpanded(item.id)} className="flex items-center gap-3 min-w-0 text-left flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center shrink-0">
+                      <Tag className="w-5 h-5 text-corporate" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
+                      <p className="text-xs text-[#86868B] mt-1 line-clamp-2">{item.description || t('loc.noDescription')}</p>
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={cn(
+                      'text-[11px] font-medium px-2 py-0.5 rounded-full',
+                      item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
+                    )}>
+                      {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
+                    </span>
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-[#86868B]" />
+                    )}
                   </div>
-                  <span className={cn(
-                    'text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ml-2',
-                    item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
-                  )}>
-                    {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
-                  </span>
                 </div>
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#F5F5F7]">
                   <span className="text-xs text-[#86868B]">
@@ -711,34 +739,65 @@ export function UbicacionesTab() {
                     </div>
                   )}
                 </div>
+                {isExpanded && (
+                  <div className="mt-4 pt-3 border-t border-[#F5F5F7] grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-left">
+                    {detailRow(t('loc.fieldName'), item.name)}
+                    {detailRow(t('loc.fieldDescription'), item.description)}
+                    {detailRow(t('loc.statusLabel'), item.isActive ? t('loc.statusActive') : t('loc.statusInactive'))}
+                    {detailRow(t('loc.fieldCreatedAt'), new Date(item.createdAt).toLocaleString('es-EC'))}
+                    {item.updatedAt && detailRow(t('loc.fieldUpdatedAt'), new Date(item.updatedAt).toLocaleString('es-EC'))}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )
+        }
+        </>
       )}
 
       {/* ─── SUB-PESTAÑA: GRUPOS ─── */}
       {subTab === 'groups' && (
-        groups.length === 0 ? (
+        <>
+        <div>
+          <h2 className="text-base font-semibold text-[#1D1D1F]">{t('loc.tabGroups')}</h2>
+          <p className="text-sm text-[#86868B] mt-0.5">{t('loc.helpGroups')}</p>
+        </div>
+        {groups.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <Layers className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">{t('loc.emptyGroups')}</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {groups.map((item) => (
+            {groups.map((item) => {
+              const isExpanded = expandedIds.has(item.id);
+              return (
               <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <div className="flex items-start justify-between">
-                  <div className="min-w-0">
-                    <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
-                    <p className="text-xs text-[#86868B] mt-1 line-clamp-2">{item.description || t('loc.noDescription')}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <button onClick={() => toggleExpanded(item.id)} className="flex items-center gap-3 min-w-0 text-left flex-1">
+                    <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center shrink-0">
+                      <Layers className="w-5 h-5 text-corporate" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="font-medium text-[#1D1D1F] truncate">{item.name}</h3>
+                      <p className="text-xs text-[#86868B] mt-1 line-clamp-2">{item.description || t('loc.noDescription')}</p>
+                    </div>
+                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={cn(
+                      'text-[11px] font-medium px-2 py-0.5 rounded-full',
+                      item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
+                    )}>
+                      {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
+                    </span>
+                    {isExpanded ? (
+                      <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-[#86868B]" />
+                    )}
                   </div>
-                  <span className={cn(
-                    'text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0 ml-2',
-                    item.isActive ? 'bg-green-50 text-green-600' : 'bg-[#F5F5F7] text-[#86868B]',
-                  )}>
-                    {item.isActive ? t('loc.statusActive') : t('loc.statusInactive')}
-                  </span>
                 </div>
                 {canManage && (
                   <div className="flex justify-end gap-0.5 mt-4 pt-3 border-t border-[#F5F5F7]">
@@ -751,15 +810,32 @@ export function UbicacionesTab() {
                     </button>
                   </div>
                 )}
+                {isExpanded && (
+                  <div className="mt-4 pt-3 border-t border-[#F5F5F7] grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 text-left">
+                    {detailRow(t('loc.fieldName'), item.name)}
+                    {detailRow(t('loc.fieldDescription'), item.description)}
+                    {detailRow(t('loc.statusLabel'), item.isActive ? t('loc.statusActive') : t('loc.statusInactive'))}
+                    {detailRow(t('loc.fieldCreatedAt'), new Date(item.createdAt).toLocaleString('es-EC'))}
+                    {item.updatedAt && detailRow(t('loc.fieldUpdatedAt'), new Date(item.updatedAt).toLocaleString('es-EC'))}
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         )
+        }
+        </>
       )}
 
       {/* ─── SUB-PESTAÑA: UBICACIONES ─── */}
       {subTab === 'locations' && (
-        locations.length === 0 ? (
+        <>
+        <div>
+          <h2 className="text-base font-semibold text-[#1D1D1F]">{t('loc.tabLocations')}</h2>
+          <p className="text-sm text-[#86868B] mt-0.5">{t('loc.helpLocations')}</p>
+        </div>
+        {locations.length === 0 ? (
           <div className="bg-white rounded-2xl p-12 text-center text-[#86868B] shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
             <MapPin className="mx-auto mb-3 h-12 w-12 opacity-30" />
             <p className="text-sm">{t('loc.emptyLocations')}</p>
@@ -767,14 +843,14 @@ export function UbicacionesTab() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {locations.map((item) => {
-              const isExpanded = expandedLocationId === item.id;
+              const isExpanded = expandedIds.has(item.id);
               const responsibleDeptName = departmentOptions.find((d) => d.code === item.responsibleDepartmentId)?.name || '';
               const relatedModuleNames = item.relatedModules.map((m) => moduleLabel(m)).filter(Boolean).join(', ');
               return (
                 <div key={item.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                   <div className="flex items-start justify-between gap-2">
                     <button
-                      onClick={() => setExpandedLocationId((prev) => (prev === item.id ? null : item.id))}
+                      onClick={() => toggleExpanded(item.id)}
                       className="flex items-center gap-3 min-w-0 text-left flex-1"
                     >
                       <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center shrink-0">
@@ -843,6 +919,8 @@ export function UbicacionesTab() {
             })}
           </div>
         )
+        }
+        </>
       )}
 
       {/* ─── MODAL: TIPO ─── */}
@@ -1041,6 +1119,9 @@ registerI18nKeys({
     'loc.tabTypes': 'Tipos',
     'loc.tabGroups': 'Grupos',
     'loc.tabLocations': 'Ubicaciones',
+    'loc.helpTypes': 'Qué clase de lugar es: oficina administrativa, bodega, punto de operación o externo. El tipo define para qué se usa el lugar.',
+    'loc.helpGroups': 'Colecciones de lugares para organizarlos y filtrarlos (ej: "Compras & Pagos" agrupa Quito y Guayaquil; "Almacenaje" agrupa todas las bodegas).',
+    'loc.helpLocations': 'Los lugares concretos de la empresa. Cada uno es de un Tipo y pertenece a un Grupo.',
     'loc.btnNewType': 'Nuevo tipo',
     'loc.btnNewGroup': 'Nuevo grupo',
     'loc.btnNewLocation': 'Nueva ubicación',
@@ -1057,6 +1138,7 @@ registerI18nKeys({
     'loc.modules': 'módulos',
     'loc.statusActive': 'Activo',
     'loc.statusInactive': 'Inactivo',
+    'loc.statusLabel': 'Estado',
     'loc.fieldName': 'Nombre',
     'loc.fieldDescription': 'Descripción',
     'loc.fieldAllowedModules': 'Módulos permitidos',
@@ -1113,6 +1195,9 @@ registerI18nKeys({
     'loc.tabTypes': 'Types',
     'loc.tabGroups': 'Groups',
     'loc.tabLocations': 'Locations',
+    'loc.helpTypes': 'What kind of place it is: administrative office, warehouse, operation point or external. The type defines what the place is used for.',
+    'loc.helpGroups': 'Collections of places to organize and filter them (e.g. "Purchases & Payments" groups Quito and Guayaquil; "Storage" groups all warehouses).',
+    'loc.helpLocations': 'The concrete places of the company. Each one has a Type and belongs to a Group.',
     'loc.btnNewType': 'New type',
     'loc.btnNewGroup': 'New group',
     'loc.btnNewLocation': 'New location',
@@ -1129,6 +1214,7 @@ registerI18nKeys({
     'loc.modules': 'modules',
     'loc.statusActive': 'Active',
     'loc.statusInactive': 'Inactive',
+    'loc.statusLabel': 'Status',
     'loc.fieldName': 'Name',
     'loc.fieldDescription': 'Description',
     'loc.fieldAllowedModules': 'Allowed modules',

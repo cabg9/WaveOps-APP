@@ -12,7 +12,7 @@ import {
   LayoutGrid, CalendarClock, Save, Clock, HeartPulse, MessageSquare, Sun, Code2,
   Briefcase, User, Upload, List,
   Phone, MapPin, Calendar, Globe, Droplets, Pill, Award, CreditCard, Camera,
-  Check, Heart, UserCircle, Flag, Droplet, BadgeCheck, IdCard, Edit3,
+  Check, Heart, UserCircle, Flag, Droplet, BadgeCheck, IdCard, Edit3, Database,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -2102,6 +2102,9 @@ function RolesTab() {
         <p className="text-sm text-[#1D1D1F] leading-relaxed">
           Desde aqui puedes crear roles personalizados y activar o desactivar los permisos de cada rol. Los cambios se guardan directamente en la plantilla del rol y <strong>afectan de inmediato</strong> a todos los usuarios que tengan ese rol asignado.
         </p>
+        <p className="text-sm text-[#86868B] leading-relaxed mt-2">
+          Los roles definen <strong className="text-[#1D1D1F]">solo permisos de acceso</strong>; no representan cargos ni puestos de trabajo (eso son las Posiciones). Los roles Conductor y Restaurante existen unicamente como perfiles de acceso limitado para usuarios externos y se activaran con sus modulos (Movilidad y Cocina).
+        </p>
       </div>
       <div className="bg-white rounded-2xl p-4 shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-[#86868B]">
@@ -2262,6 +2265,20 @@ function RolesTab() {
 // PESTANA: Posiciones — Catalogo de cargos
 // ═══════════════════════════════════════════════════════════════════
 
+// Semillas del catalogo de posiciones. Se cargan con el boton
+// "Cargar iniciales": si ya existe una posicion con el mismo nombre
+// (activa o no), no se pisa ni se duplica.
+const SEED_POSITIONS = [
+  { name: 'Capitan', level: 5 },
+  { name: 'Instructor de buceo', level: 6 },
+  { name: 'Instructor de surf', level: 6 },
+  { name: 'Guia de buceo', level: 7 },
+  { name: 'Marinero', level: 7 },
+  { name: 'Salonero', level: 7 },
+  { name: 'Conductor (interno)', level: 7 },
+  { name: 'Cocinero/Restaurantero', level: 7 },
+];
+
 function PosicionesTab() {
   const { positions, loading, createPosition, updatePosition, deletePosition } = useFirestorePositions();
   const { users } = useFirestoreUsers();
@@ -2276,6 +2293,45 @@ function PosicionesTab() {
   const [filter, setFilter] = useState('');
   const [showInactive, setShowInactive] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'cards'>('list');
+  const [seedingInitial, setSeedingInitial] = useState(false);
+
+  // Carga idempotente: verifica por nombre contra las posiciones cargadas
+  // por el hook y nunca pisa las existentes.
+  const handleLoadInitialPositions = async () => {
+    if (seedingInitial) return;
+    setSeedingInitial(true);
+    let created = 0;
+    let existing = 0;
+    try {
+      for (const seed of SEED_POSITIONS) {
+        const normalized = seed.name.trim().toLowerCase();
+        if (positions.some((p) => p.name.trim().toLowerCase() === normalized)) {
+          existing++;
+          continue;
+        }
+        const id = await createPosition(
+          { name: seed.name, level: seed.level, department: null, isActive: true },
+          currentUser?.id || 'system'
+        );
+        if (id) {
+          created++;
+          await logAction({
+            action: 'POSITION_CREATED',
+            targetType: 'position',
+            targetId: id,
+            targetName: seed.name,
+            impactLevel: 'major',
+            description: `Posicion inicial creada: ${seed.name}`,
+          });
+        }
+      }
+      toast.success(`${created} creadas, ${existing} ya existian`);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setSeedingInitial(false);
+    }
+  };
 
   const usageCount = useCallback((positionName: string) => {
     return users.filter((u: any) => u.position === positionName && u.isActive !== false).length;
@@ -2387,7 +2443,17 @@ function PosicionesTab() {
             <h3 className="text-lg font-semibold text-[#1D1D1F]">Posiciones</h3>
             <p className="text-sm text-[#86868B]">{positions.filter((p) => p.isActive !== false).length} activas · {positions.length} total</p>
           </div>
-          <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90"><Plus className="mr-1.5 h-4 w-4" />Crear posicion</Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleLoadInitialPositions}
+              disabled={seedingInitial}
+              className="flex items-center gap-2 whitespace-nowrap"
+            >
+              <Database className="h-4 w-4" /> {seedingInitial ? 'Cargando...' : 'Cargar iniciales'}
+            </Button>
+            <Button onClick={openCreate} className="bg-corporate hover:bg-corporate/90"><Plus className="mr-1.5 h-4 w-4" />Crear posicion</Button>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-4">

@@ -218,4 +218,4 @@ const notifyControlAssigned = onDocumentCreated({
   });
 });
 
-module.exports = { checkControlExpirations, checkControlsNow, notifyControlAssigned };
+module.exports = { checkControlExpirations, checkControlsNow, notifyControlAssigned, runExpirationCheck };

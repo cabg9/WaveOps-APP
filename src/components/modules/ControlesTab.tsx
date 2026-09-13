@@ -6,7 +6,7 @@
 // (vigente/por_vencer/vencido/verificado). Las alertas de vencimiento las
 // generan Cloud Functions (programada cada 15 min + inmediata al asignar):
 // el cliente solo muestra estado y dispara la callable 'checkControlsNow'.
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '@/firebase-config';
@@ -16,6 +16,8 @@ import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
+import { useFirestorePositions } from '@/hooks/firestore/useFirestorePositions';
+import { executeWithConfirm } from '@/lib/confirm-action';
 import { getCurrentTenantId } from '@/lib/tenant';
 import { registerI18nKeys, t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -35,7 +37,7 @@ import type {
   ControlHistoryEntry,
 } from '@/types/catalogs';
 import {
-  Plus, Pencil, ShieldCheck, ChevronDown, ChevronRight, Search, ClipboardList,
+  Plus, Pencil, ShieldCheck, ChevronDown, ChevronUp, Search, ClipboardList,
   Layers, ImagePlus, AlertTriangle, CheckCircle2, XCircle, Clock, Power, FileCheck2, RefreshCw,
 } from 'lucide-react';
 
@@ -52,7 +54,6 @@ registerI18nKeys({
     'controls.types.subtitle': 'catálogo dinámico · nada hardcodeado',
     'controls.types.new': 'Nuevo tipo',
     'controls.types.loadSeeds': 'Cargar iniciales',
-    'controls.types.seedsLoaded': 'Catálogo inicial cargado',
     'controls.types.empty': 'No hay tipos de control registrados',
     'controls.types.emptyHint': 'Crea el primer tipo o carga el catálogo inicial',
     'controls.type.modalNew': 'Nuevo tipo de control',
@@ -70,6 +71,7 @@ registerI18nKeys({
     'controls.type.isRequired': 'Obligatorio',
     'controls.type.isOptional': 'Opcional',
     'controls.type.verifierRole': 'Rol verificador',
+    'controls.type.positions': 'Posiciones a las que aplica',
     'controls.type.customFields': 'Campos personalizados',
     'controls.type.addField': 'Agregar campo',
     'controls.type.fieldLabel': 'Etiqueta',
@@ -94,12 +96,13 @@ registerI18nKeys({
     'controls.applies.vehiculos': 'Vehículos',
     'controls.applies.embarcaciones': 'Embarcaciones',
     'controls.applies.ubicaciones': 'Ubicaciones',
-    'controls.targets.title': 'Aplica a (catálogo)',
-    'controls.targets.subtitle': 'destinos posibles para los controles',
+    'controls.targets.title': '¿A qué se le puede asignar un control?',
+    'controls.targets.subtitle': 'Tipos de destino: personas, departamentos, equipos, vehículos, embarcaciones o ubicaciones. Crea aquí cualquier tipo de cosa que necesite documentos o controles.',
     'controls.targets.add': 'Agregar',
     'controls.targets.newPlaceholder': 'Nuevo destino...',
-    'controls.targets.loadSeeds': 'Cargar iniciales',
-    'controls.targets.seedsLoaded': 'Catálogo de destinos cargado',
+    'controls.seeds.confirmTitle': 'Cargar catálogo inicial',
+    'controls.seeds.confirmDesc': 'Se crearán los destinos y tipos de control iniciales que falten. Los existentes no se modifican.',
+    'controls.seeds.summary': '{targets} destinos y {types} tipos cargados ({existing} ya existían)',
     'controls.targets.empty': 'Sin destinos en el catálogo. Carga el catálogo inicial o agrega uno.',
     'controls.targets.renamed': 'Destino actualizado',
     'controls.assignments.title': 'Controles asignados',
@@ -153,6 +156,18 @@ registerI18nKeys({
     'controls.history.editado': 'Editado',
     'controls.history.desactivado': 'Desactivado',
     'controls.history.alerta_enviada': 'Alerta enviada',
+    'controls.detail.id': 'ID',
+    'controls.detail.nameEn': 'Nombre (inglés)',
+    'controls.detail.roles': 'Roles',
+    'controls.detail.positions': 'Posiciones',
+    'controls.detail.verifierRole': 'Rol verificador',
+    'controls.detail.created': 'Creado',
+    'controls.detail.updated': 'Actualizado',
+    'controls.detail.icon': 'Icono',
+    'controls.detail.state': 'Estado',
+    'controls.detail.targetType': 'Tipo de destino',
+    'controls.detail.lastAlert': 'Última alerta',
+    'controls.detail.fieldType': 'Tipo de dato',
     'controls.common.save': 'Guardar',
     'controls.common.create': 'Crear',
     'controls.common.cancel': 'Cancelar',
@@ -176,7 +191,6 @@ registerI18nKeys({
     'controls.types.subtitle': 'dynamic catalog · nothing hardcoded',
     'controls.types.new': 'New type',
     'controls.types.loadSeeds': 'Load initial set',
-    'controls.types.seedsLoaded': 'Initial catalog loaded',
     'controls.types.empty': 'No control types registered',
     'controls.types.emptyHint': 'Create the first type or load the initial catalog',
     'controls.type.modalNew': 'New control type',
@@ -194,6 +208,7 @@ registerI18nKeys({
     'controls.type.isRequired': 'Required',
     'controls.type.isOptional': 'Optional',
     'controls.type.verifierRole': 'Verifier role',
+    'controls.type.positions': 'Positions it applies to',
     'controls.type.customFields': 'Custom fields',
     'controls.type.addField': 'Add field',
     'controls.type.fieldLabel': 'Label',
@@ -218,12 +233,13 @@ registerI18nKeys({
     'controls.applies.vehiculos': 'Vehicles',
     'controls.applies.embarcaciones': 'Vessels',
     'controls.applies.ubicaciones': 'Locations',
-    'controls.targets.title': 'Applies to (catalog)',
-    'controls.targets.subtitle': 'possible targets for controls',
+    'controls.targets.title': 'What can a control be assigned to?',
+    'controls.targets.subtitle': 'Target types: people, departments, teams, vehicles, vessels or locations. Create here any kind of thing that needs documents or controls.',
     'controls.targets.add': 'Add',
     'controls.targets.newPlaceholder': 'New target...',
-    'controls.targets.loadSeeds': 'Load initial set',
-    'controls.targets.seedsLoaded': 'Target catalog loaded',
+    'controls.seeds.confirmTitle': 'Load initial catalog',
+    'controls.seeds.confirmDesc': 'Missing initial targets and control types will be created. Existing ones will not be modified.',
+    'controls.seeds.summary': '{targets} targets and {types} types loaded ({existing} already existed)',
     'controls.targets.empty': 'No targets in the catalog. Load the initial set or add one.',
     'controls.targets.renamed': 'Target updated',
     'controls.assignments.title': 'Assigned controls',
@@ -277,6 +293,18 @@ registerI18nKeys({
     'controls.history.editado': 'Edited',
     'controls.history.desactivado': 'Deactivated',
     'controls.history.alerta_enviada': 'Alert sent',
+    'controls.detail.id': 'ID',
+    'controls.detail.nameEn': 'Name (English)',
+    'controls.detail.roles': 'Roles',
+    'controls.detail.positions': 'Positions',
+    'controls.detail.verifierRole': 'Verifier role',
+    'controls.detail.created': 'Created',
+    'controls.detail.updated': 'Updated',
+    'controls.detail.icon': 'Icon',
+    'controls.detail.state': 'Status',
+    'controls.detail.targetType': 'Target type',
+    'controls.detail.lastAlert': 'Last alert',
+    'controls.detail.fieldType': 'Field type',
     'controls.common.save': 'Save',
     'controls.common.create': 'Create',
     'controls.common.cancel': 'Cancel',
@@ -336,7 +364,16 @@ const AUDIT_ACTIONS = {
   assignmentVerified: 'CONTROL_ASSIGNMENT_VERIFIED' as AuditAction,
   targetCreated: 'CONTROL_TARGET_CREATED' as AuditAction,
   targetUpdated: 'CONTROL_TARGET_UPDATED' as AuditAction,
-  targetSeedsLoaded: 'CONTROL_TARGETS_SEEDED' as AuditAction,
+};
+
+// Claves i18n legibles para ControlAssignment.targetType (singular guardado)
+const ASSIGN_TARGET_I18N: Record<string, string> = {
+  user: 'controls.applies.personas',
+  departamento: 'controls.applies.departamentos',
+  equipo: 'controls.applies.equipos',
+  vehiculo: 'controls.applies.vehiculos',
+  embarcacion: 'controls.applies.embarcaciones',
+  ubicacion: 'controls.applies.ubicaciones',
 };
 
 function toIso(value: any): string {
@@ -389,6 +426,7 @@ function docToControlType(id: string, data: any): ControlType {
     description: data.description,
     appliesTo: Array.isArray(data.appliesTo) ? data.appliesTo : [],
     roleIds: Array.isArray(data.roleIds) ? data.roleIds : [],
+    positionIds: Array.isArray(data.positionIds) ? data.positionIds : [],
     validityMonths: typeof data.validityMonths === 'number' ? data.validityMonths : null,
     frequencyDays: typeof data.frequencyDays === 'number' ? data.frequencyDays : null,
     customFields: Array.isArray(data.customFields) ? data.customFields : [],
@@ -451,6 +489,7 @@ interface TypeFormState {
   description: string;
   appliesTo: string[]; // ids del catálogo dinámico controlTargetTypes
   roleIds: string[];
+  positionIds: string[]; // ids de positions
   validityMonths: string; // string para input; vacío = no vence
   alertDaysBefore: string;
   isRequired: boolean;
@@ -464,6 +503,7 @@ const EMPTY_TYPE_FORM: TypeFormState = {
   description: '',
   appliesTo: [],
   roleIds: [],
+  positionIds: [],
   validityMonths: '',
   alertDaysBefore: '30',
   isRequired: false,
@@ -502,6 +542,16 @@ const STATUS_STYLE: Record<ControlAssignmentStatus, { bg: string; text: string; 
   verificado: { bg: 'bg-blue-50', text: 'text-blue-600', icon: ShieldCheck },
 };
 
+// Fila de detalle expandible: etiqueta gris + valor, usada en las tres listas
+function DetailRow({ label, value }: { label: string; value?: ReactNode }) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-3 text-xs">
+      <span className="sm:w-44 shrink-0 text-[#86868B] font-medium">{label}</span>
+      <span className="text-[#1D1D1F] break-words">{value || '—'}</span>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENTE
 // ═══════════════════════════════════════════════════════════════════
@@ -511,6 +561,7 @@ export function ControlesTab() {
   const { users } = useFirestoreUsers();
   const { departments: dynamicDepartments } = useDynamicDepartments();
   const { roleTemplates } = useAppConfig();
+  const { positions } = useFirestorePositions();
   const { logAction } = useAudit();
   const { uploadImage, uploading: uploadingPhoto } = useStorageUpload();
 
@@ -562,6 +613,14 @@ export function ControlesTab() {
     const legacy = t(`controls.applies.${id}`);
     return legacy !== `controls.applies.${id}` ? legacy : id;
   };
+
+  // Nombre legible de una posición a partir de su id
+  const positionName = (id: string): string =>
+    positions.find(p => p.id === id)?.name || id;
+
+  // Nombre legible de un rol (roleTemplate) a partir de su id
+  const roleName = (id: string): string =>
+    roleTemplates.find(rt => rt.id === id)?.name || id;
 
   // ═══════════════════════════════════════════════════════════════════
   // LISTENERS FIRESTORE
@@ -674,6 +733,7 @@ export function ControlesTab() {
       description: ct.description || '',
       appliesTo: [...ct.appliesTo],
       roleIds: [...ct.roleIds],
+      positionIds: [...(ct.positionIds || [])],
       validityMonths: ct.validityMonths != null ? String(ct.validityMonths) : '',
       alertDaysBefore: String(ct.alertDaysBefore ?? 30),
       isRequired: ct.isRequired,
@@ -703,6 +763,15 @@ export function ControlesTab() {
       roleIds: prev.roleIds.includes(roleId)
         ? prev.roleIds.filter(r => r !== roleId)
         : [...prev.roleIds, roleId],
+    }));
+  };
+
+  const togglePositionId = (positionId: string) => {
+    setTypeForm(prev => ({
+      ...prev,
+      positionIds: prev.positionIds.includes(positionId)
+        ? prev.positionIds.filter(p => p !== positionId)
+        : [...prev.positionIds, positionId],
     }));
   };
 
@@ -745,6 +814,7 @@ export function ControlesTab() {
         description: typeForm.description.trim() || null,
         appliesTo: typeForm.appliesTo,
         roleIds: typeForm.roleIds,
+        positionIds: typeForm.positionIds,
         validityMonths,
         alertDaysBefore,
         isRequired: typeForm.isRequired,
@@ -812,46 +882,97 @@ export function ControlesTab() {
     }
   };
 
-  const handleLoadSeeds = async () => {
+  // UN SOLO botón "Cargar iniciales": primero los destinos (controlTargetTypes)
+  // y después los tipos de control ligados a ellos. Idempotente: los docs que
+  // ya existen con nombre NO se pisan (el usuario pudo renombrarlos/editarlos).
+  const handleLoadInitialCatalog = async () => {
     if (!currentUser || !canWrite) return;
-    setSaving(true);
-    try {
-      const now = new Date().toISOString();
-      // setDoc determinista: re-ejecutar no duplica ni pisa ediciones del nombre
-      for (const seed of SEED_CONTROL_TYPES) {
-        await setDoc(doc(db, 'controlTypes', seed.id), {
-          tenantId,
-          name: seed.name,
-          nameEn: null,
-          description: seed.description,
-          appliesTo: seed.appliesTo,
-          roleIds: [],
-          validityMonths: seed.validityMonths,
-          alertDaysBefore: 30,
-          isRequired: false,
-          verifierRole: 'RRHH',
-          customFields: [],
-          isActive: true,
-          createdAt: now,
-          createdBy: currentUser.name,
-          updatedAt: now,
-          updatedBy: currentUser.name,
-        }, { merge: true });
-      }
-      await logAction({
-        action: AUDIT_ACTIONS.seedsLoaded,
-        targetType: 'control_type',
-        targetId: 'initial-catalog',
-        targetName: 'Catálogo inicial de controles',
-        impactLevel: 'major',
-        description: `Catálogo inicial de controles cargado (${SEED_CONTROL_TYPES.length} tipos)`,
-      });
-      toast.success(t('controls.types.seedsLoaded'));
-    } catch (err: any) {
-      toast.error(`${t('controls.error.save')}: ${err.message}`);
-    } finally {
-      setSaving(false);
-    }
+    await executeWithConfirm({
+      level: 'major',
+      title: t('controls.seeds.confirmTitle'),
+      description: t('controls.seeds.confirmDesc'),
+      action: async () => {
+        setSaving(true);
+        try {
+          const now = new Date().toISOString();
+
+          // 1) Destinos
+          let targetsCreated = 0;
+          let targetsExisting = 0;
+          for (const seed of SEED_TARGET_TYPES) {
+            const ref = doc(db, 'controlTargetTypes', seed.id);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              if (!snap.data()?.name) await setDoc(ref, { name: seed.name }, { merge: true });
+              targetsExisting++;
+            } else {
+              await setDoc(ref, {
+                tenantId,
+                name: seed.name,
+                isActive: true,
+                createdAt: now,
+                createdBy: currentUser.name,
+                updatedAt: now,
+                updatedBy: currentUser.name,
+              }, { merge: true });
+              targetsCreated++;
+            }
+          }
+
+          // 2) Tipos de control ligados a los destinos
+          let typesCreated = 0;
+          let typesExisting = 0;
+          for (const seed of SEED_CONTROL_TYPES) {
+            const ref = doc(db, 'controlTypes', seed.id);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+              if (!snap.data()?.name) await setDoc(ref, { name: seed.name }, { merge: true });
+              typesExisting++;
+            } else {
+              await setDoc(ref, {
+                tenantId,
+                name: seed.name,
+                nameEn: null,
+                description: seed.description,
+                appliesTo: seed.appliesTo,
+                roleIds: [],
+                positionIds: [],
+                validityMonths: seed.validityMonths,
+                alertDaysBefore: 30,
+                isRequired: false,
+                verifierRole: 'RRHH',
+                customFields: [],
+                isActive: true,
+                createdAt: now,
+                createdBy: currentUser.name,
+                updatedAt: now,
+                updatedBy: currentUser.name,
+              }, { merge: true });
+              typesCreated++;
+            }
+          }
+
+          await logAction({
+            action: AUDIT_ACTIONS.seedsLoaded,
+            targetType: 'control_type',
+            targetId: 'initial-catalog',
+            targetName: 'Catálogo inicial de controles',
+            impactLevel: 'major',
+            description: `Catálogo inicial cargado: ${targetsCreated} destinos y ${typesCreated} tipos nuevos (${targetsExisting + typesExisting} ya existían)`,
+          });
+          toast.success(
+            t('controls.seeds.summary')
+              .replace('{targets}', String(targetsCreated))
+              .replace('{types}', String(typesCreated))
+              .replace('{existing}', String(targetsExisting + typesExisting))
+          );
+        } catch (err: any) {
+          toast.error(`${t('controls.error.save')}: ${err.message}`);
+        } finally {
+          setSaving(false);
+        }
+      },
+    });
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -930,48 +1051,6 @@ export function ControlesTab() {
       });
     } catch (err: any) {
       toast.error(`${t('controls.error.save')}: ${err.message}`);
-    }
-  };
-
-  // Idempotente: setDoc con ids deterministas. Si el doc ya existe NO se pisa
-  // el nombre (el usuario pudo renombrarlo): solo se asegura que tenga name.
-  const handleLoadTargetSeeds = async () => {
-    if (!currentUser || !canWrite) return;
-    setSavingTargets(true);
-    try {
-      const now = new Date().toISOString();
-      for (const seed of SEED_TARGET_TYPES) {
-        const ref = doc(db, 'controlTargetTypes', seed.id);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          if (!snap.data()?.name) {
-            await setDoc(ref, { name: seed.name }, { merge: true });
-          }
-        } else {
-          await setDoc(ref, {
-            tenantId,
-            name: seed.name,
-            isActive: true,
-            createdAt: now,
-            createdBy: currentUser.name,
-            updatedAt: now,
-            updatedBy: currentUser.name,
-          }, { merge: true });
-        }
-      }
-      await logAction({
-        action: AUDIT_ACTIONS.targetSeedsLoaded,
-        targetType: 'control_target',
-        targetId: 'initial-catalog',
-        targetName: 'Catálogo inicial de destinos',
-        impactLevel: 'minor',
-        description: `Catálogo inicial de destinos cargado (${SEED_TARGET_TYPES.length} destinos)`,
-      });
-      toast.success(t('controls.targets.seedsLoaded'));
-    } catch (err: any) {
-      toast.error(`${t('controls.error.save')}: ${err.message}`);
-    } finally {
-      setSavingTargets(false);
     }
   };
 
@@ -1321,7 +1400,7 @@ export function ControlesTab() {
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
-                  onClick={handleLoadSeeds}
+                  onClick={handleLoadInitialCatalog}
                   disabled={saving}
                   className="flex items-center gap-2 whitespace-nowrap"
                 >
@@ -1341,26 +1420,15 @@ export function ControlesTab() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('controls.targets.title')}</h3>
-                <p className="text-xs text-[#86868B]">{t('controls.targets.subtitle')}</p>
+                <p className="text-xs text-[#86868B] mt-0.5 max-w-2xl">{t('controls.targets.subtitle')}</p>
               </div>
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  onClick={handleLoadTargetSeeds}
-                  disabled={savingTargets}
-                  className="flex items-center gap-2 whitespace-nowrap"
-                >
-                  <FileCheck2 className="w-4 h-4" />
-                  {t('controls.targets.loadSeeds')}
-                </Button>
-              )}
             </div>
             {targetTypes.length === 0 ? (
               <p className="text-xs text-[#86868B] mt-3">{t('controls.targets.empty')}</p>
             ) : (
-              <div className="flex flex-wrap gap-1.5 mt-3">
+              <div className="space-y-2 mt-3">
                 {targetTypes.map(tt => editingTargetId === tt.id ? (
-                  <span key={tt.id} className="inline-flex items-center gap-1">
+                  <div key={tt.id} className="flex items-center gap-2 bg-[#F5F5F7] rounded-xl p-2">
                     <Input
                       value={editingTargetName}
                       onChange={e => setEditingTargetName(e.target.value)}
@@ -1383,37 +1451,76 @@ export function ControlesTab() {
                     >
                       <XCircle className="w-4 h-4" />
                     </button>
-                  </span>
+                  </div>
                 ) : (
-                  <span
+                  <div
                     key={tt.id}
                     className={cn(
-                      'inline-flex items-center gap-0.5 pl-3 pr-1.5 py-1 rounded-full text-xs font-medium border',
-                      tt.isActive
-                        ? 'bg-white text-[#1D1D1F] border-[#E5E5E7]'
-                        : 'bg-[#F5F5F7] text-[#86868B] border-[#F5F5F7] opacity-60'
+                      'bg-white rounded-xl border p-3 transition-shadow',
+                      tt.isActive ? 'border-[#E5E5E7]' : 'border-[#F5F5F7] opacity-70',
+                      expandedIds.has(tt.id) && 'shadow-[0_2px_8px_rgba(0,0,0,0.06)]'
                     )}
                   >
-                    {tt.name}
-                    {canWrite && (
-                      <>
-                        <button
-                          onClick={() => { setEditingTargetId(tt.id); setEditingTargetName(tt.name); }}
-                          title={t('controls.type.modalEdit')}
-                          className="p-1 rounded-full hover:bg-[#F5F5F7] text-[#86868B]"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleTargetActive(tt)}
-                          title={tt.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
-                          className="p-1 rounded-full hover:bg-red-50 text-[#86868B] hover:text-red-500"
-                        >
-                          <Power className="w-3 h-3" />
-                        </button>
-                      </>
+                    <div
+                      className="flex items-center justify-between gap-2 cursor-pointer"
+                      onClick={() => toggleExpanded(tt.id)}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={cn(
+                          'px-2 py-0.5 rounded-full text-xs font-medium',
+                          tt.isActive ? 'bg-[#F5F5F7] text-[#1D1D1F]' : 'bg-[#F5F5F7] text-[#86868B]'
+                        )}>
+                          {tt.name}
+                        </span>
+                        <span className="text-[11px] text-[#86868B]">
+                          {tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={e => { e.stopPropagation(); setEditingTargetId(tt.id); setEditingTargetName(tt.name); }}
+                              title={t('controls.type.modalEdit')}
+                              className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={e => { e.stopPropagation(); handleToggleTargetActive(tt); }}
+                              title={tt.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
+                              className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                            >
+                              <Power className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        {expandedIds.has(tt.id)
+                          ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                          : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
+                      </div>
+                    </div>
+                    {expandedIds.has(tt.id) && (
+                      <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-1.5">
+                        <DetailRow label={t('controls.detail.id')} value={tt.id} />
+                        <DetailRow label={t('controls.type.name')} value={tt.name} />
+                        <DetailRow label={t('controls.detail.nameEn')} value={tt.nameEn} />
+                        <DetailRow label={t('controls.detail.icon')} value={tt.icon} />
+                        <DetailRow
+                          label={t('controls.detail.state')}
+                          value={tt.isActive ? t('controls.common.active') : t('controls.common.inactive')}
+                        />
+                        <DetailRow
+                          label={t('controls.detail.created')}
+                          value={`${tt.createdBy || '—'} · ${new Date(tt.createdAt).toLocaleString()}`}
+                        />
+                        <DetailRow
+                          label={t('controls.detail.updated')}
+                          value={tt.updatedAt ? `${tt.updatedBy || '—'} · ${new Date(tt.updatedAt).toLocaleString()}` : undefined}
+                        />
+                      </div>
                     )}
-                  </span>
+                  </div>
                 ))}
               </div>
             )}
@@ -1450,33 +1557,50 @@ export function ControlesTab() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {activeTypes.map(ct => (
                 <div key={ct.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-start justify-between gap-2">
+                  <div
+                    className="flex items-start justify-between gap-2 cursor-pointer"
+                    onClick={() => toggleExpanded(ct.id)}
+                  >
                     <div className="min-w-0">
                       <h3 className="font-medium text-[#1D1D1F] truncate">{ct.name}</h3>
                       {ct.description && (
                         <p className="text-xs text-[#86868B] mt-1 line-clamp-2">{ct.description}</p>
                       )}
                     </div>
-                    {canWrite && (
-                      <div className="flex gap-0.5 shrink-0">
-                        <button onClick={() => openEditType(ct)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleToggleTypeActive(ct)}
-                          title={t('controls.type.deactivate')}
-                          className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
-                        >
-                          <Power className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {canWrite && (
+                        <>
+                          <button
+                            onClick={e => { e.stopPropagation(); openEditType(ct); }}
+                            title={t('controls.type.modalEdit')}
+                            className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleToggleTypeActive(ct); }}
+                            title={t('controls.type.deactivate')}
+                            className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
+                          >
+                            <Power className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {expandedIds.has(ct.id)
+                        ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                        : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {ct.appliesTo.map(opt => (
                       <span key={opt} className="px-2 py-0.5 rounded-full bg-[#F5F5F7] text-xs text-[#1D1D1F]">
                         {targetTypeName(opt)}
+                      </span>
+                    ))}
+                    {(ct.positionIds || []).map(pid => (
+                      <span key={pid} className="px-2 py-0.5 rounded-full bg-corporate/10 text-xs text-corporate">
+                        {positionName(pid)}
                       </span>
                     ))}
                     <span className={cn(
@@ -1505,6 +1629,55 @@ export function ControlesTab() {
                       </span>
                     )}
                   </div>
+
+                  {/* Detalle expandible: todos los campos del tipo */}
+                  {expandedIds.has(ct.id) && (
+                    <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-1.5">
+                      <DetailRow label={t('controls.type.name')} value={ct.name} />
+                      <DetailRow label={t('controls.detail.nameEn')} value={ct.nameEn} />
+                      <DetailRow label={t('controls.type.description')} value={ct.description} />
+                      <DetailRow
+                        label={t('controls.type.appliesTo')}
+                        value={ct.appliesTo.map(targetTypeName).join(', ')}
+                      />
+                      <DetailRow
+                        label={t('controls.detail.roles')}
+                        value={ct.roleIds.length > 0 ? ct.roleIds.map(roleName).join(', ') : undefined}
+                      />
+                      <DetailRow
+                        label={t('controls.detail.positions')}
+                        value={(ct.positionIds || []).length > 0 ? (ct.positionIds || []).map(positionName).join(', ') : undefined}
+                      />
+                      <DetailRow
+                        label={t('controls.type.validityMonths')}
+                        value={ct.validityMonths != null ? `${ct.validityMonths}` : t('controls.type.validityForever')}
+                      />
+                      <DetailRow label={t('controls.type.alertDaysBefore')} value={String(ct.alertDaysBefore)} />
+                      <DetailRow
+                        label={t('controls.type.isRequired')}
+                        value={ct.isRequired ? t('controls.type.required') : t('controls.type.optional')}
+                      />
+                      <DetailRow label={t('controls.detail.verifierRole')} value={ct.verifierRole} />
+                      <DetailRow
+                        label={t('controls.type.customFields')}
+                        value={
+                          (ct.customFields || []).length > 0
+                            ? ct.customFields.map(f =>
+                                `${f.label} (${t(`controls.type.fieldType.${f.type}`)}${f.options?.length ? `: ${f.options.join(', ')}` : ''})`
+                              ).join(' · ')
+                            : undefined
+                        }
+                      />
+                      <DetailRow
+                        label={t('controls.detail.created')}
+                        value={`${ct.createdBy || '—'} · ${new Date(ct.createdAt).toLocaleString()}`}
+                      />
+                      <DetailRow
+                        label={t('controls.detail.updated')}
+                        value={ct.updatedAt ? `${ct.updatedBy || '—'} · ${new Date(ct.updatedAt).toLocaleString()}` : undefined}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1575,7 +1748,10 @@ export function ControlesTab() {
                 return (
                   <div key={a.id} className="bg-white rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
+                      <div
+                        className="min-w-0 flex-1 cursor-pointer"
+                        onClick={() => toggleExpanded(a.id)}
+                      >
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="font-medium text-[#1D1D1F]">{a.controlTypeName || type?.name || '—'}</h3>
                           {statusBadge(status)}
@@ -1610,13 +1786,19 @@ export function ControlesTab() {
 
                       <div className="flex items-center gap-1 shrink-0">
                         {a.photoUrl && (
-                          <a href={a.photoUrl} target="_blank" rel="noreferrer" className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
+                          <a
+                            href={a.photoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={e => e.stopPropagation()}
+                            className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+                          >
                             <ImagePlus className="w-4 h-4" />
                           </a>
                         )}
                         {canWrite && status !== 'verificado' && canVerify(a) && (
                           <button
-                            onClick={() => setVerifyTarget(a)}
+                            onClick={e => { e.stopPropagation(); setVerifyTarget(a); }}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100"
                           >
                             <ShieldCheck className="w-3.5 h-3.5" />
@@ -1625,49 +1807,100 @@ export function ControlesTab() {
                         )}
                         {canWrite && (
                           <>
-                            <button onClick={() => openEditAssignment(a)} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
+                            <button
+                              onClick={e => { e.stopPropagation(); openEditAssignment(a); }}
+                              title={t('controls.assignment.modalEdit')}
+                              className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+                            >
                               <Pencil className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleToggleAssignmentActive(a)}
+                              onClick={e => { e.stopPropagation(); handleToggleAssignmentActive(a); }}
+                              title={a.isActive ? t('controls.type.deactivate') : t('controls.type.activate')}
                               className="p-1.5 rounded-lg hover:bg-red-50 text-[#86868B] hover:text-red-500"
                             >
                               <Power className="w-4 h-4" />
                             </button>
                           </>
                         )}
-                        <button
-                          onClick={() => toggleExpanded(a.id)}
-                          className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
-                        >
-                          {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        </button>
+                        {isExpanded
+                          ? <ChevronUp className="w-4 h-4 text-[#86868B]" />
+                          : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
                       </div>
                     </div>
 
-                    {/* Historial expandible */}
+                    {/* Detalle expandible: todos los campos + historial completo */}
                     {isExpanded && (
-                      <div className="mt-3 pt-3 border-t border-[#F5F5F7]">
-                        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] mb-2">
-                          {t('controls.assignment.history')}
-                        </h4>
-                        {(a.history || []).length === 0 ? (
-                          <p className="text-xs text-[#86868B]">{t('controls.assignment.historyEmpty')}</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {[...(a.history || [])].reverse().map((h, i) => (
-                              <div key={i} className="flex items-start gap-2 text-xs">
-                                <span className="shrink-0 px-1.5 py-0.5 rounded bg-[#F5F5F7] text-[#1D1D1F] font-medium">
-                                  {t(`controls.history.${h.action}`)}
-                                </span>
-                                <span className="text-[#86868B]">
-                                  {h.byName} · {new Date(h.at).toLocaleString()}
-                                  {h.note && <span className="text-[#1D1D1F]"> — {h.note}</span>}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-4">
+                        <div className="space-y-1.5">
+                          <DetailRow label={t('controls.assignment.controlType')} value={a.controlTypeName || type?.name} />
+                          <DetailRow
+                            label={t('controls.detail.targetType')}
+                            value={t(ASSIGN_TARGET_I18N[a.targetType] || 'controls.assignment.targetName.generic')}
+                          />
+                          <DetailRow label={t('controls.assignment.targetUser')} value={a.targetName} />
+                          <DetailRow label={t('controls.assignment.issueDate')} value={a.issueDate} />
+                          <DetailRow
+                            label={t('controls.assignment.expiryDate')}
+                            value={a.expiryDate || t('controls.type.validityForever')}
+                          />
+                          <DetailRow
+                            label={t('controls.type.customFields')}
+                            value={
+                              Object.keys(a.customValues || {}).length > 0
+                                ? Object.entries(a.customValues).map(([k, v]) => {
+                                    const f = type?.customFields.find(cf => cf.key === k);
+                                    return `${f?.label || k}: ${String(v)}`;
+                                  }).join(' · ')
+                                : undefined
+                            }
+                          />
+                          <DetailRow
+                            label={t('controls.assignment.photo')}
+                            value={a.photoUrl ? <a href={a.photoUrl} target="_blank" rel="noreferrer" className="text-corporate underline">{a.photoUrl}</a> : undefined}
+                          />
+                          <DetailRow
+                            label={t('controls.assignment.verifiedBy')}
+                            value={
+                              a.verifiedByName
+                                ? `${a.verifiedByName}${a.verifiedAt ? ` · ${new Date(a.verifiedAt).toLocaleString()}` : ''}`
+                                : undefined
+                            }
+                          />
+                          <DetailRow label={t('controls.detail.lastAlert')} value={a.lastAlertAt ? new Date(a.lastAlertAt).toLocaleString() : undefined} />
+                          <DetailRow label={t('controls.assignment.filterStatus')} value={t(`controls.status.${status}`)} />
+                          <DetailRow
+                            label={t('controls.detail.created')}
+                            value={`${a.createdBy || '—'} · ${new Date(a.createdAt).toLocaleString()}`}
+                          />
+                          <DetailRow
+                            label={t('controls.detail.updated')}
+                            value={a.updatedAt ? `${a.updatedBy || '—'} · ${new Date(a.updatedAt).toLocaleString()}` : undefined}
+                          />
+                        </div>
+
+                        <div>
+                          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B] mb-2">
+                            {t('controls.assignment.history')}
+                          </h4>
+                          {(a.history || []).length === 0 ? (
+                            <p className="text-xs text-[#86868B]">{t('controls.assignment.historyEmpty')}</p>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {[...(a.history || [])].reverse().map((h, i) => (
+                                <div key={i} className="flex items-start gap-2 text-xs">
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded bg-[#F5F5F7] text-[#1D1D1F] font-medium">
+                                    {t(`controls.history.${h.action}`)}
+                                  </span>
+                                  <span className="text-[#86868B]">
+                                    {h.byName} · {new Date(h.at).toLocaleString()}
+                                    {h.note && <span className="text-[#1D1D1F]"> — {h.note}</span>}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1769,6 +2002,29 @@ export function ControlesTab() {
                 ))}
               </div>
               <p className="text-[11px] text-[#86868B]">{t('controls.type.rolesHint')}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('controls.type.positions')}</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {positions.length === 0 ? (
+                  <span className="text-xs text-[#86868B]">—</span>
+                ) : positions.map(pos => (
+                  <button
+                    key={pos.id}
+                    type="button"
+                    onClick={() => togglePositionId(pos.id)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                      typeForm.positionIds.includes(pos.id)
+                        ? 'bg-corporate text-white border-corporate'
+                        : 'bg-white text-[#86868B] border-[#E5E5E7] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    {pos.name}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
