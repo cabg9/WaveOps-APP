@@ -72,7 +72,7 @@ registerI18nKeys({
     'controls.type.isRequired': 'Obligatorio',
     'controls.type.isOptional': 'Opcional',
     'controls.type.verifierRole': 'Rol verificador',
-    'controls.type.positions': 'Posiciones a las que aplica',
+    'controls.type.positions': 'Posiciones',
     'controls.type.customFields': 'Campos personalizados',
     'controls.type.addField': 'Agregar campo',
     'controls.type.fieldLabel': 'Etiqueta',
@@ -120,6 +120,7 @@ registerI18nKeys({
     'controls.destinations.default.posiciones': 'Todos los usuarios con una posición determinada.',
     'controls.destinations.default.departamentos': 'Todos los usuarios de un departamento determinado.',
     'controls.destinations.saved': 'Descripción guardada',
+    'controls.destinations.editDescription': 'Editar descripción',
     'controls.targets.customTitle': 'Destinos personalizados',
     'controls.targets.subtitle': 'Tipos de destino: personas, departamentos, equipos, vehículos, embarcaciones o ubicaciones. Crea aquí cualquier tipo de cosa que necesite documentos o controles.',
     'controls.targets.add': 'Agregar',
@@ -246,7 +247,7 @@ registerI18nKeys({
     'controls.type.isRequired': 'Required',
     'controls.type.isOptional': 'Optional',
     'controls.type.verifierRole': 'Verifier role',
-    'controls.type.positions': 'Positions it applies to',
+    'controls.type.positions': 'Positions',
     'controls.type.customFields': 'Custom fields',
     'controls.type.addField': 'Add field',
     'controls.type.fieldLabel': 'Label',
@@ -294,6 +295,7 @@ registerI18nKeys({
     'controls.destinations.default.posiciones': 'All users with a given position.',
     'controls.destinations.default.departamentos': 'All users of a given department.',
     'controls.destinations.saved': 'Description saved',
+    'controls.destinations.editDescription': 'Edit description',
     'controls.targets.customTitle': 'Custom targets',
     'controls.targets.subtitle': 'Target types: people, departments, teams, vehicles, vessels or locations. Create here any kind of thing that needs documents or controls.',
     'controls.targets.add': 'Add',
@@ -705,6 +707,10 @@ export function ControlesTab() {
     posiciones: '',
     departamentos: '',
   });
+
+  // Destino base cuya descripción se está editando (null = ninguno). La edición
+  // es secundaria: vive detrás del botón lápiz en la tarjeta expandida.
+  const [editingBaseDesc, setEditingBaseDesc] = useState<BaseDestinationId | null>(null);
 
   // Mini-formularios de ítems: en la pestaña Destinos (por id de destino) y
   // dentro del modal de tipo de control (mismo shape, estado aparte).
@@ -2045,12 +2051,80 @@ export function ControlesTab() {
                       : <ChevronDown className="w-4 h-4 text-[#86868B]" />}
                   </div>
                   {expandedIds.has(`base:${id}`) && (
-                    <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-2">
-                      <p className="text-xs text-[#86868B]">
-                        {baseDescriptions[id] || t(`controls.destinations.default.${id}`)}
-                      </p>
-                      {canWrite && (
-                        <>
+                    <div className="mt-3 pt-3 border-t border-[#F5F5F7] space-y-3">
+                      {/* Datos reales conectados (solo lectura) — contenido principal */}
+                      {id === 'personas' && (
+                        <div className="space-y-2">
+                          {usersByDepartment.length === 0 ? (
+                            <p className="text-xs text-[#86868B]">—</p>
+                          ) : usersByDepartment.map(([dept, deptUsers]) => (
+                            <div key={dept || 'sin-dept'}>
+                              <p className="text-[11px] font-semibold text-[#86868B] uppercase tracking-wide">
+                                {dept || '—'}
+                              </p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {deptUsers.map(u => (
+                                  <span key={u.id} className="px-2 py-0.5 rounded-full text-xs bg-[#F5F5F7] text-[#1D1D1F]">
+                                    {u.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {id === 'roles' && (
+                        <div className="flex flex-wrap gap-1">
+                          {roleTemplates.filter(rt => rt.isActive !== false).length === 0 ? (
+                            <p className="text-xs text-[#86868B]">—</p>
+                          ) : roleTemplates.filter(rt => rt.isActive !== false).map(rt => (
+                            <span key={rt.id} className="px-2 py-0.5 rounded-full text-xs bg-[#F5F5F7] text-[#1D1D1F]">
+                              {rt.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {id === 'posiciones' && (
+                        <div className="flex flex-wrap gap-1">
+                          {positions.filter(p => p.isActive !== false).length === 0 ? (
+                            <p className="text-xs text-[#86868B]">—</p>
+                          ) : positions.filter(p => p.isActive !== false).map(p => (
+                            <span key={p.id} className="px-2 py-0.5 rounded-full text-xs bg-[#F5F5F7] text-[#1D1D1F]">
+                              {p.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {id === 'departamentos' && (
+                        <div className="flex flex-wrap gap-1">
+                          {activeDepartments.length === 0 ? (
+                            <p className="text-xs text-[#86868B]">—</p>
+                          ) : activeDepartments.map(d => (
+                            <span key={d.id} className="px-2 py-0.5 rounded-full text-xs bg-[#F5F5F7] text-[#1D1D1F]">
+                              {d.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Descripción: campo secundario, detrás del lápiz */}
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs text-[#86868B]">
+                          {baseDescriptions[id] || t(`controls.destinations.default.${id}`)}
+                        </p>
+                        {canWrite && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingBaseDesc(editingBaseDesc === id ? null : id)}
+                            className="p-1 rounded-lg hover:bg-[#F5F5F7] text-[#86868B] hover:text-[#1D1D1F] shrink-0"
+                            title={t('controls.destinations.editDescription')}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      {canWrite && editingBaseDesc === id && (
+                        <div className="space-y-2">
                           <textarea
                             value={baseDescriptions[id]}
                             onChange={e => setBaseDescriptions(prev => ({ ...prev, [id]: e.target.value }))}
@@ -2058,16 +2132,26 @@ export function ControlesTab() {
                             rows={2}
                             className="w-full rounded-lg border border-[#E5E5E7] px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-corporate/20 resize-none"
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleSaveBaseDescription(id)}
-                            className="flex items-center gap-1 whitespace-nowrap"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            {t('controls.common.save')}
-                          </Button>
-                        </>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSaveBaseDescription(id)}
+                              className="flex items-center gap-1 whitespace-nowrap"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              {t('controls.common.save')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setEditingBaseDesc(null)}
+                              className="flex items-center gap-1 whitespace-nowrap"
+                            >
+                              {t('controls.common.cancel')}
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
                   )}

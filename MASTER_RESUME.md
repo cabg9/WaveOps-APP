@@ -34,6 +34,14 @@
 
 **Archivos:** `src/components/modules/ControlesTab.tsx` (único). **Build:** verificado por el coordinador, exit 0; deploy hosting staging hecho.
 
+### Mini-fix — Tarjetas de destinos base con datos reales
+
+- La etiqueta `controls.type.positions` pasó de "Posiciones a las que aplica" a **"Posiciones"** (es/en), unificada con Personas, Roles y Departamentos (chip del formulario y bloque incluidos).
+- Las tarjetas de los 4 destinos base, al expandirse, muestran los **datos reales conectados** (solo lectura): Personas → usuarios activos agrupados por departamento; Roles → roles activos; Posiciones → posiciones activas; Departamentos → departamentos activos.
+- La edición de la descripción quedó **secundaria**: texto pequeño con un botón lápiz que despliega el textarea + Guardar/Cancelar (estado `editingBaseDesc`). Nueva clave i18n `controls.destinations.editDescription` (es/en).
+
+**Archivos:** `src/components/modules/ControlesTab.tsx` (único). **Build:** exit 0; deploy hosting staging hecho.
+
 ---
 
 **Estado:** EN GEMELA. Con la aprobación del usuario se CIERRA la Fase 0 y se puede pasar a producción (hosting + reglas + índices + functions + semilla `seed-fase0.cjs`).
