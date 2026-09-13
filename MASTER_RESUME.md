@@ -1,13 +1,27 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 — corrección "Estructura final" del módulo Controles desplegada en gemela — pendiente re-prueba del usuario)
+> Última actualización: 2026-09-13 (FASE 0 CERRADA — desplegada en PRODUCCIÓN con todo apagado tras sus feature flags — listo para Fase 1)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
 
 ---
 
-## FASE 0.4 — Corrección: ESTRUCTURA FINAL del módulo Controles (13 de septiembre) — DESPLEGADA EN STAGING
+## FASE 0 — CIERRE Y DESPLIEGUE A PRODUCCIÓN (13 de septiembre) — VALIDADA Y CERRADA
+
+**Estado:** CERRADA. Aprobada por el usuario; desplegada en `wve-b3db5` (producción) con todo lo nuevo APAGADO tras sus feature flags.
+
+**Desplegado a producción:**
+- Hosting (`https://wve-b3db5.web.app` — verificado HTTP 200), reglas de Firestore, índices compuestos y reglas de Storage.
+- Functions: las 3 nuevas de controles (`checkControlExpirations` programada cada 15 min, `checkControlsNow` callable, `notifyControlAssigned` trigger) + actualización de las existentes. Secreto `SENDGRID_API_KEY` real ya existía en prod → los emails de alertas SÍ funcionan en producción.
+- Semillas (`scripts/seed-fase0.cjs` con SA de prod): roles Conductor y Restaurante (0 permisos, toggles apagados); renombres de solo presentación "Requisiciones"→"Inventario / Requisiciones" y "Ordenes de Pago"→"Compras & Pagos" (ids/rutas intactos); feature flags `enableUbicaciones`, `enableCatalogosMaestros`, `enableCatalogoControles` escritos en `appSettings/global` en **falso**.
+- NO se sembraron catálogos de prod (ubicaciones/controles quedan vacíos): se cargan con "Cargar iniciales" desde la UI cuando el usuario decida encender cada flag.
+
+**Lo que ve el usuario final hoy en producción:** nada nuevo — las pestañas Ubicaciones/Catálogos/Controles están ocultas (flags apagados, solo Director General podría encenderlas desde Develops). Todo lo demás (Tasks, Horarios, Recordatorios, Develops, login) quedó igual; la supervivencia fue validada en staging antes del cierre.
+
+**Pendiente hacia Fase 1:** encender flags en prod cuando se apruebe; sembrar catálogos de prod vía UI; migrar usuarios reales a posiciones semilla.
+
+---
 
 **Estado:** EN GEMELA, pendiente re-prueba del usuario.
 
