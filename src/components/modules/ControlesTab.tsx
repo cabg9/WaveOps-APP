@@ -2124,7 +2124,15 @@ export function ControlesTab() {
                   {t('controls.applies.departamentos')}
                 </button>
                 {activeTargetTypes
-                  .filter(tt => tt.id !== 'personas' && tt.id !== 'departamentos')
+                  .filter(tt => {
+                    const key = tt.id.trim().toLowerCase();
+                    const name = tt.name.trim().toLowerCase();
+                    // Excluir los chips fijos por id Y por nombre (el usuario pudo
+                    // crear entradas del catálogo duplicadas con id autogenerado).
+                    return !['personas', 'departamentos', 'roles'].some(
+                      fixed => key === fixed || name === fixed
+                    );
+                  })
                   .map(tt => (
                   <button
                     key={tt.id}

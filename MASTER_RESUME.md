@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2, 0.3 + mini-ajuste de cierre desplegados en gemela — pendiente cierre del usuario)
+> Última actualización: 2026-09-13 (Fase 0 completa — rondas 0.1, 0.2, 0.3 + mini-ajuste y mini-fix de cierre desplegados en gemela — pendiente cierre del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -28,6 +28,14 @@ El bloque "Aplica a" del formulario de Tipo de control ahora arranca con TRES ch
 - Las tres se pueden tener activadas a la vez; los valores guardados precargan al editar.
 - Texto de ayuda con clave i18n `controls.type.scopeTabsHint`.
 - Nota: `appliesTo` sigue siendo obligatorio al guardar — si solo se activa ROLES sin destino, el formulario pedirá elegir un destino.
+
+**Archivos:** `ControlesTab.tsx` (solo este). **Build:** limpio (exit 0); deploy hosting staging hecho.
+
+### Mini-fix — Chips "Aplica a" duplicados
+
+**Causa:** el usuario tenía en el catálogo `controlTargetTypes` entradas creadas manualmente con nombre "Personas"/"Departamentos" pero con id autogenerado (diferente de los ids fijos `personas`/`departamentos` de las semillas). El filtro anterior excluía solo por id, así que esas entradas duplicadas también se renderizaban como chips.
+
+**Corrección:** el filtro del listado del catálogo ahora excluye las entradas fijas por id Y por nombre (insensible a mayúsculas/minúsculas): `personas`, `departamentos`, `roles`. Cada chip aparece una sola vez, en el orden PERSONAS | ROLES | DEPARTAMENTOS | demás destinos, tanto al crear como al editar.
 
 **Archivos:** `ControlesTab.tsx` (solo este). **Build:** limpio (exit 0); deploy hosting staging hecho.
 
