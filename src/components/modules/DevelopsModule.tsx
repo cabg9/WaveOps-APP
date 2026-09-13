@@ -354,10 +354,17 @@ function GeneralTab() {
           <h3 className="font-semibold text-[#1D1D1F]">Feature Flags</h3>
         </div>
         <div className="space-y-3">
-          {Object.entries(settings.featureFlags).length === 0 ? (
-            <p className="text-sm text-[#86868B]">No hay feature flags configurados</p>
-          ) : (
-            Object.entries(settings.featureFlags).map(([key, value]) => {
+          {(() => {
+            // Los flags nuevos deben poder activarse aunque aun no existan en Firestore.
+            // Flags nuevos (Fase 0): nacen apagados. Flags antiguos de modulos: ausente = encendido.
+            const NEW_FLAGS_DEFAULT_OFF = ['enableUbicaciones', 'enableCatalogosMaestros', 'enableCatalogoControles'];
+            const flagKeys = Array.from(new Set([...Object.keys(settings.featureFlags), ...NEW_FLAGS_DEFAULT_OFF]));
+            if (flagKeys.length === 0) {
+              return <p className="text-sm text-[#86868B]">No hay feature flags configurados</p>;
+            }
+            return flagKeys.map((key) => {
+              const raw = settings.featureFlags[key];
+              const value = raw !== undefined ? raw : !NEW_FLAGS_DEFAULT_OFF.includes(key);
               const meta = FEATURE_FLAG_META[key] || { name: key, on: 'Funcionalidad controlada por feature flag.', off: 'Funcionalidad controlada por feature flag.' };
               return (
                 <div key={key} className="flex items-start justify-between py-3 border-b border-[#E5E5E7] last:border-0">
@@ -382,8 +389,8 @@ function GeneralTab() {
                   </button>
                 </div>
               );
-            })
-          )}
+            });
+          })()}
         </div>
       </div>
     </div>

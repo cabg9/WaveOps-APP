@@ -98,6 +98,22 @@ async function main() {
     console.log(`✅ Módulo renombrado: "${current.name}" → "${patch.name}" (id e ruta sin cambios)`);
   }
 
+  // 2b) Feature flags de Fase 0: escritos explicitos en falso (idempotente)
+  const settingsRef = db.collection('appSettings').doc('global');
+  const settingsSnap = await settingsRef.get();
+  const currentFlags = (settingsSnap.exists && settingsSnap.data().featureFlags) || {};
+  const FASE0_FLAGS = { enableUbicaciones: false, enableCatalogosMaestros: false, enableCatalogoControles: false };
+  const flagsPatch = {};
+  for (const [k, v] of Object.entries(FASE0_FLAGS)) {
+    if (currentFlags[k] === undefined) flagsPatch[k] = v;
+  }
+  if (Object.keys(flagsPatch).length > 0) {
+    await settingsRef.set({ featureFlags: { ...currentFlags, ...flagsPatch } }, { merge: true });
+    console.log('✅ Feature flags Fase 0 escritos (apagados):', Object.keys(flagsPatch).join(', '));
+  } else {
+    console.log('⏭  Feature flags Fase 0 ya existen, no se modifican');
+  }
+
   console.log('🏁 Seed Fase 0 completado');
 }
 
