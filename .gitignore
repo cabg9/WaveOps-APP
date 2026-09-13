@@ -53,3 +53,7 @@ coverage/
 *.bak[0-9]*
 .firebase/
 .env
+
+# Backups de Firestore (contienen datos personales, nunca a git)
+backups/
+service-account*.json

@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "wve-b3db5"
+    "default": "wve-b3db5",
+    "staging": "wve-pruebas-b3db5"
   }
 }
