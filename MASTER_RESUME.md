@@ -1,9 +1,29 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-08-24 (Tasks: dropdowns móviles en fila + tarjetas más espaciosas)
+> Última actualización: 2026-09-12 (WAVEOPS_DESIGN.md v20 copiado como plano maestro — inicio de módulos nuevos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5`
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## Plano maestro de módulos nuevos — Fase 0 en preparación (12 de septiembre)
+
+**Estado:** DOCUMENTO RECIBIDO Y COMPROMETIDO
+
+- Se copió `WAVEOPS_DESIGN.md` (v20, 740 líneas) a la raíz del proyecto como plano maestro de diseño. Commit `347e1b5d`.
+- El documento define: módulo RRHH completo (cerrado), módulos operativos (Dive Ops, Cocina, Dive Shop, Vessels, Warehouse/Renta, Movilidad, Finanzas, Ventas/CRM), patrones arquitectónicos (Catálogo Dinámico de Controles, Ubicaciones, bandejas transversales, ofertas de trabajo aceptables, patrón dos caras) y plan de construcción por fases 0-9.
+- **Protocolo de protección (sección 8 del documento) — reglas obligatorias comprometidas:**
+  1. App gemela de pruebas (URL aparte + BD de prueba); el usuario valida siempre en la gemela.
+  2. Todo módulo nuevo nace APAGADO tras su propio feature flag en Develops.
+  3. Módulos existentes (Tasks, Horarios, Recordatorios, Develops, login) intocables en su lógica.
+  4. Respaldo de Firestore antes de cada fase.
+  5. Lista de supervivencia (regresión) antes de aprobar cada fase.
+  6. Una fase a la vez con checklist de validación.
+  7. Reglas de seguridad solo aditivas hasta auditoría completa.
+- **Decisiones clave del plano:** principio "TODO ES DATO, NADA HARDCODEADO" (todo tipo de control/prueba/licencia es un registro configurable); multi-tenancy preparado con `tenant_id` en entidades nuevas; i18n ES/EN con claves desde pantallas nuevas; nada de Excel como fuente de datos (solo exportación); WaveOps Finanzas ES el sistema contable.
+- **Orden de construcción pactado:** Fase 0 cimientos en Develops (Ubicaciones, catálogos maestros: Proveedores, Productos, Centros de Costo, Canales de Venta, Clientes; Catálogo Dinámico de Controles; roles nuevos formales) → Fase 1 Inventario+Warehouse → Fase 2 Finanzas+Ventas → Fase 3 Activity Ops+Cocina+Dive Shop → Fase 4 RRHH → Fase 5 Compras & Pagos → Fase 6 Movilidad+Vessels+Mantenimiento → Fase 7 actividades extra → Fase 8 Reportes → Fase 9 futuras.
+- **Pendiente antes de Fase 0:** definir/app gemela de pruebas (Firebase de staging) y respaldo de Firestore.
 
 ---
 
