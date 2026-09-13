@@ -27,6 +27,19 @@
 
 ---
 
+## Infraestructura de pruebas (12-13 de septiembre) — COMPLETADA
+
+**Estado:** COMPLETADA (a falta de 3 habilitaciones manuales en consola)
+
+- **Respaldo Firestore:** `scripts/backup-firestore.cjs` exporta todas las colecciones y subcolecciones a `backups/` (excluido de git por contener datos personales). Primer respaldo: 239 documentos en 19 colecciones (`backups/2026-09-13-wve-b3db5`). Comando: `node scripts/backup-firestore.cjs /ruta/service-account.json`.
+- **App gemela:** proyecto Firebase nuevo `wve-pruebas-b3db5` ("WaveOps Pruebas", plan Spark). URL: https://wve-pruebas-b3db5.web.app. Deploy: `npx firebase deploy --only hosting -P staging`.
+- **Conexion automatica:** `src/firebase-config.ts` elige el proyecto segun el hostname (pruebas/staging/localhost -> wve-pruebas-b3db5; resto -> wve-b3db5). Mismo codigo, dos destinos.
+- **.firebaserc:** default = wve-b3db5, staging = wve-pruebas-b3db5.
+- **Limitacion conocida de la gemela:** el service worker de FCM sigue apuntando a produccion (las push web no funcionaran en staging hasta parametrizarlo). Storage requiere plan Blaze (tarjeta) — sin Blaze las fotos no subiran en staging.
+- **Faltan 3 habilitaciones manuales en consola del proyecto nuevo:** Firestore (crear base de datos), Authentication (Email/Password) y, opcionalmente, Storage (requiere Blaze).
+
+---
+
 ## Nota importante: políticas de seguridad
 
 Las políticas mostradas en **Develops > Seguridad** (longitud mínima de contraseña, requerir mayúsculas/números, intentos máximos de inicio de sesión, timeout de sesión, retención de logs, etc.) **aún no están conectadas al flujo real de la aplicación**.
