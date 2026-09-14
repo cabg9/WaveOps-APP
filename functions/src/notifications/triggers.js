@@ -435,5 +435,6 @@ module.exports = {
   notifyRoleChanged,
   checkOverdueTasks,
   cleanupOldNotifications,
+  getAdminsAndRRHH,
 };
 

@@ -214,4 +214,184 @@ export const CATALOG_COLLECTIONS = {
   controlTypes: 'controlTypes',
   controlAssignments: 'controlAssignments',
   controlTargetTypes: 'controlTargetTypes',
+  // Fase 1 — Inventario / Warehouse
+  inventoryStocks: 'inventoryStocks',
+  inventoryMovements: 'inventoryMovements',
+  inventoryTransfers: 'inventoryTransfers',
+  countSessions: 'countSessions',
+  movementTypes: 'movementTypes',
+  serialStatuses: 'serialStatuses',
+  rentalUnits: 'rentalUnits',
+  rentalOrders: 'rentalOrders',
+  rentalOrderStatuses: 'rentalOrderStatuses',
 } as const;
+
+// ═══════════════════════════════════════════════════════════════════
+// FASE 1 — INVENTARIO / WAREHOUSE
+// ═══════════════════════════════════════════════════════════════════
+
+// Stock de un producto en una ubicación (cantidad actual + mínimos/máximos)
+export interface InventoryStock {
+  id?: string;
+  tenantId: string;
+  productId: string;
+  locationId: string;
+  quantity: number;
+  minStock?: number | null;
+  maxStock?: number | null;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+// Kardex: bitácora INMUTABLE de movimientos (create-only en reglas)
+export interface InventoryMovement {
+  id?: string;
+  tenantId: string;
+  productId: string;
+  quantity: number; // con signo: + entrada, - salida
+  fromLocationId?: string | null;
+  toLocationId?: string | null;
+  movementTypeId: string;
+  reason?: string | null;
+  referenceType?: 'transfer' | 'count' | 'rental' | null;
+  referenceId?: string | null;
+  createdAt: string;
+  createdBy: string;
+  createdByName: string;
+}
+
+// Transferencia entre ubicaciones con estado en tránsito
+export interface InventoryTransfer {
+  id?: string;
+  tenantId: string;
+  productId: string;
+  quantity: number;
+  fromLocationId: string;
+  toLocationId: string;
+  responsibleUserId?: string | null;
+  responsibleName?: string | null;
+  status: 'pendiente' | 'en_transito' | 'recibido' | 'cancelado';
+  receivedBy?: string | null;
+  receivedAt?: string | null;
+  createdAt: string;
+  createdBy: string;
+  createdByName: string;
+}
+
+export type CountFrequency = 'semanal' | 'quincenal' | 'mensual';
+
+// Conteo cíclico por ubicación; el ajuste de diferencias requiere aprobación
+export interface CountSession {
+  id?: string;
+  tenantId: string;
+  locationId: string;
+  status: 'programado' | 'en_curso' | 'finalizado' | 'ajustado';
+  blind: boolean;
+  frequency: CountFrequency;
+  counts?: Record<string, number>;
+  differences?: Array<{ productId: string; expected: number; counted: number; delta: number }>;
+  approvedBy?: string | null;
+  approvedAt?: string | null;
+  adjustmentReason?: string | null;
+  scheduledAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  createdBy: string;
+  createdByName: string;
+}
+
+// Tipo de movimiento (catálogo dinámico). isOutput = resta del stock.
+export interface MovementType {
+  id?: string;
+  tenantId: string;
+  name: string;
+  nameEn?: string;
+  isOutput: boolean;
+  isActive: boolean;
+}
+
+// Estado de ciclo de vida de un serial (catálogo dinámico).
+// blocksRental = true impide rentar la unidad (anti-sobre-renta).
+export interface SerialStatus {
+  id?: string;
+  tenantId: string;
+  name: string;
+  nameEn?: string;
+  blocksRental: boolean;
+  isActive: boolean;
+}
+
+// Unidad serializada de un producto rentable (ej: Tanque #T001)
+export interface RentalUnit {
+  id?: string;
+  tenantId: string;
+  productId: string;
+  serialNumber: string; // único
+  photoUrl?: string | null;
+  size?: string | null;
+  statusId: string; // id del catálogo serialStatuses
+  notes?: string | null;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export type RentalPaymentStatus = 'pagada' | 'pendiente' | 'parcial' | 'credito';
+
+// Ítem de una orden de renta: producto rentable + cantidad
+export interface RentalOrderItem {
+  productId: string;
+  quantity: number;
+  // Seriales exactos asignados al despachar (anti-sobre-renta: se sabe QUÉ salió)
+  assignedUnitIds?: string[];
+  tallaRef?: string | null; // rentas internas: referencia de pasajero/talla cuando aplique
+}
+
+// Orden de renta: punto único de entrada del flujo canónico (Fase 1B)
+export interface RentalOrder {
+  id?: string;
+  tenantId: string;
+  orderNumber?: number; // correlativo (se asigna por Cloud Function)
+  clientType: 'interno' | 'externo';
+  clientId: string; // id de clients (interno = cliente del departamento)
+  clientName: string;
+  items: RentalOrderItem[];
+  deliveryDate: string; // fecha y hora de entrega
+  locationId?: string | null; // ubicación de entrega
+  statusId: string; // id del catálogo rentalOrderStatuses
+  paymentStatus: RentalPaymentStatus;
+  paymentProofUrl?: string | null; // foto de comprobante
+  paymentProofRef?: string | null; // n° de transacción
+  depositAmount?: number | null; // fianza/depósito
+  depositStatus?: 'retenida' | 'devuelta' | 'descontada' | null;
+  depositDiscountApprovedBy?: string | null;
+  depositDiscountEvidenceUrl?: string | null;
+  observations?: string | null;
+  preparedBy?: string | null; // quién prepara
+  dispatchedBy?: string | null; // quién despacha (QR de la orden)
+  dispatchedAt?: string | null;
+  deliveredAt?: string | null;
+  returnedAt?: string | null;
+  verifiedBy?: string | null;
+  verifiedAt?: string | null;
+  storedAt?: string | null;
+  createdAt: string;
+  createdBy: string;
+  createdByName: string;
+  updatedAt: string;
+}
+
+// Estado del flujo canónico de renta (catálogo dinámico, seeds en este orden:
+// recibido → en_preparacion → listo_despachar → despachado → entregado →
+// devuelto → verificado → almacenado | a_reparacion)
+export interface RentalOrderStatus {
+  id?: string;
+  tenantId: string;
+  name: string;
+  nameEn?: string;
+  order: number;
+  isFinalOk?: boolean; // almacenado: fin feliz
+  isFinalRepair?: boolean; // a_reparacion: fin con daño
+  isActive: boolean;
+}

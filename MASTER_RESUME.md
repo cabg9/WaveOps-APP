@@ -1,9 +1,54 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-13 (FASE 0 CERRADA — desplegada en PRODUCCIÓN con todo apagado tras sus feature flags — listo para Fase 1)
+> Última actualización: 2026-09-14 (FASE 1 — Inventario + Warehouse desplegados en GEMELA — pendiente validación del usuario)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — INVENTARIO + WAREHOUSE (14 de septiembre) — DESPLEGADA EN GEMELA
+
+**Estado:** EN GEMELA (staging), pendiente validación del usuario. Flags nuevos `enableInventario` y `enableWarehouse` APAGADOS por defecto (visibles/toggles en Develops → General; el módulo Warehouse oculto hasta encenderse).
+
+**Infraestructura base:**
+- Tipos nuevos en `src/types/catalogs.ts`: InventoryStock, InventoryMovement, InventoryTransfer, CountSession, MovementType (isOutput), SerialStatus (blocksRental), RentalUnit, RentalOrder, RentalOrderItem, RentalPaymentStatus, RentalOrderStatus (order/isFinalOk/isFinalRepair). Colecciones en CATALOG_COLLECTIONS: inventoryStocks, inventoryMovements, inventoryTransfers, countSessions, movementTypes, serialStatuses, rentalUnits, rentalOrders, rentalOrderStatuses.
+- `firestore.rules`: matches explícitos Fase 1; **inventoryMovements INMUTABLE** (create sí, update/delete no para nadie). Config (movementTypes/serialStatuses/rentalOrderStatuses) solo catalog admin.
+- AuditAction nuevas (STOCK_*, TRANSFER_*, COUNT_*, SERIAL_*).
+- Deps nuevas: `qrcode` + `html5-qrcode` (QR e impresión; escáner con cámara que limpia bien).
+- Semilla gemela (`scripts/seed-fase1.cjs`): appModules/warehouse creado, flag enableWarehouse=false, permiso canViewModuleWarehouse a Director General y Gerente de Operaciones. En producción NO se ha corrido todavía.
+
+**Módulo Inventario / Requisiciones** (`src/components/modules/InventarioModule.tsx`, ~4000 líneas, ruta /requisiciones): gating interno con enableInventario (apagado = placeholder "Módulo en desarrollo"). Sub-pestañas:
+- **Stock**: vistas por producto / por ubicación; mín/máx editables inline; badge "Bajo mínimo"; línea "En tránsito a X" desde transfers; QR de producto/ubicación con imprimir; escáner.
+- **Movimientos**: kardex solo lectura (inmutable en reglas), filtros, badge +/- coloreado. MovementForm compartido (signo por isOutput del tipo).
+- **Transferencias**: crear (descuenta origen al crear), estados pendiente → en_tránsito → recibido/cancelado (recibir suma al destino; cancelar devuelve), todo queda en kardex con referenceType 'transfer'. TODO: notificación (hecha vía function, ver abajo).
+- **Conteos**: programar por ubicación (frecuencia + conteo ciego), captura con guardado parcial, finalizar calcula diferencias; ajuste con motivo OBLIGATORIO solo canWrite (DG/RRHH), queda en kardex como 'ajuste' referenceType 'count', auditoría sensitive.
+- **Seriales**: solo productos isRentable; serial único validado; foto; talla; estado con badge "Bloqueado para renta"; QR por serial; historial derivado de rentalOrders (cuándo salió/volvió, reparaciones).
+- **Catálogos**: tipos de movimiento (seeds: compra/consumo/ajuste/renta/devolucion/dano/transferencia) y estados de ciclo de vida (disponible/rentado/en_reparacion/en_mantenimiento/dado_de_baja) con "Cargar iniciales" idempotente.
+- Deep links: `/requisiciones?product=|location=|serial=` abren la ficha y limpian la URL.
+
+**Módulo Warehouse** (`src/components/modules/WarehouseModule.tsx`, ~2000 líneas, ruta /warehouse, appModule 'warehouse'): gating con enableWarehouse. Sub-pestañas Pizarra | Órdenes | Estados | Retornos.
+- **Roles**: canSeeMoney = DG/Director/RRHH/GerOp/GerDept/Supervisor; STAFF (operación) NO ve montos/pago/fianza (solo badge Autorizada/Pendiente de autorización). canApprove (descuento fianza) = sin Director.
+- **Órdenes de renta**: único punto de entrada. Crear: interna (cliente interno del depto) / externa (persona/empresa + alta rápida de cliente), ítems rentables con cantidad y tallaRef, fecha/hora entrega, ubicación, preparador, pago (status + comprobante foto o n° transacción), fianza (monto + retenida→devuelta/descontada con motivo obligatorio + evidencia y aprobación). Estados: catálogo dinámico con seeds en orden (recibido→en_preparacion→listo_despachar→despachado→entregado→devuelto→verificado→almacenado|a_reparacion) y transición por orden con timestamps por campo. orderNumber pendiente (TODO Cloud Function correlativo).
+- **Despacho con QR** (estado listo_despachar): escanear QR de orden + asignar seriales exactos disponibles (anti-sobre-renta: no permite más de quantity ni los bloqueados; imposible despachar más de las disponibles). Al confirmar: orden despachada con dispatchedBy/At, seriales → rentado, movimientos kardex 'renta', descuento de stock si hay ubicación.
+- **Retorno** (despachado/entregado): lista de seriales → OK → disponible / Dañada → en_reparacion; movimientos 'devolucion' + retorno de stock; orden → almacenado (todo OK) o a_reparacion (con aviso para descontar fianza).
+- **Pizarra**: columnas kanban por estado, mini-tarjetas con clic a detalle; resumen del turno SOLO LECTURA desde Horarios (useShifts, sin duplicar ni editar); cola de retornos pendientes.
+- Deep link `/warehouse?order=<id>`.
+
+**Cloud Functions nuevas** (`functions/src/notifications/inventory.js`, desplegadas en staging):
+- `notifyTransferCreated`: notifica al responsable de la ubicación destino (o al responsable de la transferencia; si ninguno, admins+RRHH). Campana + push + email.
+- `checkLowStock` (onDocumentUpdated inventoryStocks): cruzó el mínimo → alerta high a responsable de ubicación + admins/RRHH con sugerencia de requisición (hasta máximo o mínimo) y proveedor preferido; dedupe 20h vía `lastLowStockAlertAt`.
+- `getAdminsAndRRHH` exportado desde triggers.js. Emails: secreto SendGrid de staging es placeholder → se omite con warning (campana/push sí funcionan).
+
+**Decisiones/pendientes conocidos:**
+- Razones de movimientos de transferencia se guardan traducidas al idioma activo al crear (mejorable a clave estable).
+- Auditoría de órdenes de renta y catálogo de estados: sin tipo AuditAction aún (TODO WH-audit).
+- Correlativo orderNumber: pendiente Cloud Function.
+- Lo que NO se tocó: Tasks, Horarios, Recordatorios, Develops (solo flags), login.
+
+**Archivos:** nuevos InventarioModule.tsx, WarehouseModule.tsx, functions/src/notifications/inventory.js, scripts/seed-fase1.cjs; modificados App.tsx (rutas /requisiciones real y /warehouse), DevelopsModule.tsx (flags meta), catalogs.ts, develops.ts, firestore.rules, functions/index.js, functions/src/notifications/triggers.js, package.json.
+
+**Build:** exit 0 verificado por el coordinador. Deploy staging: hosting + firestore rules + functions (32 functions OK; aviso de cleanup policy de artifacts es cosmético).
 
 ---
 
@@ -22,6 +67,8 @@
 **Pendiente hacia Fase 1:** encender flags en prod cuando se apruebe; sembrar catálogos de prod vía UI; migrar usuarios reales a posiciones semilla.
 
 ---
+
+## FASE 0.4 — Corrección: ESTRUCTURA FINAL del módulo Controles (13 de septiembre) — DESPLEGADA EN STAGING
 
 **Estado:** EN GEMELA, pendiente re-prueba del usuario.
 
@@ -57,6 +104,8 @@
 **Archivos:** `src/components/modules/ControlesTab.tsx` (único). **Build:** exit 0; deploy hosting staging hecho.
 
 ---
+
+## FASE 0.3 — Tercera y última ronda (13 de septiembre) — DESPLEGADA EN STAGING
 
 **Estado:** EN GEMELA. Con la aprobación del usuario se CIERRA la Fase 0 y se puede pasar a producción (hosting + reglas + índices + functions + semilla `seed-fase0.cjs`).
 

@@ -32,6 +32,12 @@ const {
   notifyControlAssigned,
 } = require("./src/notifications/controls");
 
+// Fase 1 — Inventario
+const {
+  notifyTransferCreated,
+  checkLowStock,
+} = require("./src/notifications/inventory");
+
 exports.createAuthUser = createAuthUser;
 exports.sendInvitationEmail = sendInvitationEmail;
 exports.acceptInvitation = acceptInvitation;
@@ -61,6 +67,10 @@ exports.cleanupOldNotifications = cleanupOldNotifications;
 exports.checkControlExpirations = checkControlExpirations;
 exports.checkControlsNow = checkControlsNow;
 exports.notifyControlAssigned = notifyControlAssigned;
+
+// Fase 1 — Inventario
+exports.notifyTransferCreated = notifyTransferCreated;
+exports.checkLowStock = checkLowStock;
 
 // Admin
 const { resetDemoData } = require("./src/admin/resetDemoData");

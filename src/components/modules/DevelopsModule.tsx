@@ -198,6 +198,16 @@ const FEATURE_FLAG_META: Record<string, { name: string; on: string; off: string 
     on: 'El modulo Requisiciones esta visible y se pueden crear y aprobar requisiciones.',
     off: 'El modulo Requisiciones esta oculto; no se podran gestionar requisiciones.',
   },
+  enableInventario: {
+    name: 'Modulo de Inventario',
+    on: 'El modulo Inventario esta visible: stock, kardex, transferencias, conteos y seriales.',
+    off: 'El modulo Inventario esta oculto; no se podra consultar ni gestionar el stock.',
+  },
+  enableWarehouse: {
+    name: 'Modulo de Warehouse',
+    on: 'El modulo Warehouse esta visible: ordenes de renta, despacho y retornos.',
+    off: 'El modulo Warehouse esta oculto; nadie podra acceder a las ordenes de renta.',
+  },
   enableMovilidad: {
     name: 'Modulo de movilidad',
     on: 'El modulo Movilidad esta visible y se pueden gestionar vehiculos y traslados.',
@@ -369,7 +379,7 @@ function GeneralTab() {
           {(() => {
             // Los flags nuevos deben poder activarse aunque aun no existan en Firestore.
             // Flags nuevos (Fase 0): nacen apagados. Flags antiguos de modulos: ausente = encendido.
-            const NEW_FLAGS_DEFAULT_OFF = ['enableUbicaciones', 'enableCatalogosMaestros', 'enableCatalogoControles'];
+            const NEW_FLAGS_DEFAULT_OFF = ['enableUbicaciones', 'enableCatalogosMaestros', 'enableCatalogoControles', 'enableInventario', 'enableWarehouse'];
             const flagKeys = Array.from(new Set([...Object.keys(settings.featureFlags), ...NEW_FLAGS_DEFAULT_OFF]));
             if (flagKeys.length === 0) {
               return <p className="text-sm text-[#86868B]">No hay feature flags configurados</p>;

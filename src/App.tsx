@@ -31,6 +31,8 @@ import Dashboard from '@/components/Dashboard';
 import TasksModule from '@/components/modules/TasksModule';
 import HorariosModule from '@/components/modules/HorariosModule';
 import DevelopsModule from '@/components/modules/DevelopsModule';
+import InventarioModule from '@/components/modules/InventarioModule';
+import { WarehouseModule } from '@/components/modules/WarehouseModule';
 import ProfilePage from '@/components/ProfilePage';
 import { PersistentAvatar } from '@/components/PersistentAvatar';
 import SettingsPage from '@/components/SettingsPage';
@@ -79,22 +81,6 @@ function DiveOpsModule() {
           </svg>
         </div>
         <h2 className="text-xl font-semibold text-[#1D1D1F] mb-2">Dive Ops</h2>
-        <p className="text-[#86868B]">Módulo en desarrollo</p>
-      </div>
-    </Layout>
-  );
-}
-
-function RequisicionesModule() {
-  return (
-    <Layout title="Requisiciones">
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="w-16 h-16 bg-apple-yellow/10 rounded-2xl flex items-center justify-center mb-4">
-          <svg className="w-8 h-8 text-apple-yellow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-        </div>
-        <h2 className="text-xl font-semibold text-[#1D1D1F] mb-2">Requisiciones</h2>
         <p className="text-[#86868B]">Módulo en desarrollo</p>
       </div>
     </Layout>
@@ -270,7 +256,21 @@ function AppRoutes() {
         element={
           <RequireProfileComplete>
             <ProtectedRoute>
-              <RequisicionesModule />
+              <Layout title="Requisiciones">
+                <InventarioModule />
+              </Layout>
+            </ProtectedRoute>
+          </RequireProfileComplete>
+        }
+      />
+      <Route
+        path="/warehouse"
+        element={
+          <RequireProfileComplete>
+            <ProtectedRoute>
+              <Layout title="Warehouse">
+                <WarehouseModule />
+              </Layout>
             </ProtectedRoute>
           </RequireProfileComplete>
         }
