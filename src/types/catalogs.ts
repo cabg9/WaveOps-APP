@@ -93,6 +93,8 @@ export interface Product extends CatalogBase {
   isConsumable: boolean; // es consumible
   photoUrl?: string;
   preferredSupplierId?: string; // proveedor preferido (ref suppliers, opcional)
+  rentalPricePerDay?: number | null; // precio de renta por unidad por día
+  depositPercent?: number | null; // porcentaje de fianza sobre el valor de la renta
 }
 
 export interface CostCenter extends CatalogBase {
@@ -363,6 +365,7 @@ export interface RentalOrder {
   paymentStatus: RentalPaymentStatus;
   paymentProofUrl?: string | null; // foto de comprobante
   paymentProofRef?: string | null; // n° de transacción
+  activityRef?: string | null; // rentas internas: referencia de salida/actividad (opcional)
   depositAmount?: number | null; // fianza/depósito
   depositStatus?: 'retenida' | 'devuelta' | 'descontada' | null;
   depositDiscountApprovedBy?: string | null;

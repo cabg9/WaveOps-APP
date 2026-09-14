@@ -41,7 +41,7 @@ import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
   ClipboardList, Plus, Search, ChevronDown, ChevronUp, Power,
   Construction, Package, UserPlus, MapPin, CalendarClock, Banknote, ArrowRight,
-  RotateCcw, Users, LayoutGrid, Pencil, Upload, QrCode, CheckCircle2, XCircle,
+  RotateCcw, Users, LayoutGrid, Pencil, Upload, QrCode, CheckCircle2, XCircle, Link2,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -85,6 +85,7 @@ registerI18nKeys({
     'wh.statuses.seedsConfirmTitle': 'Cargar estados iniciales',
     'wh.statuses.seedsConfirmDesc': 'Se crearán los estados iniciales que falten. Los existentes no se modifican.',
     'wh.statuses.seedsSummary': '{created} estados cargados ({existing} ya existían)',
+    'wh.statuses.seedsAlreadyLoaded': 'Ya están cargadas',
     'wh.statuses.validation.nameRequired': 'El nombre es obligatorio',
     'wh.statuses.validation.orderInvalid': 'El orden debe ser un número entero',
 
@@ -118,6 +119,9 @@ registerI18nKeys({
     'wh.orderForm.tallaRef': 'Talla / ref.',
     'wh.orderForm.tallaRefPlaceholder': 'Pasajero o talla (rentas internas), opcional',
     'wh.orderForm.removeItem': 'Quitar ítem',
+    'wh.orderForm.activityRef': 'Referencia de salida/actividad',
+    'wh.orderForm.activityRefPlaceholder': 'Ej: salida de buceo, actividad del departamento...',
+    'wh.orderForm.activityRefHelp': 'Opcional. Sirve para ligar la renta a una salida o actividad.',
     'wh.orderForm.deliveryDate': 'Fecha y hora de entrega',
     'wh.orderForm.location': 'Ubicación de entrega',
     'wh.orderForm.selectLocation': 'Selecciona una ubicación',
@@ -135,6 +139,7 @@ registerI18nKeys({
     'wh.orderForm.proofRef': 'N° de transacción',
     'wh.orderForm.proofRefPlaceholder': 'Ej: 1234567890',
     'wh.orderForm.depositAmount': 'Fianza (monto, opcional)',
+    'wh.orderForm.depositSuggestion': 'Sugerencia: {days} día(s) × ${perDay}/día × {percent}% fianza = ${amount}',
     'wh.orderForm.observations': 'Observaciones',
     'wh.orderForm.observationsPlaceholder': 'Ej: entregar en recepción, cliente recoge con cédula...',
     'wh.orderForm.save': 'Crear orden',
@@ -161,7 +166,9 @@ registerI18nKeys({
     'wh.detail.noProof': 'Sin comprobante registrado',
     'wh.detail.viewProof': 'Ver comprobante',
     'wh.detail.proofRef': 'N° de transacción',
+    'wh.detail.activityRef': 'Referencia de salida/actividad',
     'wh.detail.deposit': 'Fianza',
+    'wh.detail.depositSuggestion': 'Sugerencia calculada: ${amount} ({days} día(s) × ${perDay}/día × {percent}%)',
     'wh.detail.depositStatus.retenida': 'Retenida',
     'wh.detail.depositStatus.devuelta': 'Devuelta',
     'wh.detail.depositStatus.descontada': 'Descontada',
@@ -249,6 +256,9 @@ registerI18nKeys({
     'wh.scanner.title': 'Escanear QR',
     'wh.scanner.hint': 'Apunta la cámara al QR de la orden o del serial. También acepta texto plano de serial.',
     'wh.scanner.unrecognized': 'QR no reconocido',
+    'wh.scanner.manualEntry': 'Ingresar código manual',
+    'wh.scanner.manualPlaceholder': 'Pega la URL del QR o escribe el ID de la orden o del serial',
+    'wh.scanner.manualApply': 'Usar código',
 
     'wh.toast.dispatched': 'Orden despachada',
     'wh.toast.returnVerified': 'Retorno verificado',
@@ -306,6 +316,7 @@ registerI18nKeys({
     'wh.statuses.seedsConfirmTitle': 'Load initial statuses',
     'wh.statuses.seedsConfirmDesc': 'Missing initial statuses will be created. Existing ones are not modified.',
     'wh.statuses.seedsSummary': '{created} statuses loaded ({existing} already existed)',
+    'wh.statuses.seedsAlreadyLoaded': 'Already loaded',
     'wh.statuses.validation.nameRequired': 'Name is required',
     'wh.statuses.validation.orderInvalid': 'Order must be a whole number',
 
@@ -339,6 +350,9 @@ registerI18nKeys({
     'wh.orderForm.tallaRef': 'Size / ref.',
     'wh.orderForm.tallaRefPlaceholder': 'Passenger or size (internal rentals), optional',
     'wh.orderForm.removeItem': 'Remove item',
+    'wh.orderForm.activityRef': 'Activity/trip reference',
+    'wh.orderForm.activityRefPlaceholder': 'E.g.: diving trip, department activity...',
+    'wh.orderForm.activityRefHelp': 'Optional. Use it to link the rental to a trip or activity.',
     'wh.orderForm.deliveryDate': 'Delivery date and time',
     'wh.orderForm.location': 'Delivery location',
     'wh.orderForm.selectLocation': 'Select a location',
@@ -356,6 +370,7 @@ registerI18nKeys({
     'wh.orderForm.proofRef': 'Transaction no.',
     'wh.orderForm.proofRefPlaceholder': 'E.g.: 1234567890',
     'wh.orderForm.depositAmount': 'Deposit (amount, optional)',
+    'wh.orderForm.depositSuggestion': 'Suggestion: {days} day(s) × ${perDay}/day × {percent}% deposit = ${amount}',
     'wh.orderForm.observations': 'Observations',
     'wh.orderForm.observationsPlaceholder': 'E.g.: deliver at reception, client picks up with ID...',
     'wh.orderForm.save': 'Create order',
@@ -382,7 +397,9 @@ registerI18nKeys({
     'wh.detail.noProof': 'No proof recorded',
     'wh.detail.viewProof': 'View proof',
     'wh.detail.proofRef': 'Transaction no.',
+    'wh.detail.activityRef': 'Activity/trip reference',
     'wh.detail.deposit': 'Deposit',
+    'wh.detail.depositSuggestion': 'Calculated suggestion: ${amount} ({days} day(s) × ${perDay}/day × {percent}%)',
     'wh.detail.depositStatus.retenida': 'Held',
     'wh.detail.depositStatus.devuelta': 'Returned',
     'wh.detail.depositStatus.descontada': 'Discounted',
@@ -470,6 +487,9 @@ registerI18nKeys({
     'wh.scanner.title': 'Scan QR',
     'wh.scanner.hint': 'Point the camera at the order or serial QR. Plain serial text is also accepted.',
     'wh.scanner.unrecognized': 'Unrecognized QR',
+    'wh.scanner.manualEntry': 'Enter code manually',
+    'wh.scanner.manualPlaceholder': 'Paste the QR URL or type the order or serial ID',
+    'wh.scanner.manualApply': 'Use code',
 
     'wh.toast.dispatched': 'Order dispatched',
     'wh.toast.returnVerified': 'Return verified',
@@ -524,6 +544,8 @@ function docToProduct(id: string, data: Record<string, unknown>): Product {
     isRentable: toBool(data.isRentable),
     isConsumable: toBool(data.isConsumable),
     photoUrl: data.photoUrl ? toStr(data.photoUrl) : undefined,
+    rentalPricePerDay: toNumOrNull(data.rentalPricePerDay) ?? null,
+    depositPercent: toNumOrNull(data.depositPercent) ?? null,
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
@@ -645,6 +667,7 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
     depositDiscountApprovedBy: data.depositDiscountApprovedBy ? toStr(data.depositDiscountApprovedBy) : null,
     depositDiscountEvidenceUrl: data.depositDiscountEvidenceUrl ? toStr(data.depositDiscountEvidenceUrl) : null,
     observations: data.observations ? toStr(data.observations) : null,
+    activityRef: data.activityRef ? toStr(data.activityRef) : null,
     preparedBy: data.preparedBy ? toStr(data.preparedBy) : null,
     dispatchedBy: data.dispatchedBy ? toStr(data.dispatchedBy) : null,
     dispatchedAt: data.dispatchedAt ? toStr(data.dispatchedAt) : null,
@@ -723,6 +746,7 @@ interface OrderFormState {
   proofRef: string;
   depositAmount: string;
   observations: string;
+  activityRef: string;
 }
 
 const EMPTY_ORDER_FORM: OrderFormState = {
@@ -736,7 +760,51 @@ const EMPTY_ORDER_FORM: OrderFormState = {
   proofRef: '',
   depositAmount: '',
   observations: '',
+  activityRef: '',
 };
+
+// Sugerencia de fianza: Σ (cantidad × precio/día) × días × % fianza / 100.
+// Requiere fecha de entrega válida y que TODOS los ítems tengan producto con
+// rentalPricePerDay y depositPercent; si no, no hay sugerencia (null).
+interface DepositSuggestion {
+  amount: number; // fianza sugerida, redondeada a 2 decimales
+  days: number; // días de renta (mínimo 1)
+  perDay: number; // valor de renta por día
+  percent: number; // % de fianza efectivo (ponderado)
+}
+
+function computeDepositSuggestion(
+  items: Array<{ productId: string; quantity: number }>,
+  deliveryDate: string,
+  fromIso: string,
+  products: Product[],
+): DepositSuggestion | null {
+  if (!deliveryDate || items.length === 0) return null;
+  const deliveryMs = new Date(deliveryDate).getTime();
+  if (Number.isNaN(deliveryMs)) return null;
+  const fromMs = new Date(fromIso).getTime();
+  const base = Number.isNaN(fromMs) ? Date.now() : fromMs;
+  const days = Math.max(1, Math.ceil((deliveryMs - base) / 86400000));
+  let perDay = 0;
+  let total = 0;
+  for (const it of items) {
+    const p = products.find(pr => pr.id === it.productId);
+    if (!p || p.rentalPricePerDay == null || p.depositPercent == null) return null;
+    const qty = it.quantity;
+    if (!Number.isFinite(qty) || qty <= 0) return null;
+    const daily = qty * p.rentalPricePerDay;
+    perDay += daily;
+    total += daily * days * (p.depositPercent / 100);
+  }
+  if (perDay <= 0) return null;
+  const amount = Math.round(total * 100) / 100;
+  return {
+    amount,
+    days,
+    perDay: Math.round(perDay * 100) / 100,
+    percent: Math.round((amount * 10000) / (perDay * days)) / 100,
+  };
+}
 
 // Badges de estado por orden de secuencia (mismo lenguaje visual del módulo)
 function statusBadgeClass(status: RentalOrderStatus | undefined): string {
@@ -815,6 +883,9 @@ export function WarehouseModule() {
   const [orderItems, setOrderItems] = useState<OrderItemDraft[]>([]);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
+  // La sugerencia de fianza solo rellena el campo mientras el usuario no lo
+  // haya editado manualmente
+  const depositTouched = useRef(false);
 
   // Cliente rápido (mini-form dentro del dialog de nueva orden)
   const [quickClientOpen, setQuickClientOpen] = useState(false);
@@ -889,6 +960,37 @@ export function WarehouseModule() {
   const statusName = (s: RentalOrderStatus | undefined) =>
     !s ? '—' : getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name;
   const userName = (id: string) => users.find(u => u.id === id)?.name || id;
+
+  // Sugerencia de fianza del formulario (solo canSeeMoney): días entre ahora y
+  // la entrega; se recalcula al cambiar ítems, fecha o catálogo de productos
+  const formDepositSuggestion = useMemo(
+    () =>
+      canSeeMoney
+        ? computeDepositSuggestion(
+            orderItems
+              .filter(it => it.productId)
+              .map(it => ({ productId: it.productId, quantity: Number(it.quantity) || 0 })),
+            orderForm.deliveryDate,
+            new Date().toISOString(),
+            products,
+          )
+        : null,
+    [canSeeMoney, orderItems, orderForm.deliveryDate, products]
+  );
+
+  // Prellena el monto de fianza con la sugerencia mientras no se haya tocado
+  useEffect(() => {
+    if (!canSeeMoney || depositTouched.current || !formDepositSuggestion) return;
+    const value = String(formDepositSuggestion.amount);
+    setOrderForm(prev => (prev.depositAmount === value ? prev : { ...prev, depositAmount: value }));
+  }, [canSeeMoney, formDepositSuggestion]);
+
+  // Sugerencia de fianza de una orden existente (referencia en el detalle):
+  // días entre su creación y la fecha de entrega
+  const orderDepositSuggestion = (order: RentalOrder): DepositSuggestion | null =>
+    canSeeMoney
+      ? computeDepositSuggestion(order.items, order.deliveryDate, order.createdAt, products)
+      : null;
 
   const toggleExpanded = (id: string) => {
     setExpandedIds(prev => {
@@ -1094,7 +1196,11 @@ export function WarehouseModule() {
             });
             created += 1;
           }
-          toast.success(tf('wh.statuses.seedsSummary', { created, existing }));
+          if (created === 0) {
+            toast.info(t('wh.statuses.seedsAlreadyLoaded'));
+          } else {
+            toast.success(tf('wh.statuses.seedsSummary', { created, existing }));
+          }
         } catch (err) {
           console.error('[WarehouseModule] loadSeedStatuses:', err);
           toast.error(t('wh.toast.error'));
@@ -1219,6 +1325,7 @@ export function WarehouseModule() {
     setProofFile(null);
     setQuickClientOpen(false);
     setQuickClientName('');
+    depositTouched.current = false;
     setOrderModalOpen(true);
   };
 
@@ -1290,6 +1397,10 @@ export function WarehouseModule() {
             : null,
         depositAmount: hasDeposit ? deposit : null,
         depositStatus: hasDeposit ? 'retenida' : null,
+        activityRef:
+          orderForm.clientType === 'interno' && orderForm.activityRef.trim()
+            ? orderForm.activityRef.trim()
+            : null,
         observations: orderForm.observations.trim() || null,
         preparedBy: orderForm.preparedBy || null,
         createdAt: now,
@@ -1518,6 +1629,16 @@ export function WarehouseModule() {
       return;
     }
     toggleSerialForItem(itemIdx, unit.id!);
+  };
+
+  // Resolución de códigos manuales: texto plano = id de orden o de serial
+  // (también acepta el número de serie); devuelve null si no hay coincidencia
+  const resolveManualScanCode = (raw: string): { kind: 'order' | 'serial'; id: string } | null => {
+    const text = raw.trim();
+    if (!text) return null;
+    if (orders.some(o => o.id === text)) return { kind: 'order', id: text };
+    if (rentalUnits.some(u => u.id === text || u.serialNumber === text)) return { kind: 'serial', id: text };
+    return null;
   };
 
   const dispatchComplete =
@@ -1837,6 +1958,13 @@ export function WarehouseModule() {
               <span>{locationName(order.locationId)}</span>
             </div>
           )}
+          {order.activityRef && (
+            <div className="flex items-center gap-2 text-[#1D1D1F]">
+              <Link2 className="h-4 w-4 text-[#86868B]" />
+              <span className="text-[#86868B]">{t('wh.detail.activityRef')}:</span>
+              <span>{order.activityRef}</span>
+            </div>
+          )}
           <div className="flex items-center gap-2 text-[#1D1D1F]">
             <Users className="h-4 w-4 text-[#86868B]" />
             <span className="text-[#86868B]">{t('wh.detail.preparedBy')}:</span>
@@ -1882,6 +2010,19 @@ export function WarehouseModule() {
                 <span className="text-[#1D1D1F] font-medium">
                   {t('wh.detail.deposit')}: ${order.depositAmount}
                 </span>
+                {(() => {
+                  const sug = orderDepositSuggestion(order);
+                  return sug ? (
+                    <span className="text-xs text-[#86868B]">
+                      {tf('wh.detail.depositSuggestion', {
+                        days: sug.days,
+                        perDay: sug.perDay,
+                        percent: sug.percent,
+                        amount: sug.amount,
+                      })}
+                    </span>
+                  ) : null;
+                })()}
                 {order.depositStatus && (
                   <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium border', DEPOSIT_STATUS_BADGE[order.depositStatus] ?? '')}>
                     {t(`wh.detail.depositStatus.${order.depositStatus}`)}
@@ -2692,6 +2833,20 @@ export function WarehouseModule() {
               </div>
             )}
 
+            {/* Referencia de salida/actividad (solo rentas internas, opcional) */}
+            {orderForm.clientType === 'interno' && (
+              <div>
+                <Label className="text-xs text-[#86868B]">{t('wh.orderForm.activityRef')}</Label>
+                <Input
+                  value={orderForm.activityRef}
+                  onChange={e => setOrderForm(prev => ({ ...prev, activityRef: e.target.value }))}
+                  placeholder={t('wh.orderForm.activityRefPlaceholder')}
+                  className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
+                />
+                <p className="mt-1 text-xs text-[#86868B]">{t('wh.orderForm.activityRefHelp')}</p>
+              </div>
+            )}
+
             {/* Ítems dinámicos */}
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -2815,11 +2970,24 @@ export function WarehouseModule() {
                       type="number"
                       min={0}
                       value={orderForm.depositAmount}
-                      onChange={e => setOrderForm(prev => ({ ...prev, depositAmount: e.target.value }))}
+                      onChange={e => {
+                        depositTouched.current = true;
+                        setOrderForm(prev => ({ ...prev, depositAmount: e.target.value }));
+                      }}
                       className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
                     />
                   </div>
                 </div>
+                {formDepositSuggestion && (
+                  <p className="text-xs text-[#86868B]">
+                    {tf('wh.orderForm.depositSuggestion', {
+                      days: formDepositSuggestion.days,
+                      perDay: formDepositSuggestion.perDay,
+                      percent: formDepositSuggestion.percent,
+                      amount: formDepositSuggestion.amount,
+                    })}
+                  </p>
+                )}
                 <div>
                   <div className="flex items-center gap-1 bg-white rounded-full p-1 w-fit border border-[#E5E5E7]">
                     {(['ref', 'foto'] as const).map(mode => (
@@ -3249,6 +3417,7 @@ export function WarehouseModule() {
         open={scanTarget !== null}
         onOpenChange={open => !open && setScanTarget(null)}
         onScan={handleDispatchScan}
+        resolveManual={resolveManualScanCode}
       />
     </div>
   );
@@ -3257,7 +3426,8 @@ export function WarehouseModule() {
 // ═══════════════════════════════════════════════════════════════════
 // MODAL ESCANER QR (html5-qrcode) del módulo Warehouse: parsea URLs de la
 // app con searchParams order / serial; si el contenido no es URL, se
-// interpreta como texto plano de serial (número de serie o id)
+// interpreta como texto plano de serial (número de serie o id). Incluye
+// entrada manual con el mismo parseo (prop resolveManual del padre).
 // ═══════════════════════════════════════════════════════════════════
 
 const WH_SCANNER_CONTAINER_ID = 'wh-qr-scanner-container';
@@ -3266,12 +3436,50 @@ interface WhScannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onScan: (kind: 'order' | 'serial', id: string) => void;
+  /** Resuelve texto plano contra colecciones conocidas (id de orden / serial) */
+  resolveManual?: (raw: string) => { kind: 'order' | 'serial'; id: string } | null;
 }
 
-function WhScannerModal({ open, onOpenChange, onScan }: WhScannerModalProps) {
+function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScannerModalProps) {
   // Ref para que el callback del escáner siempre vea el handler actual
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+
+  // Entrada manual de código
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualCode, setManualCode] = useState('');
+  useEffect(() => {
+    if (open) {
+      setManualOpen(false);
+      setManualCode('');
+    }
+  }, [open]);
+
+  const applyManualCode = () => {
+    const text = manualCode.trim();
+    if (!text) return;
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(text);
+    } catch {
+      parsed = null;
+    }
+    const order = parsed?.searchParams.get('order') ?? null;
+    const serial = parsed?.searchParams.get('serial') ?? null;
+    const result = order
+      ? { kind: 'order' as const, id: order }
+      : serial
+        ? { kind: 'serial' as const, id: serial }
+        : parsed
+          ? null
+          : resolveManual?.(text) ?? null;
+    if (!result) {
+      toast.error(t('wh.scanner.unrecognized'));
+      return;
+    }
+    onOpenChange(false);
+    onScanRef.current(result.kind, result.id);
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -3331,7 +3539,36 @@ function WhScannerModal({ open, onOpenChange, onScan }: WhScannerModalProps) {
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('wh.scanner.hint')}</p>
-          <div id={WH_SCANNER_CONTAINER_ID} className="rounded-xl overflow-hidden" />
+          <div className="space-y-2">
+            <div id={WH_SCANNER_CONTAINER_ID} className="rounded-xl overflow-hidden" />
+            {!manualOpen ? (
+              <button
+                type="button"
+                onClick={() => setManualOpen(true)}
+                className="text-xs text-corporate underline"
+              >
+                {t('wh.scanner.manualEntry')}
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={manualCode}
+                  onChange={e => setManualCode(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && applyManualCode()}
+                  placeholder={t('wh.scanner.manualPlaceholder')}
+                  className="rounded-xl border-[#E5E5E7] text-sm"
+                />
+                <Button
+                  size="sm"
+                  onClick={applyManualCode}
+                  disabled={!manualCode.trim()}
+                  className="rounded-xl bg-corporate hover:bg-corporate/90 shrink-0"
+                >
+                  {t('wh.scanner.manualApply')}
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

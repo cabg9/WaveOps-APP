@@ -276,6 +276,17 @@ registerI18nKeys({
     'inv.serials.outAt': 'Salió',
     'inv.serials.backAt': 'Volvió',
     'inv.serials.inRepair': 'En reparación',
+    'inv.serials.retire': 'Dar de baja',
+    'inv.serials.retireTitle': 'Dar de baja serial',
+    'inv.serials.retireDesc': 'Registra la evidencia y el motivo. La baja es permanente: el serial no podrá reactivarse.',
+    'inv.serials.retirePhoto': 'Foto de evidencia (obligatoria)',
+    'inv.serials.retireReason': 'Motivo (obligatorio)',
+    'inv.serials.retireReasonPlaceholder': 'Ej: daño irreparable, pérdida, obsolescencia...',
+    'inv.serials.retireConfirmDesc': 'El serial pasará a estado "Dado de baja" de forma permanente.',
+    'inv.serials.retireDone': 'Serial dado de baja',
+    'inv.serials.retired': 'Dado de baja',
+    'inv.serials.retirePhotoRequired': 'La foto de evidencia es obligatoria',
+    'inv.serials.retireReasonRequired': 'El motivo es obligatorio',
 
     'inv.qr.print': 'Imprimir',
     'inv.qr.product': 'Producto',
@@ -290,6 +301,10 @@ registerI18nKeys({
     'inv.scanner.hint': 'Apunta la cámara al código QR de un producto, ubicación o serial.',
     'inv.scanner.unrecognized': 'Código QR no reconocido',
     'inv.scanner.error': 'No se pudo iniciar la cámara',
+    'inv.scanner.manual': 'Ingresar código manual',
+    'inv.scanner.manualPlaceholder': 'Pega la URL del QR o el id del serial',
+    'inv.scanner.manualSubmit': 'Buscar',
+    'inv.catalogs.seedsAlreadyLoaded': 'Ya están cargadas',
   },
   en: {
     'inv.devTitle': 'Module under development',
@@ -487,6 +502,17 @@ registerI18nKeys({
     'inv.serials.outAt': 'Out',
     'inv.serials.backAt': 'Back',
     'inv.serials.inRepair': 'In repair',
+    'inv.serials.retire': 'Decommission',
+    'inv.serials.retireTitle': 'Decommission serial',
+    'inv.serials.retireDesc': 'Record the evidence and the reason. This is permanent: the serial cannot be reactivated.',
+    'inv.serials.retirePhoto': 'Evidence photo (required)',
+    'inv.serials.retireReason': 'Reason (required)',
+    'inv.serials.retireReasonPlaceholder': 'E.g.: irreparable damage, loss, obsolescence...',
+    'inv.serials.retireConfirmDesc': 'The serial will permanently move to "Decommissioned" status.',
+    'inv.serials.retireDone': 'Serial decommissioned',
+    'inv.serials.retired': 'Decommissioned',
+    'inv.serials.retirePhotoRequired': 'Evidence photo is required',
+    'inv.serials.retireReasonRequired': 'Reason is required',
 
     'inv.qr.print': 'Print',
     'inv.qr.product': 'Product',
@@ -501,6 +527,10 @@ registerI18nKeys({
     'inv.scanner.hint': 'Point the camera at the QR code of a product, location or serial.',
     'inv.scanner.unrecognized': 'Unrecognized QR code',
     'inv.scanner.error': 'Could not start the camera',
+    'inv.scanner.manual': 'Enter code manually',
+    'inv.scanner.manualPlaceholder': 'Paste the QR URL or the serial id',
+    'inv.scanner.manualSubmit': 'Look up',
+    'inv.catalogs.seedsAlreadyLoaded': 'Already loaded',
   },
 });
 
@@ -945,6 +975,12 @@ export function InventarioModule() {
   const [editingSerialId, setEditingSerialId] = useState<string | null>(null);
   const [serialEditDraft, setSerialEditDraft] = useState<{ size: string; notes: string }>({ size: '', notes: '' });
 
+  // Baja permanente de un serial (foto + motivo obligatorios, aprobadores ampliados)
+  const [retiringUnit, setRetiringUnit] = useState<RentalUnit | null>(null);
+  const [retirePhotoFile, setRetirePhotoFile] = useState<File | null>(null);
+  const [retireReason, setRetireReason] = useState('');
+  const [savingRetire, setSavingRetire] = useState(false);
+
   // QR y escáner (FASE 1B-serials)
   const [qrDialog, setQrDialog] = useState<{ title: string; subtitle: string; qrText: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -959,6 +995,11 @@ export function InventarioModule() {
   const tenantId = getCurrentTenantId();
   const enabled = isFeatureEnabled('enableInventario');
   const canWrite = currentUser?.role === Role.DIRECTOR_GENERAL || currentUser?.role === Role.RRHH;
+  // Baja permanente: además de canWrite, la aprueban gerentes de departamento y supervisores
+  const canRetire =
+    canWrite ||
+    currentUser?.role === Role.GERENTE_DEPARTAMENTO ||
+    currentUser?.role === Role.SUPERVISOR;
 
   const activeProducts = useMemo(() => products.filter(p => p.isActive), [products]);
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
@@ -1895,6 +1936,7 @@ export function InventarioModule() {
 
   const handleChangeSerialStatus = async (unit: RentalUnit, statusId: string) => {
     if (!currentUser || !canWrite || !unit.id || !statusId || statusId === unit.statusId) return;
+    if (unit.statusId === 'dado_de_baja') return; // baja permanente: no se reactiva
     try {
       const now = new Date().toISOString();
       const status = serialStatuses.find(s => s.id === statusId);
@@ -1945,6 +1987,55 @@ export function InventarioModule() {
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
     }
+  };
+
+  const openRetireSerial = (unit: RentalUnit) => {
+    setRetiringUnit(unit);
+    setRetirePhotoFile(null);
+    setRetireReason('');
+  };
+
+  const handleRetireSerial = async () => {
+    if (!currentUser || !retiringUnit?.id) return;
+    const reason = retireReason.trim();
+    if (!retirePhotoFile) return toast.error(t('inv.serials.retirePhotoRequired'));
+    if (!reason) return toast.error(t('inv.serials.retireReasonRequired'));
+    const unit = retiringUnit;
+    await executeWithConfirm({
+      level: 'sensitive',
+      title: t('inv.serials.retireTitle'),
+      description: `${productName(unit.productId)} · ${unit.serialNumber}\n${t('inv.serials.retireConfirmDesc')}`,
+      action: async () => {
+        setSavingRetire(true);
+        try {
+          const photoUrl = await uploadImage(retirePhotoFile, 'serials');
+          const now = new Date().toISOString();
+          await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unit.id!), {
+            statusId: 'dado_de_baja',
+            photoUrl,
+            notes: `${reason} · Baja permanente`,
+            updatedAt: now,
+            updatedBy: currentUser.name,
+          });
+          await logAction({
+            action: AUDIT_ACTIONS.serialStatusChanged,
+            targetType: 'rental_unit',
+            targetId: unit.id!,
+            targetName: `${productName(unit.productId)} · ${unit.serialNumber}`,
+            impactLevel: 'sensitive',
+            description: `Baja permanente del serial ${unit.serialNumber}: ${reason}`,
+          });
+          toast.success(t('inv.serials.retireDone'));
+          setRetiringUnit(null);
+          setRetirePhotoFile(null);
+          setRetireReason('');
+        } catch (err: any) {
+          toast.error(`${t('inv.error.save')}: ${err.message}`);
+        } finally {
+          setSavingRetire(false);
+        }
+      },
+    });
   };
 
   // Seriales agrupados por producto rentable (para el render)
@@ -2141,11 +2232,15 @@ export function InventarioModule() {
             impactLevel: 'minor',
             description: `Tipos de movimiento iniciales cargados: ${created} nuevos (${existing} ya existían)`,
           });
-          toast.success(
-            t('inv.catalogs.mt.seedsSummary')
-              .replace('{created}', String(created))
-              .replace('{existing}', String(existing))
-          );
+          if (created === 0) {
+            toast.info(t('inv.catalogs.seedsAlreadyLoaded'));
+          } else {
+            toast.success(
+              t('inv.catalogs.mt.seedsSummary')
+                .replace('{created}', String(created))
+                .replace('{existing}', String(existing))
+            );
+          }
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -2276,11 +2371,15 @@ export function InventarioModule() {
             impactLevel: 'minor',
             description: `Estados iniciales cargados: ${created} nuevos (${existing} ya existían)`,
           });
-          toast.success(
-            t('inv.catalogs.ss.seedsSummary')
-              .replace('{created}', String(created))
-              .replace('{existing}', String(existing))
-          );
+          if (created === 0) {
+            toast.info(t('inv.catalogs.seedsAlreadyLoaded'));
+          } else {
+            toast.success(
+              t('inv.catalogs.ss.seedsSummary')
+                .replace('{created}', String(created))
+                .replace('{existing}', String(existing))
+            );
+          }
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -3311,6 +3410,11 @@ export function InventarioModule() {
                             {t('inv.serials.blocksRental')}
                           </span>
                         )}
+                        {unit.statusId === 'dado_de_baja' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7] shrink-0">
+                            {t('inv.serials.retired')}
+                          </span>
+                        )}
                         {isOpen ? (
                           <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0" />
                         ) : (
@@ -3344,14 +3448,18 @@ export function InventarioModule() {
                                 <span
                                   className={cn(
                                     'px-2 py-0.5 rounded-full text-[10px] font-medium border',
-                                    status?.blocksRental
-                                      ? 'bg-red-50 text-red-700 border-red-200'
-                                      : 'bg-green-50 text-green-700 border-green-200'
+                                    unit.statusId === 'dado_de_baja'
+                                      ? 'bg-[#F5F5F7] text-[#86868B] border-[#E5E5E7]'
+                                      : status?.blocksRental
+                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        : 'bg-green-50 text-green-700 border-green-200'
                                   )}
                                 >
-                                  {status ? (getLanguage() === 'en' && status.nameEn ? status.nameEn : status.name) : unit.statusId}
+                                  {unit.statusId === 'dado_de_baja'
+                                    ? t('inv.serials.retired')
+                                    : status ? (getLanguage() === 'en' && status.nameEn ? status.nameEn : status.name) : unit.statusId}
                                 </span>
-                                {status?.blocksRental && (
+                                {status?.blocksRental && unit.statusId !== 'dado_de_baja' && (
                                   <span className="text-[11px] text-red-700">
                                     {t('inv.serials.blocksRental')}
                                   </span>
@@ -3419,32 +3527,47 @@ export function InventarioModule() {
                             )}
                           </div>
 
-                          {canWrite && (
+                          {(canWrite || canRetire) && unit.statusId !== 'dado_de_baja' && (
                             <div className="flex flex-wrap items-center gap-2 pt-2">
-                              <div className="flex items-center gap-1.5">
-                                <Label className="text-xs text-[#86868B]">{t('inv.serials.changeStatus')}</Label>
-                                <select
-                                  value={unit.statusId}
-                                  onChange={e => handleChangeSerialStatus(unit, e.target.value)}
-                                  className="h-7 text-xs rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                              {canWrite && (
+                                <>
+                                  <div className="flex items-center gap-1.5">
+                                    <Label className="text-xs text-[#86868B]">{t('inv.serials.changeStatus')}</Label>
+                                    <select
+                                      value={unit.statusId}
+                                      onChange={e => handleChangeSerialStatus(unit, e.target.value)}
+                                      className="h-7 text-xs rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                                    >
+                                      {activeSerialStatuses.map(s => (
+                                        <option key={s.id} value={s.id}>
+                                          {getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name}
+                                          {s.blocksRental ? ` · ${t('inv.catalogs.ss.blocksRental')}` : ''}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startEditSerial(unit)}
+                                    className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    {t('inv.serials.edit')}
+                                  </Button>
+                                </>
+                              )}
+                              {canRetire && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openRetireSerial(unit)}
+                                  className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5 text-[#86868B]"
                                 >
-                                  {activeSerialStatuses.map(s => (
-                                    <option key={s.id} value={s.id}>
-                                      {getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name}
-                                      {s.blocksRental ? ` · ${t('inv.catalogs.ss.blocksRental')}` : ''}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => startEditSerial(unit)}
-                                className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                                {t('inv.serials.edit')}
-                              </Button>
+                                  <Ban className="h-3.5 w-3.5" />
+                                  {t('inv.serials.retire')}
+                                </Button>
+                              )}
                             </div>
                           )}
 
@@ -4263,6 +4386,78 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
+      {/* ─── MODAL: BAJA PERMANENTE DE SERIAL ─── */}
+      <Dialog
+        open={retiringUnit !== null}
+        onOpenChange={open => { if (!open) { setRetiringUnit(null); setRetirePhotoFile(null); setRetireReason(''); } }}
+      >
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
+              <Ban className="h-4 w-4 text-corporate" />
+              {t('inv.serials.retireTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-[#86868B]">
+              {retiringUnit ? `${productName(retiringUnit.productId)} · ${retiringUnit.serialNumber}` : ''}
+              {' — '}{t('inv.serials.retireDesc')}
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.serials.retirePhoto')}</Label>
+              <div className="flex items-center gap-3">
+                {retirePhotoFile && (
+                  <img
+                    src={URL.createObjectURL(retirePhotoFile)}
+                    alt={retiringUnit?.serialNumber || ''}
+                    className="h-14 w-14 rounded-lg object-cover border border-[#E5E5E7]"
+                  />
+                )}
+                <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-corporate hover:underline">
+                  <Upload className="h-3.5 w-3.5" />
+                  {uploadingSerialPhoto ? '...' : t('inv.serials.uploadPhoto')}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={uploadingSerialPhoto}
+                    onChange={e => setRetirePhotoFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.serials.retireReason')}</Label>
+              <textarea
+                value={retireReason}
+                onChange={e => setRetireReason(e.target.value)}
+                placeholder={t('inv.serials.retireReasonPlaceholder')}
+                rows={3}
+                className="w-full text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 py-1.5 text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/30 resize-none"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setRetiringUnit(null); setRetirePhotoFile(null); setRetireReason(''); }}
+                className="text-xs text-[#86868B]"
+              >
+                {t('inv.common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleRetireSerial}
+                disabled={savingRetire || uploadingSerialPhoto}
+                className="text-xs bg-corporate"
+              >
+                {t('inv.serials.retire')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── MODAL: QR (producto / ubicación / serial) ─── */}
       <QrDialog
         open={qrDialog !== null}
@@ -4277,6 +4472,7 @@ export function InventarioModule() {
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onScan={handleScanResult}
+        serialIds={rentalUnits.map(u => u.id || '')}
       />
     </div>
   );
@@ -4391,12 +4587,47 @@ interface ScannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onScan: (kind: 'product' | 'location' | 'serial', id: string) => void;
+  /** ids de seriales existentes: un texto plano que coincida se trata como serial */
+  serialIds: string[];
 }
 
-function ScannerModal({ open, onOpenChange, onScan }: ScannerModalProps) {
-  // Ref para que el callback del escáner siempre vea el handler actual
+function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalProps) {
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualCode, setManualCode] = useState('');
+
+  // Refs para que los callbacks siempre vean los valores actuales
   const onScanRef = useRef(onScan);
+  const serialIdsRef = useRef(serialIds);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+  useEffect(() => { serialIdsRef.current = serialIds; }, [serialIds]);
+
+  // Reinicia la entrada manual cada vez que se abre el modal
+  useEffect(() => {
+    if (open) {
+      setManualOpen(false);
+      setManualCode('');
+    }
+  }, [open]);
+
+  // Mismo parseo para cámara y entrada manual: URL con searchParams
+  // product / location / serial, o texto plano que sea id de serial existente
+  const parseScan = (text: string): { kind: 'product' | 'location' | 'serial'; id: string } | null => {
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(text);
+    } catch {
+      parsed = null;
+    }
+    const product = parsed?.searchParams.get('product');
+    const location = parsed?.searchParams.get('location');
+    const serial = parsed?.searchParams.get('serial');
+    if (product) return { kind: 'product', id: product };
+    if (location) return { kind: 'location', id: location };
+    if (serial) return { kind: 'serial', id: serial };
+    const trimmed = text.trim();
+    if (trimmed && serialIdsRef.current.includes(trimmed)) return { kind: 'serial', id: trimmed };
+    return null;
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -4409,24 +4640,14 @@ function ScannerModal({ open, onOpenChange, onScan }: ScannerModalProps) {
       );
       scanner.render(
         (decodedText) => {
-          let parsed: URL | null = null;
-          try {
-            parsed = new URL(decodedText);
-          } catch {
-            parsed = null;
-          }
-          const product = parsed?.searchParams.get('product');
-          const location = parsed?.searchParams.get('location');
-          const serial = parsed?.searchParams.get('serial');
-          if (!product && !location && !serial) {
+          const result = parseScan(decodedText);
+          if (!result) {
             toast.error(t('inv.scanner.unrecognized'));
             return;
           }
           // QR válido: detener la cámara y entregar el resultado
           scanner?.clear().catch(() => undefined);
-          if (product) onScanRef.current('product', product);
-          else if (location) onScanRef.current('location', location);
-          else if (serial) onScanRef.current('serial', serial);
+          onScanRef.current(result.kind, result.id);
         },
         () => undefined // errores de lectura transitorios: se ignoran
       );
@@ -4438,7 +4659,17 @@ function ScannerModal({ open, onOpenChange, onScan }: ScannerModalProps) {
     return () => {
       scanner?.clear().catch(() => undefined);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  const handleManualSubmit = () => {
+    const result = parseScan(manualCode);
+    if (!result) {
+      toast.error(t('inv.scanner.unrecognized'));
+      return;
+    }
+    onScanRef.current(result.kind, result.id);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -4452,6 +4683,33 @@ function ScannerModal({ open, onOpenChange, onScan }: ScannerModalProps) {
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('inv.scanner.hint')}</p>
           <div id={SCANNER_CONTAINER_ID} className="rounded-xl overflow-hidden" />
+          {manualOpen ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={manualCode}
+                onChange={e => setManualCode(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleManualSubmit(); }}
+                placeholder={t('inv.scanner.manualPlaceholder')}
+                className="h-8 text-xs rounded-lg"
+              />
+              <Button
+                size="sm"
+                onClick={handleManualSubmit}
+                disabled={!manualCode.trim()}
+                className="h-8 text-xs rounded-lg bg-corporate shrink-0"
+              >
+                {t('inv.scanner.manualSubmit')}
+              </Button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setManualOpen(true)}
+              className="text-xs text-corporate hover:underline"
+            >
+              {t('inv.scanner.manual')}
+            </button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

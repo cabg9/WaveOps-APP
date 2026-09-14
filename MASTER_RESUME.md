@@ -1,6 +1,6 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-14 (FASE 1 — Inventario + Warehouse desplegados en GEMELA — pendiente validación del usuario)
+> Última actualización: 2026-09-14 (FASE 1 + ajustes validados del usuario desplegados en GEMELA — pendiente validación)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
@@ -49,6 +49,18 @@
 **Archivos:** nuevos InventarioModule.tsx, WarehouseModule.tsx, functions/src/notifications/inventory.js, scripts/seed-fase1.cjs; modificados App.tsx (rutas /requisiciones real y /warehouse), DevelopsModule.tsx (flags meta), catalogs.ts, develops.ts, firestore.rules, functions/index.js, functions/src/notifications/triggers.js, package.json.
 
 **Build:** exit 0 verificado por el coordinador. Deploy staging: hosting + firestore rules + functions (32 functions OK; aviso de cleanup policy de artifacts es cosmético).
+
+### Ajustes post-validación del usuario (14 de septiembre) — DESPLEGADOS EN GEMELA
+
+Respuestas del usuario integradas:
+1. **Renta interna libre**: campo OPCIONAL "Referencia de salida/actividad" en órdenes internas (RentalOrder.activityRef?: string | null); sin obligatoriedad.
+2. **Precios y fianza**: Product ahora tiene `rentalPricePerDay` y `depositPercent` (se editan en Develops → Catálogos → Productos, visibles solo para rentables; se muestran en la tarjeta expandida). En Warehouse, al crear la orden la fianza se **sugiere automática** (n días × unidades × precio × %, mínimo 1 día) con desglose visible y **ajuste manual permitido** (el campo deja de auto-recalcularse al tocarlo). Integración caja/Finanzas = Fase 2 (aquí solo se registra pago + comprobante).
+3. **Baja permanente de serial** (Inventario → Seriales): foto + motivo obligatorios, aprueba DG/RRHH/Gerente depto/Supervisor (executeWithConfirm sensitive, audit sensitive); el serial queda en 'dado_de_baja' (bloquea renta), sin opción de reactivación ni edición.
+4. **Escáner con fallback manual**: ambos escáneres (Inventario y Warehouse) tienen "Ingresar código manual" (acepta URL completa del QR o id/código de serie); cámara por getUserMedia (HTTPS), funciona en PC y móvil.
+5. **Link público de fotos**: fuera de Fase 1 (pertenece a Dive Shop, Fase 3) — registrado, no implementado.
+- "Cargar iniciales" en todos los catálogos: si ya están cargadas, toast informativo "Ya están cargadas" (sin duplicar).
+
+**Build:** exit 0 verificado por el coordinador; deploy staging hosting + rules hecho.
 
 ---
 

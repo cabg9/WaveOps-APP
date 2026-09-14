@@ -119,6 +119,10 @@ registerI18nKeys({
     'catalogs.products.groupByCategory': 'Agrupar por categoría',
     'catalogs.products.noCategory': 'Sin categoría',
     'catalogs.products.noResults': 'Sin resultados para los filtros aplicados',
+    'catalogs.products.rentalPrice': 'Precio de renta por unidad/día',
+    'catalogs.products.rentalPriceHelp': 'Precio por unidad por día cuando se renta.',
+    'catalogs.products.depositPercent': 'Fianza (% sobre el valor de la renta)',
+    'catalogs.products.depositPercentHelp': 'Porcentaje retenido como fianza sobre el valor de la renta.',
     'catalogs.categories.title': 'Categorías y unidades',
     'catalogs.categories.categories': 'Categorías de producto',
     'catalogs.categories.units': 'Unidades de medida',
@@ -253,6 +257,10 @@ registerI18nKeys({
     'catalogs.products.groupByCategory': 'Group by category',
     'catalogs.products.noCategory': 'Uncategorized',
     'catalogs.products.noResults': 'No results for the applied filters',
+    'catalogs.products.rentalPrice': 'Rental price per unit/day',
+    'catalogs.products.rentalPriceHelp': 'Price per unit per day when rented.',
+    'catalogs.products.depositPercent': 'Deposit (% of rental value)',
+    'catalogs.products.depositPercentHelp': 'Percentage held as a deposit on the rental value.',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -1044,6 +1052,8 @@ interface ProductFormState {
   isRentable: boolean;
   isConsumable: boolean;
   preferredSupplierId: string;
+  rentalPrice: string;
+  depositPercent: string;
 }
 
 function ProductsSection({ canWrite }: { canWrite: boolean }) {
@@ -1055,7 +1065,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const { items: suppliers } = useCatalog<Supplier>('suppliers');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<ProductFormState>({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '' });
+  const [form, setForm] = useState<ProductFormState>({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '' });
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const { uploadImage, uploading } = useStorageUpload();
@@ -1104,7 +1114,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '' });
+    setForm({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '' });
     setPhotoUrl('');
     setPhotoFile(null);
     setShowModal(true);
@@ -1121,6 +1131,8 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       isRentable: !!p.isRentable,
       isConsumable: !!p.isConsumable,
       preferredSupplierId: p.preferredSupplierId || '',
+      rentalPrice: p.rentalPricePerDay != null ? String(p.rentalPricePerDay) : '',
+      depositPercent: p.depositPercent != null ? String(p.depositPercent) : '',
     });
     setPhotoUrl(p.photoUrl || '');
     setPhotoFile(null);
@@ -1155,6 +1167,8 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
         isRentable: form.isRentable,
         isConsumable: form.isConsumable,
         preferredSupplierId: form.preferredSupplierId || null,
+        rentalPricePerDay: form.rentalPrice.trim() === '' ? null : Number(form.rentalPrice),
+        depositPercent: form.depositPercent.trim() === '' ? null : Number(form.depositPercent),
         photoUrl: finalPhotoUrl || null,
       };
       if (editing) {
@@ -1303,6 +1317,12 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             <DetailItem label={t('catalogs.products.preferredSupplier')}>{supplierName(p.preferredSupplierId)}</DetailItem>
             <DetailItem label={t('catalogs.products.isRentable')}>{p.isRentable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
             <DetailItem label={t('catalogs.products.isConsumable')}>{p.isConsumable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
+            {p.isRentable && p.rentalPricePerDay != null && (
+              <DetailItem label={t('catalogs.products.rentalPrice')}>{p.rentalPricePerDay}</DetailItem>
+            )}
+            {p.isRentable && p.depositPercent != null && (
+              <DetailItem label={t('catalogs.products.depositPercent')}>{p.depositPercent}%</DetailItem>
+            )}
             <DetailItem label={t('catalogs.common.status')}>
               {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
             </DetailItem>
@@ -1478,6 +1498,33 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                     <option value="no">{t('catalogs.products.no')}</option>
                   </select>
                 </div>
+                {form.isRentable && (
+                  <>
+                    <div className="space-y-2">
+                      <Label>{t('catalogs.products.rentalPrice')}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.rentalPrice}
+                        onChange={(e) => setForm({ ...form, rentalPrice: e.target.value })}
+                      />
+                      <p className="text-[11px] text-[#86868B]">{t('catalogs.products.rentalPriceHelp')}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('catalogs.products.depositPercent')}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={form.depositPercent}
+                        onChange={(e) => setForm({ ...form, depositPercent: e.target.value })}
+                      />
+                      <p className="text-[11px] text-[#86868B]">{t('catalogs.products.depositPercentHelp')}</p>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
