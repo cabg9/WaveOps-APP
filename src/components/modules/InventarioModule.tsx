@@ -99,6 +99,7 @@ registerI18nKeys({
     'inv.stock.scanQr': 'Escanear QR',
     'inv.stock.scanQrSoon': 'Próximamente',
     'inv.stock.registerMovement': 'Registrar movimiento',
+    'inv.stock.newMovement': 'Registrar movimiento',
     'inv.stock.editMinMax': 'Editar mín/máx',
     'inv.stock.min': 'Mín',
     'inv.stock.max': 'Máx',
@@ -110,6 +111,7 @@ registerI18nKeys({
     'inv.movementForm.title': 'Registrar movimiento',
     'inv.movementForm.product': 'Producto',
     'inv.movementForm.selectProduct': 'Selecciona un producto',
+    'inv.movementForm.noMatches': 'Sin coincidencias',
     'inv.movementForm.type': 'Tipo de movimiento',
     'inv.movementForm.selectType': 'Selecciona un tipo',
     'inv.movementForm.quantity': 'Cantidad',
@@ -325,6 +327,7 @@ registerI18nKeys({
     'inv.stock.scanQr': 'Scan QR',
     'inv.stock.scanQrSoon': 'Coming soon',
     'inv.stock.registerMovement': 'Register movement',
+    'inv.stock.newMovement': 'Register movement',
     'inv.stock.editMinMax': 'Edit min/max',
     'inv.stock.min': 'Min',
     'inv.stock.max': 'Max',
@@ -336,6 +339,7 @@ registerI18nKeys({
     'inv.movementForm.title': 'Register movement',
     'inv.movementForm.product': 'Product',
     'inv.movementForm.selectProduct': 'Select a product',
+    'inv.movementForm.noMatches': 'No matches',
     'inv.movementForm.type': 'Movement type',
     'inv.movementForm.selectType': 'Select a type',
     'inv.movementForm.quantity': 'Quantity',
@@ -880,6 +884,53 @@ const COUNT_STATUS_BADGE: Record<CountSession['status'], string> = {
   finalizado: 'bg-green-50 text-green-700 border border-green-200',
   ajustado: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
 };
+
+// Selector de producto con buscador (formularios de movimiento y transferencia).
+// Escribe para filtrar; clic para elegir. El seleccionado se muestra como valor.
+function ProductSearchSelect({
+  products,
+  value,
+  onChange,
+  selectPlaceholder,
+  searchPlaceholder,
+}: {
+  products: Array<{ id: string; name: string }>;
+  value: string;
+  onChange: (id: string) => void;
+  selectPlaceholder: string;
+  searchPlaceholder: string;
+}) {
+  const [query, setQuery] = useState('');
+  const selected = products.find(p => p.id === value);
+  const q = query.trim().toLowerCase();
+  const filtered = q ? products.filter(p => p.name.toLowerCase().includes(q)) : products;
+  return (
+    <div className="relative">
+      <input
+        value={query || (selected ? selected.name : '')}
+        onChange={e => setQuery(e.target.value)}
+        placeholder={selectPlaceholder}
+        className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+      />
+      {q && (
+        <div className="absolute z-20 left-0 right-0 mt-1 max-h-40 overflow-y-auto rounded-lg border border-[#E5E5E7] bg-white shadow-lg">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-[#86868B]">{searchPlaceholder}</div>
+          ) : filtered.map(p => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => { onChange(p.id); setQuery(''); }}
+              className="w-full text-left px-3 py-2 text-sm text-[#1D1D1F] hover:bg-[#F5F5F7]"
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
@@ -2501,15 +2552,27 @@ export function InventarioModule() {
                 {t('inv.stock.viewByLocation')}
               </button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setScannerOpen(true)}
-              className="ml-auto gap-2 rounded-xl border-[#E5E5E7]"
-            >
-              <QrCode className="h-4 w-4" />
-              {t('inv.stock.scanQr')}
-            </Button>
+            <div className="flex items-center gap-2 ml-auto">
+              {canWrite && (
+                <Button
+                  size="sm"
+                  onClick={() => openMovementForm()}
+                  className="gap-2 rounded-xl bg-corporate hover:bg-corporate/90"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t('inv.stock.newMovement')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setScannerOpen(true)}
+                className="gap-2 rounded-xl border-[#E5E5E7]"
+              >
+                <QrCode className="h-4 w-4" />
+                {t('inv.stock.scanQr')}
+              </Button>
+            </div>
           </div>
 
           {/* Vista por producto */}
@@ -2838,6 +2901,16 @@ export function InventarioModule() {
                 ))}
               </select>
             </div>
+            {canWrite && (
+              <Button
+                size="sm"
+                onClick={() => openMovementForm()}
+                className="ml-auto gap-2 rounded-xl bg-corporate hover:bg-corporate/90"
+              >
+                <Plus className="h-4 w-4" />
+                {t('inv.stock.newMovement')}
+              </Button>
+            )}
           </div>
 
           {/* Lista cronológica inversa */}
@@ -3913,16 +3986,13 @@ export function InventarioModule() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
-              <select
+              <ProductSearchSelect
+                products={activeProducts}
                 value={movementForm.productId}
-                onChange={e => setMovementForm(f => ({ ...f, productId: e.target.value }))}
-                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-              >
-                <option value="">{t('inv.movementForm.selectProduct')}</option>
-                {activeProducts.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={id => setMovementForm(f => ({ ...f, productId: id }))}
+                selectPlaceholder={t('inv.movementForm.selectProduct')}
+                searchPlaceholder={t('inv.movementForm.noMatches')}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.type')}</Label>
@@ -4021,16 +4091,13 @@ export function InventarioModule() {
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
-              <select
+              <ProductSearchSelect
+                products={activeProducts}
                 value={transferForm.productId}
-                onChange={e => setTransferForm(f => ({ ...f, productId: e.target.value }))}
-                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-              >
-                <option value="">{t('inv.movementForm.selectProduct')}</option>
-                {activeProducts.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+                onChange={id => setTransferForm(f => ({ ...f, productId: id }))}
+                selectPlaceholder={t('inv.movementForm.selectProduct')}
+                searchPlaceholder={t('inv.movementForm.noMatches')}
+              />
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.transfers.quantity')}</Label>

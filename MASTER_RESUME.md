@@ -60,7 +60,13 @@ Respuestas del usuario integradas:
 5. **Link público de fotos**: fuera de Fase 1 (pertenece a Dive Shop, Fase 3) — registrado, no implementado.
 - "Cargar iniciales" en todos los catálogos: si ya están cargadas, toast informativo "Ya están cargadas" (sin duplicar).
 
-**Build:** exit 0 verificado por el coordinador; deploy staging hosting + rules hecho.
+### Mini-fix — Botón global "Registrar movimiento" + ayudas de conceptos (14 de septiembre)
+
+- **"+ Registrar movimiento"** como botón global visible en Inventario → Stock (encabezado, junto al escáner) y en Movimientos (junto a los filtros), para canWrite. Abre el mismo formulario manual (tipo de movimiento del catálogo dinámico, producto, cantidad, ubicación origen/destino, motivo) — el escáner queda como atajo, nunca como único camino; resuelto el problema de huevo y gallina de la primera alta.
+- Selector de producto en los formularios de movimiento y transferencia ahora es **buscador con texto** (nuevo componente ProductSearchSelect).
+- Develops → Catálogos → Productos: textos de ayuda bajo "¿Es rentable?" ("Se presta a clientes y vuelve… se controla por UNIDADES INDIVIDUALES (seriales) con su código y QR") y "¿Es consumible?" ("Se gasta y se acaba… se controla por CANTIDAD…"). Regla general adoptada: ningún concepto requiere manual externo.
+
+**Build:** exit 0 verificado por el coordinador; deploy staging hosting hecho.
 
 ---
 

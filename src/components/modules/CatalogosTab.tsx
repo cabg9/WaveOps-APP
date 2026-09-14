@@ -101,7 +101,9 @@ registerI18nKeys({
     'catalogs.products.unit': 'Unidad de medida',
     'catalogs.products.sku': 'SKU / Código',
     'catalogs.products.isRentable': 'Es rentable',
+    'catalogs.products.isRentableHelp': 'Se presta a clientes y vuelve (ej: tanques, reguladores, wetsuits). Se controla por UNIDADES INDIVIDUALES (seriales) con su código y QR.',
     'catalogs.products.isConsumable': 'Es consumible',
+    'catalogs.products.isConsumableHelp': 'Se gasta y se acaba (ej: cloro, papel, snacks). Se controla por CANTIDAD (ej: 20 galones) y baja con cada salida.',
     'catalogs.products.photo': 'Foto del producto',
     'catalogs.products.uploadPhoto': 'Subir foto',
     'catalogs.products.selectCategory': 'Selecciona una categoría',
@@ -239,7 +241,9 @@ registerI18nKeys({
     'catalogs.products.unit': 'Unit of measure',
     'catalogs.products.sku': 'SKU / Code',
     'catalogs.products.isRentable': 'Rentable',
+    'catalogs.products.isRentableHelp': 'Lent to customers and comes back (e.g. tanks, regulators, wetsuits). Tracked as INDIVIDUAL UNITS (serials) with their own code and QR.',
     'catalogs.products.isConsumable': 'Consumable',
+    'catalogs.products.isConsumableHelp': 'It gets used up (e.g. chlorine, paper, snacks). Tracked by QUANTITY (e.g. 20 gallons) and decreases with each outgoing movement.',
     'catalogs.products.photo': 'Product photo',
     'catalogs.products.uploadPhoto': 'Upload photo',
     'catalogs.products.selectCategory': 'Select a category',
@@ -1486,6 +1490,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                     <option value="yes">{t('catalogs.products.yes')}</option>
                     <option value="no">{t('catalogs.products.no')}</option>
                   </select>
+                  <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.isRentableHelp')}</p>
                 </div>
                 <div className="space-y-2">
                   <Label>{t('catalogs.products.isConsumable')}</Label>
@@ -1497,6 +1502,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                     <option value="yes">{t('catalogs.products.yes')}</option>
                     <option value="no">{t('catalogs.products.no')}</option>
                   </select>
+                  <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.isConsumableHelp')}</p>
                 </div>
                 {form.isRentable && (
                   <>
