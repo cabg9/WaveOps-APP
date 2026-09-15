@@ -43,12 +43,14 @@ import type {
   Product,
   Location,
   UnitOfMeasure,
+  Supplier,
 } from '@/types/catalogs';
 import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
   Box, ArrowDownUp, Tags, Package, MapPin, Plus, Search, QrCode,
   ChevronDown, ChevronUp, Pencil, Power, Construction,
   Truck, ClipboardList, Play, Send, Inbox, Ban, Printer, Upload,
+  ShoppingCart, ArrowUpRight, SlidersHorizontal,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -121,6 +123,16 @@ registerI18nKeys({
     'inv.movementForm.reason': 'Motivo (opcional)',
     'inv.movementForm.reasonPlaceholder': 'Ej: compra a proveedor, consumo en mantenimiento...',
     'inv.movementForm.save': 'Guardar movimiento',
+    'inv.quick.compra': 'Compra',
+    'inv.quick.transferencia': 'Transferencia',
+    'inv.quick.consumo': 'Consumo',
+    'inv.quick.ajuste': 'Ajuste',
+    'inv.movementForm.originFixedSupplier': 'Proveedor/Externo',
+    'inv.movementForm.supplier': 'Proveedor',
+    'inv.movementForm.noSupplier': 'Sin proveedor específico',
+    'inv.movementForm.destFixedConsumption': 'Consumo/Externo',
+    'inv.movementForm.help': 'En una compra, la mercadería entra desde un proveedor hacia tu ubicación. En un consumo, sale de tu ubicación y se gasta. En una transferencia, viaja entre dos ubicaciones tuyas.',
+    'inv.movementForm.reasonRequired': 'El motivo es obligatorio para un ajuste',
 
     'inv.movements.help': 'Bitácora inmutable: los movimientos no se editan ni se borran. Cada entrada queda registrada para siempre.',
     'inv.movements.filterProduct': 'Producto',
@@ -349,6 +361,16 @@ registerI18nKeys({
     'inv.movementForm.reason': 'Reason (optional)',
     'inv.movementForm.reasonPlaceholder': 'E.g.: supplier purchase, maintenance consumption...',
     'inv.movementForm.save': 'Save movement',
+    'inv.quick.compra': 'Purchase',
+    'inv.quick.transferencia': 'Transfer',
+    'inv.quick.consumo': 'Consumption',
+    'inv.quick.ajuste': 'Adjustment',
+    'inv.movementForm.originFixedSupplier': 'Supplier/External',
+    'inv.movementForm.supplier': 'Supplier',
+    'inv.movementForm.noSupplier': 'No specific supplier',
+    'inv.movementForm.destFixedConsumption': 'Consumption/External',
+    'inv.movementForm.help': 'In a purchase, goods come in from a supplier to your location. In consumption, they leave your location and are used up. In a transfer, they travel between two of your locations.',
+    'inv.movementForm.reasonRequired': 'Reason is required for an adjustment',
 
     'inv.movements.help': 'Immutable log: movements are never edited or deleted. Every entry is recorded forever.',
     'inv.movements.filterProduct': 'Product',
@@ -591,8 +613,22 @@ function docToMovementType(id: string, data: Record<string, unknown>): MovementT
   };
 }
 
-function docToSerialStatus(id: string, data: Record<string, unknown>): SerialStatus {
+function docToSupplier(id: string, data: Record<string, unknown>): Supplier {
   return {
+    id,
+    tenantId: toStr(data.tenantId),
+    identification: toStr(data.identification),
+    name: toStr(data.name),
+    contactName: data.contactName ? toStr(data.contactName) : undefined,
+    email: data.email ? toStr(data.email) : undefined,
+    phone: data.phone ? toStr(data.phone) : undefined,
+    isActive: toBool(data.isActive, true),
+    createdAt: toStr(data.createdAt),
+    createdBy: toStr(data.createdBy),
+  };
+}
+
+function docToSerialStatus(id: string, data: Record<string, unknown>): SerialStatus {  return {
     id,
     tenantId: toStr(data.tenantId),
     name: toStr(data.name),
@@ -815,6 +851,7 @@ interface MovementFormState {
   fromLocationId: string;
   toLocationId: string;
   reason: string;
+  supplierId: string;
 }
 
 const EMPTY_MOVEMENT_FORM: MovementFormState = {
@@ -824,6 +861,7 @@ const EMPTY_MOVEMENT_FORM: MovementFormState = {
   fromLocationId: '',
   toLocationId: '',
   reason: '',
+  supplierId: '',
 };
 
 interface TransferFormState {
@@ -949,6 +987,7 @@ export function InventarioModule() {
   const [products, setProducts] = useState<Product[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   // Estado de carga / error
   const [loading, setLoading] = useState(true);
@@ -1055,6 +1094,7 @@ export function InventarioModule() {
   const activeProducts = useMemo(() => products.filter(p => p.isActive), [products]);
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
   const activeMovementTypes = useMemo(() => movementTypes.filter(m => m.isActive), [movementTypes]);
+  const activeSuppliers = useMemo(() => suppliers.filter(s => s.isActive), [suppliers]);
   const activeUsers = useMemo(() => users.filter(u => u.isActive), [users]);
   const sortedMovementTypes = useMemo(
     () => [...movementTypes].sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.name.localeCompare(b.name)),
@@ -1209,6 +1249,24 @@ export function InventarioModule() {
     return () => unsub();
   }, [enabled, tenantId]);
 
+  // Proveedores (para movimientos de entrada: compra / devolución)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.suppliers), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setSuppliers(
+          snap.docs
+            .map(d => docToSupplier(d.id, d.data()))
+            .filter(s => !s.tenantId || s.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[InventarioModule] suppliers:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
   useEffect(() => {
     if (!enabled) return;
     const q = query(collection(db, CATALOG_COLLECTIONS.serialStatuses), orderBy('name', 'asc'));
@@ -1326,6 +1384,24 @@ export function InventarioModule() {
     setMovementModalOpen(true);
   };
 
+  // Botones rápidos: abre el formulario con un tipo preseleccionado.
+  // Si el id semilla no existe en el catálogo, resuelve un equivalente activo.
+  const openMovementFormFor = (typeId: string) => {
+    let mt = activeMovementTypes.find(m => m.id === typeId);
+    if (!mt) {
+      if (typeId === 'compra') {
+        mt = activeMovementTypes.find(m => !m.isOutput);
+      } else if (typeId === 'consumo') {
+        mt = activeMovementTypes.find(m => m.isOutput && m.id !== 'transferencia' && m.id !== 'ajuste');
+      } else {
+        // 'ajuste' u otro id de salida: comportamiento genérico
+        mt = activeMovementTypes.find(m => m.isOutput);
+      }
+    }
+    setMovementForm({ ...EMPTY_MOVEMENT_FORM, movementTypeId: mt?.id || '' });
+    setMovementModalOpen(true);
+  };
+
   const handleSaveMovement = async () => {
     if (!currentUser || !canWrite) return;
     const qty = Number(movementForm.quantity);
@@ -1333,8 +1409,26 @@ export function InventarioModule() {
     if (!movementForm.productId) return toast.error(t('inv.validation.productRequired'));
     if (!mt) return toast.error(t('inv.validation.typeRequired'));
     if (!Number.isFinite(qty) || qty <= 0) return toast.error(t('inv.validation.quantityPositive'));
+    const isTransfer = mt.id === 'transferencia';
     if (mt.isOutput && !movementForm.fromLocationId) return toast.error(t('inv.validation.fromRequired'));
-    if (!mt.isOutput && !movementForm.toLocationId) return toast.error(t('inv.validation.toRequired'));
+    if ((!mt.isOutput || isTransfer) && !movementForm.toLocationId) return toast.error(t('inv.validation.toRequired'));
+    if (isTransfer && movementForm.fromLocationId === movementForm.toLocationId) {
+      return toast.error(t('inv.transfers.validation.sameLocation'));
+    }
+    if (mt.id === 'ajuste' && !movementForm.reason.trim()) {
+      return toast.error(t('inv.movementForm.reasonRequired'));
+    }
+
+    // Ubicaciones efectivas según el tipo: en entradas no hay origen interno
+    // (proveedor/externo) y en salidas no hay destino interno (consumo/externo)
+    const effFromLocationId = mt.isOutput ? movementForm.fromLocationId : '';
+    const effToLocationId = !mt.isOutput || isTransfer ? movementForm.toLocationId : '';
+    // Persistencia del proveedor en compras: se antepone al motivo guardado
+    let reason = movementForm.reason.trim();
+    if (!mt.isOutput && movementForm.supplierId) {
+      const supplier = activeSuppliers.find(s => s.id === movementForm.supplierId);
+      if (supplier) reason = `Proveedor: ${supplier.name}. ${reason}`.trim();
+    }
 
     await executeWithConfirm({
       level: 'major',
@@ -1346,7 +1440,7 @@ export function InventarioModule() {
           const now = new Date().toISOString();
           const signedQty = mt.isOutput ? -qty : qty;
           // La ubicación que cambia: origen si resta, destino si suma
-          const targetLocationId = mt.isOutput ? movementForm.fromLocationId : movementForm.toLocationId;
+          const targetLocationId = mt.isOutput ? effFromLocationId : effToLocationId;
           const current = stockFor(movementForm.productId, targetLocationId)?.quantity ?? 0;
 
           // Actualizar (o crear) el stock del producto en la ubicación
@@ -1368,10 +1462,10 @@ export function InventarioModule() {
             tenantId,
             productId: movementForm.productId,
             quantity: signedQty,
-            fromLocationId: movementForm.fromLocationId || null,
-            toLocationId: movementForm.toLocationId || null,
+            fromLocationId: effFromLocationId || null,
+            toLocationId: effToLocationId || null,
             movementTypeId: mt.id!,
-            reason: movementForm.reason.trim() || null,
+            reason: reason || null,
             referenceType: null,
             referenceId: null,
             createdAt: now,
@@ -2505,6 +2599,12 @@ export function InventarioModule() {
   // RENDER
   // ═══════════════════════════════════════════════════════════════════
 
+  // Tipo de movimiento seleccionado en el formulario (campos adaptados al tipo)
+  const selectedMt = movementTypes.find(m => m.id === movementForm.movementTypeId);
+  const isTransferMt = selectedMt?.id === 'transferencia';
+  const isInputMt = selectedMt ? !selectedMt.isOutput : false;
+  const isAdjustMt = selectedMt?.id === 'ajuste';
+
   return (
     <div className="space-y-4">
       {/* Pills de sub-pestañas */}
@@ -2552,16 +2652,45 @@ export function InventarioModule() {
                 {t('inv.stock.viewByLocation')}
               </button>
             </div>
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
               {canWrite && (
-                <Button
-                  size="sm"
-                  onClick={() => openMovementForm()}
-                  className="gap-2 rounded-xl bg-corporate hover:bg-corporate/90"
-                >
-                  <Plus className="h-4 w-4" />
-                  {t('inv.stock.newMovement')}
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => openMovementFormFor('compra')}
+                    className="gap-2 rounded-xl bg-corporate hover:bg-corporate/90"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    {t('inv.quick.compra')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTransferModalOpen(true)}
+                    className="gap-2 rounded-xl border-[#E5E5E7]"
+                  >
+                    <Truck className="h-4 w-4" />
+                    {t('inv.quick.transferencia')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMovementFormFor('consumo')}
+                    className="gap-2 rounded-xl border-[#E5E5E7]"
+                  >
+                    <ArrowUpRight className="h-4 w-4" />
+                    {t('inv.quick.consumo')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMovementFormFor('ajuste')}
+                    className="gap-2 rounded-xl border-[#E5E5E7]"
+                  >
+                    <SlidersHorizontal className="h-4 w-4" />
+                    {t('inv.quick.ajuste')}
+                  </Button>
+                </>
               )}
               <Button
                 variant="outline"
@@ -3984,6 +4113,9 @@ export function InventarioModule() {
             <DialogTitle className="text-[#1D1D1F]">{t('inv.movementForm.title')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg px-3 py-2">
+              {t('inv.movementForm.help')}
+            </p>
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
               <ProductSearchSelect
@@ -4021,35 +4153,88 @@ export function InventarioModule() {
               />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs text-[#86868B]">{t('inv.movementForm.fromLocation')}</Label>
-                <select
-                  value={movementForm.fromLocationId}
-                  onChange={e => setMovementForm(f => ({ ...f, fromLocationId: e.target.value }))}
-                  className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-                >
-                  <option value="">{t('inv.movementForm.selectLocation')}</option>
-                  {activeLocations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-[#86868B]">{t('inv.movementForm.toLocation')}</Label>
-                <select
-                  value={movementForm.toLocationId}
-                  onChange={e => setMovementForm(f => ({ ...f, toLocationId: e.target.value }))}
-                  className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-                >
-                  <option value="">{t('inv.movementForm.selectLocation')}</option>
-                  {activeLocations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
+              {isInputMt ? (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.movementForm.fromLocation')}</Label>
+                    <div className="h-9 flex items-center px-2 rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] text-sm text-[#86868B]">
+                      {t('inv.movementForm.originFixedSupplier')}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.movementForm.toLocation')}</Label>
+                    <select
+                      value={movementForm.toLocationId}
+                      onChange={e => setMovementForm(f => ({ ...f, toLocationId: e.target.value }))}
+                      className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                    >
+                      <option value="">{t('inv.movementForm.selectLocation')}</option>
+                      {activeLocations.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.movementForm.fromLocation')}</Label>
+                    <select
+                      value={movementForm.fromLocationId}
+                      onChange={e => setMovementForm(f => ({ ...f, fromLocationId: e.target.value }))}
+                      className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                    >
+                      <option value="">{t('inv.movementForm.selectLocation')}</option>
+                      {activeLocations.map(l => (
+                        <option key={l.id} value={l.id}>{l.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {isTransferMt ? (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.movementForm.toLocation')}</Label>
+                      <select
+                        value={movementForm.toLocationId}
+                        onChange={e => setMovementForm(f => ({ ...f, toLocationId: e.target.value }))}
+                        className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                      >
+                        <option value="">{t('inv.movementForm.selectLocation')}</option>
+                        {activeLocations.map(l => (
+                          <option key={l.id} value={l.id}>{l.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.movementForm.toLocation')}</Label>
+                      <div className="h-9 flex items-center px-2 rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] text-sm text-[#86868B]">
+                        {t('inv.movementForm.destFixedConsumption')}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+            {isInputMt && (
+              <div className="space-y-1">
+                <Label className="text-xs text-[#86868B]">{t('inv.movementForm.supplier')}</Label>
+                <select
+                  value={movementForm.supplierId}
+                  onChange={e => setMovementForm(f => ({ ...f, supplierId: e.target.value }))}
+                  className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                >
+                  <option value="">{t('inv.movementForm.noSupplier')}</option>
+                  {activeSuppliers.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.reason')}</Label>
+              <Label className="text-xs text-[#86868B]">
+                {t('inv.movementForm.reason')}
+                {isAdjustMt && <span className="text-red-500"> *</span>}
+              </Label>
               <Input
                 value={movementForm.reason}
                 onChange={e => setMovementForm(f => ({ ...f, reason: e.target.value }))}

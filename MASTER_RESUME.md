@@ -68,6 +68,13 @@ Respuestas del usuario integradas:
 
 **Build:** exit 0 verificado por el coordinador; deploy staging hosting hecho.
 
+### Mini-fix — Botones rápidos por operación + formulario adaptado al tipo (15 de septiembre)
+
+- En Inventario → Stock, el botón único "+ Registrar movimiento" se reemplazó por **cuatro botones rápidos**: "Compra", "Transferencia" (abre el modal de transferencia con estados), "Consumo/Salida" y "Ajuste". Cada uno abre su formulario con el tipo de movimiento ya preseleccionado (resolución por id de semilla con fallback al catálogo activo). En móvil envuelven sin scroll horizontal. El escáner QR sigue como atajo y el kardex conserva su botón genérico.
+- **Formulario adaptado al tipo**: entrada (compra/devolución) → origen fijo "Proveedor/Externo" + selector opcional de proveedors (nuevo listener de suppliers) + destino obligatorio; salida (consumo/renta/daño) → origen obligatorio + destino fijo "Consumo/Externo"; transferencia → ambas ubicaciones obligatorias y distintas; **ajuste → motivo obligatorio**. Texto de ayuda fijo en el formulario ("En una compra, la mercadería entra desde un proveedor…"). El proveedor elegido se antepone al reason del movimiento.
+
+**Build:** exit 0 verificado por el coordinador; deploy staging hosting hecho.
+
 ---
 
 ## FASE 0 — CIERRE Y DESPLIEGUE A PRODUCCIÓN (13 de septiembre) — VALIDADA Y CERRADA
