@@ -123,6 +123,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if isCatalogAdmin();
     }
+    // Descuentos preconfigurados de renta: config de catálogo (igual que
+    // movementTypes/serialStatuses/rentalOrderStatuses)
+    match /rentalDiscounts/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
     match /inventoryMovements/{docId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;

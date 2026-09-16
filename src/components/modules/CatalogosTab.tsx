@@ -2,7 +2,7 @@
 // Piso de los futuros módulos Inventario y Compras & Pagos.
 // Cero datos hardcodeados: todo se crea desde la app.
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import {
   Plus, Pencil, Package, Truck, Layers, Calculator, Megaphone, Users,
   Eye, EyeOff, Upload, Sparkles, Building2, Info, Lock, Tags, Scale,
-  Search, Trash2, ArrowUpDown, Star, ChevronDown, ChevronUp,
+  Search, Trash2, ArrowUpDown, Star, ChevronDown, ChevronUp, Percent,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -21,12 +22,12 @@ import { useDynamicDepartments } from '@/hooks/firestore/useDynamicDepartments';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { executeWithConfirm } from '@/lib/confirm-action';
 import { getCurrentTenantId } from '@/lib/tenant';
-import { registerI18nKeys, t } from '@/lib/i18n';
+import { registerI18nKeys, t, getLanguage } from '@/lib/i18n';
 import { Role } from '@/types';
 import type { AuditAction } from '@/types/develops';
 import type {
   CatalogBase, Supplier, SupplierBankAccount, Product, ProductCategory, UnitOfMeasure,
-  CostCenter, SalesChannel, Client, ClientType,
+  CostCenter, SalesChannel, Client, ClientType, PriceTier, RentalDiscount, RentalOrderStatus,
 } from '@/types/catalogs';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -56,6 +57,8 @@ registerI18nKeys({
     'catalogs.common.createdAt': 'Fecha de creación',
     'catalogs.common.updatedAt': 'Última edición',
     'catalogs.common.none': 'Ninguno',
+    'catalogs.common.yes': 'Sí',
+    'catalogs.common.no': 'No',
     'catalogs.common.empty': 'No hay registros todavía',
     'catalogs.common.required': 'Completa los campos obligatorios',
     'catalogs.common.confirmActivateTitle': 'Activar registro',
@@ -88,6 +91,8 @@ registerI18nKeys({
     'catalogs.suppliers.noCategories': 'No hay categorías activas',
     'catalogs.suppliers.noCostCenters': 'No hay centros de costo activos',
     'catalogs.suppliers.paymentTerms': 'Condiciones de pago',
+    'catalogs.suppliers.paymentTermsOther': 'Otro',
+    'catalogs.suppliers.paymentTermsOtherPlaceholder': 'Especifica las condiciones de pago',
     'catalogs.suppliers.notes': 'Notas',
     'catalogs.suppliers.preferredProducts': 'Productos donde es proveedor preferido',
     'catalogs.suppliers.preferredProductsNone': 'No es proveedor preferido de ningún producto',
@@ -125,6 +130,15 @@ registerI18nKeys({
     'catalogs.products.rentalPriceHelp': 'Precio por unidad por día cuando se renta.',
     'catalogs.products.depositPercent': 'Fianza (% sobre el valor de la renta)',
     'catalogs.products.depositPercentHelp': 'Porcentaje retenido como fianza sobre el valor de la renta.',
+    'catalogs.products.priceTiers': 'Precios escalonados por cantidad',
+    'catalogs.products.priceTiersHelp': 'Rangos de cantidad con su precio por unidad/día. Si un rango cubre la cantidad pedida, se usa su precio en lugar del precio base (el rango más específico gana).',
+    'catalogs.products.tierMin': 'Desde (unidades)',
+    'catalogs.products.tierMax': 'Hasta (vacío = sin tope)',
+    'catalogs.products.tierPrice': 'Precio/unidad/día',
+    'catalogs.products.addTier': 'Agregar rango',
+    'catalogs.products.tierRange': '{min}–{max}: ${price}/día',
+    'catalogs.products.tierRangeOpen': '{min} o más: ${price}/día',
+    'catalogs.products.tierInvalid': 'Revisa los rangos: mínimo ≥ 1, máximo vacío o ≥ mínimo, precio > 0',
     'catalogs.categories.title': 'Categorías y unidades',
     'catalogs.categories.categories': 'Categorías de producto',
     'catalogs.categories.units': 'Unidades de medida',
@@ -173,6 +187,32 @@ registerI18nKeys({
     'catalogs.clients.generateInternal': 'Generar clientes internos',
     'catalogs.clients.internalGenerated': 'Clientes internos: {created} creados, {existing} ya existían',
     'catalogs.clients.internalPrefix': 'Interno - ',
+    'catalogs.tabs.discounts': 'Descuentos de renta',
+    'catalogs.discounts.title': 'Descuentos de renta',
+    'catalogs.discounts.count': '{count} descuento(s)',
+    'catalogs.discounts.new': 'Nuevo descuento',
+    'catalogs.discounts.edit': 'Editar descuento',
+    'catalogs.discounts.name': 'Nombre',
+    'catalogs.discounts.percent': 'Porcentaje de descuento',
+    'catalogs.discounts.percentHelp': 'Valor positivo: 10 significa -10 % sobre el total de la orden.',
+    'catalogs.discounts.percentInvalid': 'El porcentaje debe ser un número mayor que 0 y máximo 100',
+    'catalogs.tabs.orderStatuses': 'Estados de orden de renta',
+    'catalogs.orderStatuses.title': 'Estados de orden de renta',
+    'catalogs.orderStatuses.count': '{count} estado(s)',
+    'catalogs.orderStatuses.new': 'Nuevo estado',
+    'catalogs.orderStatuses.edit': 'Editar estado',
+    'catalogs.orderStatuses.name': 'Nombre (español)',
+    'catalogs.orderStatuses.nameEn': 'Nombre (inglés, opcional)',
+    'catalogs.orderStatuses.order': 'Orden (secuencia)',
+    'catalogs.orderStatuses.orderHelp': 'El número define la secuencia en que avanza una orden; los estados inactivos no se ofrecen al avanzar.',
+    'catalogs.orderStatuses.finalOk': 'Final exitoso',
+    'catalogs.orderStatuses.finalRepair': 'Final a reparación',
+    'catalogs.orderStatuses.help': 'Son los estados por los que pasa una orden de renta: recibido → en preparación → listo para despachar → despachado → entregado → devuelto → verificado → almacenado. Si el equipo regresa dañado, la orden cierra en "a reparación" en lugar de "almacenado". El número de orden define la secuencia de avance. Este catálogo lo consume el módulo Warehouse desde Firestore.',
+    'catalogs.orderStatuses.noDelete': 'Los estados no se eliminan: se desactivan para conservar el historial.',
+    'catalogs.orderStatuses.orderInvalid': 'El orden debe ser un número entero',
+    'catalogs.orderStatuses.seedsConfirmTitle': 'Cargar estados iniciales',
+    'catalogs.orderStatuses.seedsConfirmDesc': 'Se crearán los estados iniciales que falten. Los existentes no se modifican.',
+    'catalogs.orderStatuses.seedsAlreadyLoaded': 'Ya están cargadas',
   },
   en: {
     'catalogs.tabs.suppliers': 'Suppliers',
@@ -196,6 +236,8 @@ registerI18nKeys({
     'catalogs.common.createdAt': 'Created at',
     'catalogs.common.updatedAt': 'Last edited',
     'catalogs.common.none': 'None',
+    'catalogs.common.yes': 'Yes',
+    'catalogs.common.no': 'No',
     'catalogs.common.empty': 'No records yet',
     'catalogs.common.required': 'Please fill in the required fields',
     'catalogs.common.confirmActivateTitle': 'Activate record',
@@ -228,6 +270,8 @@ registerI18nKeys({
     'catalogs.suppliers.noCategories': 'No active categories',
     'catalogs.suppliers.noCostCenters': 'No active cost centers',
     'catalogs.suppliers.paymentTerms': 'Payment terms',
+    'catalogs.suppliers.paymentTermsOther': 'Other',
+    'catalogs.suppliers.paymentTermsOtherPlaceholder': 'Specify the payment terms',
     'catalogs.suppliers.notes': 'Notes',
     'catalogs.suppliers.preferredProducts': 'Products where preferred supplier',
     'catalogs.suppliers.preferredProductsNone': 'Not the preferred supplier of any product',
@@ -265,6 +309,41 @@ registerI18nKeys({
     'catalogs.products.rentalPriceHelp': 'Price per unit per day when rented.',
     'catalogs.products.depositPercent': 'Deposit (% of rental value)',
     'catalogs.products.depositPercentHelp': 'Percentage held as a deposit on the rental value.',
+    'catalogs.products.priceTiers': 'Quantity tiered pricing',
+    'catalogs.products.priceTiersHelp': 'Quantity ranges with their price per unit/day. If a range covers the ordered quantity, its price is used instead of the base price (the most specific range wins).',
+    'catalogs.products.tierMin': 'From (units)',
+    'catalogs.products.tierMax': 'To (empty = no cap)',
+    'catalogs.products.tierPrice': 'Price/unit/day',
+    'catalogs.products.addTier': 'Add range',
+    'catalogs.products.tierRange': '{min}–{max}: ${price}/day',
+    'catalogs.products.tierRangeOpen': '{min} or more: ${price}/day',
+    'catalogs.products.tierInvalid': 'Check the ranges: minimum ≥ 1, maximum empty or ≥ minimum, price > 0',
+    'catalogs.tabs.discounts': 'Rental discounts',
+    'catalogs.discounts.title': 'Rental discounts',
+    'catalogs.discounts.count': '{count} discount(s)',
+    'catalogs.discounts.new': 'New discount',
+    'catalogs.discounts.edit': 'Edit discount',
+    'catalogs.discounts.name': 'Name',
+    'catalogs.discounts.percent': 'Discount percentage',
+    'catalogs.discounts.percentHelp': 'Positive value: 10 means -10 % off the order total.',
+    'catalogs.discounts.percentInvalid': 'The percentage must be a number greater than 0 and at most 100',
+    'catalogs.tabs.orderStatuses': 'Rental order statuses',
+    'catalogs.orderStatuses.title': 'Rental order statuses',
+    'catalogs.orderStatuses.count': '{count} status(es)',
+    'catalogs.orderStatuses.new': 'New status',
+    'catalogs.orderStatuses.edit': 'Edit status',
+    'catalogs.orderStatuses.name': 'Name (Spanish)',
+    'catalogs.orderStatuses.nameEn': 'Name (English, optional)',
+    'catalogs.orderStatuses.order': 'Order (sequence)',
+    'catalogs.orderStatuses.orderHelp': 'The number defines the sequence in which an order advances; inactive statuses are not offered when advancing.',
+    'catalogs.orderStatuses.finalOk': 'Successful final',
+    'catalogs.orderStatuses.finalRepair': 'Repair final',
+    'catalogs.orderStatuses.help': 'These are the statuses a rental order goes through: received → in preparation → ready to dispatch → dispatched → delivered → returned → verified → stored. If the equipment comes back damaged, the order closes in "to repair" instead of "stored". The order number defines the advance sequence. The Warehouse module consumes this catalog from Firestore.',
+    'catalogs.orderStatuses.noDelete': 'Statuses are not deleted: they are deactivated to preserve history.',
+    'catalogs.orderStatuses.orderInvalid': 'Order must be a whole number',
+    'catalogs.orderStatuses.seedsConfirmTitle': 'Load initial statuses',
+    'catalogs.orderStatuses.seedsConfirmDesc': 'Missing initial statuses will be created. Existing ones are not modified.',
+    'catalogs.orderStatuses.seedsAlreadyLoaded': 'Already loaded',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -544,7 +623,7 @@ function EmptyState({ icon, onCreate, canWrite }: { icon: React.ReactNode; onCre
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'suppliers' | 'products' | 'categories' | 'costCenters' | 'salesChannels' | 'clients';
+type SubTab = 'suppliers' | 'products' | 'categories' | 'costCenters' | 'salesChannels' | 'clients' | 'discounts' | 'orderStatuses';
 
 const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ReactNode }[] = [
   { key: 'suppliers', labelKey: 'catalogs.tabs.suppliers', icon: <Truck className="w-4 h-4" /> },
@@ -553,6 +632,8 @@ const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ReactNode }[] = [
   { key: 'costCenters', labelKey: 'catalogs.tabs.costCenters', icon: <Calculator className="w-4 h-4" /> },
   { key: 'salesChannels', labelKey: 'catalogs.tabs.salesChannels', icon: <Megaphone className="w-4 h-4" /> },
   { key: 'clients', labelKey: 'catalogs.tabs.clients', icon: <Users className="w-4 h-4" /> },
+  { key: 'discounts', labelKey: 'catalogs.tabs.discounts', icon: <Percent className="w-4 h-4" /> },
+  { key: 'orderStatuses', labelKey: 'catalogs.tabs.orderStatuses', icon: <ClipboardList className="w-4 h-4" /> },
 ];
 
 export function CatalogosTab() {
@@ -599,6 +680,8 @@ export function CatalogosTab() {
       {subTab === 'costCenters' && <CostCentersSection canWrite={canWrite} />}
       {subTab === 'salesChannels' && <SalesChannelsSection canWrite={canWrite} />}
       {subTab === 'clients' && <ClientsSection canWrite={canWrite} />}
+      {subTab === 'discounts' && <RentalDiscountsSection canWrite={canWrite} />}
+      {subTab === 'orderStatuses' && <RentalOrderStatusesSection canWrite={canWrite} />}
     </div>
   );
 }
@@ -616,13 +699,20 @@ interface SupplierFormState {
   bankAccounts: SupplierBankAccount[];
   productCategoryIds: string[];
   costCenterIds: string[];
-  paymentTerms: string;
+  paymentTerms: string; // opción fija elegida ('__other__' = texto libre)
+  paymentTermsOther: string; // texto libre cuando la opción es "Otro"
   notes: string;
 }
 
+// Condiciones de pago: opciones fijas (spec) + "Otro" con texto libre.
+// Los valores ya guardados que no coincidan con una fija se muestran
+// como "Otro" con su texto (compatibilidad hacia atrás).
+const PAYMENT_TERMS_OPTIONS = ['Contado', 'Crédito 15', 'Crédito 30', 'Crédito 60', 'Anticipo 50%'];
+const PAYMENT_TERMS_OTHER = '__other__';
+
 const EMPTY_SUPPLIER: SupplierFormState = {
   identification: '', name: '', contactName: '', email: '', phone: '',
-  bankAccounts: [], productCategoryIds: [], costCenterIds: [], paymentTerms: '', notes: '',
+  bankAccounts: [], productCategoryIds: [], costCenterIds: [], paymentTerms: '', paymentTermsOther: '', notes: '',
 };
 
 function newAccountId(): string {
@@ -671,7 +761,8 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       bankAccounts: existingAccounts,
       productCategoryIds: s.productCategoryIds ? [...s.productCategoryIds] : [],
       costCenterIds: s.costCenterIds ? [...s.costCenterIds] : [],
-      paymentTerms: s.paymentTerms || '',
+      paymentTerms: s.paymentTerms && !PAYMENT_TERMS_OPTIONS.includes(s.paymentTerms) ? PAYMENT_TERMS_OTHER : (s.paymentTerms || ''),
+      paymentTermsOther: s.paymentTerms && !PAYMENT_TERMS_OPTIONS.includes(s.paymentTerms) ? s.paymentTerms : '',
       notes: s.notes || '',
     });
     setShowModal(true);
@@ -741,7 +832,9 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       bankData: null, // legacy migrado a bankAccounts
       productCategoryIds: [...form.productCategoryIds],
       costCenterIds: [...form.costCenterIds],
-      paymentTerms: form.paymentTerms.trim() || null,
+      paymentTerms: form.paymentTerms === PAYMENT_TERMS_OTHER
+        ? form.paymentTermsOther.trim() || null
+        : form.paymentTerms.trim() || null,
       notes: form.notes.trim() || null,
     };
     try {
@@ -925,7 +1018,42 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
               </div>
               <div className="space-y-2">
                 <Label>{t('catalogs.suppliers.paymentTerms')}</Label>
-                <Input value={form.paymentTerms} onChange={set('paymentTerms')} />
+                <div className="flex flex-wrap gap-1.5">
+                  {PAYMENT_TERMS_OPTIONS.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, paymentTerms: opt }))}
+                      className={cn(
+                        'px-2.5 h-8 rounded-lg text-xs font-medium transition-colors border',
+                        form.paymentTerms === opt
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, paymentTerms: PAYMENT_TERMS_OTHER }))}
+                    className={cn(
+                      'px-2.5 h-8 rounded-lg text-xs font-medium transition-colors border',
+                      form.paymentTerms === PAYMENT_TERMS_OTHER
+                        ? 'bg-corporate text-white border-corporate'
+                        : 'bg-white border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                    )}
+                  >
+                    {t('catalogs.suppliers.paymentTermsOther')}
+                  </button>
+                </div>
+                {form.paymentTerms === PAYMENT_TERMS_OTHER && (
+                  <Input
+                    value={form.paymentTermsOther}
+                    onChange={set('paymentTermsOther')}
+                    placeholder={t('catalogs.suppliers.paymentTermsOtherPlaceholder')}
+                  />
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -1047,6 +1175,13 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
 // SECCIÓN: PRODUCTOS
 // ═══════════════════════════════════════════════════════════════════
 
+// Rango de precio escalonado en edición (strings hasta guardar)
+interface PriceTierDraft {
+  minQty: string;
+  maxQty: string; // vacío = sin tope
+  pricePerDay: string;
+}
+
 interface ProductFormState {
   name: string;
   nameEn: string;
@@ -1058,6 +1193,36 @@ interface ProductFormState {
   preferredSupplierId: string;
   rentalPrice: string;
   depositPercent: string;
+  priceTiers: PriceTierDraft[];
+}
+
+const EMPTY_PRODUCT_FORM: ProductFormState = {
+  name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false,
+  isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '', priceTiers: [],
+};
+
+function tiersToDrafts(tiers: PriceTier[] | null | undefined): PriceTierDraft[] {
+  return (tiers ?? []).map(t => ({
+    minQty: String(t.minQty),
+    maxQty: t.maxQty != null ? String(t.maxQty) : '',
+    pricePerDay: String(t.pricePerDay),
+  }));
+}
+
+// Valida y convierte los rangos editados; null si alguno es inválido
+function draftsToTiers(drafts: PriceTierDraft[]): PriceTier[] | null {
+  const tiers: PriceTier[] = [];
+  for (const d of drafts) {
+    if (!d.minQty.trim() && !d.maxQty.trim() && !d.pricePerDay.trim()) continue; // fila vacía
+    const minQty = Number(d.minQty);
+    const maxQty = d.maxQty.trim() === '' ? null : Number(d.maxQty);
+    const pricePerDay = Number(d.pricePerDay);
+    if (!Number.isInteger(minQty) || minQty < 1) return null;
+    if (maxQty != null && (!Number.isInteger(maxQty) || maxQty < minQty)) return null;
+    if (!Number.isFinite(pricePerDay) || pricePerDay <= 0) return null;
+    tiers.push({ minQty, maxQty, pricePerDay });
+  }
+  return tiers.sort((a, b) => a.minQty - b.minQty);
 }
 
 function ProductsSection({ canWrite }: { canWrite: boolean }) {
@@ -1069,7 +1234,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const { items: suppliers } = useCatalog<Supplier>('suppliers');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [form, setForm] = useState<ProductFormState>({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '' });
+  const [form, setForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM);
   const [photoUrl, setPhotoUrl] = useState<string>('');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const { uploadImage, uploading } = useStorageUpload();
@@ -1118,7 +1283,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false, isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '' });
+    setForm(EMPTY_PRODUCT_FORM);
     setPhotoUrl('');
     setPhotoFile(null);
     setShowModal(true);
@@ -1137,6 +1302,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       preferredSupplierId: p.preferredSupplierId || '',
       rentalPrice: p.rentalPricePerDay != null ? String(p.rentalPricePerDay) : '',
       depositPercent: p.depositPercent != null ? String(p.depositPercent) : '',
+      priceTiers: tiersToDrafts(p.priceTiers),
     });
     setPhotoUrl(p.photoUrl || '');
     setPhotoFile(null);
@@ -1156,6 +1322,12 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       toast.error(t('catalogs.common.required'));
       return;
     }
+    // Rangos de precio solo para productos rentables; filas vacías se ignoran
+    const tiers = form.isRentable ? draftsToTiers(form.priceTiers) : [];
+    if (form.isRentable && tiers === null) {
+      toast.error(t('catalogs.products.tierInvalid'));
+      return;
+    }
     setSaving(true);
     try {
       let finalPhotoUrl = editing?.photoUrl || '';
@@ -1173,6 +1345,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
         preferredSupplierId: form.preferredSupplierId || null,
         rentalPricePerDay: form.rentalPrice.trim() === '' ? null : Number(form.rentalPrice),
         depositPercent: form.depositPercent.trim() === '' ? null : Number(form.depositPercent),
+        priceTiers: form.isRentable && tiers && tiers.length > 0 ? tiers : null,
         photoUrl: finalPhotoUrl || null,
       };
       if (editing) {
@@ -1326,6 +1499,19 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             )}
             {p.isRentable && p.depositPercent != null && (
               <DetailItem label={t('catalogs.products.depositPercent')}>{p.depositPercent}%</DetailItem>
+            )}
+            {p.isRentable && (p.priceTiers ?? []).length > 0 && (
+              <DetailItem label={t('catalogs.products.priceTiers')}>
+                <div className="space-y-0.5">
+                  {(p.priceTiers ?? []).map((tier, i) => (
+                    <p key={i} className="text-xs">
+                      {tier.maxQty != null
+                        ? fmt('catalogs.products.tierRange', { min: tier.minQty, max: tier.maxQty, price: tier.pricePerDay })
+                        : fmt('catalogs.products.tierRangeOpen', { min: tier.minQty, price: tier.pricePerDay })}
+                    </p>
+                  ))}
+                </div>
+              </DetailItem>
             )}
             <DetailItem label={t('catalogs.common.status')}>
               {p.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
@@ -1532,6 +1718,74 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                   </>
                 )}
               </div>
+
+              {/* Precios escalonados por cantidad (solo productos rentables) */}
+              {form.isRentable && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label>{t('catalogs.products.priceTiers')}</Label>
+                  <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.priceTiersHelp')}</p>
+                  <div className="space-y-2">
+                    {form.priceTiers.map((tier, i) => (
+                      <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tier.minQty}
+                          placeholder={t('catalogs.products.tierMin')}
+                          onChange={(e) => setForm({
+                            ...form,
+                            priceTiers: form.priceTiers.map((x, j) => (j === i ? { ...x, minQty: e.target.value } : x)),
+                          })}
+                          className="col-span-3"
+                        />
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={tier.maxQty}
+                          placeholder={t('catalogs.products.tierMax')}
+                          onChange={(e) => setForm({
+                            ...form,
+                            priceTiers: form.priceTiers.map((x, j) => (j === i ? { ...x, maxQty: e.target.value } : x)),
+                          })}
+                          className="col-span-3"
+                        />
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={tier.pricePerDay}
+                          placeholder={t('catalogs.products.tierPrice')}
+                          onChange={(e) => setForm({
+                            ...form,
+                            priceTiers: form.priceTiers.map((x, j) => (j === i ? { ...x, pricePerDay: e.target.value } : x)),
+                          })}
+                          className="col-span-4"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setForm({ ...form, priceTiers: form.priceTiers.filter((_, j) => j !== i) })}
+                          title={t('catalogs.suppliers.removeAccount')}
+                          className="col-span-2 flex items-center justify-center h-9 rounded-lg text-[#86868B] hover:text-red-600 hover:bg-[#F5F5F7] transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setForm({ ...form, priceTiers: [...form.priceTiers, { minQty: '', maxQty: '', pricePerDay: '' }] })}
+                    className="gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {t('catalogs.products.addTier')}
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button onClick={handleSave} disabled={saving || uploading} className="flex-1 bg-corporate hover:bg-corporate/90">
@@ -2205,6 +2459,432 @@ function SalesChannelsSection({ canWrite }: { canWrite: boolean }) {
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 bg-corporate hover:bg-corporate/90">
+                {editing ? t('catalogs.common.update') : t('catalogs.common.create')}
+              </Button>
+              <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">
+                {t('catalogs.common.cancel')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECCIÓN: DESCUENTOS DE RENTA (catálogo rentalDiscounts)
+// Descuentos preconfigurados seleccionables en el formulario de orden de
+// renta (Warehouse). percent positivo: 10 = -10 % sobre el total.
+// ═══════════════════════════════════════════════════════════════════
+
+function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
+  const { user } = useAuth();
+  const { logAction } = useAudit();
+  const { items: discounts } = useCatalog<RentalDiscount>('rentalDiscounts');
+
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<RentalDiscount | null>(null);
+  const [form, setForm] = useState({ name: '', percent: '' });
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const openCreate = () => { setEditing(null); setForm({ name: '', percent: '' }); setShowModal(true); };
+  const openEdit = (d: RentalDiscount) => {
+    setEditing(d);
+    setForm({ name: d.name || '', percent: d.percent != null ? String(d.percent) : '' });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+    if (!form.name.trim()) { toast.error(t('catalogs.common.required')); return; }
+    const percent = Number(form.percent);
+    if (!Number.isFinite(percent) || percent <= 0 || percent > 100) {
+      toast.error(t('catalogs.discounts.percentInvalid'));
+      return;
+    }
+    const payload = { name: form.name.trim(), percent };
+    try {
+      if (editing) {
+        await updateDoc(doc(db, 'rentalDiscounts', editing.id), { ...payload, ...touchPayload(user.id) });
+        await logAction({
+          action: 'RENTAL_DISCOUNT_UPDATED' as AuditAction,
+          targetType: 'rental_discount',
+          targetId: editing.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Descuento de renta actualizado: ${payload.name} (-${percent}%)`,
+        });
+        toast.success(t('catalogs.common.update'));
+      } else {
+        const ref = await addDoc(collection(db, 'rentalDiscounts'), { ...payload, ...basePayload(user.id) });
+        await logAction({
+          action: 'RENTAL_DISCOUNT_CREATED' as AuditAction,
+          targetType: 'rental_discount',
+          targetId: ref.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Descuento de renta creado: ${payload.name} (-${percent}%)`,
+        });
+        toast.success(t('catalogs.common.create'));
+      }
+      setShowModal(false);
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleToggle = async (d: RentalDiscount) => {
+    if (!user?.id) return;
+    const next = !d.isActive;
+    const done = await executeWithConfirm({
+      level: 'major',
+      title: next ? t('catalogs.common.confirmActivateTitle') : t('catalogs.common.confirmDeactivateTitle'),
+      message: fmt(next ? 'catalogs.common.confirmActivate' : 'catalogs.common.confirmDeactivate', { name: d.name }),
+      action: async () => {
+        await updateDoc(doc(db, 'rentalDiscounts', d.id), { isActive: next, ...touchPayload(user.id) });
+      },
+    });
+    if (done !== null) {
+      await logAction({
+        action: (next ? 'RENTAL_DISCOUNT_ACTIVATED' : 'RENTAL_DISCOUNT_DEACTIVATED') as AuditAction,
+        targetType: 'rental_discount',
+        targetId: d.id,
+        targetName: d.name,
+        impactLevel: 'major',
+        description: `Descuento de renta ${next ? 'activado' : 'desactivado'}: ${d.name}`,
+      });
+      toast.success(next ? t('catalogs.common.activate') : t('catalogs.common.deactivate'));
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        title={t('catalogs.discounts.title')}
+        subtitle={fmt('catalogs.discounts.count', { count: discounts.length })}
+        canWrite={canWrite}
+        onNew={openCreate}
+        newLabel={t('catalogs.discounts.new')}
+      />
+      {discounts.length === 0 ? (
+        <EmptyState icon={<Percent className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
+          {discounts.map((d) => (
+            <EntityCard
+              key={d.id}
+              name={d.name}
+              lines={[`-${d.percent}%`]}
+              icon={<Percent className="w-5 h-5" />}
+              isActive={d.isActive}
+              canWrite={canWrite}
+              onEdit={() => openEdit(d)}
+              onToggle={() => handleToggle(d)}
+              expanded={expandedIds.has(d.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, d.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.discounts.percent')}>-{d.percent}%</DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {d.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(d.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(d.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? t('catalogs.discounts.edit') : t('catalogs.discounts.new')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('catalogs.discounts.name')} *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.discounts.percent')} *</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={form.percent}
+                onChange={(e) => setForm({ ...form, percent: e.target.value })}
+              />
+              <p className="text-[11px] text-[#86868B]">{t('catalogs.discounts.percentHelp')}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button onClick={handleSave} className="flex-1 bg-corporate hover:bg-corporate/90">
+                {editing ? t('catalogs.common.update') : t('catalogs.common.create')}
+              </Button>
+              <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">
+                {t('catalogs.common.cancel')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECCIÓN: ESTADOS DE ORDEN DE RENTA
+// (catálogo consumido por WarehouseModule; se administra aquí como
+// catálogo maestro, igual que movementTypes/serialStatuses)
+// ═══════════════════════════════════════════════════════════════════
+
+// Semillas idempotentes (ids deterministas, nunca pisan renombres).
+// Mismo orden del flujo canónico de renta.
+const SEED_ORDER_STATUSES: Array<{
+  id: string; name: string; nameEn: string; order: number;
+  isFinalOk?: boolean; isFinalRepair?: boolean;
+}> = [
+  { id: 'recibido', name: 'Recibido', nameEn: 'Received', order: 1 },
+  { id: 'en_preparacion', name: 'En preparación', nameEn: 'In preparation', order: 2 },
+  { id: 'listo_despachar', name: 'Listo para despachar', nameEn: 'Ready to dispatch', order: 3 },
+  { id: 'despachado', name: 'Despachado', nameEn: 'Dispatched', order: 4 },
+  { id: 'entregado', name: 'Entregado', nameEn: 'Delivered', order: 5 },
+  { id: 'devuelto', name: 'Devuelto', nameEn: 'Returned', order: 6 },
+  { id: 'verificado', name: 'Verificado', nameEn: 'Verified', order: 7 },
+  { id: 'almacenado', name: 'Almacenado', nameEn: 'Stored', order: 8, isFinalOk: true },
+  { id: 'a_reparacion', name: 'A reparación', nameEn: 'To repair', order: 9, isFinalRepair: true },
+];
+
+function RentalOrderStatusesSection({ canWrite }: { canWrite: boolean }) {
+  const { user } = useAuth();
+  const { logAction } = useAudit();
+  // Intersección con CatalogBase: el tipo RentalOrderStatus no declara los
+  // timestamps, pero el hook genérico los expone si existen en Firestore.
+  const { items: statuses } = useCatalog<RentalOrderStatus & CatalogBase>('rentalOrderStatuses');
+
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<(RentalOrderStatus & CatalogBase) | null>(null);
+  const [form, setForm] = useState({ name: '', nameEn: '', order: '' });
+  const [saving, setSaving] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Orden de secuencia (el campo `order` define el flujo, no el nombre)
+  const sortedStatuses = useMemo(
+    () => [...statuses].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [statuses]
+  );
+
+  const openCreate = () => { setEditing(null); setForm({ name: '', nameEn: '', order: '' }); setShowModal(true); };
+  const openEdit = (s: RentalOrderStatus & CatalogBase) => {
+    setEditing(s);
+    setForm({ name: s.name || '', nameEn: s.nameEn || '', order: s.order != null ? String(s.order) : '' });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+    if (!form.name.trim()) { toast.error(t('catalogs.common.required')); return; }
+    const order = Number(form.order);
+    if (!Number.isInteger(order)) { toast.error(t('catalogs.orderStatuses.orderInvalid')); return; }
+    const payload = { name: form.name.trim(), nameEn: form.nameEn.trim() || null, order };
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateDoc(doc(db, 'rentalOrderStatuses', editing.id), { ...payload, ...touchPayload(user.id) });
+        await logAction({
+          action: 'RENTAL_ORDER_STATUS_UPDATED' as AuditAction,
+          targetType: 'rental_order_status',
+          targetId: editing.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Estado de orden de renta actualizado: ${payload.name} (orden ${order})`,
+        });
+        toast.success(t('catalogs.common.update'));
+      } else {
+        const ref = await addDoc(collection(db, 'rentalOrderStatuses'), { ...payload, ...basePayload(user.id) });
+        await logAction({
+          action: 'RENTAL_ORDER_STATUS_CREATED' as AuditAction,
+          targetType: 'rental_order_status',
+          targetId: ref.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Estado de orden de renta creado: ${payload.name} (orden ${order})`,
+        });
+        toast.success(t('catalogs.common.create'));
+      }
+      setShowModal(false);
+    } catch (err: any) { toast.error(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (s: RentalOrderStatus & CatalogBase) => {
+    if (!user?.id) return;
+    const next = !s.isActive;
+    const done = await executeWithConfirm({
+      level: 'important',
+      title: next ? t('catalogs.common.confirmActivateTitle') : t('catalogs.common.confirmDeactivateTitle'),
+      message: fmt(next ? 'catalogs.common.confirmActivate' : 'catalogs.common.confirmDeactivate', { name: s.name }),
+      action: async () => {
+        await updateDoc(doc(db, 'rentalOrderStatuses', s.id), { isActive: next, ...touchPayload(user.id) });
+      },
+    });
+    if (done !== null) {
+      await logAction({
+        action: (next ? 'RENTAL_ORDER_STATUS_ACTIVATED' : 'RENTAL_ORDER_STATUS_DEACTIVATED') as AuditAction,
+        targetType: 'rental_order_status',
+        targetId: s.id,
+        targetName: s.name,
+        impactLevel: 'major',
+        description: `Estado de orden de renta ${next ? 'activado' : 'desactivado'}: ${s.name}`,
+      });
+      toast.success(next ? t('catalogs.common.activate') : t('catalogs.common.deactivate'));
+    }
+  };
+
+  // Seeds idempotentes: crea solo los que falten, con ids deterministas
+  const loadSeeds = async () => {
+    if (!user?.id) return;
+    await executeWithConfirm(
+      {
+        level: 'important',
+        title: t('catalogs.orderStatuses.seedsConfirmTitle'),
+        message: t('catalogs.orderStatuses.seedsConfirmDesc'),
+      },
+      async () => {
+        setSaving(true);
+        try {
+          let created = 0;
+          let existing = 0;
+          for (const seed of SEED_ORDER_STATUSES) {
+            const ref = doc(db, 'rentalOrderStatuses', seed.id);
+            const snap = await getDoc(ref);
+            if (snap.exists()) { existing += 1; continue; }
+            const now = new Date().toISOString();
+            await setDoc(ref, {
+              tenantId: getCurrentTenantId(),
+              name: seed.name,
+              nameEn: seed.nameEn,
+              order: seed.order,
+              ...(seed.isFinalOk !== undefined ? { isFinalOk: seed.isFinalOk } : {}),
+              ...(seed.isFinalRepair !== undefined ? { isFinalRepair: seed.isFinalRepair } : {}),
+              isActive: true,
+              createdAt: now,
+              createdBy: user.id,
+            });
+            created += 1;
+          }
+          if (created === 0) {
+            toast.info(t('catalogs.orderStatuses.seedsAlreadyLoaded'));
+          } else {
+            toast.success(fmt('catalogs.common.loadInitialDone', { created, existing }));
+            await logAction({
+              action: 'RENTAL_ORDER_STATUS_SEEDED' as AuditAction,
+              targetType: 'rental_order_status',
+              targetId: 'seeds',
+              targetName: t('catalogs.orderStatuses.title'),
+              impactLevel: 'major',
+              description: `Estados iniciales de orden de renta cargados: ${created} nuevos, ${existing} ya existían`,
+            });
+          }
+        } catch (err: any) { toast.error(err.message); }
+        finally { setSaving(false); }
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        title={t('catalogs.orderStatuses.title')}
+        subtitle={fmt('catalogs.orderStatuses.count', { count: statuses.length })}
+        canWrite={canWrite}
+        onNew={openCreate}
+        newLabel={t('catalogs.orderStatuses.new')}
+        extra={
+          canWrite ? (
+            <Button variant="outline" onClick={loadSeeds} disabled={saving} className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> {t('catalogs.common.loadInitial')}
+            </Button>
+          ) : undefined
+        }
+      />
+      <div className="flex items-start gap-3 bg-[#F5F5F7] rounded-2xl p-4">
+        <Info className="w-4 h-4 text-corporate shrink-0 mt-0.5" />
+        <div className="text-xs text-[#86868B] space-y-1">
+          <p>{t('catalogs.orderStatuses.help')}</p>
+          <p>{t('catalogs.orderStatuses.noDelete')}</p>
+        </div>
+      </div>
+      {sortedStatuses.length === 0 ? (
+        <EmptyState icon={<ClipboardList className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
+          {sortedStatuses.map((s) => (
+            <EntityCard
+              key={s.id}
+              name={getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name}
+              lines={[
+                `${t('catalogs.orderStatuses.order')}: ${s.order ?? '—'}`,
+                s.isFinalOk ? t('catalogs.orderStatuses.finalOk') : '',
+                s.isFinalRepair ? t('catalogs.orderStatuses.finalRepair') : '',
+              ]}
+              icon={<ClipboardList className="w-5 h-5" />}
+              isActive={s.isActive}
+              canWrite={canWrite}
+              onEdit={() => openEdit(s)}
+              onToggle={() => handleToggle(s)}
+              expanded={expandedIds.has(s.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, s.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.orderStatuses.name')}>{s.name}</DetailItem>
+                  <DetailItem label={t('catalogs.orderStatuses.nameEn')}>{s.nameEn || '—'}</DetailItem>
+                  <DetailItem label={t('catalogs.orderStatuses.order')}>{s.order ?? '—'}</DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {s.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  {s.isFinalOk && (
+                    <DetailItem label={t('catalogs.orderStatuses.finalOk')}>{t('catalogs.common.yes')}</DetailItem>
+                  )}
+                  {s.isFinalRepair && (
+                    <DetailItem label={t('catalogs.orderStatuses.finalRepair')}>{t('catalogs.common.yes')}</DetailItem>
+                  )}
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(s.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(s.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? t('catalogs.orderStatuses.edit') : t('catalogs.orderStatuses.new')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('catalogs.orderStatuses.name')} *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.orderStatuses.nameEn')}</Label>
+              <Input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.orderStatuses.order')} *</Label>
+              <Input
+                type="number"
+                step="1"
+                value={form.order}
+                onChange={(e) => setForm({ ...form, order: e.target.value })}
+              />
+              <p className="text-[11px] text-[#86868B]">{t('catalogs.orderStatuses.orderHelp')}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button onClick={handleSave} disabled={saving} className="flex-1 bg-corporate hover:bg-corporate/90">
                 {editing ? t('catalogs.common.update') : t('catalogs.common.create')}
               </Button>
               <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">

@@ -1,9 +1,51 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-14 (FASE 1 + ajustes validados del usuario desplegados en GEMELA — pendiente validación)
+> Última actualización: 2026-09-15 (FASE 1 — RONDA 2 de correcciones desplegada en GEMELA — pendiente re-prueba de los 6 puntos señalados)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — RONDA 2 DE CORRECCIONES (15 de septiembre) — DESPLEGADA EN GEMELA
+
+**Estado:** EN GEMELA (https://wve-pruebas-b3db5.web.app), pendiente re-prueba del usuario. Corrige los puntos marcados 🔴 en la validación de Fase 1 + facilidades. NOTA: la sección 4.21 de WAVEOPS_DESIGN.md no existe (aún no se agregó); la spec aplicada es la del prompt del usuario.
+
+**🔴 Control anti-fraude (Warehouse):**
+1. **Despacho SOLO con escaneo**: eliminado el avance manual a "despachado". El estado solo avanza escaneando QR de orden + seriales (igual para retorno: QR de orden + seriales que regresan, marcando OK/Dañada por serial, con validación de pertenencia y anti-duplicado). **Modo emergencia**: botón discreto visible a Supervisor+ (listo_despachar/despachado/entregado/devuelto), con selector de destino + motivo OBLIGATORIO + doble confirmación; escribe `emergencyDispatchReason/By/At` y auditoría `RENTAL_ORDER_EMERGENCY_DISPATCH` (sensitive). Excepción deliberada: órdenes SIN seriales asignados (productos no serializados) siguen pudiendo avanzar manual en devuelto/verificado (no hay nada que escanear).
+2. **Separación envía/recibe (Transferencias)**: `canReceiveTransfer` = en tránsito + NO creador + (responsable de ubicación destino según `locations.responsibleUserId` o Supervisor+). Recepción de rentables con seriales exige confirmar exactamente `quantity` unidades (QR o lista, persistido en `receivedUnitIds`); consumibles con botón simple. Creador ve aviso "Quien crea o envía una transferencia no puede marcarla como recibida".
+3. **Catálogo "Estados" movido a Develops**: CRUD de `rentalOrderStatuses` ahora en Develops → Catálogos → "Estados de orden de renta" (sub-pestaña nueva, patrón EntityCard + "Cargar iniciales" idempotente, seeds con ids deterministas). Eliminada la sub-pestaña "Estados" de Warehouse (sigue CONSUMIENDO el catálogo). Reglas: ya existía `isCatalogAdmin()`, sin cambios. Auditoría: `RENTAL_ORDER_STATUS_*`.
+
+**🔴 Vista STAFF sin montos (completada):** STAFF no ve totales, precios por línea, desglose, comprobante, fianza ni campos de dinero en formulario; sí ve cliente/ítems/fechas/estado + etiqueta "Autorizada" / "Pendiente de pago" SIN cifras. Regla: `canSeeMoney` = `MONEY_ROLES` (DG/Director/RRHH/GerOp/GerDept/Supervisor — mismo set que edita paymentStatus/fianza hoy). Al guardar, STAFF no escribe campos de dinero en la orden.
+
+**Visibilidad y facilidad:**
+5. Transferencia: formulario muestra stock del producto en origen y destino ("The Warehouse: 20 gal"). Nueva Cloud Function **`notifyTransferShipped`** (onDocumentUpdated → al pasar a `en_transito`) notifica campana+push+email al responsable del destino; al recibir, el cliente marca leídas las notificaciones de esa transferencia. `handleShipTransfer` guarda `shippedBy/shippedByName/shippedAt`.
+6. ~~Notificación al salir~~ (hecha, punto 5).
+7. Orden: bajo el selector de ubicación de entrega se lista la disponibilidad en esa ubicación de cada producto pedido ("{producto} ×N disponibles", rojo si pide más de lo disponible; datos de `inventoryStocks`). Fecha/hora: `datetime-local` ya es 24h — sin cambios.
+8. Botones rápidos en tarjetas de orden (Pizarra y Órdenes): Despachar / Retorno (abren el flujo de escaneo con la orden preseleccionada), Ver detalle, Imprimir QR (`WhQrDialog`, deep link `/warehouse?order=<id>`, lib `qrcode`). En Inventario → Stock los botones rápidos ya existían de la ronda anterior.
+9. Movimiento: selector de producto por CATEGORÍA primero (listener a `productCategories`; buscador alfabético filtrado por categoría; "Sin categoría" si aplica; preseleccionada al abrir desde tarjeta de producto). Origen ofrece "Proveedor externo / compra directa" en TODOS los tipos que suman stock.
+10. Proveedores: condiciones de pago como botones fijos (Contado, Crédito 15/30/60, Anticipo 50%) + "Otro" con texto libre; valor guardado no estándar precarga como "Otro" (compatibilidad).
+11. Mínimos/máximos: edición SOLO Supervisor+ (`SUPERVISOR_PLUS_ROLES`; antes era canWrite). Ayuda visible: "Solo supervisores definen mínimos y máximos. Al bajar del mínimo avisaremos por campana con la sugerencia de compra."
+12. Conteos con QR: producto rentable con seriales → conteo SOLO por escaneo de cada serial (input manual deshabilitado, badge QR, contador, deshacer-último, anti doble-conteo; persistido en `scannedSerials` para sobrevivir "Guardar avance"); resto → entrada manual, y escanear QR de producto salta a esa fila.
+13. 🔴 **BUG escáner en Conteos ("HTML Element with id=inv-qr-scanner-container not found")**: causa raíz = `html5-qrcode` lanza en su constructor si el contenedor no está en el DOM (efecto corría antes del portal de Radix en algunos contextos). Fix robusto aplicado a AMBAS copias del escáner (InventarioModule `ScannerModal` y WarehouseModule `WhScannerModal`): id único por instancia (`useId`), instancia solo tras verificar `getElementById` con reintento `requestAnimationFrame` (~1 s), cleanup con `disposed` + `cancelAnimationFrame` + `clear()`. No verificable con cámara real desde CLI — pedir confirmación visual al usuario.
+14. **Precios por rol + tiers + descuentos**: vendedores/cobradores (canSeeMoney) SÍ ven precios y total al crear/editar (línea por ítem cantidad × precio, subtotal/descuento/total). Producto rentable: `priceTiers: [{minQty, maxQty|null, pricePerDay}]` (editor en Catálogos → Productos; tarjeta expandida los lista). Nuevo catálogo **`rentalDiscounts`** (`{name, percent, isActive, tenantId...}`, CRUD en Catálogos → "Descuentos de renta") seleccionable con un toque en la orden. Orden guarda `items[].unitPrice/subtotal` + `subtotal/discountId/discountName/discountPercent/total`. **Decisión**: línea = cantidad × precio/unidad/día (la orden no tiene fecha de devolución; si llega, multiplicar por días). Reglas firestore: match explícito nuevo para rentalDiscounts (read auth, write isCatalogAdmin).
+15. **Módulos visibles por departamento**: campo aditivo `departments/{id}.visibleModuleIds: string[]`. REGLA CLAVE: ausente o vacío = sin restricción (comportamiento actual, no rompe nada). Selector manual multi-select (chips + búsqueda, fuente `appModules`, excluye `develops`) en Develops → Departamentos, editable SOLO por Director General, con botón "Limpiar". Filtro aplicado al final en `useAppConfig.visibleModules` (después de flags/permisos), consumido por Layout (menú) y Dashboard (tarjetas). Anti-parpadeo: mientras no cargan los departamentos o no hay match, no se oculta nada. DG exento del filtro. Cambio auditado (DEPARTMENT_UPDATED, critical).
+16. Ayudas: mín/máx (punto 11), conteos con QR (flujo + ajuste por aprobación), origen/destino según tipo de movimiento (ronda anterior).
+
+**Shapes de datos nuevos (todos aditivos, sin migración):**
+- `inventoryTransfers`: `receivedUnitIds?`, `shippedBy/shippedByName/shippedAt`
+- `countSessions`: `scannedSerials?: Record<productId, string[]>`
+- `rentalOrders`: `items[].unitPrice/subtotal`, `subtotal`, `discountId/discountName/discountPercent`, `total`, `emergencyDispatchReason/By/At`
+- `products`: `priceTiers?: [{minQty, maxQty|null, pricePerDay}]`
+- `rentalDiscounts/{id}`: `{tenantId, name, percent, isActive, createdAt/By, updatedAt/By}`
+- `departments/{id}`: `visibleModuleIds?: string[]`
+- `notifications` (functions): `data.transferId`
+
+**Cloud Functions**: nueva `notifyTransferShipped` (33 funciones). Verificación pendiente en gemela: las 6 verificaciones solicitadas (despacho sin escáner bloqueado; creador no recibe; staff sin montos; escáner en Conteos; precios visibles para vendedor; selector de módulos por departamento) — la prueba visual/es de sesión la hace el usuario.
+
+**Archivos modificados:** InventarioModule.tsx (+688/−117), WarehouseModule.tsx (~+1189/−257 acumulado), CatalogosTab.tsx (+~780), DepartamentosTab.tsx, src/types/catalogs.ts, src/types/develops.ts, src/types/department.ts, src/hooks/useAppConfig.ts, src/hooks/firestore/useFirestoreDepartments.ts, functions/src/notifications/inventory.js, functions/index.js, firestore.rules.
+
+**Build:** exit 0 verificado por el coordinador. **Deploy gemela:** hosting + firestore:rules + functions.
 
 ---
 

@@ -18,6 +18,9 @@ function docToDepartment(id: string, data: any): Department {
     icon: data.icon || 'building',
     isActive: data.isActive !== false,
     parentId: data.parentId || null,
+    visibleModuleIds: Array.isArray(data.visibleModuleIds)
+      ? data.visibleModuleIds.filter((x: unknown): x is string => typeof x === 'string')
+      : undefined,
     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt?.toDate?.().toISOString() || data.updatedAt || new Date().toISOString(),
   };

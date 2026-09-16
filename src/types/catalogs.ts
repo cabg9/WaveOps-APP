@@ -73,6 +73,15 @@ export interface Supplier extends CatalogBase {
   notes?: string;
 }
 
+// Precio escalonado por cantidad para productos rentables: a partir de
+// minQty unidades, el precio por unidad/día es pricePerDay (maxQty null =
+// sin tope superior). Campo aditivo de Product (priceTiers).
+export interface PriceTier {
+  minQty: number;
+  maxQty: number | null;
+  pricePerDay: number;
+}
+
 export interface ProductCategory extends CatalogBase {
   name: string;
   nameEn?: string;
@@ -95,6 +104,14 @@ export interface Product extends CatalogBase {
   preferredSupplierId?: string; // proveedor preferido (ref suppliers, opcional)
   rentalPricePerDay?: number | null; // precio de renta por unidad por día
   depositPercent?: number | null; // porcentaje de fianza sobre el valor de la renta
+  priceTiers?: PriceTier[] | null; // precios escalonados por cantidad (rentable)
+}
+
+// Descuento preconfigurado aplicable a órdenes de renta (catálogo Firestore
+// rentalDiscounts). percent es positivo: 10 = -10 % sobre el total.
+export interface RentalDiscount extends CatalogBase {
+  name: string;
+  percent: number;
 }
 
 export interface CostCenter extends CatalogBase {
@@ -226,6 +243,7 @@ export const CATALOG_COLLECTIONS = {
   rentalUnits: 'rentalUnits',
   rentalOrders: 'rentalOrders',
   rentalOrderStatuses: 'rentalOrderStatuses',
+  rentalDiscounts: 'rentalDiscounts',
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -275,6 +293,10 @@ export interface InventoryTransfer {
   status: 'pendiente' | 'en_transito' | 'recibido' | 'cancelado';
   receivedBy?: string | null;
   receivedAt?: string | null;
+  receivedUnitIds?: string[] | null; // seriales confirmados al recibir (productos rentables)
+  shippedBy?: string | null;
+  shippedByName?: string | null;
+  shippedAt?: string | null;
   createdAt: string;
   createdBy: string;
   createdByName: string;
@@ -291,6 +313,9 @@ export interface CountSession {
   blind: boolean;
   frequency: CountFrequency;
   counts?: Record<string, number>;
+  // Seriales escaneados por producto (productos rentables serializados: el
+  // conteo se valida por escaneo; evita dobles conteos entre sesiones)
+  scannedSerials?: Record<string, string[]>;
   differences?: Array<{ productId: string; expected: number; counted: number; delta: number }>;
   approvedBy?: string | null;
   approvedAt?: string | null;
@@ -348,6 +373,10 @@ export interface RentalOrderItem {
   // Seriales exactos asignados al despachar (anti-sobre-renta: se sabe QUÉ salió)
   assignedUnitIds?: string[];
   tallaRef?: string | null; // rentas internas: referencia de pasajero/talla cuando aplique
+  // Precio aplicado por unidad (tier según cantidad o precio base) y total de
+  // la línea; solo los graban usuarios con permiso de montos (canSeeMoney)
+  unitPrice?: number | null;
+  subtotal?: number | null;
 }
 
 // Orden de renta: punto único de entrada del flujo canónico (Fase 1B)
@@ -370,6 +399,17 @@ export interface RentalOrder {
   depositStatus?: 'retenida' | 'devuelta' | 'descontada' | null;
   depositDiscountApprovedBy?: string | null;
   depositDiscountEvidenceUrl?: string | null;
+  // Precios cobrados (solo los graba personal con permiso de montos)
+  subtotal?: number | null;
+  discountId?: string | null; // ref rentalDiscounts
+  discountName?: string | null; // denormalizado
+  discountPercent?: number | null; // positivo: 10 = -10 %
+  total?: number | null;
+  // Despacho de emergencia (escáner inoperativo): forzar el avance queda
+  // auditado con motivo obligatorio y quién lo hizo (Supervisor+)
+  emergencyDispatchReason?: string | null;
+  emergencyDispatchBy?: string | null;
+  emergencyDispatchAt?: string | null;
   observations?: string | null;
   preparedBy?: string | null; // quién prepara
   dispatchedBy?: string | null; // quién despacha (QR de la orden)

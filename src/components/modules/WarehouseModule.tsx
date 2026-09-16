@@ -1,13 +1,15 @@
 // WAREHOUSE MODULE - Primera mitad (Fase 1B)
 // Sub-pestañas: Pizarra (tablero del día), Órdenes (órdenes de renta con
-// flujo canónico), Estados (CRUD de rentalOrderStatuses) y Retornos
-// (placeholder WH-D2-retornos, lo completa otro agente).
+// flujo canónico) y Retornos (verificación de retorno por escaneo).
+// El catálogo de estados (rentalOrderStatuses) se CONSUME desde Firestore
+// pero se administra en Develops → Catálogos → Estados de orden de renta.
 // Todo payload lleva tenantId; los catálogos se crean desde la app
 // (nada hardcodeado salvo seeds idempotentes con ids deterministas).
 // Deep link: /warehouse?order=<id> abre el detalle de la orden.
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Html5QrcodeScanner } from 'html5-qrcode';
+import QRCode from 'qrcode';
 import {
   collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, query, orderBy,
 } from 'firebase/firestore';
@@ -17,6 +19,7 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useShifts } from '@/hooks/useShifts';
+import { useAudit } from '@/hooks/useAudit';
 import { executeWithConfirm } from '@/lib/confirm-action';
 import { getCurrentTenantId } from '@/lib/tenant';
 import { registerI18nKeys, t, getLanguage } from '@/lib/i18n';
@@ -36,12 +39,16 @@ import type {
   Product,
   Location,
   Client,
+  InventoryStock,
+  RentalDiscount,
 } from '@/types/catalogs';
+import type { AuditAction } from '@/types/develops';
 import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
-  ClipboardList, Plus, Search, ChevronDown, ChevronUp, Power,
+  ClipboardList, Plus, Search, ChevronDown, ChevronUp,
   Construction, Package, UserPlus, MapPin, CalendarClock, Banknote, ArrowRight,
-  RotateCcw, Users, LayoutGrid, Pencil, Upload, QrCode, CheckCircle2, XCircle, Link2,
+  RotateCcw, Users, LayoutGrid, Upload, QrCode, CheckCircle2, XCircle, Link2,
+  Printer, AlertTriangle,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -56,7 +63,6 @@ registerI18nKeys({
     'wh.error.load': 'Error al cargar datos de warehouse',
     'wh.tab.board': 'Pizarra',
     'wh.tab.orders': 'Órdenes',
-    'wh.tab.statuses': 'Estados',
     'wh.tab.returns': 'Retornos',
 
     'wh.common.save': 'Guardar',
@@ -67,29 +73,8 @@ registerI18nKeys({
     'wh.common.inactive': 'Inactivo',
     'wh.common.optional': 'opcional',
 
-    'wh.statuses.help': 'Flujo canónico de una orden de renta: recibido → en preparación → listo para despachar → despachado → entregado → devuelto → verificado → almacenado. Si el equipo regresa dañado, la orden cierra en "a reparación" en lugar de "almacenado". El número de orden define la secuencia en que se avanza; los estados inactivos no se ofrecen al avanzar.',
-    'wh.statuses.new': 'Nuevo estado',
-    'wh.statuses.loadSeeds': 'Cargar iniciales',
-    'wh.statuses.name': 'Nombre (español)',
-    'wh.statuses.nameEn': 'Nombre (inglés, opcional)',
-    'wh.statuses.order': 'Orden',
-    'wh.statuses.empty': 'Sin estados de orden. Crea el primero o carga el catálogo inicial.',
-    'wh.statuses.finalOk': 'Final exitoso',
-    'wh.statuses.finalRepair': 'Final a reparación',
-    'wh.statuses.edit': 'Editar',
-    'wh.statuses.activate': 'Activar',
-    'wh.statuses.deactivate': 'Desactivar',
-    'wh.statuses.noDelete': 'Los estados no se eliminan: se desactivan para conservar el historial.',
-    'wh.statuses.created': 'Estado creado',
-    'wh.statuses.updated': 'Estado actualizado',
-    'wh.statuses.seedsConfirmTitle': 'Cargar estados iniciales',
-    'wh.statuses.seedsConfirmDesc': 'Se crearán los estados iniciales que falten. Los existentes no se modifican.',
-    'wh.statuses.seedsSummary': '{created} estados cargados ({existing} ya existían)',
-    'wh.statuses.seedsAlreadyLoaded': 'Ya están cargadas',
-    'wh.statuses.validation.nameRequired': 'El nombre es obligatorio',
-    'wh.statuses.validation.orderInvalid': 'El orden debe ser un número entero',
-
     'wh.orders.new': 'Nueva orden',
+    'wh.orders.noStatuses': 'No hay estados de orden activos. Crea el catálogo en Desarrollo → Catálogos → Estados de orden de renta.',
     'wh.orders.empty': 'No hay órdenes de renta registradas',
     'wh.orders.searchPlaceholder': 'Buscar por cliente o número...',
     'wh.orders.filterStatus': 'Estado',
@@ -183,7 +168,7 @@ registerI18nKeys({
     'wh.detail.advance': 'Avanzar estado',
     'wh.detail.advanceTo': 'Avanzar a "{name}"',
     'wh.detail.authorized': 'Autorizada',
-    'wh.detail.pendingAuth': 'Pendiente de autorización',
+    'wh.detail.pendingAuth': 'Pendiente de pago',
     'wh.detail.timestamps': 'Registro de tiempos',
     'wh.detail.dispatchedAt': 'Despachada',
     'wh.detail.deliveredAt': 'Entregada',
@@ -279,6 +264,53 @@ registerI18nKeys({
     'wh.confirm.depositReturnDesc': 'Se registrará que la fianza fue devuelta al cliente.',
     'wh.confirm.discountTitle': 'Descontar fianza',
     'wh.confirm.discountDesc': 'Se descontará la fianza de esta orden. Requiere motivo obligatorio y quedará registrado quién lo aprueba.',
+
+    'wh.quick.dispatch': 'Despachar',
+    'wh.quick.return': 'Retorno',
+    'wh.quick.detail': 'Ver detalle',
+    'wh.quick.qr': 'Imprimir QR',
+
+    'wh.qr.print': 'Imprimir',
+    'wh.qr.title': 'QR de la orden',
+    'wh.qr.hint': 'Escanea este código para abrir la orden en Warehouse.',
+
+    'wh.emergency.button': 'Modo emergencia',
+    'wh.emergency.title': 'Despacho de emergencia',
+    'wh.emergency.desc': 'El escáner no está disponible. Un supervisor puede forzar el avance de la orden; el motivo es obligatorio y la acción queda auditada.',
+    'wh.emergency.target': 'Avanzar a',
+    'wh.emergency.reason': 'Motivo (obligatorio)',
+    'wh.emergency.reasonPlaceholder': 'Ej: cámara del escáner dañada, QR ilegible...',
+    'wh.emergency.forbidden': 'Solo supervisores pueden usar el modo emergencia',
+    'wh.emergency.toast': 'Avance forzado registrado (emergencia)',
+
+    'wh.scanOnly.dispatchBlocked': 'El despacho solo es posible escaneando el QR de la orden y los seriales, o con el modo emergencia.',
+    'wh.scanOnly.returnBlocked': 'La verificación del retorno solo es posible escaneando el QR de la orden y los seriales que regresan, o con el modo emergencia.',
+
+    'wh.orderForm.unitPrice': 'Precio unit.',
+    'wh.orderForm.subtotal': 'Subtotal',
+    'wh.orderForm.discount': 'Descuento',
+    'wh.orderForm.discountNone': 'Sin descuento',
+    'wh.orderForm.total': 'Total',
+    'wh.orderForm.locationAvailability': 'Disponibilidad en {location}',
+    'wh.orderForm.availableInLocation': '{product} ×{count} disponibles',
+
+    'wh.detail.subtotal': 'Subtotal',
+    'wh.detail.discountLabel': 'Descuento',
+    'wh.detail.total': 'Total',
+    'wh.detail.emergency': 'Avance de emergencia',
+    'wh.detail.emergencyBy': 'Forzado por',
+
+    'wh.return.scanOrder': 'Escanear QR de la orden',
+    'wh.return.orSelect': 'O selecciona una orden manualmente',
+    'wh.return.selectOrderPlaceholder': 'Selecciona una orden despachada o entregada',
+    'wh.return.noOrdersForReturn': 'No hay órdenes despachadas o entregadas',
+    'wh.return.invalidStatus': 'La orden seleccionada no está en retorno',
+    'wh.return.scanSerials': 'Escanear seriales que regresan',
+    'wh.return.scanSerialsHint': 'Escanea el QR o código de cada serial devuelto; solo los seriales escaneados se verifican.',
+    'wh.return.serialUnknown': 'No se encontró el serial escaneado',
+    'wh.return.serialNotAssigned': 'Este serial no pertenece a esta orden',
+    'wh.return.serialAlreadyScanned': 'Este serial ya fue escaneado',
+    'wh.return.returned': 'Regresó',
   },
   en: {
     'wh.devTitle': 'Module under development',
@@ -287,7 +319,6 @@ registerI18nKeys({
     'wh.error.load': 'Error loading warehouse data',
     'wh.tab.board': 'Board',
     'wh.tab.orders': 'Orders',
-    'wh.tab.statuses': 'Statuses',
     'wh.tab.returns': 'Returns',
 
     'wh.common.save': 'Save',
@@ -298,29 +329,8 @@ registerI18nKeys({
     'wh.common.inactive': 'Inactive',
     'wh.common.optional': 'optional',
 
-    'wh.statuses.help': 'Canonical rental order flow: received → in preparation → ready to dispatch → dispatched → delivered → returned → verified → stored. If the gear comes back damaged, the order closes at "to repair" instead of "stored". The order number defines the sequence; inactive statuses are not offered when advancing.',
-    'wh.statuses.new': 'New status',
-    'wh.statuses.loadSeeds': 'Load initial set',
-    'wh.statuses.name': 'Name (Spanish)',
-    'wh.statuses.nameEn': 'Name (English, optional)',
-    'wh.statuses.order': 'Order',
-    'wh.statuses.empty': 'No order statuses. Create the first one or load the initial catalog.',
-    'wh.statuses.finalOk': 'Successful final',
-    'wh.statuses.finalRepair': 'Final to repair',
-    'wh.statuses.edit': 'Edit',
-    'wh.statuses.activate': 'Activate',
-    'wh.statuses.deactivate': 'Deactivate',
-    'wh.statuses.noDelete': 'Statuses are never deleted: they are deactivated to preserve history.',
-    'wh.statuses.created': 'Status created',
-    'wh.statuses.updated': 'Status updated',
-    'wh.statuses.seedsConfirmTitle': 'Load initial statuses',
-    'wh.statuses.seedsConfirmDesc': 'Missing initial statuses will be created. Existing ones are not modified.',
-    'wh.statuses.seedsSummary': '{created} statuses loaded ({existing} already existed)',
-    'wh.statuses.seedsAlreadyLoaded': 'Already loaded',
-    'wh.statuses.validation.nameRequired': 'Name is required',
-    'wh.statuses.validation.orderInvalid': 'Order must be a whole number',
-
     'wh.orders.new': 'New order',
+    'wh.orders.noStatuses': 'No active order statuses. Create the catalog in Develops → Catalogs → Rental order statuses.',
     'wh.orders.empty': 'No rental orders recorded',
     'wh.orders.searchPlaceholder': 'Search by client or number...',
     'wh.orders.filterStatus': 'Status',
@@ -414,7 +424,7 @@ registerI18nKeys({
     'wh.detail.advance': 'Advance status',
     'wh.detail.advanceTo': 'Advance to "{name}"',
     'wh.detail.authorized': 'Authorized',
-    'wh.detail.pendingAuth': 'Pending authorization',
+    'wh.detail.pendingAuth': 'Payment pending',
     'wh.detail.timestamps': 'Timeline',
     'wh.detail.dispatchedAt': 'Dispatched',
     'wh.detail.deliveredAt': 'Delivered',
@@ -510,6 +520,53 @@ registerI18nKeys({
     'wh.confirm.depositReturnDesc': 'It will be recorded that the deposit was returned to the client.',
     'wh.confirm.discountTitle': 'Discount deposit',
     'wh.confirm.discountDesc': 'The deposit for this order will be discounted. A mandatory reason is required and who approves it will be recorded.',
+
+    'wh.quick.dispatch': 'Dispatch',
+    'wh.quick.return': 'Return',
+    'wh.quick.detail': 'View detail',
+    'wh.quick.qr': 'Print QR',
+
+    'wh.qr.print': 'Print',
+    'wh.qr.title': 'Order QR',
+    'wh.qr.hint': 'Scan this code to open the order in Warehouse.',
+
+    'wh.emergency.button': 'Emergency mode',
+    'wh.emergency.title': 'Emergency dispatch',
+    'wh.emergency.desc': 'The scanner is unavailable. A supervisor can force the order to advance; the reason is mandatory and the action is audited.',
+    'wh.emergency.target': 'Advance to',
+    'wh.emergency.reason': 'Reason (required)',
+    'wh.emergency.reasonPlaceholder': 'E.g.: scanner camera broken, QR unreadable...',
+    'wh.emergency.forbidden': 'Only supervisors can use emergency mode',
+    'wh.emergency.toast': 'Forced advance recorded (emergency)',
+
+    'wh.scanOnly.dispatchBlocked': 'Dispatch is only possible by scanning the order QR and the serials, or via emergency mode.',
+    'wh.scanOnly.returnBlocked': 'Return verification is only possible by scanning the order QR and the returning serials, or via emergency mode.',
+
+    'wh.orderForm.unitPrice': 'Unit price',
+    'wh.orderForm.subtotal': 'Subtotal',
+    'wh.orderForm.discount': 'Discount',
+    'wh.orderForm.discountNone': 'No discount',
+    'wh.orderForm.total': 'Total',
+    'wh.orderForm.locationAvailability': 'Availability at {location}',
+    'wh.orderForm.availableInLocation': '{product} ×{count} available',
+
+    'wh.detail.subtotal': 'Subtotal',
+    'wh.detail.discountLabel': 'Discount',
+    'wh.detail.total': 'Total',
+    'wh.detail.emergency': 'Emergency advance',
+    'wh.detail.emergencyBy': 'Forced by',
+
+    'wh.return.scanOrder': 'Scan order QR',
+    'wh.return.orSelect': 'Or select an order manually',
+    'wh.return.selectOrderPlaceholder': 'Select a dispatched or delivered order',
+    'wh.return.noOrdersForReturn': 'No dispatched or delivered orders',
+    'wh.return.invalidStatus': 'The selected order is not in return',
+    'wh.return.scanSerials': 'Scan returning serials',
+    'wh.return.scanSerialsHint': 'Scan the QR or code of each returned serial; only scanned serials are verified.',
+    'wh.return.serialUnknown': 'Scanned serial not found',
+    'wh.return.serialNotAssigned': 'This serial does not belong to this order',
+    'wh.return.serialAlreadyScanned': 'This serial was already scanned',
+    'wh.return.returned': 'Returned',
   },
 });
 
@@ -533,6 +590,17 @@ const toNumOrNull = (v: unknown): number | null | undefined =>
 const toBool = (v: unknown, fallback = false): boolean => (typeof v === 'boolean' ? v : fallback);
 
 function docToProduct(id: string, data: Record<string, unknown>): Product {
+  const priceTiers: Product['priceTiers'] = Array.isArray(data.priceTiers)
+    ? (data.priceTiers as Array<Record<string, unknown>>)
+        .filter(t => t && typeof t === 'object')
+        .map(t => ({
+          minQty: toNum(t.minQty),
+          maxQty: toNumOrNull(t.maxQty) ?? null,
+          pricePerDay: toNum(t.pricePerDay),
+        }))
+        .filter(t => t.minQty > 0 && t.pricePerDay > 0)
+        .sort((a, b) => a.minQty - b.minQty)
+    : null;
   return {
     id,
     tenantId: toStr(data.tenantId),
@@ -546,6 +614,7 @@ function docToProduct(id: string, data: Record<string, unknown>): Product {
     photoUrl: data.photoUrl ? toStr(data.photoUrl) : undefined,
     rentalPricePerDay: toNumOrNull(data.rentalPricePerDay) ?? null,
     depositPercent: toNumOrNull(data.depositPercent) ?? null,
+    priceTiers,
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
@@ -645,6 +714,8 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
           ? (raw.assignedUnitIds as unknown[]).filter((x): x is string => typeof x === 'string')
           : undefined,
         tallaRef: raw.tallaRef ? toStr(raw.tallaRef) : null,
+        unitPrice: toNumOrNull(raw.unitPrice) ?? null,
+        subtotal: toNumOrNull(raw.subtotal) ?? null,
       });
     }
   }
@@ -666,6 +737,14 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
     depositStatus: (data.depositStatus as RentalOrder['depositStatus']) ?? null,
     depositDiscountApprovedBy: data.depositDiscountApprovedBy ? toStr(data.depositDiscountApprovedBy) : null,
     depositDiscountEvidenceUrl: data.depositDiscountEvidenceUrl ? toStr(data.depositDiscountEvidenceUrl) : null,
+    subtotal: toNumOrNull(data.subtotal) ?? null,
+    discountId: data.discountId ? toStr(data.discountId) : null,
+    discountName: data.discountName ? toStr(data.discountName) : null,
+    discountPercent: toNumOrNull(data.discountPercent) ?? null,
+    total: toNumOrNull(data.total) ?? null,
+    emergencyDispatchReason: data.emergencyDispatchReason ? toStr(data.emergencyDispatchReason) : null,
+    emergencyDispatchBy: data.emergencyDispatchBy ? toStr(data.emergencyDispatchBy) : null,
+    emergencyDispatchAt: data.emergencyDispatchAt ? toStr(data.emergencyDispatchAt) : null,
     observations: data.observations ? toStr(data.observations) : null,
     activityRef: data.activityRef ? toStr(data.activityRef) : null,
     preparedBy: data.preparedBy ? toStr(data.preparedBy) : null,
@@ -683,24 +762,31 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
   };
 }
 
-// ═══════════════════════════════════════════════════════════════════
-// SEMILLAS IDEMPOTENTES (ids deterministas, nunca pisan renombres)
-// ═══════════════════════════════════════════════════════════════════
+function docToInventoryStock(id: string, data: Record<string, unknown>): InventoryStock {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    productId: toStr(data.productId),
+    locationId: toStr(data.locationId),
+    quantity: toNum(data.quantity),
+    updatedAt: toStr(data.updatedAt),
+    updatedBy: toStr(data.updatedBy),
+  };
+}
 
-const SEED_ORDER_STATUSES: Array<{
-  id: string; name: string; nameEn: string; order: number;
-  isFinalOk?: boolean; isFinalRepair?: boolean;
-}> = [
-  { id: 'recibido', name: 'Recibido', nameEn: 'Received', order: 1 },
-  { id: 'en_preparacion', name: 'En preparación', nameEn: 'In preparation', order: 2 },
-  { id: 'listo_despachar', name: 'Listo para despachar', nameEn: 'Ready to dispatch', order: 3 },
-  { id: 'despachado', name: 'Despachado', nameEn: 'Dispatched', order: 4 },
-  { id: 'entregado', name: 'Entregado', nameEn: 'Delivered', order: 5 },
-  { id: 'devuelto', name: 'Devuelto', nameEn: 'Returned', order: 6 },
-  { id: 'verificado', name: 'Verificado', nameEn: 'Verified', order: 7 },
-  { id: 'almacenado', name: 'Almacenado', nameEn: 'Stored', order: 8, isFinalOk: true },
-  { id: 'a_reparacion', name: 'A reparación', nameEn: 'To repair', order: 9, isFinalRepair: true },
-];
+function docToRentalDiscount(id: string, data: Record<string, unknown>): RentalDiscount {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    name: toStr(data.name),
+    percent: toNum(data.percent),
+    isActive: toBool(data.isActive, true),
+    createdAt: toStr(data.createdAt),
+    createdBy: toStr(data.createdBy),
+    updatedAt: data.updatedAt ? toStr(data.updatedAt) : undefined,
+    updatedBy: data.updatedBy ? toStr(data.updatedBy) : undefined,
+  };
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // ROLES
@@ -723,11 +809,40 @@ const APPROVE_ROLES: Role[] = [
   Role.SUPERVISOR,
 ];
 
+// Nivel Supervisor+ (misma jerarquía que InventarioModule): puede forzar el
+// avance de una orden en modo emergencia cuando el escáner no funciona
+const SUPERVISOR_PLUS_ROLES: Role[] = [
+  Role.DIRECTOR_GENERAL,
+  Role.DIRECTOR,
+  Role.RRHH,
+  Role.GERENTE_OPERACIONES,
+  Role.GERENTE_DEPARTAMENTO,
+  Role.SUPERVISOR,
+];
+
+// Estados que SOLO avanzan escaneando (QR de orden + seriales); el único
+// atajo manual permitido es el modo emergencia (Supervisor+, auditado)
+const SCAN_ONLY_STATUS_IDS = ['despachado', 'devuelto', 'verificado'];
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Precio por unidad/día aplicable a una cantidad: el tier más específico
+// (mayor minQty) cuyo rango cubra la cantidad; sin tier, el precio base.
+// null = producto sin precio definido.
+function unitPriceForQty(product: Product | undefined, qty: number): number | null {
+  if (!product || product.rentalPricePerDay == null) return null;
+  const tiers = (product.priceTiers ?? []).filter(
+    t => qty >= t.minQty && (t.maxQty == null || qty <= t.maxQty)
+  );
+  if (tiers.length === 0) return product.rentalPricePerDay;
+  return tiers.reduce((best, t) => (t.minQty >= best.minQty ? t : best)).pricePerDay;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // TIPOS INTERNOS
 // ═══════════════════════════════════════════════════════════════════
 
-type WhTab = 'board' | 'orders' | 'statuses' | 'returns';
+type WhTab = 'board' | 'orders' | 'returns';
 
 interface OrderItemDraft {
   productId: string;
@@ -745,6 +860,7 @@ interface OrderFormState {
   proofMode: 'foto' | 'ref';
   proofRef: string;
   depositAmount: string;
+  discountId: string; // '' = sin descuento (ref rentalDiscounts)
   observations: string;
   activityRef: string;
 }
@@ -759,6 +875,7 @@ const EMPTY_ORDER_FORM: OrderFormState = {
   proofMode: 'ref',
   proofRef: '',
   depositAmount: '',
+  discountId: '',
   observations: '',
   activityRef: '',
 };
@@ -855,6 +972,8 @@ export function WarehouseModule() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [rentalUnits, setRentalUnits] = useState<RentalUnit[]>([]);
   const [serialStatuses, setSerialStatuses] = useState<SerialStatus[]>([]);
+  const [stocks, setStocks] = useState<InventoryStock[]>([]);
+  const [rentalDiscounts, setRentalDiscounts] = useState<RentalDiscount[]>([]);
 
   // Estado de carga / error
   const [loading, setLoading] = useState(true);
@@ -893,16 +1012,6 @@ export function WarehouseModule() {
   const [quickClientType, setQuickClientType] = useState<'persona' | 'empresa'>('persona');
   const [savingClient, setSavingClient] = useState(false);
 
-  // CRUD del catálogo rentalOrderStatuses
-  const [stNewName, setStNewName] = useState('');
-  const [stNewNameEn, setStNewNameEn] = useState('');
-  const [stNewOrder, setStNewOrder] = useState('');
-  const [stEditingId, setStEditingId] = useState<string | null>(null);
-  const [stEditingName, setStEditingName] = useState('');
-  const [stEditingNameEn, setStEditingNameEn] = useState('');
-  const [stEditingOrder, setStEditingOrder] = useState('');
-  const [savingStatus, setSavingStatus] = useState(false);
-
   // Descontar fianza (solo canApprove)
   const [discountOrderId, setDiscountOrderId] = useState<string | null>(null);
   const [discountReason, setDiscountReason] = useState('');
@@ -922,14 +1031,31 @@ export function WarehouseModule() {
   // Verificación de retorno (WH-D2): marca por serial 'ok' | 'damaged'
   const [returnOpen, setReturnOpen] = useState(false);
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
+  const [returnStep, setReturnStep] = useState<1 | 2>(1);
+  // Seriales que regresan: solo entran a la verificación escaneándolos
+  const [returnedSerialIds, setReturnedSerialIds] = useState<Set<string>>(new Set());
   const [returnMarks, setReturnMarks] = useState<Record<string, 'ok' | 'damaged'>>({});
   const [savingReturn, setSavingReturn] = useState(false);
+  // Destino del escáner en el flujo de retorno: QR de orden o serial devuelto
+  const [returnScanTarget, setReturnScanTarget] = useState<'order' | 'serial' | null>(null);
+
+  // Modo emergencia (Supervisor+): forzar avance con motivo obligatorio
+  const [emergencyOrderId, setEmergencyOrderId] = useState<string | null>(null);
+  const [emergencyTargetId, setEmergencyTargetId] = useState('');
+  const [emergencyReason, setEmergencyReason] = useState('');
+  const [savingEmergency, setSavingEmergency] = useState(false);
+
+  // QR imprimible de la orden (botón rápido de las tarjetas)
+  const [qrOrderId, setQrOrderId] = useState<string | null>(null);
+
+  const { logAction } = useAudit();
 
   const tenantId = getCurrentTenantId();
   const enabled = isFeatureEnabled('enableWarehouse');
   const role = currentUser?.role;
   const canSeeMoney = !!role && MONEY_ROLES.includes(role);
   const canApprove = !!role && APPROVE_ROLES.includes(role);
+  const canSupervise = !!role && SUPERVISOR_PLUS_ROLES.includes(role);
   const canOperate = !!currentUser; // cualquier usuario autenticado opera órdenes
 
   const activeStatuses = useMemo(
@@ -945,6 +1071,13 @@ export function WarehouseModule() {
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
   const activeClients = useMemo(() => clients.filter(c => c.isActive), [clients]);
   const activeUsers = useMemo(() => users.filter(u => u.isActive), [users]);
+  const activeDiscounts = useMemo(
+    () => rentalDiscounts.filter(d => d.isActive && d.percent > 0),
+    [rentalDiscounts]
+  );
+
+  const stockAtLocation = (productId: string, locationId: string) =>
+    stocks.find(s => s.productId === productId && s.locationId === locationId)?.quantity ?? 0;
 
   // Unidades disponibles por producto (solo lectura, anti-sobre-renta visual)
   const availableUnitsCount = (productId: string) =>
@@ -984,6 +1117,32 @@ export function WarehouseModule() {
     const value = String(formDepositSuggestion.amount);
     setOrderForm(prev => (prev.depositAmount === value ? prev : { ...prev, depositAmount: value }));
   }, [canSeeMoney, formDepositSuggestion]);
+
+  // Precios del formulario (solo canSeeMoney): por ítem se aplica el tier que
+  // corresponda a la cantidad (sin tier, precio base); el descuento
+  // seleccionado se aplica sobre el subtotal. Base: 1 día de renta.
+  // Las líneas se alinean por índice con orderItems (ítem sin producto o
+  // cantidad inválida queda con precio null).
+  const formPricing = useMemo(() => {
+    if (!canSeeMoney) return null;
+    const lines = orderItems.map(it => {
+      const qty = Number(it.quantity);
+      const product = it.productId ? products.find(p => p.id === it.productId) : undefined;
+      const unitPrice =
+        product && Number.isFinite(qty) && qty > 0 ? unitPriceForQty(product, qty) : null;
+      return {
+        productId: it.productId,
+        qty,
+        unitPrice,
+        lineTotal: unitPrice != null ? round2(qty * unitPrice) : null,
+      };
+    });
+    const subtotal = round2(lines.reduce((acc, l) => acc + (l.lineTotal ?? 0), 0));
+    const discount = activeDiscounts.find(d => d.id === orderForm.discountId) ?? null;
+    const percent = discount?.percent ?? 0;
+    const total = round2(subtotal * (1 - percent / 100));
+    return { lines, subtotal, discount, percent, total };
+  }, [canSeeMoney, orderItems, products, activeDiscounts, orderForm.discountId]);
 
   // Sugerencia de fianza de una orden existente (referencia en el detalle):
   // días entre su creación y la fecha de entrega
@@ -1160,128 +1319,40 @@ export function WarehouseModule() {
     return () => unsub();
   }, [enabled, tenantId]);
 
-  // ═══════════════════════════════════════════════════════════════════
-  // CATÁLOGO DE ESTADOS (CRUD + seeds idempotentes)
-  // TODO WH-audit: registrar CRUD/seeds de estados cuando exista una
-  // acción de auditoría genérica adecuada (sin inventar tipos nuevos).
-  // ═══════════════════════════════════════════════════════════════════
-
-  const loadSeedStatuses = async () => {
-    await executeWithConfirm(
-      {
-        level: 2,
-        title: t('wh.statuses.seedsConfirmTitle'),
-        description: t('wh.statuses.seedsConfirmDesc'),
+  // Stock por producto/ubicación (disponibilidad mostrada en el formulario)
+  useEffect(() => {
+    if (!enabled) return;
+    const unsub = onSnapshot(
+      collection(db, CATALOG_COLLECTIONS.inventoryStocks),
+      (snap) => {
+        setStocks(
+          snap.docs
+            .map(d => docToInventoryStock(d.id, d.data()))
+            .filter(s => !s.tenantId || s.tenantId === tenantId)
+        );
       },
-      async () => {
-        setSavingStatus(true);
-        try {
-          let created = 0;
-          let existing = 0;
-          for (const seed of SEED_ORDER_STATUSES) {
-            const ref = doc(db, CATALOG_COLLECTIONS.rentalOrderStatuses, seed.id);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-              existing += 1;
-              continue;
-            }
-            await setDoc(ref, {
-              tenantId,
-              name: seed.name,
-              nameEn: seed.nameEn,
-              order: seed.order,
-              ...(seed.isFinalOk !== undefined ? { isFinalOk: seed.isFinalOk } : {}),
-              ...(seed.isFinalRepair !== undefined ? { isFinalRepair: seed.isFinalRepair } : {}),
-              isActive: true,
-            });
-            created += 1;
-          }
-          if (created === 0) {
-            toast.info(t('wh.statuses.seedsAlreadyLoaded'));
-          } else {
-            toast.success(tf('wh.statuses.seedsSummary', { created, existing }));
-          }
-        } catch (err) {
-          console.error('[WarehouseModule] loadSeedStatuses:', err);
-          toast.error(t('wh.toast.error'));
-        } finally {
-          setSavingStatus(false);
-        }
-      }
+      (err) => console.error('[WarehouseModule] inventoryStocks:', err)
     );
-  };
+    return () => unsub();
+  }, [enabled, tenantId]);
 
-  const createStatus = async () => {
-    const name = stNewName.trim();
-    const order = Number(stNewOrder);
-    if (!name) {
-      toast.error(t('wh.statuses.validation.nameRequired'));
-      return;
-    }
-    if (!Number.isInteger(order)) {
-      toast.error(t('wh.statuses.validation.orderInvalid'));
-      return;
-    }
-    setSavingStatus(true);
-    try {
-      await addDoc(collection(db, CATALOG_COLLECTIONS.rentalOrderStatuses), {
-        tenantId,
-        name,
-        nameEn: stNewNameEn.trim() || null,
-        order,
-        isActive: true,
-      });
-      setStNewName('');
-      setStNewNameEn('');
-      setStNewOrder('');
-      toast.success(t('wh.statuses.created'));
-    } catch (err) {
-      console.error('[WarehouseModule] createStatus:', err);
-      toast.error(t('wh.toast.error'));
-    } finally {
-      setSavingStatus(false);
-    }
-  };
-
-  const saveStatusEdit = async (status: RentalOrderStatus) => {
-    const name = stEditingName.trim();
-    const order = Number(stEditingOrder);
-    if (!name) {
-      toast.error(t('wh.statuses.validation.nameRequired'));
-      return;
-    }
-    if (!Number.isInteger(order)) {
-      toast.error(t('wh.statuses.validation.orderInvalid'));
-      return;
-    }
-    setSavingStatus(true);
-    try {
-      await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrderStatuses, status.id!), {
-        name,
-        nameEn: stEditingNameEn.trim() || null,
-        order,
-      });
-      setStEditingId(null);
-      toast.success(t('wh.statuses.updated'));
-    } catch (err) {
-      console.error('[WarehouseModule] saveStatusEdit:', err);
-      toast.error(t('wh.toast.error'));
-    } finally {
-      setSavingStatus(false);
-    }
-  };
-
-  const toggleStatusActive = async (status: RentalOrderStatus) => {
-    try {
-      await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrderStatuses, status.id!), {
-        isActive: !status.isActive,
-      });
-      toast.success(t('wh.statuses.updated'));
-    } catch (err) {
-      console.error('[WarehouseModule] toggleStatusActive:', err);
-      toast.error(t('wh.toast.error'));
-    }
-  };
+  // Descuentos preconfigurados de renta (selector del formulario de orden)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.rentalDiscounts), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setRentalDiscounts(
+          snap.docs
+            .map(d => docToRentalDiscount(d.id, d.data()))
+            .filter(d => !d.tenantId || d.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[WarehouseModule] rentalDiscounts:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
 
   // ═══════════════════════════════════════════════════════════════════
   // CLIENTE RÁPIDO
@@ -1361,7 +1432,7 @@ export function WarehouseModule() {
     }
     const firstStatus = activeStatuses[0];
     if (!firstStatus) {
-      toast.error(t('wh.statuses.empty'));
+      toast.error(t('wh.orders.noStatuses'));
       return;
     }
 
@@ -1374,6 +1445,19 @@ export function WarehouseModule() {
       const deposit = canSeeMoney ? Number(orderForm.depositAmount) : 0;
       const hasDeposit = canSeeMoney && Number.isFinite(deposit) && deposit > 0;
       const now = new Date().toISOString();
+      // Precios cobrados: solo los registra personal con permiso de montos.
+      // Los demás roles dejan los campos en null (la orden no expone dinero).
+      const pricingLines = canSeeMoney
+        ? orderItems.map(it => {
+            const qty = Number(it.quantity);
+            const product = products.find(p => p.id === it.productId);
+            const unitPrice = product ? unitPriceForQty(product, qty) : null;
+            return { unitPrice, subtotal: unitPrice != null ? round2(qty * unitPrice) : null };
+          })
+        : [];
+      const subtotal = canSeeMoney && formPricing ? formPricing.subtotal : null;
+      const discount = canSeeMoney ? formPricing?.discount ?? null : null;
+      const total = canSeeMoney && formPricing ? formPricing.total : null;
       await addDoc(collection(db, CATALOG_COLLECTIONS.rentalOrders), {
         tenantId,
         // TODO: orderNumber lo asigna una Cloud Function (correlativo); por ahora null
@@ -1381,10 +1465,13 @@ export function WarehouseModule() {
         clientType: orderForm.clientType,
         clientId: client.id,
         clientName: client.name,
-        items: orderItems.map(it => ({
+        items: orderItems.map((it, idx) => ({
           productId: it.productId,
           quantity: Number(it.quantity),
           tallaRef: it.tallaRef.trim() || null,
+          ...(canSeeMoney
+            ? { unitPrice: pricingLines[idx]?.unitPrice ?? null, subtotal: pricingLines[idx]?.subtotal ?? null }
+            : {}),
         })),
         deliveryDate: orderForm.deliveryDate,
         locationId: orderForm.locationId || null,
@@ -1397,6 +1484,15 @@ export function WarehouseModule() {
             : null,
         depositAmount: hasDeposit ? deposit : null,
         depositStatus: hasDeposit ? 'retenida' : null,
+        ...(canSeeMoney
+          ? {
+              subtotal,
+              discountId: discount?.id ?? null,
+              discountName: discount?.name ?? null,
+              discountPercent: discount?.percent ?? null,
+              total,
+            }
+          : {}),
         activityRef:
           orderForm.clientType === 'interno' && orderForm.activityRef.trim()
             ? orderForm.activityRef.trim()
@@ -1420,12 +1516,33 @@ export function WarehouseModule() {
 
   // ═══════════════════════════════════════════════════════════════════
   // TRANSICIONES DE ESTADO
+  // despachado / devuelto / verificado NO avanzan con el botón manual: el
+  // único camino es escanear (QR de orden + seriales); el modo emergencia
+  // (Supervisor+, motivo obligatorio y auditado) es el único atajo.
   // ═══════════════════════════════════════════════════════════════════
+
+  const orderHasAssignedSerials = (order: RentalOrder) =>
+    order.items.some(it => (it.assignedUnitIds ?? []).length > 0);
+
+  const isScanOnlyTarget = (order: RentalOrder, targetId: string) => {
+    if (!SCAN_ONLY_STATUS_IDS.includes(targetId)) return false;
+    // Sin seriales asignados no hay nada que escanear: el avance manual sigue
+    // disponible para no bloquear órdenes de productos no serializados
+    if ((targetId === 'devuelto' || targetId === 'verificado') && !orderHasAssignedSerials(order)) {
+      return false;
+    }
+    return true;
+  };
 
   const buildTransitionPatch = (target: RentalOrderStatus): Record<string, unknown> => {
     const now = new Date().toISOString();
     const patch: Record<string, unknown> = { statusId: target.id, updatedAt: now };
     const key = target.id || '';
+    if (key === 'despachado') {
+      // Solo ocurre vía modo emergencia: el escaneo normal lo registra en confirmDispatch
+      patch.dispatchedBy = currentUser!.name;
+      patch.dispatchedAt = now;
+    }
     if (key === 'entregado') patch.deliveredAt = now;
     if (key === 'devuelto') patch.returnedAt = now;
     if (key === 'verificado') {
@@ -1438,6 +1555,14 @@ export function WarehouseModule() {
 
   const advanceOrder = async (order: RentalOrder, target: RentalOrderStatus) => {
     if (!canOperate) return;
+    if (isScanOnlyTarget(order, target.id || '')) {
+      toast.error(
+        target.id === 'despachado'
+          ? t('wh.scanOnly.dispatchBlocked')
+          : t('wh.scanOnly.returnBlocked')
+      );
+      return;
+    }
     await executeWithConfirm(
       {
         level: 2,
@@ -1451,6 +1576,69 @@ export function WarehouseModule() {
         } catch (err) {
           console.error('[WarehouseModule] advanceOrder:', err);
           toast.error(t('wh.toast.error'));
+        }
+      }
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // MODO EMERGENCIA: el escáner no funciona y un Supervisor+ debe forzar el
+  // avance. Motivo obligatorio en la orden + registro de auditoría.
+  // ═══════════════════════════════════════════════════════════════════
+
+  const openEmergency = (order: RentalOrder) => {
+    if (!canSupervise) {
+      toast.error(t('wh.emergency.forbidden'));
+      return;
+    }
+    const firstBlocked = advanceTargetsFor(order).find(t => isScanOnlyTarget(order, t.id || ''));
+    setEmergencyOrderId(order.id!);
+    setEmergencyTargetId(firstBlocked?.id ?? '');
+    setEmergencyReason('');
+  };
+
+  const saveEmergency = async () => {
+    const order = orders.find(o => o.id === emergencyOrderId);
+    const target = statuses.find(s => s.id === emergencyTargetId);
+    const reason = emergencyReason.trim();
+    if (!order || !currentUser) return;
+    if (!target || !reason) {
+      toast.error(t('wh.emergency.reason'));
+      return;
+    }
+    await executeWithConfirm(
+      {
+        level: 'major',
+        title: t('wh.emergency.title'),
+        description: tf('wh.confirm.advanceDesc', { name: statusName(target) }),
+      },
+      async () => {
+        setSavingEmergency(true);
+        try {
+          const now = new Date().toISOString();
+          await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+            ...buildTransitionPatch(target),
+            emergencyDispatchReason: reason,
+            emergencyDispatchBy: currentUser.name,
+            emergencyDispatchAt: now,
+          });
+          await logAction({
+            action: 'RENTAL_ORDER_EMERGENCY_DISPATCH' as AuditAction,
+            targetType: 'rental_order',
+            targetId: order.id!,
+            targetName: order.orderNumber != null ? `Orden #${order.orderNumber}` : order.clientName,
+            previousValue: { statusId: order.statusId },
+            newValue: { statusId: target.id, reason },
+            impactLevel: 'sensitive',
+            description: `Avance forzado en modo emergencia a "${statusName(target)}" sin escáner. Motivo: ${reason}`,
+          });
+          setEmergencyOrderId(null);
+          toast.success(t('wh.emergency.toast'));
+        } catch (err) {
+          console.error('[WarehouseModule] saveEmergency:', err);
+          toast.error(t('wh.toast.error'));
+        } finally {
+          setSavingEmergency(false);
         }
       }
     );
@@ -1713,7 +1901,10 @@ export function WarehouseModule() {
   };
 
   // ═══════════════════════════════════════════════════════════════════
-  // RETORNO (WH-D2): verificación de seriales devueltos
+  // RETORNO (WH-D2): verificación de seriales devueltos.
+  // Flujo obligatorio por escáner: (1) QR de la orden, (2) cada serial que
+  // regresa se escanea para entrar a la verificación y se marca OK/Dañada.
+  // Solo así la orden avanza a su estado final (almacenado / a reparación).
   // TODO WH-audit: registrar la verificación cuando exista una acción de
   // auditoría genérica adecuada (sin inventar tipos nuevos).
   // ═══════════════════════════════════════════════════════════════════
@@ -1727,18 +1918,72 @@ export function WarehouseModule() {
     return out;
   };
 
-  const openReturn = (orderId: string) => {
-    setReturnOrderId(orderId);
+  const openReturn = (orderId?: string) => {
+    setReturnOrderId(orderId ?? null);
+    setReturnStep(orderId ? 2 : 1);
+    setReturnedSerialIds(new Set());
     setReturnMarks({});
     setReturnOpen(true);
+  };
+
+  const closeReturn = () => {
+    setReturnOpen(false);
+    setReturnOrderId(null);
+    setReturnStep(1);
+    setReturnedSerialIds(new Set());
+    setReturnMarks({});
+  };
+
+  const selectReturnOrder = (order: RentalOrder) => {
+    if (order.statusId !== 'despachado' && order.statusId !== 'entregado') {
+      toast.error(t('wh.return.invalidStatus'));
+      return;
+    }
+    setReturnOrderId(order.id!);
+    setReturnedSerialIds(new Set());
+    setReturnMarks({});
+    setReturnStep(2);
+  };
+
+  // Escaneo en el flujo de retorno: QR de orden (paso 1) o serial devuelto
+  const handleReturnScan = (kind: 'order' | 'serial', id: string) => {
+    setReturnScanTarget(null);
+    if (kind === 'order') {
+      const order = orders.find(o => o.id === id);
+      if (!order) {
+        toast.error(t('wh.dispatch.orderUnknown'));
+        return;
+      }
+      selectReturnOrder(order);
+      return;
+    }
+    const order = returnOrder;
+    if (!order) return;
+    const unit = rentalUnits.find(u => u.id === id || u.serialNumber === id);
+    if (!unit) {
+      toast.error(t('wh.return.serialUnknown'));
+      return;
+    }
+    const assigned = assignedUnitEntries(order).some(e => e.unitId === unit.id);
+    if (!assigned) {
+      toast.error(t('wh.return.serialNotAssigned'));
+      return;
+    }
+    if (returnedSerialIds.has(unit.id!)) {
+      toast.error(t('wh.return.serialAlreadyScanned'));
+      return;
+    }
+    setReturnedSerialIds(prev => new Set(prev).add(unit.id!));
   };
 
   const finalizeReturn = async () => {
     const order = returnOrder;
     if (!order || !currentUser) return;
     const entries = assignedUnitEntries(order);
-    const okIds = entries.filter(e => returnMarks[e.unitId] === 'ok').map(e => e.unitId);
-    const damagedIds = entries.filter(e => returnMarks[e.unitId] === 'damaged').map(e => e.unitId);
+    const returnedEntries = entries.filter(e => returnedSerialIds.has(e.unitId));
+    const okIds = returnedEntries.filter(e => returnMarks[e.unitId] === 'ok').map(e => e.unitId);
+    const damagedIds = returnedEntries.filter(e => returnMarks[e.unitId] === 'damaged').map(e => e.unitId);
+    // Todo serial asignado debe haber regresado (escaneado) y estar marcado
     if (entries.length > 0 && okIds.length + damagedIds.length < entries.length) return;
     await executeWithConfirm(
       {
@@ -1766,7 +2011,7 @@ export function WarehouseModule() {
           }
           // Devolución a inventario: solo las unidades OK vuelven al stock
           for (const [idx, it] of order.items.entries()) {
-            const okQty = entries.filter(e => e.itemIdx === idx && returnMarks[e.unitId] === 'ok').length;
+            const okQty = returnedEntries.filter(e => e.itemIdx === idx && returnMarks[e.unitId] === 'ok').length;
             if (okQty === 0) continue;
             await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
               tenantId,
@@ -1791,13 +2036,12 @@ export function WarehouseModule() {
             statusId: allOk ? 'almacenado' : 'a_reparacion',
             verifiedBy: currentUser.name,
             verifiedAt: now,
+            ...(order.returnedAt ? {} : { returnedAt: now }),
             ...(allOk ? { storedAt: now } : {}),
             updatedAt: now,
           });
           // TODO WH-audit: registrar la verificación cuando exista una acción adecuada
-          setReturnOpen(false);
-          setReturnOrderId(null);
-          setReturnMarks({});
+          closeReturn();
           toast.success(t('wh.toast.returnVerified'));
         } catch (err) {
           console.error('[WarehouseModule] finalizeReturn:', err);
@@ -1822,10 +2066,14 @@ export function WarehouseModule() {
 
   // Siguientes estados ofrecidos: el primer no-final; si solo quedan
   // finales, se ofrecen todos los finales (almacenado / a_reparacion).
+  // Los estados de escaneo obligatorio (despachado, devuelto, verificado con
+  // seriales asignados) nunca se ofrecen aquí: solo avanzan escaneando.
   const advanceTargetsFor = (order: RentalOrder): RentalOrderStatus[] => {
     const current = statusById(order.statusId);
     if (!current) return [];
-    const nexts = activeStatuses.filter(s => s.order > current.order);
+    const nexts = activeStatuses
+      .filter(s => s.order > current.order)
+      .filter(s => !isScanOnlyTarget(order, s.id || ''));
     const nonFinal = nexts.filter(s => !s.isFinalOk && !s.isFinalRepair);
     if (nonFinal.length > 0) return [nonFinal[0]];
     return nexts.filter(s => s.isFinalOk || s.isFinalRepair);
@@ -1910,7 +2158,6 @@ export function WarehouseModule() {
   const tabs: Array<{ id: WhTab; label: string }> = [
     { id: 'board', label: t('wh.tab.board') },
     { id: 'orders', label: t('wh.tab.orders') },
-    { id: 'statuses', label: t('wh.tab.statuses') },
     { id: 'returns', label: t('wh.tab.returns') },
   ];
 
@@ -1920,6 +2167,20 @@ export function WarehouseModule() {
     const targets = advanceTargetsFor(order);
     const depositHeld =
       (order.depositAmount ?? 0) > 0 && order.depositStatus === 'retenida';
+    // Precios cobrados (solo canSeeMoney): se muestran los guardados en la
+    // orden; si la creó personal sin permiso de montos y faltan, se calculan
+    // al vuelo con los tiers vigentes del catálogo
+    const moneyLines = canSeeMoney
+      ? order.items.map(it => {
+          const p = products.find(pr => pr.id === it.productId);
+          const unitPrice = it.unitPrice ?? (p ? unitPriceForQty(p, it.quantity) : null);
+          return { unitPrice, lineTotal: unitPrice != null ? round2(it.quantity * unitPrice) : null };
+        })
+      : null;
+    const moneySubtotal = order.subtotal ?? (moneyLines ? round2(moneyLines.reduce((a, l) => a + (l.lineTotal ?? 0), 0)) : null);
+    const moneyTotal = order.total ?? (moneySubtotal != null
+      ? round2(moneySubtotal * (1 - (order.discountPercent ?? 0) / 100))
+      : null);
     return (
       <div className="space-y-4">
         {/* Ítems */}
@@ -1934,6 +2195,11 @@ export function WarehouseModule() {
                 <Package className="h-4 w-4 text-[#86868B] shrink-0" />
                 <span className="text-[#1D1D1F] font-medium">{productName(it.productId)}</span>
                 <span className="text-[#86868B]">×{it.quantity}</span>
+                {canSeeMoney && moneyLines && moneyLines[idx]?.unitPrice != null && (
+                  <span className="text-xs text-[#86868B]">
+                    (${moneyLines[idx].unitPrice} × {it.quantity} = ${moneyLines[idx].lineTotal})
+                  </span>
+                )}
                 {it.tallaRef && (
                   <span className="ml-auto text-xs text-[#86868B] border border-[#E5E5E7] bg-white rounded-full px-2 py-0.5">
                     {it.tallaRef}
@@ -1942,6 +2208,27 @@ export function WarehouseModule() {
               </div>
             ))}
           </div>
+          {/* Totales cobrados (solo canSeeMoney) */}
+          {canSeeMoney && moneySubtotal != null && moneyTotal != null && (
+            <div className="mt-2 bg-[#F5F5F7] rounded-xl px-3 py-2 text-sm space-y-0.5">
+              <div className="flex justify-between text-[#86868B]">
+                <span>{t('wh.detail.subtotal')}</span>
+                <span>${moneySubtotal}</span>
+              </div>
+              {(order.discountPercent ?? 0) > 0 && (
+                <div className="flex justify-between text-[#86868B]">
+                  <span>
+                    {t('wh.detail.discountLabel')}: {order.discountName ?? ''} (-{order.discountPercent}%)
+                  </span>
+                  <span>-${round2(moneySubtotal * ((order.discountPercent ?? 0) / 100))}</span>
+                </div>
+              )}
+              <div className="flex justify-between font-medium text-[#1D1D1F] pt-0.5 border-t border-[#E5E5E7]">
+                <span>{t('wh.detail.total')}</span>
+                <span>${moneyTotal}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Datos generales */}
@@ -2133,14 +2420,86 @@ export function WarehouseModule() {
                 {t('wh.return.button')}
               </Button>
             )}
+            {/* Modo emergencia (discreto, Supervisor+): forzar el avance cuando
+                el escáner no funciona; motivo obligatorio y auditado */}
+            {canSupervise &&
+              ['listo_despachar', 'despachado', 'entregado', 'devuelto'].includes(order.statusId) && (
+                <button
+                  type="button"
+                  onClick={() => openEmergency(order)}
+                  className="ml-auto inline-flex items-center gap-1 text-[11px] text-[#86868B] hover:text-amber-700 underline-offset-2 hover:underline"
+                >
+                  <AlertTriangle className="h-3 w-3" />
+                  {t('wh.emergency.button')}
+                </button>
+              )}
             {targets.length === 0 && !currentStatus?.isFinalOk && !currentStatus?.isFinalRepair && (
               <span className="text-xs text-[#86868B]">{statusName(currentStatus)}</span>
             )}
           </div>
         )}
+
+        {/* Avance forzado en modo emergencia (auditable) */}
+        {order.emergencyDispatchReason && (
+          <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 space-y-0.5">
+            <p className="font-medium">{t('wh.detail.emergency')}</p>
+            <p>{order.emergencyDispatchReason}</p>
+            <p className="text-[#86868B]">
+              {t('wh.detail.emergencyBy')}: {order.emergencyDispatchBy || '—'}
+              {order.emergencyDispatchAt ? ` · ${fmtDateTime(order.emergencyDispatchAt)}` : ''}
+            </p>
+          </div>
+        )}
       </div>
     );
   };
+
+  // Botones rápidos de cada tarjeta de orden (pizarra y lista): cada botón
+  // hace exactamente lo que dice, sin confirmaciones extra. El contenedor
+  // detiene la propagación para no disparar el clic de expansión/detalle.
+  const renderQuickActions = (order: RentalOrder) => (
+    <div className="flex flex-wrap items-center gap-1" onClick={e => e.stopPropagation()}>
+      {order.statusId === 'listo_despachar' && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 rounded-lg text-[11px] gap-1 border-corporate text-corporate hover:bg-corporate/10"
+          onClick={() => openDispatch(order.id!)}
+        >
+          <QrCode className="h-3 w-3" />
+          {t('wh.quick.dispatch')}
+        </Button>
+      )}
+      {(order.statusId === 'despachado' || order.statusId === 'entregado') && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 rounded-lg text-[11px] gap-1 border-[#E5E5E7] text-[#1D1D1F]"
+          onClick={() => openReturn(order.id!)}
+        >
+          <RotateCcw className="h-3 w-3" />
+          {t('wh.quick.return')}
+        </Button>
+      )}
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 rounded-lg text-[11px] text-[#86868B] hover:text-[#1D1D1F]"
+        onClick={() => setDetailOrderId(order.id!)}
+      >
+        {t('wh.quick.detail')}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 rounded-lg text-[11px] text-[#86868B] hover:text-[#1D1D1F]"
+        onClick={() => setQrOrderId(order.id!)}
+      >
+        <Printer className="h-3 w-3" />
+        {t('wh.quick.qr')}
+      </Button>
+    </div>
+  );
 
   // ═══════════════════════════════════════════════════════════════════
   // RENDER
@@ -2195,10 +2554,15 @@ export function WarehouseModule() {
                       <span className="text-xs text-[#86868B]">{columnOrders.length}</span>
                     </div>
                     {columnOrders.map(order => (
-                      <button
+                      <div
                         key={order.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setDetailOrderId(order.id!)}
-                        className="w-full text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') setDetailOrderId(order.id!);
+                        }}
+                        className="w-full text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
                       >
                         <p className="text-sm font-medium text-[#1D1D1F] truncate">{order.clientName}</p>
                         <p className="text-xs text-[#86868B] mt-0.5 flex items-center gap-1">
@@ -2206,7 +2570,8 @@ export function WarehouseModule() {
                           {fmtTime(order.deliveryDate)}
                         </p>
                         <p className="text-xs text-[#86868B] mt-1 truncate">{itemsSummary(order)}</p>
-                      </button>
+                        {canOperate && <div className="mt-2">{renderQuickActions(order)}</div>}
+                      </div>
                     ))}
                   </div>
                 );
@@ -2365,6 +2730,11 @@ export function WarehouseModule() {
                     <ChevronDown className="h-4 w-4 text-[#86868B] shrink-0" />
                   )}
                 </div>
+                {canOperate && (
+                  <div className="px-3 pb-2" onClick={e => e.stopPropagation()}>
+                    {renderQuickActions(order)}
+                  </div>
+                )}
                 {isOpen && (
                   <div className="px-3 pb-3 pt-1 border-t border-[#E5E5E7]">
                     {renderOrderDetail(order)}
@@ -2373,180 +2743,6 @@ export function WarehouseModule() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* ─── SUB-PESTAÑA: ESTADOS ─── */}
-      {tab === 'statuses' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <ClipboardList className="h-4 w-4 text-corporate" />
-              <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.statuses')}</h3>
-            </div>
-            <p className="text-xs text-[#86868B]">{t('wh.statuses.help')}</p>
-            <p className="text-xs text-[#86868B] mt-1">{t('wh.statuses.noDelete')}</p>
-          </div>
-
-          {/* Formulario de creación */}
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div>
-                <Label className="text-xs text-[#86868B]">{t('wh.statuses.name')}</Label>
-                <Input
-                  value={stNewName}
-                  onChange={e => setStNewName(e.target.value)}
-                  className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-[#86868B]">{t('wh.statuses.nameEn')}</Label>
-                <Input
-                  value={stNewNameEn}
-                  onChange={e => setStNewNameEn(e.target.value)}
-                  className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-[#86868B]">{t('wh.statuses.order')}</Label>
-                <Input
-                  type="number"
-                  value={stNewOrder}
-                  onChange={e => setStNewOrder(e.target.value)}
-                  className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
-                />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button
-                  size="sm"
-                  onClick={createStatus}
-                  disabled={savingStatus}
-                  className="rounded-xl bg-corporate hover:bg-corporate/90 gap-1"
-                >
-                  <Plus className="h-4 w-4" />
-                  {t('wh.statuses.new')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={loadSeedStatuses}
-                  disabled={savingStatus}
-                  className="rounded-xl border-[#E5E5E7] gap-1"
-                >
-                  <Upload className="h-4 w-4" />
-                  {t('wh.statuses.loadSeeds')}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Lista del catálogo */}
-          {sortedStatuses.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
-              {t('wh.statuses.empty')}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {sortedStatuses.map(status => {
-                const isEditing = stEditingId === status.id;
-                return (
-                  <div
-                    key={status.id}
-                    className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3"
-                  >
-                    {isEditing ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <Input
-                          value={stEditingName}
-                          onChange={e => setStEditingName(e.target.value)}
-                          className="rounded-xl border-[#E5E5E7] text-sm"
-                        />
-                        <Input
-                          value={stEditingNameEn}
-                          onChange={e => setStEditingNameEn(e.target.value)}
-                          className="rounded-xl border-[#E5E5E7] text-sm"
-                        />
-                        <Input
-                          type="number"
-                          value={stEditingOrder}
-                          onChange={e => setStEditingOrder(e.target.value)}
-                          className="rounded-xl border-[#E5E5E7] text-sm"
-                        />
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => saveStatusEdit(status)}
-                            disabled={savingStatus}
-                            className="rounded-xl bg-corporate hover:bg-corporate/90"
-                          >
-                            {t('wh.common.save')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setStEditingId(null)}
-                            className="rounded-xl border-[#E5E5E7]"
-                          >
-                            {t('wh.common.cancel')}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-[#1D1D1F] w-40 truncate">
-                          {statusName(status)}
-                        </span>
-                        <span className="text-xs text-[#86868B]">{t('wh.statuses.order')}: {status.order}</span>
-                        {status.isFinalOk && (
-                          <span className="rounded-full px-2 py-0.5 text-[11px] font-medium border bg-green-50 text-green-700 border-green-200">
-                            {t('wh.statuses.finalOk')}
-                          </span>
-                        )}
-                        {status.isFinalRepair && (
-                          <span className="rounded-full px-2 py-0.5 text-[11px] font-medium border bg-red-50 text-red-700 border-red-200">
-                            {t('wh.statuses.finalRepair')}
-                          </span>
-                        )}
-                        <span
-                          className={cn(
-                            'rounded-full px-2 py-0.5 text-[11px] font-medium border',
-                            status.isActive
-                              ? 'bg-green-50 text-green-700 border-green-200'
-                              : 'bg-[#F5F5F7] text-[#86868B] border-[#E5E5E7]'
-                          )}
-                        >
-                          {status.isActive ? t('wh.common.active') : t('wh.common.inactive')}
-                        </span>
-                        <div className="ml-auto flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 rounded-lg"
-                            onClick={() => {
-                              setStEditingId(status.id!);
-                              setStEditingName(status.name);
-                              setStEditingNameEn(status.nameEn ?? '');
-                              setStEditingOrder(String(status.order));
-                            }}
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-[#86868B]" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0 rounded-lg"
-                            onClick={() => toggleStatusActive(status)}
-                          >
-                            <Power className="h-3.5 w-3.5 text-[#86868B]" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </div>
       )}
 
@@ -2864,18 +3060,26 @@ export function WarehouseModule() {
               <div className="space-y-2">
                 {orderItems.map((item, idx) => (
                   <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <select
-                      value={item.productId}
-                      onChange={e => updateItem(idx, { productId: e.target.value })}
-                      className="col-span-12 sm:col-span-5 px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
-                    >
-                      <option value="">{t('wh.orderForm.selectProduct')}</option>
-                      {rentableProducts.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} ({tf('wh.orderForm.available', { count: availableUnitsCount(p.id!) })})
-                        </option>
-                      ))}
-                    </select>
+                    <div className="col-span-12 sm:col-span-5">
+                      <select
+                        value={item.productId}
+                        onChange={e => updateItem(idx, { productId: e.target.value })}
+                        className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+                      >
+                        <option value="">{t('wh.orderForm.selectProduct')}</option>
+                        {rentableProducts.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({tf('wh.orderForm.available', { count: availableUnitsCount(p.id!) })})
+                          </option>
+                        ))}
+                      </select>
+                      {/* Precio de la línea (solo quien cobra): tier según cantidad o precio base */}
+                      {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
+                        <p className="mt-0.5 text-[11px] text-[#86868B] pl-1">
+                          {t('wh.orderForm.unitPrice')}: ${formPricing.lines[idx].unitPrice} · ${formPricing.lines[idx].lineTotal}
+                        </p>
+                      )}
+                    </div>
                     <Input
                       type="number"
                       min={1}
@@ -2926,6 +3130,33 @@ export function WarehouseModule() {
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
                 </select>
+                {/* Disponibilidad por ubicación de cada producto rentable pedido */}
+                {orderForm.locationId &&
+                  orderItems.some(it => it.productId) && (
+                    <div className="mt-2 bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-0.5">
+                      <p className="text-[11px] font-medium text-[#86868B]">
+                        {tf('wh.orderForm.locationAvailability', { location: locationName(orderForm.locationId) })}
+                      </p>
+                      {orderItems
+                        .filter(it => it.productId)
+                        .map((it, idx) => {
+                          const available = stockAtLocation(it.productId, orderForm.locationId);
+                          const qty = Number(it.quantity) || 0;
+                          const short = qty > 0 && available < qty;
+                          return (
+                            <p
+                              key={idx}
+                              className={cn('text-xs', short ? 'text-red-700 font-medium' : 'text-[#1D1D1F]')}
+                            >
+                              {tf('wh.orderForm.availableInLocation', {
+                                product: productName(it.productId),
+                                count: available,
+                              })}
+                            </p>
+                          );
+                        })}
+                    </div>
+                  )}
               </div>
             </div>
 
@@ -2987,6 +3218,43 @@ export function WarehouseModule() {
                       amount: formDepositSuggestion.amount,
                     })}
                   </p>
+                )}
+                {/* Descuento preconfigurado: un toque modifica el total */}
+                <div>
+                  <Label className="text-xs text-[#86868B]">{t('wh.orderForm.discount')}</Label>
+                  <select
+                    value={orderForm.discountId}
+                    onChange={e => setOrderForm(prev => ({ ...prev, discountId: e.target.value }))}
+                    className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+                  >
+                    <option value="">{t('wh.orderForm.discountNone')}</option>
+                    {activeDiscounts.map(d => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} (-{d.percent}%)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {/* Totales: por ítem el tier que aplique; descuento sobre el total */}
+                {formPricing && (
+                  <div className="bg-white rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm space-y-0.5">
+                    <div className="flex justify-between text-[#86868B]">
+                      <span>{t('wh.orderForm.subtotal')}</span>
+                      <span>${formPricing.subtotal}</span>
+                    </div>
+                    {formPricing.percent > 0 && (
+                      <div className="flex justify-between text-[#86868B]">
+                        <span>
+                          {t('wh.orderForm.discount')}: {formPricing.discount?.name} (-{formPricing.percent}%)
+                        </span>
+                        <span>-${round2(formPricing.subtotal * (formPricing.percent / 100))}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-medium text-[#1D1D1F] pt-0.5 border-t border-[#E5E5E7]">
+                      <span>{t('wh.orderForm.total')}</span>
+                      <span>${formPricing.total}</span>
+                    </div>
+                  </div>
                 )}
                 <div>
                   <div className="flex items-center gap-1 bg-white rounded-full p-1 w-fit border border-[#E5E5E7]">
@@ -3283,16 +3551,61 @@ export function WarehouseModule() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── DIALOG: VERIFICAR RETORNO (WH-D2) ─── */}
-      <Dialog open={returnOpen} onOpenChange={open => !open && setReturnOpen(false)}>
+      {/* ─── DIALOG: VERIFICAR RETORNO (WH-D2, escaneo obligatorio) ─── */}
+      <Dialog open={returnOpen} onOpenChange={open => !open && closeReturn()}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#1D1D1F]">{t('wh.return.title')}</DialogTitle>
           </DialogHeader>
-          {returnOrder && (() => {
+          {/* Paso 1: escanear o seleccionar la orden que regresa */}
+          {returnStep === 1 && (
+            <div className="space-y-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReturnScanTarget('order')}
+                className="rounded-xl border-[#E5E5E7] gap-2"
+              >
+                <QrCode className="h-4 w-4" />
+                {t('wh.return.scanOrder')}
+              </Button>
+              <div>
+                <Label className="text-xs text-[#86868B]">{t('wh.return.orSelect')}</Label>
+                <select
+                  value={returnOrderId ?? ''}
+                  onChange={e => {
+                    const order = orders.find(o => o.id === e.target.value);
+                    if (order) selectReturnOrder(order);
+                  }}
+                  className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+                >
+                  <option value="">{t('wh.return.selectOrderPlaceholder')}</option>
+                  {orders
+                    .filter(o => o.statusId === 'despachado' || o.statusId === 'entregado')
+                    .map(o => (
+                      <option key={o.id} value={o.id}>
+                        {o.orderNumber != null ? `#${o.orderNumber} · ` : ''}{o.clientName}
+                      </option>
+                    ))}
+                </select>
+                {orders.filter(o => o.statusId === 'despachado' || o.statusId === 'entregado').length === 0 && (
+                  <p className="mt-1 text-xs text-[#86868B]">{t('wh.return.noOrdersForReturn')}</p>
+                )}
+              </div>
+              {returnOrder && (
+                <p className="text-sm text-[#1D1D1F] bg-[#F5F5F7] rounded-xl px-3 py-2">
+                  {returnOrder.orderNumber != null ? `#${returnOrder.orderNumber} · ` : ''}
+                  {returnOrder.clientName}
+                  {' · '}{itemsSummary(returnOrder)}
+                </p>
+              )}
+            </div>
+          )}
+          {/* Paso 2: escanear los seriales que regresan y marcarse OK/Dañada */}
+          {returnStep === 2 && returnOrder && (() => {
             const entries = assignedUnitEntries(returnOrder);
-            const damagedCount = entries.filter(e => returnMarks[e.unitId] === 'damaged').length;
-            const allMarked = entries.length > 0 && entries.every(e => returnMarks[e.unitId]);
+            const damagedCount = entries.filter(e => returnedSerialIds.has(e.unitId) && returnMarks[e.unitId] === 'damaged').length;
+            const allMarked = entries.length === 0 || entries.every(e => returnedSerialIds.has(e.unitId) && returnMarks[e.unitId]);
             const depositHeld =
               (returnOrder.depositAmount ?? 0) > 0 && returnOrder.depositStatus === 'retenida';
             return (
@@ -3302,16 +3615,32 @@ export function WarehouseModule() {
                   {returnOrder.orderNumber != null ? `#${returnOrder.orderNumber} · ` : ''}
                   {returnOrder.clientName}
                 </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setReturnScanTarget('serial')}
+                    className="h-7 rounded-lg border-[#E5E5E7] text-xs gap-1"
+                  >
+                    <QrCode className="h-3.5 w-3.5" />
+                    {t('wh.return.scanSerials')}
+                  </Button>
+                  <span className="text-xs text-[#86868B]">{t('wh.return.scanSerialsHint')}</span>
+                </div>
                 <div className="space-y-2">
                   {entries.map(({ unitId }) => {
                     const unit = rentalUnits.find(u => u.id === unitId);
                     if (!unit) return null;
+                    const returned = returnedSerialIds.has(unitId);
                     const mark = returnMarks[unitId];
                     const st = serialStatuses.find(s => s.id === unit.statusId);
                     return (
                       <div
                         key={unitId}
-                        className="flex items-center gap-3 rounded-xl border border-[#E5E5E7] p-3"
+                        className={cn(
+                          'flex items-center gap-3 rounded-xl border p-3',
+                          returned ? 'border-[#E5E5E7]' : 'border-dashed border-[#E5E5E7] opacity-60'
+                        )}
                       >
                         {unit.photoUrl ? (
                           <img
@@ -3329,38 +3658,44 @@ export function WarehouseModule() {
                           <p className="text-xs text-[#86868B]">
                             {unit.size && <span className="mr-2">{unit.size}</span>}
                             {st ? serialStatusName(st) : unit.statusId}
+                            {!returned && <span className="ml-2">· {t('wh.return.scanSerials')}</span>}
                           </p>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReturnMarks(m => ({ ...m, [unitId]: 'ok' }))}
-                            className={cn(
-                              'h-7 rounded-lg text-xs gap-1',
-                              mark === 'ok'
-                                ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-50'
-                                : 'border-[#E5E5E7]'
-                            )}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5" />
-                            {t('wh.return.markOk')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setReturnMarks(m => ({ ...m, [unitId]: 'damaged' }))}
-                            className={cn(
-                              'h-7 rounded-lg text-xs gap-1',
-                              mark === 'damaged'
-                                ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-50'
-                                : 'border-[#E5E5E7]'
-                            )}
-                          >
-                            <XCircle className="h-3.5 w-3.5" />
-                            {t('wh.return.markDamaged')}
-                          </Button>
-                        </div>
+                        {returned && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[10px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-1.5 py-0.5">
+                              {t('wh.return.returned')}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setReturnMarks(m => ({ ...m, [unitId]: 'ok' }))}
+                              className={cn(
+                                'h-7 rounded-lg text-xs gap-1',
+                                mark === 'ok'
+                                  ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-50'
+                                  : 'border-[#E5E5E7]'
+                              )}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              {t('wh.return.markOk')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setReturnMarks(m => ({ ...m, [unitId]: 'damaged' }))}
+                              className={cn(
+                                'h-7 rounded-lg text-xs gap-1',
+                                mark === 'damaged'
+                                  ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-50'
+                                  : 'border-[#E5E5E7]'
+                              )}
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              {t('wh.return.markDamaged')}
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -3378,7 +3713,7 @@ export function WarehouseModule() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          setReturnOpen(false);
+                          closeReturn();
                           openDiscount(returnOrder);
                         }}
                         className="ml-auto h-7 rounded-lg border-amber-300 text-amber-800 hover:bg-amber-100 text-xs"
@@ -3388,22 +3723,105 @@ export function WarehouseModule() {
                     )}
                   </div>
                 )}
-                <div className="flex justify-end gap-2 pt-2 border-t border-[#E5E5E7]">
+                <div className="flex justify-between items-center gap-2 pt-2 border-t border-[#E5E5E7]">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setReturnOpen(false)}
+                    onClick={() => {
+                      setReturnStep(1);
+                      setReturnOrderId(null);
+                      setReturnedSerialIds(new Set());
+                      setReturnMarks({});
+                    }}
+                    className="rounded-xl border-[#E5E5E7]"
+                  >
+                    {t('wh.dispatch.back')}
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={closeReturn}
+                      className="rounded-xl border-[#E5E5E7]"
+                    >
+                      {t('wh.common.cancel')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={finalizeReturn}
+                      disabled={savingReturn || !allMarked}
+                      className="rounded-xl bg-corporate hover:bg-corporate/90"
+                    >
+                      {savingReturn ? t('wh.return.finish') + '…' : t('wh.return.finish')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: MODO EMERGENCIA (Supervisor+, motivo obligatorio) ─── */}
+      <Dialog open={!!emergencyOrderId} onOpenChange={open => !open && setEmergencyOrderId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#1D1D1F]">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              {t('wh.emergency.title')}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const emergencyOrder = orders.find(o => o.id === emergencyOrderId);
+            if (!emergencyOrder) return null;
+            const blockedTargets = advanceTargetsFor(emergencyOrder).filter(s =>
+              isScanOnlyTarget(emergencyOrder, s.id || '')
+            );
+            return (
+              <div className="space-y-3">
+                <p className="text-xs text-[#86868B]">{t('wh.emergency.desc')}</p>
+                <p className="text-sm font-medium text-[#1D1D1F]">
+                  {emergencyOrder.orderNumber != null ? `#${emergencyOrder.orderNumber} · ` : ''}
+                  {emergencyOrder.clientName}
+                </p>
+                <div>
+                  <Label className="text-xs text-[#86868B]">{t('wh.emergency.target')}</Label>
+                  <select
+                    value={emergencyTargetId}
+                    onChange={e => setEmergencyTargetId(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+                  >
+                    <option value="">—</option>
+                    {blockedTargets.map(s => (
+                      <option key={s.id} value={s.id}>{statusName(s)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="text-xs text-[#86868B]">{t('wh.emergency.reason')}</Label>
+                  <Input
+                    value={emergencyReason}
+                    onChange={e => setEmergencyReason(e.target.value)}
+                    placeholder={t('wh.emergency.reasonPlaceholder')}
+                    className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEmergencyOrderId(null)}
                     className="rounded-xl border-[#E5E5E7]"
                   >
                     {t('wh.common.cancel')}
                   </Button>
                   <Button
                     size="sm"
-                    onClick={finalizeReturn}
-                    disabled={savingReturn || !allMarked}
-                    className="rounded-xl bg-corporate hover:bg-corporate/90"
+                    onClick={saveEmergency}
+                    disabled={savingEmergency || !emergencyTargetId || !emergencyReason.trim()}
+                    className="rounded-xl bg-amber-600 hover:bg-amber-600/90 text-white"
                   >
-                    {savingReturn ? t('wh.return.finish') + '…' : t('wh.return.finish')}
+                    {savingEmergency ? t('wh.common.save') + '…' : t('wh.common.save')}
                   </Button>
                 </div>
               </div>
@@ -3412,11 +3830,26 @@ export function WarehouseModule() {
         </DialogContent>
       </Dialog>
 
+      {/* ─── DIALOG: QR IMPRIMIBLE DE LA ORDEN ─── */}
+      <WhQrDialog
+        open={!!qrOrderId}
+        onOpenChange={open => !open && setQrOrderId(null)}
+        order={qrOrderId ? orders.find(o => o.id === qrOrderId) ?? null : null}
+      />
+
       {/* ─── MODAL: ESCANER QR (WH-D2: orden / serial / texto plano) ─── */}
       <WhScannerModal
-        open={scanTarget !== null}
-        onOpenChange={open => !open && setScanTarget(null)}
-        onScan={handleDispatchScan}
+        open={scanTarget !== null || returnScanTarget !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setScanTarget(null);
+            setReturnScanTarget(null);
+          }
+        }}
+        onScan={(kind, id) => {
+          if (returnScanTarget !== null) handleReturnScan(kind, id);
+          else handleDispatchScan(kind, id);
+        }}
         resolveManual={resolveManualScanCode}
       />
     </div>
@@ -3428,9 +3861,13 @@ export function WarehouseModule() {
 // app con searchParams order / serial; si el contenido no es URL, se
 // interpreta como texto plano de serial (número de serie o id). Incluye
 // entrada manual con el mismo parseo (prop resolveManual del padre).
+// Bug "HTML Element with id=... not found": html5-qrcode LANZA en su
+// CONSTRUCTOR si el contenedor no está en el DOM todavía. Con el Dialog
+// de Radix el portal puede montarse después del efecto, así que la
+// instancia se crea SOLO cuando el contenedor ya existe (reintento por
+// requestAnimationFrame) y el id es único por instancia (useId), igual que
+// en el ScannerModal de InventarioModule.
 // ═══════════════════════════════════════════════════════════════════
-
-const WH_SCANNER_CONTAINER_ID = 'wh-qr-scanner-container';
 
 interface WhScannerModalProps {
   open: boolean;
@@ -3444,6 +3881,11 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
   // Ref para que el callback del escáner siempre vea el handler actual
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
+  const resolveManualRef = useRef(resolveManual);
+  useEffect(() => { resolveManualRef.current = resolveManual; }, [resolveManual]);
+
+  // Id único por instancia: nunca colisiona entre dos modales montados
+  const instanceId = `wh-qr-scanner-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   // Entrada manual de código
   const [manualOpen, setManualOpen] = useState(false);
@@ -3455,9 +3897,9 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
     }
   }, [open]);
 
-  const applyManualCode = () => {
-    const text = manualCode.trim();
-    if (!text) return;
+  // Mismo parseo para cámara y entrada manual: URL con searchParams
+  // order / serial, o texto plano resuelto contra colecciones conocidas
+  const parseScan = (text: string): { kind: 'order' | 'serial'; id: string } | null => {
     let parsed: URL | null = null;
     try {
       parsed = new URL(text);
@@ -3466,13 +3908,74 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
     }
     const order = parsed?.searchParams.get('order') ?? null;
     const serial = parsed?.searchParams.get('serial') ?? null;
-    const result = order
-      ? { kind: 'order' as const, id: order }
-      : serial
-        ? { kind: 'serial' as const, id: serial }
-        : parsed
-          ? null
-          : resolveManual?.(text) ?? null;
+    if (order) return { kind: 'order', id: order };
+    if (serial) return { kind: 'serial', id: serial };
+    const trimmed = text.trim();
+    if (!parsed && trimmed) {
+      const resolved = resolveManualRef.current?.(trimmed) ?? null;
+      if (resolved) return resolved;
+      // Texto plano no resuelto: se entrega como serial (el flujo valida)
+      return { kind: 'serial', id: trimmed };
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    let disposed = false;
+    let scanner: Html5QrcodeScanner | null = null;
+    let rafId = 0;
+    let attempts = 0;
+
+    const start = () => {
+      if (disposed) return;
+      // El contenedor vive en el portal del Dialog: no se crea la instancia
+      // hasta verificar que existe (reintento durante ~1s).
+      const el = document.getElementById(instanceId);
+      if (!el) {
+        attempts += 1;
+        if (attempts < 60) rafId = requestAnimationFrame(start);
+        return;
+      }
+      try {
+        scanner = new Html5QrcodeScanner(
+          instanceId,
+          { fps: 10, qrbox: 250 },
+          /* verbose= */ false
+        );
+        scanner.render(
+          (decodedText) => {
+            const result = parseScan(decodedText);
+            if (!result) {
+              toast.error(t('wh.scanner.unrecognized'));
+              return;
+            }
+            // QR válido: detener la cámara y entregar el resultado
+            scanner?.clear().catch(() => undefined);
+            onScanRef.current(result.kind, result.id);
+          },
+          () => undefined // errores de lectura transitorios: se ignoran
+        );
+      } catch (err) {
+        console.error('[WhScannerModal]', err);
+        toast.error(t('wh.toast.error'));
+      }
+    };
+
+    rafId = requestAnimationFrame(start);
+
+    // Apaga la cámara al desmontar / cerrar el modal
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      const active = scanner;
+      scanner = null;
+      if (active) active.clear().catch(() => undefined);
+    };
+  }, [open, instanceId]);
+
+  const applyManualCode = () => {
+    const result = parseScan(manualCode);
     if (!result) {
       toast.error(t('wh.scanner.unrecognized'));
       return;
@@ -3480,53 +3983,6 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
     onOpenChange(false);
     onScanRef.current(result.kind, result.id);
   };
-
-  useEffect(() => {
-    if (!open) return;
-    let scanner: Html5QrcodeScanner | null = null;
-    try {
-      scanner = new Html5QrcodeScanner(
-        WH_SCANNER_CONTAINER_ID,
-        { fps: 10, qrbox: 250 },
-        /* verbose= */ false
-      );
-      scanner.render(
-        (decodedText) => {
-          let parsed: URL | null = null;
-          try {
-            parsed = new URL(decodedText);
-          } catch {
-            parsed = null;
-          }
-          const order = parsed?.searchParams.get('order') ?? null;
-          const serial = parsed?.searchParams.get('serial') ?? null;
-          // QR válido: detener la cámara y entregar el resultado
-          scanner?.clear().catch(() => undefined);
-          if (order) {
-            onScanRef.current('order', order);
-            return;
-          }
-          if (serial) {
-            onScanRef.current('serial', serial);
-            return;
-          }
-          if (!parsed && decodedText.trim()) {
-            onScanRef.current('serial', decodedText.trim());
-            return;
-          }
-          toast.error(t('wh.scanner.unrecognized'));
-        },
-        () => undefined // errores de lectura transitorios: se ignoran
-      );
-    } catch (err) {
-      console.error('[WhScannerModal]', err);
-      toast.error(t('wh.toast.error'));
-    }
-    // Apaga la cámara al desmontar / cerrar el modal
-    return () => {
-      scanner?.clear().catch(() => undefined);
-    };
-  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -3540,7 +3996,7 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('wh.scanner.hint')}</p>
           <div className="space-y-2">
-            <div id={WH_SCANNER_CONTAINER_ID} className="rounded-xl overflow-hidden" />
+            <div id={instanceId} className="rounded-xl overflow-hidden" />
             {!manualOpen ? (
               <button
                 type="button"
@@ -3569,6 +4025,103 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
               </div>
             )}
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DIÁLOGO QR DE LA ORDEN con impresión de etiqueta (mismo patrón que el
+// QrDialog de InventarioModule). El QR apunta al deep link
+// /warehouse?order=<id> que abre el detalle de la orden.
+// ═══════════════════════════════════════════════════════════════════
+
+function WhQrDialog({
+  open,
+  onOpenChange,
+  order,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  order: RentalOrder | null;
+}) {
+  const [dataUrl, setDataUrl] = useState('');
+
+  const qrText = order
+    ? `${window.location.origin}/warehouse?order=${order.id}`
+    : '';
+
+  useEffect(() => {
+    if (!open || !qrText) return;
+    let alive = true;
+    QRCode.toDataURL(qrText, { width: 512, margin: 2 })
+      .then(url => { if (alive) setDataUrl(url); })
+      .catch(err => console.error('[WhQrDialog] QRCode:', err));
+    return () => { alive = false; };
+  }, [open, qrText]);
+
+  const handlePrint = () => {
+    if (!dataUrl || !order) return;
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const title = order.orderNumber != null ? `Orden #${order.orderNumber}` : t('wh.qr.title');
+    win.document.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${title}</title>
+    <style>
+      body { font-family: -apple-system, system-ui, sans-serif; text-align: center; padding: 24px; color: #1D1D1F; }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      p.label { font-size: 14px; color: #555; margin: 0 0 16px; }
+      img { width: 280px; height: 280px; }
+    </style>
+  </head>
+  <body>
+    <h1>${title}</h1>
+    <p class="label">${order.clientName}</p>
+    <img src="${dataUrl}" alt="QR" />
+    <script>window.onload = function () { window.print(); };</script>
+  </body>
+</html>`);
+    win.document.close();
+    win.focus();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="rounded-2xl max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
+            <QrCode className="h-4 w-4 text-corporate" />
+            {t('wh.qr.title')}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col items-center gap-3">
+          {order && (
+            <p className="text-sm font-medium text-[#1D1D1F]">
+              {order.orderNumber != null ? `#${order.orderNumber} · ` : ''}{order.clientName}
+            </p>
+          )}
+          <p className="text-xs text-[#86868B]">{t('wh.qr.hint')}</p>
+          {dataUrl ? (
+            <img src={dataUrl} alt="QR" className="w-56 h-56 rounded-xl border border-[#E5E5E7]" />
+          ) : (
+            <div className="w-56 h-56 rounded-xl bg-[#F5F5F7] flex items-center justify-center text-xs text-[#86868B]">
+              {t('wh.loading')}
+            </div>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            disabled={!dataUrl}
+            className="h-8 text-xs rounded-lg border-[#E5E5E7] gap-2"
+          >
+            <Printer className="h-3.5 w-3.5" />
+            {t('wh.qr.print')}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

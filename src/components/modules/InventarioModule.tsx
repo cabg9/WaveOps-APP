@@ -5,12 +5,12 @@
 // (movementTypes + serialStatuses). Todo payload lleva
 // tenantId; los catálogos se crean desde la app (nada hardcodeado salvo
 // seeds idempotentes).
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import {
-  collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, query, orderBy,
+  collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, getDocs, query, orderBy, where,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -44,6 +44,7 @@ import type {
   Location,
   UnitOfMeasure,
   Supplier,
+  ProductCategory,
 } from '@/types/catalogs';
 import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
@@ -105,6 +106,7 @@ registerI18nKeys({
     'inv.stock.editMinMax': 'Editar mín/máx',
     'inv.stock.min': 'Mín',
     'inv.stock.max': 'Máx',
+    'inv.stock.minMaxHelp': 'Solo supervisores definen mínimos y máximos. Al bajar del mínimo avisaremos por campana con la sugerencia de compra.',
     'inv.stock.lowStock': 'Bajo mínimo',
     'inv.stock.noProducts': 'No hay productos activos con stock',
     'inv.stock.noProductsHint': 'Registra el primer movimiento para crear stock de un producto.',
@@ -114,6 +116,9 @@ registerI18nKeys({
     'inv.movementForm.product': 'Producto',
     'inv.movementForm.selectProduct': 'Selecciona un producto',
     'inv.movementForm.noMatches': 'Sin coincidencias',
+    'inv.movementForm.category': 'Categoría',
+    'inv.movementForm.selectCategory': 'Selecciona una categoría',
+    'inv.movementForm.noCategory': 'Sin categoría',
     'inv.movementForm.type': 'Tipo de movimiento',
     'inv.movementForm.selectType': 'Selecciona un tipo',
     'inv.movementForm.quantity': 'Cantidad',
@@ -127,10 +132,11 @@ registerI18nKeys({
     'inv.quick.transferencia': 'Transferencia',
     'inv.quick.consumo': 'Consumo',
     'inv.quick.ajuste': 'Ajuste',
-    'inv.movementForm.originFixedSupplier': 'Proveedor/Externo',
+    'inv.movementForm.originFixedSupplier': 'Proveedor externo / compra directa',
     'inv.movementForm.supplier': 'Proveedor',
     'inv.movementForm.noSupplier': 'Sin proveedor específico',
     'inv.movementForm.destFixedConsumption': 'Consumo/Externo',
+    'inv.movementForm.originExternalHint': 'En los movimientos de entrada, el origen es siempre un proveedor externo o una compra directa; elige el proveedor si está registrado.',
     'inv.movementForm.help': 'En una compra, la mercadería entra desde un proveedor hacia tu ubicación. En un consumo, sale de tu ubicación y se gasta. En una transferencia, viaja entre dos ubicaciones tuyas.',
     'inv.movementForm.reasonRequired': 'El motivo es obligatorio para un ajuste',
 
@@ -190,7 +196,7 @@ registerI18nKeys({
     'inv.validation.fromRequired': 'La ubicación origen es obligatoria para tipos que restan stock',
     'inv.validation.toRequired': 'La ubicación destino es obligatoria para tipos que suman stock',
 
-    'inv.transfers.help': 'Mueve stock entre ubicaciones con seguimiento de estado. Al crear se descuenta del origen; al recibir se suma al destino; al cancelar se devuelve al origen. Estados: pendiente, en tránsito, recibido y cancelado.',
+    'inv.transfers.help': 'Mueve stock entre ubicaciones con seguimiento de estado. Al crear se descuenta del origen; al recibir se suma al destino; al cancelar se devuelve al origen. Estados: pendiente, en tránsito, recibido y cancelado. Solo el responsable del destino (o un supervisor) confirma la recepción; quien crea o envía no puede recibirla.',
     'inv.transfers.new': 'Nueva transferencia',
     'inv.transfers.empty': 'No hay transferencias registradas',
     'inv.transfers.quantity': 'Cantidad',
@@ -222,8 +228,18 @@ registerI18nKeys({
     'inv.transfers.reasonCreated': 'Transferencia creada',
     'inv.transfers.reasonReceived': 'Transferencia recibida',
     'inv.transfers.reasonCancelled': 'Transferencia cancelada',
+    'inv.transfers.stockLine': '{location}: {quantity} {unit}',
+    'inv.transfers.stockOrigin': 'Disponible en el origen',
+    'inv.transfers.stockDestination': 'En el destino',
+    'inv.transfers.receiveRule': 'Solo el responsable de la ubicación destino (o un supervisor) confirma la recepción; quien crea o envía la transferencia no puede recibirla.',
+    'inv.transfers.creatorCannotReceive': 'Quien crea o envía una transferencia no puede marcarla como recibida.',
+    'inv.transfers.serializedHint': 'Producto rentable con seriales: confirma las unidades que llegaron escaneando su QR o marcándolas en la lista.',
+    'inv.transfers.unitsReceived': 'Unidades confirmadas',
+    'inv.transfers.scanUnit': 'Escanear unidad',
+    'inv.transfers.validation.serialNotForProduct': 'Ese serial no pertenece al producto de esta transferencia',
+    'inv.transfers.validation.unitsRequired': 'Confirma las {expected} unidades que llegaron para poder recibir',
 
-    'inv.counts.help': 'Conteos cíclicos por ubicación. Al finalizar se comparan contra el stock esperado; si hay diferencias, el ajuste requiere aprobación con motivo obligatorio.',
+    'inv.counts.help': 'Un conteo cíclico revisa físicamente el stock de una ubicación para compararlo con lo registrado. Los productos rentables con seriales se cuentan escaneando el QR de cada unidad (obligatorio); los demás productos admiten entrada manual de cantidad (si tienen QR de producto, escanearlo salta a ese producto). Al finalizar se comparan contra el stock esperado; si hay diferencias, el ajuste requiere aprobación de un supervisor con motivo obligatorio.',
     'inv.counts.schedule': 'Programar conteo',
     'inv.counts.empty': 'No hay conteos programados',
     'inv.counts.frequency': 'Frecuencia',
@@ -242,6 +258,12 @@ registerI18nKeys({
     'inv.counts.continue': 'Continuar conteo',
     'inv.counts.scan': 'Escanear',
     'inv.counts.scanSoon': 'Próximamente',
+    'inv.counts.scanRequired': 'Escanea el QR de cada unidad',
+    'inv.counts.scannedCount': '{count} escaneadas',
+    'inv.counts.undoScan': 'Deshacer último escaneo',
+    'inv.counts.serialNotInCount': 'Ese serial no pertenece a un producto de este conteo',
+    'inv.counts.serialAlreadyCounted': 'Ese serial ya fue contado',
+    'inv.counts.productNotInCount': 'Ese producto no está en este conteo',
     'inv.counts.expected': 'Esperado',
     'inv.counts.counted': 'Contado',
     'inv.counts.savePartial': 'Guardar avance',
@@ -343,6 +365,7 @@ registerI18nKeys({
     'inv.stock.editMinMax': 'Edit min/max',
     'inv.stock.min': 'Min',
     'inv.stock.max': 'Max',
+    'inv.stock.minMaxHelp': 'Only supervisors set minimums and maximums. When stock drops below the minimum we will notify you with a purchase suggestion.',
     'inv.stock.lowStock': 'Below minimum',
     'inv.stock.noProducts': 'No active products with stock',
     'inv.stock.noProductsHint': 'Register the first movement to create stock for a product.',
@@ -352,6 +375,9 @@ registerI18nKeys({
     'inv.movementForm.product': 'Product',
     'inv.movementForm.selectProduct': 'Select a product',
     'inv.movementForm.noMatches': 'No matches',
+    'inv.movementForm.category': 'Category',
+    'inv.movementForm.selectCategory': 'Select a category',
+    'inv.movementForm.noCategory': 'No category',
     'inv.movementForm.type': 'Movement type',
     'inv.movementForm.selectType': 'Select a type',
     'inv.movementForm.quantity': 'Quantity',
@@ -365,10 +391,11 @@ registerI18nKeys({
     'inv.quick.transferencia': 'Transfer',
     'inv.quick.consumo': 'Consumption',
     'inv.quick.ajuste': 'Adjustment',
-    'inv.movementForm.originFixedSupplier': 'Supplier/External',
+    'inv.movementForm.originFixedSupplier': 'External supplier / direct purchase',
     'inv.movementForm.supplier': 'Supplier',
     'inv.movementForm.noSupplier': 'No specific supplier',
     'inv.movementForm.destFixedConsumption': 'Consumption/External',
+    'inv.movementForm.originExternalHint': 'In incoming movements, the source is always an external supplier or a direct purchase; choose the supplier if it is registered.',
     'inv.movementForm.help': 'In a purchase, goods come in from a supplier to your location. In consumption, they leave your location and are used up. In a transfer, they travel between two of your locations.',
     'inv.movementForm.reasonRequired': 'Reason is required for an adjustment',
 
@@ -428,7 +455,7 @@ registerI18nKeys({
     'inv.validation.fromRequired': 'Source location is required for types that subtract stock',
     'inv.validation.toRequired': 'Destination location is required for types that add stock',
 
-    'inv.transfers.help': 'Moves stock between locations with status tracking. Creating it subtracts from the source; receiving adds to the destination; cancelling returns it to the source. Statuses: pending, in transit, received and cancelled.',
+    'inv.transfers.help': 'Moves stock between locations with status tracking. Creating it subtracts from the source; receiving adds to the destination; cancelling returns it to the source. Statuses: pending, in transit, received and cancelled. Only the destination responsible (or a supervisor) confirms reception; whoever creates or ships cannot receive it.',
     'inv.transfers.new': 'New transfer',
     'inv.transfers.empty': 'No transfers recorded',
     'inv.transfers.quantity': 'Quantity',
@@ -460,8 +487,18 @@ registerI18nKeys({
     'inv.transfers.reasonCreated': 'Transfer created',
     'inv.transfers.reasonReceived': 'Transfer received',
     'inv.transfers.reasonCancelled': 'Transfer cancelled',
+    'inv.transfers.stockLine': '{location}: {quantity} {unit}',
+    'inv.transfers.stockOrigin': 'Available at source',
+    'inv.transfers.stockDestination': 'At destination',
+    'inv.transfers.receiveRule': 'Only the destination location responsible (or a supervisor) confirms reception; whoever creates or ships a transfer cannot receive it.',
+    'inv.transfers.creatorCannotReceive': 'Whoever creates or ships a transfer cannot mark it as received.',
+    'inv.transfers.serializedHint': 'Rentable product with serials: confirm the units that arrived by scanning their QR or checking them in the list.',
+    'inv.transfers.unitsReceived': 'Confirmed units',
+    'inv.transfers.scanUnit': 'Scan unit',
+    'inv.transfers.validation.serialNotForProduct': 'That serial does not belong to the product of this transfer',
+    'inv.transfers.validation.unitsRequired': 'Confirm the {expected} units that arrived in order to receive',
 
-    'inv.counts.help': 'Cyclic counts by location. On completion they are compared against expected stock; if there are differences, the adjustment requires approval with a mandatory reason.',
+    'inv.counts.help': 'A cyclic count physically checks the stock of a location to compare it with what is recorded. Rentable products with serials are counted by scanning the QR of each unit (mandatory); other products allow manual quantity entry (if they have a product QR, scanning it jumps to that product). On completion they are compared against expected stock; if there are differences, the adjustment requires supervisor approval with a mandatory reason.',
     'inv.counts.schedule': 'Schedule count',
     'inv.counts.empty': 'No counts scheduled',
     'inv.counts.frequency': 'Frequency',
@@ -480,6 +517,12 @@ registerI18nKeys({
     'inv.counts.continue': 'Continue count',
     'inv.counts.scan': 'Scan',
     'inv.counts.scanSoon': 'Coming soon',
+    'inv.counts.scanRequired': 'Scan the QR of each unit',
+    'inv.counts.scannedCount': '{count} scanned',
+    'inv.counts.undoScan': 'Undo last scan',
+    'inv.counts.serialNotInCount': 'That serial does not belong to a product of this count',
+    'inv.counts.serialAlreadyCounted': 'That serial has already been counted',
+    'inv.counts.productNotInCount': 'That product is not in this count',
     'inv.counts.expected': 'Expected',
     'inv.counts.counted': 'Counted',
     'inv.counts.savePartial': 'Save progress',
@@ -759,6 +802,19 @@ function docToUnit(id: string, data: Record<string, unknown>): UnitOfMeasure {
   };
 }
 
+function docToProductCategory(id: string, data: Record<string, unknown>): Omit<ProductCategory, 'id'> {
+  return {
+    tenantId: toStr(data.tenantId),
+    isActive: data.isActive === undefined ? true : toBool(data.isActive),
+    createdAt: toStr(data.createdAt),
+    createdBy: toStr(data.createdBy),
+    updatedAt: data.updatedAt ? toStr(data.updatedAt) : undefined,
+    updatedBy: data.updatedBy ? toStr(data.updatedBy) : undefined,
+    name: toStr(data.name),
+    nameEn: data.nameEn ? toStr(data.nameEn) : undefined,
+  };
+}
+
 function docToTransfer(id: string, data: Record<string, unknown>): InventoryTransfer {
   return {
     id,
@@ -772,6 +828,9 @@ function docToTransfer(id: string, data: Record<string, unknown>): InventoryTran
     status: (data.status as InventoryTransfer['status']) ?? 'pendiente',
     receivedBy: data.receivedBy ? toStr(data.receivedBy) : null,
     receivedAt: data.receivedAt ? toStr(data.receivedAt) : null,
+    receivedUnitIds: Array.isArray(data.receivedUnitIds)
+      ? data.receivedUnitIds.map(u => toStr(u)).filter(Boolean)
+      : null,
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
     createdByName: toStr(data.createdByName),
@@ -793,6 +852,14 @@ function docToCountSession(id: string, data: Record<string, unknown>): CountSess
     blind: toBool(data.blind),
     frequency: (data.frequency as CountFrequency) ?? 'mensual',
     counts: Object.keys(counts).length ? counts : undefined,
+    scannedSerials: (() => {
+      if (!data.scannedSerials || typeof data.scannedSerials !== 'object') return undefined;
+      const out: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(data.scannedSerials as Record<string, unknown>)) {
+        if (Array.isArray(v)) out[k] = v.map(u => toStr(u)).filter(Boolean);
+      }
+      return Object.keys(out).length ? out : undefined;
+    })(),
     differences: Array.isArray(data.differences)
       ? (data.differences as Array<Record<string, unknown>>).map(d => ({
           productId: toStr(d.productId),
@@ -916,6 +983,18 @@ const TRANSFER_STATUS_BADGE: Record<InventoryTransfer['status'], string> = {
   cancelado: 'bg-red-50 text-red-700 border border-red-200',
 };
 
+// Nivel de rol: definición de mínimos/máximos, ajustes por conteo y
+// recepción de transferencias (Supervisor o superior, misma jerarquía que
+// usa WarehouseModule: DG/Director/RRHH/GerOp/GerDept/Supervisor)
+const SUPERVISOR_PLUS_ROLES: Role[] = [
+  Role.DIRECTOR_GENERAL,
+  Role.DIRECTOR,
+  Role.RRHH,
+  Role.GERENTE_OPERACIONES,
+  Role.GERENTE_DEPARTAMENTO,
+  Role.SUPERVISOR,
+];
+
 const COUNT_STATUS_BADGE: Record<CountSession['status'], string> = {
   programado: 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]',
   en_curso: 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -985,6 +1064,7 @@ export function InventarioModule() {
   const [movementTypes, setMovementTypes] = useState<MovementType[]>([]);
   const [serialStatuses, setSerialStatuses] = useState<SerialStatus[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -1005,6 +1085,7 @@ export function InventarioModule() {
   // Modal de movimiento (compartido: lo reusan Stock y los siguientes agentes)
   const [movementModalOpen, setMovementModalOpen] = useState(false);
   const [movementForm, setMovementForm] = useState<MovementFormState>(EMPTY_MOVEMENT_FORM);
+  const [movementCategoryId, setMovementCategoryId] = useState('');
   const [savingMovement, setSavingMovement] = useState(false);
 
   // Edición inline de mín/máx por fila de stock
@@ -1040,6 +1121,7 @@ export function InventarioModule() {
   const [savingTransfer, setSavingTransfer] = useState(false);
   const [receiveTransferId, setReceiveTransferId] = useState<string | null>(null);
   const [receivedByName, setReceivedByName] = useState('');
+  const [receiveSerialIds, setReceiveSerialIds] = useState<string[]>([]);
   const [cancelTransferId, setCancelTransferId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
@@ -1050,6 +1132,8 @@ export function InventarioModule() {
   const [savingCount, setSavingCount] = useState(false);
   const [countingId, setCountingId] = useState<string | null>(null);
   const [countsDraft, setCountsDraft] = useState<Record<string, string>>({});
+  const [scannedSerials, setScannedSerials] = useState<Record<string, string[]>>({});
+  const [countHighlightId, setCountHighlightId] = useState<string | null>(null);
   const [adjustmentSessionId, setAdjustmentSessionId] = useState<string | null>(null);
   const [adjustmentReason, setAdjustmentReason] = useState('');
 
@@ -1074,6 +1158,9 @@ export function InventarioModule() {
   // QR y escáner (FASE 1B-serials)
   const [qrDialog, setQrDialog] = useState<{ title: string; subtitle: string; qrText: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  // Contexto del escaneo: navegación general, conteo cíclico o recepción
+  // de transferencia serializada (cambia cómo se procesa el resultado)
+  const [scanContext, setScanContext] = useState<'navigate' | 'count' | 'receive'>('navigate');
 
   // Deep links (?product= / ?location= / ?serial=): solo se procesan una vez
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1085,6 +1172,9 @@ export function InventarioModule() {
   const tenantId = getCurrentTenantId();
   const enabled = isFeatureEnabled('enableInventario');
   const canWrite = currentUser?.role === Role.DIRECTOR_GENERAL || currentUser?.role === Role.RRHH;
+  // Supervisor o superior (jerarquía de niveles 1-6): define mínimos/máximos,
+  // aprueba ajustes por conteo y puede recibir transferencias ajenas
+  const canSupervise = !!currentUser?.role && SUPERVISOR_PLUS_ROLES.includes(currentUser.role);
   // Baja permanente: además de canWrite, la aprueban gerentes de departamento y supervisores
   const canRetire =
     canWrite ||
@@ -1092,6 +1182,16 @@ export function InventarioModule() {
     currentUser?.role === Role.SUPERVISOR;
 
   const activeProducts = useMemo(() => products.filter(p => p.isActive), [products]);
+  const activeCategories = useMemo(() => productCategories.filter(c => c.isActive), [productCategories]);
+  // Formulario de movimiento: primero categoría, luego productos de esa
+  // categoría en orden alfabético (los productos ya vienen ordenados por nombre)
+  const movementFormProducts = useMemo(() => {
+    if (!movementCategoryId) return [];
+    if (movementCategoryId === '__none__') {
+      return activeProducts.filter(p => !p.categoryId);
+    }
+    return activeProducts.filter(p => p.categoryId === movementCategoryId);
+  }, [activeProducts, movementCategoryId]);
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
   const activeMovementTypes = useMemo(() => movementTypes.filter(m => m.isActive), [movementTypes]);
   const activeSuppliers = useMemo(() => suppliers.filter(s => s.isActive), [suppliers]);
@@ -1249,6 +1349,24 @@ export function InventarioModule() {
     return () => unsub();
   }, [enabled, tenantId]);
 
+  // Categorías de producto (selector por categoría en el formulario de movimiento)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.productCategories), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setProductCategories(
+          snap.docs
+            .map(d => ({ id: d.id, ...docToProductCategory(d.id, d.data()) } as ProductCategory))
+            .filter(c => !c.tenantId || c.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[InventarioModule] productCategories:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
   // Proveedores (para movimientos de entrada: compra / devolución)
   useEffect(() => {
     if (!enabled) return;
@@ -1375,6 +1493,8 @@ export function InventarioModule() {
   // ═══════════════════════════════════════════════════════════════════
 
   const openMovementForm = (productId?: string, locationId?: string) => {
+    const product = productId ? products.find(p => p.id === productId) : null;
+    setMovementCategoryId(product?.categoryId || '');
     setMovementForm({
       ...EMPTY_MOVEMENT_FORM,
       productId: productId || '',
@@ -1398,6 +1518,7 @@ export function InventarioModule() {
         mt = activeMovementTypes.find(m => m.isOutput);
       }
     }
+    setMovementCategoryId('');
     setMovementForm({ ...EMPTY_MOVEMENT_FORM, movementTypeId: mt?.id || '' });
     setMovementModalOpen(true);
   };
@@ -1485,6 +1606,7 @@ export function InventarioModule() {
           toast.success(t('inv.movementForm.save'));
           setMovementModalOpen(false);
           setMovementForm(EMPTY_MOVEMENT_FORM);
+          setMovementCategoryId('');
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -1574,7 +1696,8 @@ export function InventarioModule() {
             createdByName: currentUser.name,
           });
 
-          // TODO Fase1B-notify: notificación push/email al coordinador (Cloud Function)
+          // La notificación al destino la envía la Cloud Function
+          // notifyTransferCreated (onDocumentCreated de inventoryTransfers)
 
           await logAction({
             action: AUDIT_ACTIONS.transferCreated,
@@ -1602,6 +1725,9 @@ export function InventarioModule() {
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), {
         status: 'en_transito',
+        shippedBy: currentUser.id,
+        shippedByName: currentUser.name,
+        shippedAt: new Date().toISOString(),
       });
       await logAction({
         action: AUDIT_ACTIONS.transferShipped,
@@ -1616,15 +1742,43 @@ export function InventarioModule() {
     }
   };
 
+  // Quién puede confirmar la recepción: el responsable de la ubicación
+  // destino o un Supervisor+ / Director General. Quien creó o envió la
+  // transferencia NUNCA puede marcarla como recibida (regla de negocio).
+  const canReceiveTransfer = (transfer: InventoryTransfer): boolean => {
+    if (!currentUser || !transfer.id || transfer.status !== 'en_transito') return false;
+    if (transfer.createdBy && transfer.createdBy === currentUser.id) return false;
+    const destResponsibleId = locations.find(l => l.id === transfer.toLocationId)?.responsibleUserId;
+    if (destResponsibleId && destResponsibleId === currentUser.id) return true;
+    return canSupervise;
+  };
+
+  // Producto rentable con unidades serializadas: la recepción exige confirmar
+  // las unidades (escaneo o selección) además de la cantidad
+  const transferNeedsUnits = (transfer: InventoryTransfer): boolean => {
+    const product = products.find(p => p.id === transfer.productId);
+    return !!product?.isRentable && rentalUnits.some(u => u.productId === transfer.productId);
+  };
+
   const openReceiveTransfer = (transfer: InventoryTransfer) => {
+    if (!canReceiveTransfer(transfer)) {
+      toast.error(t('inv.transfers.creatorCannotReceive'));
+      return;
+    }
     setReceiveTransferId(transfer.id!);
     setReceivedByName(currentUser?.name || '');
+    setReceiveSerialIds(transfer.receivedUnitIds ?? []);
   };
 
   const handleReceiveTransfer = async () => {
     const transfer = transfers.find(x => x.id === receiveTransferId);
-    if (!currentUser || !canWrite || !transfer?.id) return;
+    if (!currentUser || !transfer?.id || !canReceiveTransfer(transfer)) return;
     if (!receivedByName.trim()) return toast.error(t('inv.validation.nameRequired'));
+    if (transferNeedsUnits(transfer) && receiveSerialIds.length !== transfer.quantity) {
+      return toast.error(
+        t('inv.transfers.validation.unitsRequired').replace('{expected}', String(transfer.quantity))
+      );
+    }
     await executeWithConfirm({
       level: 'major',
       title: t('inv.transfers.receiveTitle'),
@@ -1667,7 +1821,29 @@ export function InventarioModule() {
             status: 'recibido',
             receivedBy: receivedByName.trim(),
             receivedAt: now,
+            receivedUnitIds: transferNeedsUnits(transfer) ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
           });
+
+          // Las notificaciones de esta transferencia quedan leídas al recibirla
+          try {
+            const notifSnap = await getDocs(
+              query(
+                collection(db, 'notifications'),
+                where('userId', '==', currentUser.id),
+                where('read', '==', false)
+              )
+            );
+            await Promise.all(
+              notifSnap.docs
+                .filter(d => {
+                  const data = d.data() as { data?: { transferId?: string } };
+                  return data.data?.transferId === transfer.id;
+                })
+                .map(d => updateDoc(d.ref, { read: true }))
+            );
+          } catch {
+            // Marcar leída es lo mejor esfuerzo: no bloquea la recepción
+          }
 
           await logAction({
             action: AUDIT_ACTIONS.transferReceived,
@@ -1680,6 +1856,7 @@ export function InventarioModule() {
 
           toast.success(t('inv.transfers.receive'));
           setReceiveTransferId(null);
+          setReceiveSerialIds([]);
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         }
@@ -1805,6 +1982,10 @@ export function InventarioModule() {
       draft[s.productId] = saved != null ? String(saved) : '';
     });
     setCountsDraft(draft);
+    // Regla del conteo con QR: los productos rentables con unidades
+    // serializadas se cuentan SOLO escaneando el QR de cada serial; los
+    // demás (consumibles, productos sin seriales) admiten entrada manual.
+    setScannedSerials(session.scannedSerials ?? {});
     setCountingId(session.id!);
   };
 
@@ -1831,7 +2012,10 @@ export function InventarioModule() {
         const n = Number(v);
         if (v.trim() !== '' && Number.isFinite(n)) parsed[pid] = n;
       });
-      await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), { counts: parsed });
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
+        counts: parsed,
+        scannedSerials,
+      });
       toast.success(t('inv.common.save'));
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -1975,11 +2159,19 @@ export function InventarioModule() {
     [stocks, countingSession]
   );
 
+  // ¿Producto rentable con unidades serializadas? → conteo por escaneo
+  // obligatorio del QR de cada serial (regla del punto 12 de la spec)
+  const productRequiresScan = (productId: string): boolean => {
+    const product = products.find(p => p.id === productId);
+    return !!product?.isRentable && rentalUnits.some(u => u.productId === productId);
+  };
+
   // ═══════════════════════════════════════════════════════════════════
   // EDICIÓN INLINE DE MÍN/MÁX (config menor, sin auditoría)
   // ═══════════════════════════════════════════════════════════════════
 
   const startEditMinMax = (stock: InventoryStock) => {
+    if (!canSupervise) return;
     setEditingMinMaxId(stock.id || null);
     setMinMaxDraft({
       min: stock.minStock != null ? String(stock.minStock) : '',
@@ -1988,7 +2180,7 @@ export function InventarioModule() {
   };
 
   const handleSaveMinMax = async (stock: InventoryStock) => {
-    if (!currentUser || !canWrite || !stock.id) return;
+    if (!currentUser || !canSupervise || !stock.id) return;
     try {
       const now = new Date().toISOString();
       const parseVal = (v: string): number | null => {
@@ -2237,8 +2429,92 @@ export function InventarioModule() {
   };
 
   const handleScanResult = (kind: 'product' | 'location' | 'serial', id: string) => {
+    if (scanContext === 'count') {
+      handleCountScan(kind, id);
+      return;
+    }
+    if (scanContext === 'receive') {
+      handleReceiveScan(kind, id);
+      return;
+    }
     setScannerOpen(false);
     revealTarget(kind, id);
+  };
+
+  // Escaneo dentro de un conteo cíclico:
+  // - QR de serial (producto serializado): suma 1 a ese producto; no admite
+  //   doble conteo del mismo serial y no permite entrada manual.
+  // - QR de producto (consumibles u otros): salta a ese producto de la lista.
+  const handleCountScan = (kind: 'product' | 'location' | 'serial', id: string) => {
+    const session = countingSession;
+    if (!session) {
+      setScannerOpen(false);
+      return;
+    }
+    if (kind === 'serial') {
+      const unit = rentalUnits.find(u => u.id === id);
+      const productId = unit?.productId;
+      if (!productId || !countRows.some(r => r.productId === productId)) {
+        toast.error(t('inv.counts.serialNotInCount'));
+        return;
+      }
+      const already = scannedSerials[productId] ?? [];
+      if (already.includes(id)) {
+        toast.error(t('inv.counts.serialAlreadyCounted'));
+        return;
+      }
+      setScannedSerials(prev => ({ ...prev, [productId]: [...already, id] }));
+      const current = Number(countsDraft[productId] ?? 0);
+      setCountsDraft(d => ({ ...d, [productId]: String((Number.isFinite(current) ? current : 0) + 1) }));
+      toast.success(productName(productId));
+      return;
+    }
+    if (kind === 'product') {
+      if (!countRows.some(r => r.productId === id)) {
+        toast.error(t('inv.counts.productNotInCount'));
+        return;
+      }
+      setScannerOpen(false);
+      setCountHighlightId(id);
+      setTimeout(() => {
+        document.getElementById(`count-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 60);
+      setTimeout(() => setCountHighlightId(null), 1800);
+      return;
+    }
+    toast.error(t('inv.counts.productNotInCount'));
+  };
+
+  // Escaneo en la recepción de una transferencia serializada: confirma la
+  // unidad que llegó (alternativa a marcarla en la lista)
+  const handleReceiveScan = (kind: 'product' | 'location' | 'serial', id: string) => {
+    const transfer = transfers.find(x => x.id === receiveTransferId);
+    if (!transfer) {
+      setScannerOpen(false);
+      return;
+    }
+    if (kind !== 'serial') {
+      toast.error(t('inv.transfers.validation.serialNotForProduct'));
+      return;
+    }
+    const unit = rentalUnits.find(u => u.id === id);
+    if (!unit || unit.productId !== transfer.productId) {
+      toast.error(t('inv.transfers.validation.serialNotForProduct'));
+      return;
+    }
+    setReceiveSerialIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+    toast.success(unit.serialNumber);
+  };
+
+  // Deshace el último serial escaneado de un producto (conteo por QR)
+  const undoLastScan = (productId: string) => {
+    const list = scannedSerials[productId] ?? [];
+    if (list.length === 0) return;
+    setScannedSerials(prev => ({ ...prev, [productId]: list.slice(0, -1) }));
+    const current = Number(countsDraft[productId] ?? 0);
+    setCountsDraft(d => ({ ...d, [productId]: String(Math.max(0, (Number.isFinite(current) ? current : 0) - 1)) }));
   };
 
   // Deep links: ?product= / ?location= / ?serial= → sub-pestaña + tarjeta expandida
@@ -2695,7 +2971,7 @@ export function InventarioModule() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setScannerOpen(true)}
+                onClick={() => { setScanContext('navigate'); setScannerOpen(true); }}
                 className="gap-2 rounded-xl border-[#E5E5E7]"
               >
                 <QrCode className="h-4 w-4" />
@@ -2786,13 +3062,18 @@ export function InventarioModule() {
                                     {s.maxStock ?? '—'}
                                   </span>
                                 )}
+                                {s.minStock != null && (
+                                  <span className="text-[10px] text-[#86868B] w-full sm:w-auto">
+                                    {t('inv.stock.minMaxHelp')}
+                                  </span>
+                                )}
                                 {isLow && s.minStock != null && (
                                   <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
                                     {t('inv.stock.lowStock')}
                                   </span>
                                 )}
-                                {canWrite && (
-                                  <div className="ml-auto flex items-center gap-1">
+                                <div className="ml-auto flex items-center gap-1">
+                                  {canWrite && (
                                     <Button
                                       variant="outline"
                                       size="sm"
@@ -2802,16 +3083,19 @@ export function InventarioModule() {
                                       <ArrowDownUp className="h-3.5 w-3.5 mr-1" />
                                       {t('inv.stock.registerMovement')}
                                     </Button>
+                                  )}
+                                  {canSupervise && (
                                     <Button
                                       variant="ghost"
                                       size="sm"
                                       onClick={() => startEditMinMax(s)}
-                                      className="h-7 text-xs text-[#86868B]"
+                                      title={t('inv.stock.editMinMax')}
+                                      className="h-7 w-7 p-0 text-[#86868B]"
                                     >
                                       <Pencil className="h-3.5 w-3.5" />
                                     </Button>
-                                  </div>
-                                )}
+                                  )}
+                                </div>
                               </div>
                               {isEditingMm && (
                                 <div className="mt-2 flex items-center gap-2">
@@ -2934,6 +3218,11 @@ export function InventarioModule() {
                                   <span className="text-xs text-[#86868B]">
                                     {t('inv.stock.min')} {s.minStock} · {t('inv.stock.max')}{' '}
                                     {s.maxStock ?? '—'}
+                                  </span>
+                                )}
+                                {s.minStock != null && (
+                                  <span className="text-[10px] text-[#86868B] w-full sm:w-auto">
+                                    {t('inv.stock.minMaxHelp')}
                                   </span>
                                 )}
                                 {isLow && s.minStock != null && (
@@ -3239,25 +3528,32 @@ export function InventarioModule() {
                           </Button>
                         </div>
                       )}
-                      {canWrite && tr.status === 'en_transito' && (
+                      {tr.status === 'en_transito' && (canWrite || canReceiveTransfer(tr)) && (
                         <div className="flex flex-wrap items-center gap-2 pt-2">
-                          <Button
-                            size="sm"
-                            onClick={() => openReceiveTransfer(tr)}
-                            className="h-7 text-xs rounded-lg bg-corporate"
-                          >
-                            <Inbox className="h-3.5 w-3.5 mr-1" />
-                            {t('inv.transfers.receive')}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => openCancelTransfer(tr)}
-                            className="h-7 text-xs rounded-lg border-[#E5E5E7]"
-                          >
-                            <Ban className="h-3.5 w-3.5 mr-1" />
-                            {t('inv.transfers.cancel')}
-                          </Button>
+                          {canReceiveTransfer(tr) && (
+                            <Button
+                              size="sm"
+                              onClick={() => openReceiveTransfer(tr)}
+                              className="h-7 text-xs rounded-lg bg-corporate"
+                            >
+                              <Inbox className="h-3.5 w-3.5 mr-1" />
+                              {t('inv.transfers.receive')}
+                            </Button>
+                          )}
+                          {canWrite && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openCancelTransfer(tr)}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7]"
+                            >
+                              <Ban className="h-3.5 w-3.5 mr-1" />
+                              {t('inv.transfers.cancel')}
+                            </Button>
+                          )}
+                          {!canReceiveTransfer(tr) && currentUser?.id && tr.createdBy === currentUser.id && (
+                            <span className="text-[11px] text-[#86868B]">{t('inv.transfers.creatorCannotReceive')}</span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -3304,11 +3600,16 @@ export function InventarioModule() {
                     {' · '}
                     {countingSession.blind ? t('inv.counts.blindYes') : t('inv.counts.blindNo')}
                   </p>
+                  {countRows.some(r => productRequiresScan(r.productId)) && (
+                    <p className="text-[11px] text-corporate mt-0.5">
+                      {t('inv.counts.scanRequired')}
+                    </p>
+                  )}
                 </div>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setScannerOpen(true)}
+                  onClick={() => { setScanContext('count'); setScannerOpen(true); }}
                   className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-2 shrink-0"
                 >
                   <QrCode className="h-3.5 w-3.5" />
@@ -3322,29 +3623,64 @@ export function InventarioModule() {
                 )}
                 {countRows.map(s => {
                   const product = products.find(p => p.id === s.productId);
+                  const needsScan = productRequiresScan(s.productId);
+                  const scanned = scannedSerials[s.productId]?.length ?? 0;
+                  const highlighted = countHighlightId === s.productId;
                   return (
-                    <div key={s.id} className="py-2 flex items-center gap-3">
+                    <div
+                      key={s.id}
+                      id={`count-row-${s.productId}`}
+                      className={cn('py-2 flex items-center gap-3 rounded-lg px-1 -mx-1', highlighted && 'bg-corporate/10')}
+                    >
                       <div className="min-w-0 flex-1">
-                        <div className="text-sm text-[#1D1D1F] truncate">
+                        <div className="text-sm text-[#1D1D1F] truncate flex items-center gap-1.5">
                           {product?.name || s.productId}
+                          {needsScan && (
+                            <span className="px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-corporate/10 text-corporate shrink-0">
+                              QR
+                            </span>
+                          )}
                         </div>
                         {!countingSession.blind && (
                           <div className="text-[11px] text-[#86868B]">
                             {t('inv.counts.expected')}: {s.quantity} {unitName(product?.unitId || '')}
                           </div>
                         )}
+                        {needsScan && (
+                          <div className="text-[11px] text-corporate">
+                            {t('inv.counts.scannedCount').replace('{count}', String(scanned))}
+                          </div>
+                        )}
                       </div>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={countsDraft[s.productId] ?? ''}
-                        onChange={e =>
-                          setCountsDraft(d => ({ ...d, [s.productId]: e.target.value }))
-                        }
-                        placeholder={t('inv.counts.counted')}
-                        className="h-8 w-28 text-xs rounded-lg"
-                      />
+                      {needsScan ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-[#1D1D1F] font-semibold w-10 text-right">
+                            {countsDraft[s.productId] || '0'}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => undoLastScan(s.productId)}
+                            disabled={scanned === 0}
+                            title={t('inv.counts.undoScan')}
+                            className="h-8 w-8 p-0 rounded-lg border-[#E5E5E7]"
+                          >
+                            <Ban className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          value={countsDraft[s.productId] ?? ''}
+                          onChange={e =>
+                            setCountsDraft(d => ({ ...d, [s.productId]: e.target.value }))
+                          }
+                          placeholder={t('inv.counts.counted')}
+                          className="h-8 w-28 text-xs rounded-lg"
+                        />
+                      )}
                     </div>
                   );
                 })}
@@ -4117,12 +4453,31 @@ export function InventarioModule() {
               {t('inv.movementForm.help')}
             </p>
             <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.category')}</Label>
+              <select
+                value={movementCategoryId}
+                onChange={e => {
+                  setMovementCategoryId(e.target.value);
+                  setMovementForm(f => ({ ...f, productId: '' }));
+                }}
+                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+              >
+                <option value="">{t('inv.movementForm.selectCategory')}</option>
+                {activeCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                {activeProducts.some(p => !p.categoryId) && (
+                  <option value="__none__">{t('inv.movementForm.noCategory')}</option>
+                )}
+              </select>
+            </div>
+            <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
               <ProductSearchSelect
-                products={activeProducts}
+                products={movementFormProducts}
                 value={movementForm.productId}
                 onChange={id => setMovementForm(f => ({ ...f, productId: id }))}
-                selectPlaceholder={t('inv.movementForm.selectProduct')}
+                selectPlaceholder={movementCategoryId ? t('inv.movementForm.selectProduct') : t('inv.movementForm.selectCategory')}
                 searchPlaceholder={t('inv.movementForm.noMatches')}
               />
             </div>
@@ -4228,6 +4583,7 @@ export function InventarioModule() {
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
+                <p className="text-[11px] text-[#86868B]">{t('inv.movementForm.originExternalHint')}</p>
               </div>
             )}
             <div className="space-y-1">
@@ -4246,7 +4602,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setMovementModalOpen(false); setMovementForm(EMPTY_MOVEMENT_FORM); }}
+                onClick={() => { setMovementModalOpen(false); setMovementForm(EMPTY_MOVEMENT_FORM); setMovementCategoryId(''); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -4325,6 +4681,28 @@ export function InventarioModule() {
                 </select>
               </div>
             </div>
+            {transferForm.productId && (
+              <div className="rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] px-3 py-2 space-y-1">
+                <div className="text-[11px] text-[#86868B]">
+                  {t('inv.transfers.stockOrigin')}
+                </div>
+                <div className="text-xs text-[#1D1D1F] font-medium">
+                  {t('inv.transfers.stockLine')
+                    .replace('{location}', locationName(transferForm.fromLocationId) || '—')
+                    .replace('{quantity}', String(stockFor(transferForm.productId, transferForm.fromLocationId)?.quantity ?? 0))
+                    .replace('{unit}', unitName(products.find(p => p.id === transferForm.productId)?.unitId || ''))}
+                </div>
+                <div className="text-[11px] text-[#86868B] pt-1">
+                  {t('inv.transfers.stockDestination')}
+                </div>
+                <div className="text-xs text-[#1D1D1F] font-medium">
+                  {t('inv.transfers.stockLine')
+                    .replace('{location}', locationName(transferForm.toLocationId) || '—')
+                    .replace('{quantity}', String(stockFor(transferForm.productId, transferForm.toLocationId)?.quantity ?? 0))
+                    .replace('{unit}', unitName(products.find(p => p.id === transferForm.productId)?.unitId || ''))}
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.transfers.responsible')}</Label>
               <select
@@ -4361,7 +4739,7 @@ export function InventarioModule() {
       </Dialog>
 
       {/* ─── MODAL: RECIBIR TRANSFERENCIA ─── */}
-      <Dialog open={receiveTransferId !== null} onOpenChange={open => { if (!open) setReceiveTransferId(null); }}>
+      <Dialog open={receiveTransferId !== null} onOpenChange={open => { if (!open) { setReceiveTransferId(null); setReceiveSerialIds([]); } }}>
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
@@ -4369,30 +4747,96 @@ export function InventarioModule() {
               {t('inv.transfers.receiveTitle')}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.transfers.receivedByLabel')}</Label>
-              <Input
-                value={receivedByName}
-                onChange={e => setReceivedByName(e.target.value)}
-                placeholder={t('inv.transfers.receivedByPlaceholder')}
-                className="h-9 text-sm rounded-lg"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setReceiveTransferId(null)}
-                className="text-xs text-[#86868B]"
-              >
-                {t('inv.common.cancel')}
-              </Button>
-              <Button size="sm" onClick={handleReceiveTransfer} className="text-xs bg-corporate">
-                {t('inv.transfers.receive')}
-              </Button>
-            </div>
-          </div>
+          {(() => {
+            const receivingTransfer = transfers.find(x => x.id === receiveTransferId);
+            const needsUnits = receivingTransfer ? transferNeedsUnits(receivingTransfer) : false;
+            const unitOptions = needsUnits && receivingTransfer
+              ? rentalUnits.filter(u => u.productId === receivingTransfer.productId)
+              : [];
+            const unitsReady = !needsUnits || !receivingTransfer || receiveSerialIds.length === receivingTransfer.quantity;
+            return (
+              <div className="space-y-3">
+                {receivingTransfer && (
+                  <p className="text-xs text-[#86868B]">
+                    {productName(receivingTransfer.productId)} · {receivingTransfer.quantity} · {locationName(receivingTransfer.toLocationId)}
+                  </p>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.transfers.receivedByLabel')}</Label>
+                  <Input
+                    value={receivedByName}
+                    onChange={e => setReceivedByName(e.target.value)}
+                    placeholder={t('inv.transfers.receivedByPlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+                {needsUnits && receivingTransfer && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-[#86868B]">{t('inv.transfers.serializedHint')}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-[#1D1D1F]">
+                        {t('inv.transfers.unitsReceived')}: {receiveSerialIds.length} / {receivingTransfer.quantity}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setScanContext('receive'); setScannerOpen(true); }}
+                        className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-2"
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                        {t('inv.transfers.scanUnit')}
+                      </Button>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto rounded-lg border border-[#E5E5E7] divide-y divide-[#F5F5F7]">
+                      {unitOptions.length === 0 && (
+                        <p className="px-3 py-2 text-xs text-[#86868B]">{t('inv.serials.empty')}</p>
+                      )}
+                      {unitOptions.map(u => {
+                        const checked = receiveSerialIds.includes(u.id || '');
+                        return (
+                          <label
+                            key={u.id}
+                            className="flex items-center gap-2 px-3 py-2 text-xs text-[#1D1D1F] cursor-pointer hover:bg-[#F5F5F7]"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setReceiveSerialIds(prev =>
+                                  checked ? prev.filter(x => x !== u.id) : [...prev, u.id || '']
+                                )
+                              }
+                              className="h-3.5 w-3.5 accent-corporate"
+                            />
+                            <span className="font-medium">{u.serialNumber}</span>
+                            {u.size && <span className="text-[#86868B]">{u.size}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setReceiveTransferId(null); setReceiveSerialIds([]); }}
+                    className="text-xs text-[#86868B]"
+                  >
+                    {t('inv.common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleReceiveTransfer}
+                    disabled={!unitsReady}
+                    className="text-xs bg-corporate"
+                  >
+                    {t('inv.transfers.receive')}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -4832,8 +5276,12 @@ function QrDialog({ open, onOpenChange, title, subtitle, qrText }: QrDialogProps
 // MODAL ESCANER QR (html5-qrcode): parsea URLs de la app con
 // searchParams product / location / serial
 // ═══════════════════════════════════════════════════════════════════
-
-const SCANNER_CONTAINER_ID = 'inv-qr-scanner-container';
+// Bug "HTML Element with id=... not found": html5-qrcode LANZA en su
+// CONSTRUCTOR si el contenedor no está en el DOM todavía. Con el Dialog
+// de Radix el portal puede montarse después del efecto, así que la
+// instancia se crea SOLO cuando el contenedor ya existe (reintento por
+// requestAnimationFrame) y el id es único por instancia (useId), así el
+// escáner funciona igual en Stock, Seriales, Conteos y Transferencias.
 
 interface ScannerModalProps {
   open: boolean;
@@ -4846,6 +5294,8 @@ interface ScannerModalProps {
 function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalProps) {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
+  // Id único por instancia: nunca colisiona entre dos ScannerModal montados
+  const instanceId = `inv-qr-scanner-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   // Refs para que los callbacks siempre vean los valores actuales
   const onScanRef = useRef(onScan);
@@ -4883,36 +5333,57 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalPro
 
   useEffect(() => {
     if (!open) return;
+    let disposed = false;
     let scanner: Html5QrcodeScanner | null = null;
-    try {
-      scanner = new Html5QrcodeScanner(
-        SCANNER_CONTAINER_ID,
-        { fps: 10, qrbox: 250 },
-        /* verbose= */ false
-      );
-      scanner.render(
-        (decodedText) => {
-          const result = parseScan(decodedText);
-          if (!result) {
-            toast.error(t('inv.scanner.unrecognized'));
-            return;
-          }
-          // QR válido: detener la cámara y entregar el resultado
-          scanner?.clear().catch(() => undefined);
-          onScanRef.current(result.kind, result.id);
-        },
-        () => undefined // errores de lectura transitorios: se ignoran
-      );
-    } catch (err) {
-      console.error('[ScannerModal]', err);
-      toast.error(t('inv.scanner.error'));
-    }
+    let rafId = 0;
+    let attempts = 0;
+
+    const start = () => {
+      if (disposed) return;
+      // El contenedor vive en el portal del Dialog: no se crea la instancia
+      // hasta verificar que existe (reintento durante ~1s).
+      const el = document.getElementById(instanceId);
+      if (!el) {
+        attempts += 1;
+        if (attempts < 60) rafId = requestAnimationFrame(start);
+        return;
+      }
+      try {
+        scanner = new Html5QrcodeScanner(
+          instanceId,
+          { fps: 10, qrbox: 250 },
+          /* verbose= */ false
+        );
+        scanner.render(
+          (decodedText) => {
+            const result = parseScan(decodedText);
+            if (!result) {
+              toast.error(t('inv.scanner.unrecognized'));
+              return;
+            }
+            // QR válido: detener la cámara y entregar el resultado
+            scanner?.clear().catch(() => undefined);
+            onScanRef.current(result.kind, result.id);
+          },
+          () => undefined // errores de lectura transitorios: se ignoran
+        );
+      } catch (err) {
+        console.error('[ScannerModal]', err);
+        toast.error(t('inv.scanner.error'));
+      }
+    };
+
+    rafId = requestAnimationFrame(start);
+
     // Apaga la cámara al desmontar / cerrar el modal
     return () => {
-      scanner?.clear().catch(() => undefined);
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      const active = scanner;
+      scanner = null;
+      if (active) active.clear().catch(() => undefined);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, instanceId]);
 
   const handleManualSubmit = () => {
     const result = parseScan(manualCode);
@@ -4934,7 +5405,7 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalPro
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('inv.scanner.hint')}</p>
-          <div id={SCANNER_CONTAINER_ID} className="rounded-xl overflow-hidden" />
+          <div id={instanceId} className="rounded-xl overflow-hidden" />
           {manualOpen ? (
             <div className="flex items-center gap-2">
               <Input

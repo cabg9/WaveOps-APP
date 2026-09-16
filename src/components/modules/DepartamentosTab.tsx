@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo, useEffect, ReactNode } from "react";
 import {
   Pencil, Trash2, Plus, Building2, X, GitBranch,
   Shield, Crown, HardHat, Users, Briefcase, Save, UserCog,
-  LayoutTemplate, Clock, ChevronRight, ChevronDown, CircleDot, Network
+  LayoutTemplate, Clock, ChevronRight, ChevronDown, CircleDot, Network,
+  Search, Check, Eraser,
 } from "lucide-react";
 import { useFirestoreDepartments } from "@/hooks/firestore/useFirestoreDepartments";
 import { useFirestoreUsers } from "@/hooks/firestore/useFirestoreUsers";
@@ -10,6 +11,7 @@ import { useFirestoreShifts } from "@/hooks/firestore/useFirestoreShifts";
 import { useFirestorePositions } from "@/hooks/firestore/useFirestorePositions";
 import { useSpecificTaskTemplates, CreateSpecificTaskTemplateData } from "@/hooks/firestore/useSpecificTaskTemplates";
 import { useDynamicDepartments, normalizeDeptCode } from "@/hooks/firestore/useDynamicDepartments";
+import { useAppConfig } from "@/hooks/useAppConfig";
 import { useAuth } from "@/hooks/useFirestoreAuth";
 import { useAudit } from "@/hooks/useAudit";
 import { executeWithConfirm } from "@/lib/confirm-action";
@@ -73,6 +75,91 @@ async function syncDepartmentName(oldName: string, newName: string): Promise<num
   return totalUpdated;
 }
 
+// Selector de módulos visibles por departamento (multi-select con búsqueda).
+// Fuente: colección appModules (la misma que alimenta el menú). El módulo
+// "develops" se excluye: su visibilidad la gobierna el acceso a Develops.
+function ModuleVisibilityPicker({
+  selected,
+  onChange,
+  disabled,
+}: {
+  selected: string[];
+  onChange: (ids: string[]) => void;
+  disabled?: boolean;
+}) {
+  const { modules } = useAppConfig();
+  const [search, setSearch] = useState("");
+
+  const available = useMemo(
+    () => modules.filter((m) => m.id !== "develops").sort((a, b) => (a.order || 0) - (b.order || 0)),
+    [modules]
+  );
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? available.filter((m) => (m.name || m.nameEs || m.id).toLowerCase().includes(q))
+    : available;
+
+  const toggle = (id: string) => {
+    if (disabled) return;
+    onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  };
+
+  return (
+    <div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#86868B]" />
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar módulo..."
+          disabled={disabled}
+          className="w-full rounded-lg border border-[#E5E5E7] bg-white py-1.5 pl-8 pr-3 text-sm text-[#1D1D1F] placeholder:text-[#86868B] focus:outline-none focus:ring-2 focus:ring-corporate/20 disabled:opacity-50"
+        />
+      </div>
+      <div className="mt-2 flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-[#E5E5E7] bg-white p-2">
+        {filtered.length === 0 && (
+          <p className="w-full py-2 text-center text-xs text-[#86868B]">Sin módulos para la búsqueda.</p>
+        )}
+        {filtered.map((m) => {
+          const isSelected = selected.includes(m.id);
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => toggle(m.id)}
+              disabled={disabled}
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition disabled:cursor-not-allowed ${
+                isSelected
+                  ? "border-corporate bg-corporate/10 text-corporate"
+                  : "border-[#E5E5E7] text-[#86868B] hover:bg-[#F5F5F7] hover:text-[#1D1D1F]"
+              } ${disabled ? "opacity-60" : ""}`}
+            >
+              {isSelected && <Check className="h-3 w-3" />}
+              {m.name || m.nameEs || m.id}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex items-center justify-between">
+        <p className="text-[11px] text-[#86868B]">
+          {selected.length === 0
+            ? "Sin restricción: el departamento ve todos los módulos."
+            : `${selected.length} módulo(s) seleccionado(s)`}
+        </p>
+        <button
+          type="button"
+          onClick={() => !disabled && onChange([])}
+          disabled={disabled || selected.length === 0}
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[#86868B] transition hover:bg-[#F5F5F7] hover:text-[#1D1D1F] disabled:opacity-40"
+        >
+          <Eraser className="h-3 w-3" /> Limpiar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function DepartamentosTab() {
   const { departments, loading, createDepartment, updateDepartment, deleteDepartment, checkUsersInDepartment } = useFirestoreDepartments();
   const { users, updateUser } = useFirestoreUsers();
@@ -90,9 +177,10 @@ export function DepartamentosTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
-    code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null,
+    code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [],
   });
   const [saving, setSaving] = useState(false);
+  const isDirectorGeneral = currentUser?.role === Role.DIRECTOR_GENERAL;
 
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
@@ -132,9 +220,13 @@ export function DepartamentosTab() {
 
   const PROTECTED_DEPT_CODES = ["OPERACIONES", "ADMINISTRATIVO"];
 
-  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null }); setShowFormModal(true); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [] }); setShowFormModal(true); };
   const openEdit = (dept: any) => {
-    setEditingId(dept.id); setOriginalName(dept.name); setForm({ code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon, isActive: dept.isActive, parentId: dept.parentId }); setShowFormModal(true);
+    setEditingId(dept.id); setOriginalName(dept.name); setForm({
+      code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon,
+      isActive: dept.isActive, parentId: dept.parentId,
+      visibleModuleIds: Array.isArray(dept.visibleModuleIds) ? [...dept.visibleModuleIds] : [],
+    }); setShowFormModal(true);
   };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
   const closeFormModal = () => { setShowFormModal(false); setEditingId(null); setOriginalName(""); };
@@ -160,6 +252,10 @@ export function DepartamentosTab() {
     setSaving(true);
     try {
       if (editingId) {
+        // Diff de módulos visibles (visibleModuleIds) para auditoría
+        const prevVisible: string[] = departments.find((d: any) => d.id === editingId)?.visibleModuleIds || [];
+        const nextVisible: string[] = form.visibleModuleIds || [];
+        const visibilityChanged = JSON.stringify(prevVisible) !== JSON.stringify(nextVisible);
         if (originalName && originalName !== form.name) {
           const updated = await syncDepartmentName(originalName, form.name);
           await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "critical", description: "Renombrado: " + originalName + " -> " + form.name + " (" + updated + " registros)" });
@@ -167,6 +263,15 @@ export function DepartamentosTab() {
           await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "major", description: "Actualizado: " + form.name });
         }
         await updateDepartment(editingId, form);
+        if (visibilityChanged) {
+          await logAction({
+            action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name,
+            impactLevel: "critical",
+            description: "Módulos visibles actualizados: " + form.name + " (" + prevVisible.length + " → " + nextVisible.length + ")",
+            previousValue: { visibleModuleIds: prevVisible },
+            newValue: { visibleModuleIds: nextVisible },
+          });
+        }
       } else {
         const id = await createDepartment({ ...form, parentId: form.parentId || null });
         await logAction({ action: "DEPARTMENT_CREATED", targetType: "department", targetId: id, targetName: form.name, impactLevel: "major", description: "Creado: " + form.name });
@@ -428,6 +533,20 @@ export function DepartamentosTab() {
                   ))}
               </select>
               <p className="text-[11px] text-[#86868B]">Si está en el subárbol de Operaciones, se considerará operacional automáticamente.</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[#86868B]">Módulos visibles para este departamento</Label>
+              <ModuleVisibilityPicker
+                selected={form.visibleModuleIds || []}
+                onChange={(ids) => setForm(f => ({ ...f, visibleModuleIds: ids }))}
+                disabled={!isDirectorGeneral || isEditingProtected}
+              />
+              <p className="text-[11px] text-[#86868B]">
+                Si no seleccionas ninguno, el departamento ve todos los módulos (comportamiento actual). Si seleccionas, sus usuarios solo verán en su menú los módulos marcados. Esto filtra lo que APARECE; los permisos del rol siguen definiendo qué puede hacer dentro de cada módulo.
+              </p>
+              {!isDirectorGeneral && (
+                <p className="text-[11px] text-amber-600">Solo el Director General puede cambiar esta configuración.</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-[#86868B]">Color</Label>

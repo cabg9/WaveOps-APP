@@ -35,6 +35,7 @@ const {
 // Fase 1 — Inventario
 const {
   notifyTransferCreated,
+  notifyTransferShipped,
   checkLowStock,
 } = require("./src/notifications/inventory");
 
@@ -70,6 +71,7 @@ exports.notifyControlAssigned = notifyControlAssigned;
 
 // Fase 1 — Inventario
 exports.notifyTransferCreated = notifyTransferCreated;
+exports.notifyTransferShipped = notifyTransferShipped;
 exports.checkLowStock = checkLowStock;
 
 // Admin

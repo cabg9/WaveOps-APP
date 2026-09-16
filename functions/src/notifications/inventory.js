@@ -4,6 +4,9 @@
 // - notifyTransferCreated: al crear una transferencia (inventoryTransfers),
 //   avisa a quien responde en el destino (campana + push + email); si no
 //   hay responsables definidos, avisa a Admins y RRHH.
+// - notifyTransferShipped: al pasar a "en_transito" (inventoryTransfers),
+//   avisa al responsable de la ubicación destino para que confirme la
+//   recepción (campana + push + email; read:false hasta que la reciba).
 // - checkLowStock: al actualizar un stock (inventoryStocks), detecta cuando
 //   la cantidad cae al o bajo el mínimo y avisa al responsable del lugar
 //   más Admins/RRHH (campana + push + email). Dedupe de 20h vía
@@ -102,15 +105,76 @@ const notifyTransferCreated = onDocumentCreated({
   const body = `${qty} × ${productName} de ${fromLocationName} → ${toLocationName}. Creada por ${createdByName || "un usuario"}.`;
 
   for (const uid of recipients) {
-    await notifyInventoryUser({
+    await db.collection("notifications").add({
       userId: uid,
       type: "TRANSFER_CREATED",
       title,
       body,
+      data: { link: "/requisiciones", transferId: event.data.id },
+      read: false,
+      createdAt: new Date().toISOString(),
+      createdBy: "system",
       priority: "normal",
-      emailSubject: `[WaveOps] ${title}`,
-      emailText: `${body}\n\nIngresa a WaveOps → Requisiciones para ver los detalles.`,
     });
+    sendPushNotification(uid, title, body, { link: "/requisiciones" }).catch(() => {});
+    const email = await getUserEmail(uid);
+    if (email) await sendInventoryEmail({ to: email, subject: `[WaveOps] ${title}`, text: `${body}\n\nIngresa a WaveOps → Requisiciones para ver los detalles.` });
+  }
+});
+
+// ── 1b) Transferencia marcada "en tránsito" (sale) ──
+// Avisa al responsable de la ubicación destino para que confirme la
+// recepción. La notificación queda con read:false hasta que la reciba
+// (el cliente la marca leída al confirmar la recepción o manualmente).
+
+const notifyTransferShipped = onDocumentUpdated({
+  document: "inventoryTransfers/{id}",
+  region: REGION,
+  secrets: [SENDGRID_API_KEY],
+}, async (event) => {
+  const before = event.data.before.data();
+  const after = event.data.after.data();
+  if (!after) return;
+  if (before.status === "en_transito" || after.status !== "en_transito") return;
+
+  const { productId, quantity, fromLocationId, toLocationId, shippedByName } = after;
+
+  const [toLocSnap, fromLocSnap, productSnap] = await Promise.all([
+    toLocationId ? db.collection("locations").doc(toLocationId).get() : Promise.resolve(null),
+    fromLocationId ? db.collection("locations").doc(fromLocationId).get() : Promise.resolve(null),
+    productId ? db.collection("products").doc(productId).get() : Promise.resolve(null),
+  ]);
+
+  const toLocationName = toLocSnap && toLocSnap.exists ? toLocSnap.data().name || toLocationId : (toLocationId || "ubicación destino");
+  const fromLocationName = fromLocSnap && fromLocSnap.exists ? fromLocSnap.data().name || fromLocationId : (fromLocationId || "ubicación origen");
+  const productName = productSnap && productSnap.exists ? productSnap.data().name || productId : (productId || "Producto");
+
+  const recipients = [];
+  const toResponsible = toLocSnap && toLocSnap.exists ? toLocSnap.data().responsibleUserId : null;
+  if (toResponsible) recipients.push(toResponsible);
+  if (recipients.length === 0) {
+    recipients.push(...(await getAdminsAndRRHH()));
+  }
+
+  const qty = quantity ?? "?";
+  const title = `Transferencia en camino: ${productName}`;
+  const body = `${qty} × ${productName} salió de ${fromLocationName} hacia ${toLocationName}${shippedByName ? ` (enviada por ${shippedByName})` : ""}. Confirma la recepción en Inventario → Transferencias.`;
+
+  for (const uid of [...new Set(recipients)]) {
+    await db.collection("notifications").add({
+      userId: uid,
+      type: "TRANSFER_SHIPPED",
+      title,
+      body,
+      data: { link: "/requisiciones", transferId: event.data.after.id },
+      read: false,
+      createdAt: new Date().toISOString(),
+      createdBy: "system",
+      priority: "normal",
+    });
+    sendPushNotification(uid, title, body, { link: "/requisiciones" }).catch(() => {});
+    const email = await getUserEmail(uid);
+    if (email) await sendInventoryEmail({ to: email, subject: `[WaveOps] ${title}`, text: `${body}\n\nIngresa a WaveOps → Requisiciones para ver los detalles.` });
   }
 });
 
@@ -198,4 +262,4 @@ const checkLowStock = onDocumentUpdated({
   await event.data.after.ref.update({ lastLowStockAlertAt: nowIso });
 });
 
-module.exports = { notifyTransferCreated, checkLowStock };
+module.exports = { notifyTransferCreated, notifyTransferShipped, checkLowStock };
