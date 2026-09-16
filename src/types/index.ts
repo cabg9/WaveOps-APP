@@ -138,6 +138,9 @@ export interface User {
   accountType?: string;
   accountNumber?: string;
   routingNumber?: string;
+  // Descuento máximo (%) que el vendedor puede aplicar a una orden de renta
+  // sin aprobación de un supervisor. Si no está definido se usa 10.
+  maxDiscountPercent?: number | null;
 }
 
 export interface Subtask {
@@ -508,6 +511,7 @@ export enum NotificationType {
   VACATION_APPROVED = 'VACATION_APPROVED',
   VACATION_REJECTED = 'VACATION_REJECTED',
   INCAPACITY_REGISTERED = 'INCAPACITY_REGISTERED',
+  DISCOUNT_APPROVAL = 'DISCOUNT_APPROVAL',
   INVITATION_SENT = 'INVITATION_SENT',
   USER_ACTIVATED = 'USER_ACTIVATED',
   USER_DEACTIVATED = 'USER_DEACTIVATED',
@@ -524,6 +528,8 @@ export interface Notification {
     taskId?: string;
     incidenciaId?: string;
     shiftId?: string;
+    orderId?: string; // orden de renta (notificación accionable de descuento)
+    approvalType?: string; // ej. 'discountApproval'
   };
   read: boolean;
   readAt?: string;

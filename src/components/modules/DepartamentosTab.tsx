@@ -63,6 +63,13 @@ function sortUsersByHierarchy(users: any[]) {
   });
 }
 
+// Firestore rechaza valores undefined ("Unsupported field value"). Elimina las
+// claves con valor undefined del payload antes de setDoc/updateDoc, para que
+// ningún campo vacío vuelva a romper el guardado.
+function sanitizeForFirestore(payload: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(payload).filter(([, v]) => v !== undefined));
+}
+
 async function syncDepartmentName(oldName: string, newName: string): Promise<number> {
   let totalUpdated = 0;
   const batch = writeBatch(db);
@@ -75,9 +82,11 @@ async function syncDepartmentName(oldName: string, newName: string): Promise<num
   return totalUpdated;
 }
 
-// Selector de módulos visibles por departamento (multi-select con búsqueda).
+// Selector de módulos adicionales por departamento (multi-select con búsqueda).
 // Fuente: colección appModules (la misma que alimenta el menú). El módulo
 // "develops" se excluye: su visibilidad la gobierna el acceso a Develops.
+// Semántica aditiva: lo seleccionado se SUMA a los módulos que el rol ya
+// permite; nunca quita visibilidad.
 function ModuleVisibilityPicker({
   selected,
   onChange,
@@ -144,8 +153,8 @@ function ModuleVisibilityPicker({
       <div className="mt-1.5 flex items-center justify-between">
         <p className="text-[11px] text-[#86868B]">
           {selected.length === 0
-            ? "Sin restricción: el departamento ve todos los módulos."
-            : `${selected.length} módulo(s) seleccionado(s)`}
+            ? "Sin selección: el departamento ve solo los módulos que su rol permite."
+            : `${selected.length} módulo(s) adicional(es) seleccionado(s)`}
         </p>
         <button
           type="button"
@@ -222,10 +231,14 @@ export function DepartamentosTab() {
 
   const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [] }); setShowFormModal(true); };
   const openEdit = (dept: any) => {
-    setEditingId(dept.id); setOriginalName(dept.name); setForm({
-      code: dept.code || "", name: dept.name, description: dept.description, color: dept.color, icon: dept.icon,
-      isActive: dept.isActive, parentId: dept.parentId,
-      visibleModuleIds: Array.isArray(dept.visibleModuleIds) ? [...dept.visibleModuleIds] : [],
+    // Los nodos del árbol (useDynamicDepartments) no traen description/color/
+    // visibleModuleIds: se busca el registro completo en el hook principal
+    // para no guardar valores undefined en Firestore.
+    const full: any = departments.find((d: any) => d.id === dept.id) || dept;
+    setEditingId(dept.id); setOriginalName(full.name || ""); setForm({
+      code: full.code || "", name: full.name || "", description: full.description ?? "", color: full.color ?? CORPORATE_COLORS[0].value, icon: full.icon ?? "building",
+      isActive: full.isActive !== false, parentId: full.parentId ?? null,
+      visibleModuleIds: Array.isArray(full.visibleModuleIds) ? [...full.visibleModuleIds] : [],
     }); setShowFormModal(true);
   };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
@@ -234,12 +247,24 @@ export function DepartamentosTab() {
   const closeTeamModal = () => { setShowTeamModal(false); setSelectedDept(null); setEditingUserId(null); };
 
   const handleSave = async () => {
+    // Payload sanitizado: ningún campo puede llegar como undefined a
+    // Firestore. visibleModuleIds siempre es un array (nunca undefined).
+    const buildPayload = (): Record<string, unknown> => sanitizeForFirestore({
+      code: form.code ?? "",
+      name: form.name,
+      description: form.description ?? "",
+      color: form.color ?? CORPORATE_COLORS[0].value,
+      icon: form.icon ?? "building",
+      isActive: form.isActive !== false,
+      parentId: form.parentId ?? null,
+      visibleModuleIds: Array.isArray(form.visibleModuleIds) ? form.visibleModuleIds : [],
+    });
     if (editingId && isEditingProtected) {
       // Departamentos base: solo permitir editar color e icono
       setSaving(true);
       try {
         const editingDept = departments.find((d: any) => d.id === editingId);
-        await updateDepartment(editingId, { color: form.color, icon: form.icon });
+        await updateDepartment(editingId, { color: form.color ?? CORPORATE_COLORS[0].value, icon: form.icon ?? "building" });
         await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: editingDept?.name || form.name, impactLevel: "major", description: "Actualizado color/icono: " + (editingDept?.name || form.name) });
         closeFormModal();
       } catch (err: any) { alert("Error: " + err.message); }
@@ -252,7 +277,7 @@ export function DepartamentosTab() {
     setSaving(true);
     try {
       if (editingId) {
-        // Diff de módulos visibles (visibleModuleIds) para auditoría
+        // Diff de módulos adicionales (visibleModuleIds) para auditoría
         const prevVisible: string[] = departments.find((d: any) => d.id === editingId)?.visibleModuleIds || [];
         const nextVisible: string[] = form.visibleModuleIds || [];
         const visibilityChanged = JSON.stringify(prevVisible) !== JSON.stringify(nextVisible);
@@ -262,18 +287,18 @@ export function DepartamentosTab() {
         } else {
           await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "major", description: "Actualizado: " + form.name });
         }
-        await updateDepartment(editingId, form);
+        await updateDepartment(editingId, buildPayload() as Partial<DepartmentFormData>);
         if (visibilityChanged) {
           await logAction({
             action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name,
             impactLevel: "critical",
-            description: "Módulos visibles actualizados: " + form.name + " (" + prevVisible.length + " → " + nextVisible.length + ")",
+            description: "Módulos adicionales actualizados: " + form.name + " (" + prevVisible.length + " → " + nextVisible.length + ")",
             previousValue: { visibleModuleIds: prevVisible },
             newValue: { visibleModuleIds: nextVisible },
           });
         }
       } else {
-        const id = await createDepartment({ ...form, parentId: form.parentId || null });
+        const id = await createDepartment({ ...buildPayload(), parentId: form.parentId ?? null } as DepartmentFormData);
         await logAction({ action: "DEPARTMENT_CREATED", targetType: "department", targetId: id, targetName: form.name, impactLevel: "major", description: "Creado: " + form.name });
       }
       closeFormModal();
@@ -535,14 +560,14 @@ export function DepartamentosTab() {
               <p className="text-[11px] text-[#86868B]">Si está en el subárbol de Operaciones, se considerará operacional automáticamente.</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-[#86868B]">Módulos visibles para este departamento</Label>
+              <Label className="text-[#86868B]">Módulos adicionales para este departamento</Label>
               <ModuleVisibilityPicker
                 selected={form.visibleModuleIds || []}
                 onChange={(ids) => setForm(f => ({ ...f, visibleModuleIds: ids }))}
                 disabled={!isDirectorGeneral || isEditingProtected}
               />
               <p className="text-[11px] text-[#86868B]">
-                Si no seleccionas ninguno, el departamento ve todos los módulos (comportamiento actual). Si seleccionas, sus usuarios solo verán en su menú los módulos marcados. Esto filtra lo que APARECE; los permisos del rol siguen definiendo qué puede hacer dentro de cada módulo.
+                Selecciona los módulos adicionales que verá este departamento. Se suman a lo que su rol permite; no quitan visibilidad.
               </p>
               {!isDirectorGeneral && (
                 <p className="text-[11px] text-amber-600">Solo el Director General puede cambiar esta configuración.</p>

@@ -82,9 +82,11 @@ service cloud.firestore {
       allow write: if isCatalogAdmin();
     }
     // ═══ FASE 0 — Alertas de controles: RRHH/Directorio pueden crear notificaciones ═══
+    // (ampliado Fase 1 Ronda 3: supervisores y gerentes de departamento también
+    // crean notificaciones operativas, ej. aprobación de descuento de renta)
     match /notifications/{notificationId} {
       allow create: if request.auth != null &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['DIRECTOR_GENERAL', 'DIRECTOR', 'RRHH', 'GERENTE_OPERACIONES'];
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['DIRECTOR_GENERAL', 'DIRECTOR', 'RRHH', 'GERENTE_OPERACIONES', 'GERENTE_DEPARTAMENTO', 'SUPERVISOR'];
     }
     // ═══ FASE 1 — Inventario / Warehouse (aditivo) ═══
     // Config (catálogos de tipos) solo admin de catálogos. Stock, transferencias,
@@ -126,6 +128,11 @@ service cloud.firestore {
     // Descuentos preconfigurados de renta: config de catálogo (igual que
     // movementTypes/serialStatuses/rentalOrderStatuses)
     match /rentalDiscounts/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isCatalogAdmin();
+    }
+    // Impuestos y cargos configurables de renta: config de catálogo
+    match /rentalFees/{docId} {
       allow read: if request.auth != null;
       allow write: if isCatalogAdmin();
     }

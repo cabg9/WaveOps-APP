@@ -105,6 +105,9 @@ export interface Product extends CatalogBase {
   rentalPricePerDay?: number | null; // precio de renta por unidad por día
   depositPercent?: number | null; // porcentaje de fianza sobre el valor de la renta
   priceTiers?: PriceTier[] | null; // precios escalonados por cantidad (rentable)
+  // Admite descuento en la orden de renta (default true). Si es false, el
+  // descuento de esa línea solo aplica vía solicitud aprobada (Supervisor+).
+  admitsDiscount?: boolean;
 }
 
 // Descuento preconfigurado aplicable a órdenes de renta (catálogo Firestore
@@ -112,6 +115,24 @@ export interface Product extends CatalogBase {
 export interface RentalDiscount extends CatalogBase {
   name: string;
   percent: number;
+}
+
+// Impuesto o cargo configurable aplicable a órdenes de renta (catálogo
+// Firestore rentalFees). mode 'percent' = value % sobre (subtotal − descuento);
+// mode 'fixed' = monto fijo. value siempre positivo.
+export interface RentalFee extends CatalogBase {
+  name: string;
+  mode: 'percent' | 'fixed';
+  value: number;
+}
+
+// Fee aplicado a una orden (denormalizado para mostrar y auditar)
+export interface RentalOrderFee {
+  feeId: string;
+  name: string;
+  mode: 'percent' | 'fixed';
+  value: number;
+  amount: number; // monto efectivo cobrado (calculado sobre subtotal − descuento)
 }
 
 export interface CostCenter extends CatalogBase {
@@ -244,6 +265,7 @@ export const CATALOG_COLLECTIONS = {
   rentalOrders: 'rentalOrders',
   rentalOrderStatuses: 'rentalOrderStatuses',
   rentalDiscounts: 'rentalDiscounts',
+  rentalFees: 'rentalFees',
 } as const;
 
 // ═══════════════════════════════════════════════════════════════════
@@ -366,6 +388,12 @@ export interface RentalUnit {
 
 export type RentalPaymentStatus = 'pagada' | 'pendiente' | 'parcial' | 'credito';
 
+// Estado de aprobación del descuento de la orden: 'pending' cuando excede el
+// máximo del vendedor o incluye un producto que no admite descuento; el
+// supervisor aprueba o rechaza con un toque desde la campana (notificación
+// accionable). Al rechazar, el descuento se quita del total.
+export type RentalDiscountStatus = 'approved' | 'pending' | 'rejected';
+
 // Ítem de una orden de renta: producto rentable + cantidad
 export interface RentalOrderItem {
   productId: string;
@@ -404,7 +432,15 @@ export interface RentalOrder {
   discountId?: string | null; // ref rentalDiscounts
   discountName?: string | null; // denormalizado
   discountPercent?: number | null; // positivo: 10 = -10 %
+  discountStatus?: RentalDiscountStatus | null; // aprobación del descuento
+  // Impuestos/cargos aplicados (catálogo rentalFees) y su suma; el total
+  // final = subtotal − descuento + feesTotal
+  fees?: RentalOrderFee[];
+  feesTotal?: number | null;
   total?: number | null;
+  // Monto efectivamente cobrado al cliente (registro simple); con total
+  // permite mostrar pagado / pendiente / parcial con cuánto falta
+  amountPaid?: number | null;
   // Despacho de emergencia (escáner inoperativo): forzar el avance queda
   // auditado con motivo obligatorio y quién lo hizo (Supervisor+)
   emergencyDispatchReason?: string | null;

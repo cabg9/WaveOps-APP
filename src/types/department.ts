@@ -10,11 +10,12 @@ export interface Department {
   createdAt: string;
   updatedAt: string;
   /**
-   * Módulos visibles para los usuarios de este departamento (ids de appModules).
-   * Campo aditivo: ausente o vacío = sin restricción (ven todos los módulos,
-   * comportamiento actual). Solo cuando el admin guarda una selección concreta,
-   * el menú del departamento se limita a esos módulos (filtro visual que se
-   * aplica después de flags/permisos; el rol sigue definiendo qué puede hacer).
+   * Módulos adicionales para los usuarios de este departamento (ids de
+   * appModules). Semántica ADITIVA: se SUMAN a los módulos que el rol ya
+   * permite; NUNCA quitan visibilidad. Ausente o vacío = sin módulos extra
+   * (el menú queda definido solo por el rol). Los extras solo se agregan si
+   * el módulo sigue visible globalmente (isVisible, feature flag y estado);
+   * el permiso del rol no se exige para ellos.
    */
   visibleModuleIds?: string[];
 }

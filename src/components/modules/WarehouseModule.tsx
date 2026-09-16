@@ -8,7 +8,7 @@
 // Deep link: /warehouse?order=<id> abre el detalle de la orden.
 import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import QRCode from 'qrcode';
 import {
   collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, query, orderBy,
@@ -28,8 +28,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { Role } from '@/types';
+import { cn, formatMoney } from '@/lib/utils';
+import { Role, NotificationType } from '@/types';
 import type {
   RentalOrder,
   RentalOrderStatus,
@@ -41,6 +41,9 @@ import type {
   Client,
   InventoryStock,
   RentalDiscount,
+  RentalFee,
+  RentalDiscountStatus,
+  RentalOrderFee,
 } from '@/types/catalogs';
 import type { AuditAction } from '@/types/develops';
 import { CATALOG_COLLECTIONS } from '@/types/catalogs';
@@ -48,7 +51,7 @@ import {
   ClipboardList, Plus, Search, ChevronDown, ChevronUp,
   Construction, Package, UserPlus, MapPin, CalendarClock, Banknote, ArrowRight,
   RotateCcw, Users, LayoutGrid, Upload, QrCode, CheckCircle2, XCircle, Link2,
-  Printer, AlertTriangle,
+  Printer, AlertTriangle, ArrowLeft, SwitchCamera, Receipt, Percent,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -311,6 +314,53 @@ registerI18nKeys({
     'wh.return.serialNotAssigned': 'Este serial no pertenece a esta orden',
     'wh.return.serialAlreadyScanned': 'Este serial ya fue escaneado',
     'wh.return.returned': 'Regresó',
+
+    'wh.view.back': 'Volver',
+    'wh.home.actions': 'Acciones',
+    'wh.home.newOrder': 'Nueva orden',
+    'wh.home.newOrderDesc': 'Crear una orden de renta con cliente, ítems, entrega y pago.',
+    'wh.home.dispatch': 'Despachar',
+    'wh.home.dispatchDesc': 'Escanear el QR de la orden y asignar los seriales que salen.',
+    'wh.home.return': 'Verificar retorno',
+    'wh.home.returnDesc': 'Escanear los seriales que regresan y marcarlos OK o dañados.',
+
+    'wh.action.prepare': 'Preparar',
+    'wh.action.ready': 'Listo para despachar',
+    'wh.action.dispatch': 'Despachar',
+    'wh.action.deliver': 'Entregar',
+
+    'wh.orderForm.fees': 'Impuestos y cargos',
+    'wh.orderForm.feesNone': 'Sin impuestos ni cargos',
+    'wh.orderForm.feesHelp': 'Se suman al total sobre (subtotal − descuento).',
+    'wh.orderForm.amountPaid': 'Monto recibido',
+    'wh.orderForm.amountPaidPlaceholder': '0.00',
+    'wh.orderForm.amountPaidHelp': 'Cuánto se cobró al cliente. Con el total permite mostrar pagado / pendiente / parcial.',
+
+    'wh.detail.fees': 'Impuestos y cargos',
+    'wh.detail.amountPaid': 'Monto recibido',
+    'wh.detail.amountPaidSave': 'Registrar',
+    'wh.detail.amountPaidHint': 'Registra cuánto se cobró; la etiqueta de pago se calcula con el total.',
+    'wh.payment.paidFull': 'Pagada',
+    'wh.payment.partialMissing': 'Parcial — falta {amount}',
+    'wh.payment.pendingMissing': 'Pendiente — falta {amount}',
+
+    'wh.discount.pendingBadge': 'Descuento por aprobar',
+    'wh.discount.rejectedBadge': 'Descuento rechazado',
+    'wh.discount.bannerTitle': 'Aprobar descuento',
+    'wh.discount.bannerDesc': 'El descuento "{name}" (-{percent}%) excede el máximo del vendedor o incluye un producto que no admite descuento. Apruébalo para aplicarlo o recházalo para quitarlo del total.',
+    'wh.discount.approve': 'Aprobar',
+    'wh.discount.reject': 'Rechazar',
+    'wh.confirm.discountApproveTitle': 'Aprobar descuento',
+    'wh.confirm.discountApproveDesc': 'El descuento quedará aplicado a la orden.',
+    'wh.confirm.discountRejectTitle': 'Rechazar descuento',
+    'wh.confirm.discountRejectDesc': 'El descuento se quitará del total de la orden.',
+    'wh.notification.discountApprovalTitle': 'Descuento por aprobar',
+    'wh.notification.discountApprovalBody': 'La orden de {client} tiene un descuento de {percent}% esperando tu aprobación.',
+    'wh.toast.discountApproved': 'Descuento aprobado',
+    'wh.toast.discountRejected': 'Descuento rechazado',
+
+    'wh.scanner.switchCamera': 'Cambiar cámara',
+    'wh.scanner.cameraError': 'No se pudo abrir la cámara. Intenta con otra o ingresa el código manual.',
   },
   en: {
     'wh.devTitle': 'Module under development',
@@ -567,6 +617,53 @@ registerI18nKeys({
     'wh.return.serialNotAssigned': 'This serial does not belong to this order',
     'wh.return.serialAlreadyScanned': 'This serial was already scanned',
     'wh.return.returned': 'Returned',
+
+    'wh.view.back': 'Back',
+    'wh.home.actions': 'Actions',
+    'wh.home.newOrder': 'New order',
+    'wh.home.newOrderDesc': 'Create a rental order with client, items, delivery and payment.',
+    'wh.home.dispatch': 'Dispatch',
+    'wh.home.dispatchDesc': 'Scan the order QR and assign the serials going out.',
+    'wh.home.return': 'Verify return',
+    'wh.home.returnDesc': 'Scan the returning serials and mark them OK or damaged.',
+
+    'wh.action.prepare': 'Prepare',
+    'wh.action.ready': 'Ready to dispatch',
+    'wh.action.dispatch': 'Dispatch',
+    'wh.action.deliver': 'Deliver',
+
+    'wh.orderForm.fees': 'Taxes and fees',
+    'wh.orderForm.feesNone': 'No taxes or fees',
+    'wh.orderForm.feesHelp': 'They are added to the total on (subtotal − discount).',
+    'wh.orderForm.amountPaid': 'Amount received',
+    'wh.orderForm.amountPaidPlaceholder': '0.00',
+    'wh.orderForm.amountPaidHelp': 'How much was collected from the client. With the total it shows paid / pending / partial.',
+
+    'wh.detail.fees': 'Taxes and fees',
+    'wh.detail.amountPaid': 'Amount received',
+    'wh.detail.amountPaidSave': 'Record',
+    'wh.detail.amountPaidHint': 'Record how much was collected; the payment label is computed from the total.',
+    'wh.payment.paidFull': 'Paid',
+    'wh.payment.partialMissing': 'Partial — missing {amount}',
+    'wh.payment.pendingMissing': 'Pending — missing {amount}',
+
+    'wh.discount.pendingBadge': 'Discount pending approval',
+    'wh.discount.rejectedBadge': 'Discount rejected',
+    'wh.discount.bannerTitle': 'Approve discount',
+    'wh.discount.bannerDesc': 'The discount "{name}" (-{percent}%) exceeds the seller\'s maximum or includes a product that does not allow discounts. Approve it to apply it or reject it to remove it from the total.',
+    'wh.discount.approve': 'Approve',
+    'wh.discount.reject': 'Reject',
+    'wh.confirm.discountApproveTitle': 'Approve discount',
+    'wh.confirm.discountApproveDesc': 'The discount will be applied to the order.',
+    'wh.confirm.discountRejectTitle': 'Reject discount',
+    'wh.confirm.discountRejectDesc': 'The discount will be removed from the order total.',
+    'wh.notification.discountApprovalTitle': 'Discount pending approval',
+    'wh.notification.discountApprovalBody': '{client}\'s order has a {percent}% discount waiting for your approval.',
+    'wh.toast.discountApproved': 'Discount approved',
+    'wh.toast.discountRejected': 'Discount rejected',
+
+    'wh.scanner.switchCamera': 'Switch camera',
+    'wh.scanner.cameraError': 'Could not open the camera. Try another one or enter the code manually.',
   },
 });
 
@@ -615,6 +712,7 @@ function docToProduct(id: string, data: Record<string, unknown>): Product {
     rentalPricePerDay: toNumOrNull(data.rentalPricePerDay) ?? null,
     depositPercent: toNumOrNull(data.depositPercent) ?? null,
     priceTiers,
+    admitsDiscount: toBool(data.admitsDiscount, true),
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
@@ -719,6 +817,17 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
       });
     }
   }
+  const fees: RentalOrderFee[] = Array.isArray(data.fees)
+    ? (data.fees as Array<Record<string, unknown>>)
+        .filter(f => f && typeof f === 'object')
+        .map(f => ({
+          feeId: toStr(f.feeId),
+          name: toStr(f.name),
+          mode: f.mode === 'fixed' ? 'fixed' : 'percent',
+          value: toNum(f.value),
+          amount: toNum(f.amount),
+        }))
+    : [];
   return {
     id,
     tenantId: toStr(data.tenantId),
@@ -741,7 +850,11 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
     discountId: data.discountId ? toStr(data.discountId) : null,
     discountName: data.discountName ? toStr(data.discountName) : null,
     discountPercent: toNumOrNull(data.discountPercent) ?? null,
+    discountStatus: (data.discountStatus as RentalDiscountStatus) ?? null,
+    fees,
+    feesTotal: toNumOrNull(data.feesTotal) ?? null,
     total: toNumOrNull(data.total) ?? null,
+    amountPaid: toNumOrNull(data.amountPaid) ?? null,
     emergencyDispatchReason: data.emergencyDispatchReason ? toStr(data.emergencyDispatchReason) : null,
     emergencyDispatchBy: data.emergencyDispatchBy ? toStr(data.emergencyDispatchBy) : null,
     emergencyDispatchAt: data.emergencyDispatchAt ? toStr(data.emergencyDispatchAt) : null,
@@ -788,6 +901,21 @@ function docToRentalDiscount(id: string, data: Record<string, unknown>): RentalD
   };
 }
 
+function docToRentalFee(id: string, data: Record<string, unknown>): RentalFee {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    name: toStr(data.name),
+    mode: data.mode === 'fixed' ? 'fixed' : 'percent',
+    value: toNum(data.value),
+    isActive: toBool(data.isActive, true),
+    createdAt: toStr(data.createdAt),
+    createdBy: toStr(data.createdBy),
+    updatedAt: data.updatedAt ? toStr(data.updatedAt) : undefined,
+    updatedBy: data.updatedBy ? toStr(data.updatedBy) : undefined,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ROLES
 // ═══════════════════════════════════════════════════════════════════
@@ -821,7 +949,10 @@ const SUPERVISOR_PLUS_ROLES: Role[] = [
 ];
 
 // Estados que SOLO avanzan escaneando (QR de orden + seriales); el único
-// atajo manual permitido es el modo emergencia (Supervisor+, auditado)
+// atajo manual permitido es el modo emergencia (Supervisor+, auditado).
+// 'despachado' exige escaneo solo si la orden tiene productos serializados;
+// 'devuelto'/'verificado' solo si ya tiene seriales asignados. Las órdenes de
+// productos NO serializados avanzan con confirmación simple en cada paso.
 const SCAN_ONLY_STATUS_IDS = ['despachado', 'devuelto', 'verificado'];
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -844,6 +975,10 @@ function unitPriceForQty(product: Product | undefined, qty: number): number | nu
 
 type WhTab = 'board' | 'orders' | 'returns';
 
+// Vista interna de pantalla completa (sin pop-ups): las acciones principales
+// navegan entre pantallas con botón Volver, no entre diálogos
+type WhView = 'create' | 'dispatch' | 'return' | null;
+
 interface OrderItemDraft {
   productId: string;
   quantity: string;
@@ -861,6 +996,8 @@ interface OrderFormState {
   proofRef: string;
   depositAmount: string;
   discountId: string; // '' = sin descuento (ref rentalDiscounts)
+  feeIds: string[]; // refs rentalFees seleccionados
+  amountPaid: string; // monto recibido (registro simple)
   observations: string;
   activityRef: string;
 }
@@ -876,6 +1013,8 @@ const EMPTY_ORDER_FORM: OrderFormState = {
   proofRef: '',
   depositAmount: '',
   discountId: '',
+  feeIds: [],
+  amountPaid: '',
   observations: '',
   activityRef: '',
 };
@@ -974,6 +1113,7 @@ export function WarehouseModule() {
   const [serialStatuses, setSerialStatuses] = useState<SerialStatus[]>([]);
   const [stocks, setStocks] = useState<InventoryStock[]>([]);
   const [rentalDiscounts, setRentalDiscounts] = useState<RentalDiscount[]>([]);
+  const [rentalFees, setRentalFees] = useState<RentalFee[]>([]);
 
   // Estado de carga / error
   const [loading, setLoading] = useState(true);
@@ -981,6 +1121,10 @@ export function WarehouseModule() {
 
   // Navegación entre sub-pestañas
   const [tab, setTab] = useState<WhTab>('board');
+
+  // Vista interna de pantalla completa (crear orden / despachar / retorno).
+  // null = pantalla principal con tarjetas de acción y sub-pestañas
+  const [whView, setWhView] = useState<WhView>(null);
 
   // Tarjetas expandibles (lista de órdenes)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -996,8 +1140,7 @@ export function WarehouseModule() {
   const [filterStatusId, setFilterStatusId] = useState('');
   const [orderSearch, setOrderSearch] = useState('');
 
-  // Formulario de nueva orden
-  const [orderModalOpen, setOrderModalOpen] = useState(false);
+  // Formulario de nueva orden (pantalla interna: whView === 'create')
   const [orderForm, setOrderForm] = useState<OrderFormState>(EMPTY_ORDER_FORM);
   const [orderItems, setOrderItems] = useState<OrderItemDraft[]>([]);
   const [proofFile, setProofFile] = useState<File | null>(null);
@@ -1019,7 +1162,7 @@ export function WarehouseModule() {
   const [savingDiscount, setSavingDiscount] = useState(false);
 
   // Despacho con escaneo QR (WH-D2): paso 1 orden, paso 2 seriales, paso 3 confirmar
-  const [dispatchOpen, setDispatchOpen] = useState(false);
+  // (pantalla interna: whView === 'dispatch')
   const [dispatchOrderId, setDispatchOrderId] = useState<string | null>(null);
   const [dispatchStep, setDispatchStep] = useState(1);
   // Asignación de seriales por índice de ítem (anti-sobre-renta: máx. quantity)
@@ -1029,7 +1172,7 @@ export function WarehouseModule() {
   const [savingDispatch, setSavingDispatch] = useState(false);
 
   // Verificación de retorno (WH-D2): marca por serial 'ok' | 'damaged'
-  const [returnOpen, setReturnOpen] = useState(false);
+  // (pantalla interna: whView === 'return')
   const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
   const [returnStep, setReturnStep] = useState<1 | 2>(1);
   // Seriales que regresan: solo entran a la verificación escaneándolos
@@ -1074,6 +1217,10 @@ export function WarehouseModule() {
   const activeDiscounts = useMemo(
     () => rentalDiscounts.filter(d => d.isActive && d.percent > 0),
     [rentalDiscounts]
+  );
+  const activeFees = useMemo(
+    () => rentalFees.filter(f => f.isActive && f.value > 0),
+    [rentalFees]
   );
 
   const stockAtLocation = (productId: string, locationId: string) =>
@@ -1120,7 +1267,8 @@ export function WarehouseModule() {
 
   // Precios del formulario (solo canSeeMoney): por ítem se aplica el tier que
   // corresponda a la cantidad (sin tier, precio base); el descuento
-  // seleccionado se aplica sobre el subtotal. Base: 1 día de renta.
+  // seleccionado se aplica sobre el subtotal y los impuestos/cargos (fees)
+  // sobre (subtotal − descuento). Base: 1 día de renta.
   // Las líneas se alinean por índice con orderItems (ítem sin producto o
   // cantidad inválida queda con precio null).
   const formPricing = useMemo(() => {
@@ -1140,9 +1288,18 @@ export function WarehouseModule() {
     const subtotal = round2(lines.reduce((acc, l) => acc + (l.lineTotal ?? 0), 0));
     const discount = activeDiscounts.find(d => d.id === orderForm.discountId) ?? null;
     const percent = discount?.percent ?? 0;
-    const total = round2(subtotal * (1 - percent / 100));
-    return { lines, subtotal, discount, percent, total };
-  }, [canSeeMoney, orderItems, products, activeDiscounts, orderForm.discountId]);
+    const discountAmount = round2(subtotal * (percent / 100));
+    const afterDiscount = round2(subtotal - discountAmount);
+    const feeLines: Array<{ fee: RentalFee; amount: number }> = activeFees
+      .filter(f => orderForm.feeIds.includes(f.id))
+      .map(f => ({
+        fee: f,
+        amount: f.mode === 'percent' ? round2((afterDiscount * f.value) / 100) : round2(f.value),
+      }));
+    const feesTotal = round2(feeLines.reduce((acc, l) => acc + l.amount, 0));
+    const total = round2(afterDiscount + feesTotal);
+    return { lines, subtotal, discount, percent, discountAmount, feeLines, feesTotal, total };
+  }, [canSeeMoney, orderItems, products, activeDiscounts, activeFees, orderForm.discountId, orderForm.feeIds]);
 
   // Sugerencia de fianza de una orden existente (referencia en el detalle):
   // días entre su creación y la fecha de entrega
@@ -1354,6 +1511,24 @@ export function WarehouseModule() {
     return () => unsub();
   }, [enabled, tenantId]);
 
+  // Impuestos y cargos configurables de renta (multi-select del formulario)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.rentalFees), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setRentalFees(
+          snap.docs
+            .map(d => docToRentalFee(d.id, d.data()))
+            .filter(f => !f.tenantId || f.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[WarehouseModule] rentalFees:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
   // ═══════════════════════════════════════════════════════════════════
   // CLIENTE RÁPIDO
   // ═══════════════════════════════════════════════════════════════════
@@ -1397,7 +1572,7 @@ export function WarehouseModule() {
     setQuickClientOpen(false);
     setQuickClientName('');
     depositTouched.current = false;
-    setOrderModalOpen(true);
+    setWhView('create');
   };
 
   const updateItem = (index: number, patch: Partial<OrderItemDraft>) => {
@@ -1457,8 +1632,43 @@ export function WarehouseModule() {
         : [];
       const subtotal = canSeeMoney && formPricing ? formPricing.subtotal : null;
       const discount = canSeeMoney ? formPricing?.discount ?? null : null;
+      const percent = discount?.percent ?? 0;
+      // Aprobación del descuento: si excede el máximo del vendedor o algún
+      // producto no admite descuento, queda "por aprobar" y se notifica a
+      // supervisores (aprueban/rechazan con un toque desde la campana).
+      const creatorProfile = users.find(u => u.id === currentUser!.id);
+      const maxDiscountPercent =
+        typeof creatorProfile?.maxDiscountPercent === 'number'
+          ? creatorProfile.maxDiscountPercent
+          : 10; // default conservador cuando el campo no está definido
+      const hasRestrictedItem = orderItems.some(it => {
+        const p = products.find(pr => pr.id === it.productId);
+        return !!p && p.admitsDiscount === false;
+      });
+      const needsDiscountApproval = percent > 0 && (percent > maxDiscountPercent || hasRestrictedItem);
+      const discountStatus: RentalDiscountStatus | null =
+        percent === 0 ? null : needsDiscountApproval ? 'pending' : 'approved';
+      const fees: RentalOrderFee[] = canSeeMoney && formPricing
+        ? formPricing.feeLines.map(l => ({
+            feeId: l.fee.id,
+            name: l.fee.name,
+            mode: l.fee.mode,
+            value: l.fee.value,
+            amount: l.amount,
+          }))
+        : [];
+      const feesTotal = canSeeMoney && formPricing ? formPricing.feesTotal : null;
       const total = canSeeMoney && formPricing ? formPricing.total : null;
-      await addDoc(collection(db, CATALOG_COLLECTIONS.rentalOrders), {
+      // Monto recibido: lo escrito en el formulario; si el pago se marca
+      // como "pagada" sin monto, se asume el total (para la etiqueta de pago)
+      const paidInput = canSeeMoney ? Number(orderForm.amountPaid) : 0;
+      const amountPaid =
+        canSeeMoney && Number.isFinite(paidInput) && paidInput > 0
+          ? round2(paidInput)
+          : canSeeMoney && orderForm.paymentStatus === 'pagada' && total != null
+            ? total
+            : null;
+      const orderRef = await addDoc(collection(db, CATALOG_COLLECTIONS.rentalOrders), {
         tenantId,
         // TODO: orderNumber lo asigna una Cloud Function (correlativo); por ahora null
         orderNumber: null,
@@ -1490,7 +1700,11 @@ export function WarehouseModule() {
               discountId: discount?.id ?? null,
               discountName: discount?.name ?? null,
               discountPercent: discount?.percent ?? null,
+              discountStatus,
+              fees,
+              feesTotal,
               total,
+              amountPaid,
             }
           : {}),
         activityRef:
@@ -1504,7 +1718,19 @@ export function WarehouseModule() {
         createdByName: currentUser!.name,
         updatedAt: now,
       });
-      setOrderModalOpen(false);
+      // Descuento por aprobar: notificación accionable a supervisores; al
+      // tocarla se abre la orden con el banner de aprobación (deep link)
+      if (needsDiscountApproval) {
+        await notifyDiscountApproval(
+          {
+            clientName: client.name,
+            discountName: discount?.name ?? '',
+            discountPercent: percent,
+          },
+          orderRef.id
+        );
+      }
+      setWhView(null);
       toast.success(t('wh.toast.orderCreated'));
     } catch (err) {
       console.error('[WarehouseModule] saveOrder:', err);
@@ -1512,6 +1738,114 @@ export function WarehouseModule() {
     } finally {
       setSavingOrder(false);
     }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // APROBACIÓN DE DESCUENTO (Ronda 3): el supervisor aprueba o rechaza con
+  // un toque desde la campana. La notificación es accionable: data.link abre
+  // el deep link /warehouse?order=<id> con el banner de aprobación.
+  // ═══════════════════════════════════════════════════════════════════
+
+  const notifyDiscountApproval = async (
+    info: { clientName: string; discountName: string; discountPercent: number },
+    orderId: string
+  ) => {
+    if (!currentUser) return;
+    // Supervisores del departamento del creador; si no hay, DG/RRHH
+    const creator = users.find(u => u.id === currentUser.id);
+    let targets = users.filter(
+      u => u.isActive && u.id !== currentUser.id && SUPERVISOR_PLUS_ROLES.includes(u.role)
+    );
+    const deptTargets = creator?.department
+      ? targets.filter(u => u.department === creator.department)
+      : [];
+    if (deptTargets.length > 0) targets = deptTargets;
+    if (targets.length === 0) {
+      targets = users.filter(
+        u =>
+          u.isActive &&
+          u.id !== currentUser.id &&
+          (u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
+      );
+    }
+    for (const target of targets) {
+      try {
+        await addDoc(collection(db, 'notifications'), {
+          userId: target.id,
+          type: NotificationType.DISCOUNT_APPROVAL,
+          title: t('wh.notification.discountApprovalTitle'),
+          body: tf('wh.notification.discountApprovalBody', {
+            client: info.clientName,
+            percent: info.discountPercent,
+          }),
+          data: {
+            link: `/warehouse?order=${orderId}`,
+            orderId,
+            approvalType: 'discountApproval',
+          },
+          read: false,
+          createdAt: new Date().toISOString(),
+          createdBy: currentUser.id,
+          priority: 'high',
+        });
+      } catch (err) {
+        console.error('[WarehouseModule] notifyDiscountApproval:', err);
+      }
+    }
+  };
+
+  const settleDiscount = async (order: RentalOrder, approve: boolean) => {
+    if (!canSupervise || !currentUser || order.discountStatus !== 'pending') return;
+    await executeWithConfirm(
+      {
+        level: 'major',
+        title: approve ? t('wh.confirm.discountApproveTitle') : t('wh.confirm.discountRejectTitle'),
+        description: approve ? t('wh.confirm.discountApproveDesc') : t('wh.confirm.discountRejectDesc'),
+      },
+      async () => {
+        try {
+          const now = new Date().toISOString();
+          if (approve) {
+            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+              discountStatus: 'approved',
+              updatedAt: now,
+            });
+          } else {
+            // Rechazar: el descuento se quita del total (los fees se
+            // conservan tal como se cobraron)
+            const subtotal = order.subtotal ?? 0;
+            const feesTotal = order.feesTotal ?? 0;
+            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+              discountStatus: 'rejected',
+              discountId: null,
+              discountName: null,
+              discountPercent: null,
+              total: round2(subtotal + feesTotal),
+              updatedAt: now,
+            });
+          }
+          await logAction({
+            action: (approve ? 'RENTAL_DISCOUNT_APPROVED' : 'RENTAL_DISCOUNT_REJECTED') as AuditAction,
+            targetType: 'rental_order',
+            targetId: order.id!,
+            targetName: order.orderNumber != null ? `Orden #${order.orderNumber}` : order.clientName,
+            previousValue: { discountStatus: order.discountStatus, discountPercent: order.discountPercent },
+            newValue: {
+              discountStatus: approve ? 'approved' : 'rejected',
+              discountPercent: approve ? order.discountPercent : null,
+            },
+            impactLevel: 'sensitive',
+            description: approve
+              ? `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) aprobado en la orden de ${order.clientName}`
+              : `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) rechazado y quitado del total en la orden de ${order.clientName}`,
+          });
+          toast.success(approve ? t('wh.toast.discountApproved') : t('wh.toast.discountRejected'));
+        } catch (err) {
+          console.error('[WarehouseModule] settleDiscount:', err);
+          toast.error(t('wh.toast.error'));
+        }
+      }
+    );
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1524,10 +1858,17 @@ export function WarehouseModule() {
   const orderHasAssignedSerials = (order: RentalOrder) =>
     order.items.some(it => (it.assignedUnitIds ?? []).length > 0);
 
+  // La orden incluye al menos un producto con unidades serializadas (hay
+  // seriales físicos que escanear). Si no, el despache avanza con confirmación
+  // simple: no hay nada que escanear (excepción anti-atasco).
+  const orderUsesSerials = (order: RentalOrder) =>
+    order.items.some(it => rentalUnits.some(u => u.productId === it.productId));
+
   const isScanOnlyTarget = (order: RentalOrder, targetId: string) => {
     if (!SCAN_ONLY_STATUS_IDS.includes(targetId)) return false;
-    // Sin seriales asignados no hay nada que escanear: el avance manual sigue
+    // Sin seriales no hay nada que escanear: el avance manual sigue
     // disponible para no bloquear órdenes de productos no serializados
+    if (!orderUsesSerials(order)) return false;
     if ((targetId === 'devuelto' || targetId === 'verificado') && !orderHasAssignedSerials(order)) {
       return false;
     }
@@ -1748,11 +2089,11 @@ export function WarehouseModule() {
     setScanTarget(null);
     setDispatchStep(orderId ? 2 : 1);
     setDispatchOrderId(orderId ?? null);
-    setDispatchOpen(true);
+    setWhView('dispatch');
   };
 
   const closeDispatch = () => {
-    setDispatchOpen(false);
+    setWhView(null);
     setDispatchOrderId(null);
     setDispatchAssignments({});
     setScanTarget(null);
@@ -1831,7 +2172,13 @@ export function WarehouseModule() {
 
   const dispatchComplete =
     !!dispatchOrder &&
-    dispatchOrder.items.every((it, idx) => (dispatchAssignments[idx] ?? []).length === it.quantity);
+    dispatchOrder.items.every((it, idx) => {
+      // Ítems de productos sin seriales registrados no bloquean el despacho
+      // (nada que escanear): cumplen automáticamente
+      const hasUnits = rentalUnits.some(u => u.productId === it.productId);
+      if (!hasUnits) return true;
+      return (dispatchAssignments[idx] ?? []).length === it.quantity;
+    });
 
   const confirmDispatch = async () => {
     const order = dispatchOrder;
@@ -1923,11 +2270,11 @@ export function WarehouseModule() {
     setReturnStep(orderId ? 2 : 1);
     setReturnedSerialIds(new Set());
     setReturnMarks({});
-    setReturnOpen(true);
+    setWhView('return');
   };
 
   const closeReturn = () => {
-    setReturnOpen(false);
+    setWhView(null);
     setReturnOrderId(null);
     setReturnStep(1);
     setReturnedSerialIds(new Set());
@@ -2082,6 +2429,53 @@ export function WarehouseModule() {
   const itemsSummary = (order: RentalOrder) =>
     order.items.map(it => `${productName(it.productId)} ×${it.quantity}`).join(' · ');
 
+  // Etiqueta de pago con cuánto falta (solo canSeeMoney): se calcula con el
+  // total (incluye impuestos/cargos) y el monto recibido. Sin montos en el
+  // doc, cae en el paymentStatus manual sin cifras.
+  const paymentBadge = (
+    order: RentalOrder
+  ): { text: string; className: string } | null => {
+    if (!canSeeMoney) return null;
+    if (order.total != null) {
+      const paid = order.amountPaid ?? 0;
+      const missing = round2(order.total - paid);
+      if (missing <= 0) {
+        return { text: t('wh.payment.paidFull'), className: 'bg-green-50 text-green-700 border-green-200' };
+      }
+      if (paid > 0) {
+        return {
+          text: tf('wh.payment.partialMissing', { amount: formatMoney(missing) }),
+          className: 'bg-blue-50 text-blue-700 border-blue-200',
+        };
+      }
+      return {
+        text: tf('wh.payment.pendingMissing', { amount: formatMoney(missing) }),
+        className: 'bg-amber-50 text-amber-700 border-amber-200',
+      };
+    }
+    return {
+      text: t(`wh.orderForm.paymentStatus.${order.paymentStatus}`),
+      className: PAYMENT_STATUS_BADGE[order.paymentStatus],
+    };
+  };
+
+  // Cada transición avanza SOLO con su acción específica (nada de selector
+  // genérico de estado): el texto del botón nombra la acción, no el destino
+  const advanceActionLabel = (target: RentalOrderStatus): string => {
+    switch (target.id) {
+      case 'en_preparacion':
+        return t('wh.action.prepare');
+      case 'listo_despachar':
+        return t('wh.action.ready');
+      case 'despachado':
+        return t('wh.action.dispatch');
+      case 'entregado':
+        return t('wh.action.deliver');
+      default:
+        return tf('wh.detail.advanceTo', { name: statusName(target) });
+    }
+  };
+
   const fmtDateTime = (iso: string | null | undefined) => {
     if (!iso) return '—';
     const d = new Date(iso);
@@ -2178,9 +2572,14 @@ export function WarehouseModule() {
         })
       : null;
     const moneySubtotal = order.subtotal ?? (moneyLines ? round2(moneyLines.reduce((a, l) => a + (l.lineTotal ?? 0), 0)) : null);
+    const moneyFeesTotal = order.feesTotal ??
+      (order.fees && order.fees.length > 0
+        ? round2(order.fees.reduce((a, f) => a + f.amount, 0))
+        : null);
     const moneyTotal = order.total ?? (moneySubtotal != null
-      ? round2(moneySubtotal * (1 - (order.discountPercent ?? 0) / 100))
+      ? round2(moneySubtotal * (1 - (order.discountPercent ?? 0) / 100) + (moneyFeesTotal ?? 0))
       : null);
+    const payBadge = paymentBadge(order);
     return (
       <div className="space-y-4">
         {/* Ítems */}
@@ -2193,16 +2592,19 @@ export function WarehouseModule() {
                 className="flex items-center gap-2 bg-[#F5F5F7] rounded-xl px-3 py-2 text-sm"
               >
                 <Package className="h-4 w-4 text-[#86868B] shrink-0" />
-                <span className="text-[#1D1D1F] font-medium">{productName(it.productId)}</span>
-                <span className="text-[#86868B]">×{it.quantity}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[#1D1D1F] font-medium">{productName(it.productId)}</span>
+                  <span className="text-[#86868B]"> ×{it.quantity}</span>
+                  {it.tallaRef && (
+                    <span className="ml-2 text-xs text-[#86868B] border border-[#E5E5E7] bg-white rounded-full px-2 py-0.5">
+                      {it.tallaRef}
+                    </span>
+                  )}
+                </div>
+                {/* Precio de la línea justificado a la derecha con desglose */}
                 {canSeeMoney && moneyLines && moneyLines[idx]?.unitPrice != null && (
-                  <span className="text-xs text-[#86868B]">
-                    (${moneyLines[idx].unitPrice} × {it.quantity} = ${moneyLines[idx].lineTotal})
-                  </span>
-                )}
-                {it.tallaRef && (
-                  <span className="ml-auto text-xs text-[#86868B] border border-[#E5E5E7] bg-white rounded-full px-2 py-0.5">
-                    {it.tallaRef}
+                  <span className="ml-auto text-xs text-[#86868B] whitespace-nowrap text-right shrink-0">
+                    ({formatMoney(moneyLines[idx].unitPrice)} × {it.quantity} = {formatMoney(moneyLines[idx].lineTotal)})
                   </span>
                 )}
               </div>
@@ -2213,19 +2615,25 @@ export function WarehouseModule() {
             <div className="mt-2 bg-[#F5F5F7] rounded-xl px-3 py-2 text-sm space-y-0.5">
               <div className="flex justify-between text-[#86868B]">
                 <span>{t('wh.detail.subtotal')}</span>
-                <span>${moneySubtotal}</span>
+                <span>{formatMoney(moneySubtotal)}</span>
               </div>
               {(order.discountPercent ?? 0) > 0 && (
                 <div className="flex justify-between text-[#86868B]">
                   <span>
                     {t('wh.detail.discountLabel')}: {order.discountName ?? ''} (-{order.discountPercent}%)
                   </span>
-                  <span>-${round2(moneySubtotal * ((order.discountPercent ?? 0) / 100))}</span>
+                  <span>-{formatMoney(round2(moneySubtotal * ((order.discountPercent ?? 0) / 100)))}</span>
+                </div>
+              )}
+              {(moneyFeesTotal ?? 0) > 0 && (
+                <div className="flex justify-between text-[#86868B]">
+                  <span>{t('wh.detail.fees')}</span>
+                  <span>+{formatMoney(moneyFeesTotal)}</span>
                 </div>
               )}
               <div className="flex justify-between font-medium text-[#1D1D1F] pt-0.5 border-t border-[#E5E5E7]">
                 <span>{t('wh.detail.total')}</span>
-                <span>${moneyTotal}</span>
+                <span>{formatMoney(moneyTotal)}</span>
               </div>
             </div>
           )}
@@ -2272,9 +2680,11 @@ export function WarehouseModule() {
               <p className="text-xs font-medium text-[#86868B]">{t('wh.detail.payment')}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium border', PAYMENT_STATUS_BADGE[order.paymentStatus])}>
-                {t(`wh.orderForm.paymentStatus.${order.paymentStatus}`)}
-              </span>
+              {payBadge && (
+                <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium border', payBadge.className)}>
+                  {payBadge.text}
+                </span>
+              )}
               {order.paymentProofUrl ? (
                 <a
                   href={order.paymentProofUrl}
@@ -2292,10 +2702,14 @@ export function WarehouseModule() {
                 <span className="text-xs text-[#86868B]">{t('wh.detail.noProof')}</span>
               )}
             </div>
+            {/* Registro simple de cuánto se cobró (solo canSeeMoney) */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <AmountPaidEditor order={order} total={moneyTotal} />
+            </div>
             {(order.depositAmount ?? 0) > 0 && (
               <div className="flex flex-wrap items-center gap-2 text-sm pt-1 border-t border-[#E5E5E7]">
                 <span className="text-[#1D1D1F] font-medium">
-                  {t('wh.detail.deposit')}: ${order.depositAmount}
+                  {t('wh.detail.deposit')}: {formatMoney(order.depositAmount)}
                 </span>
                 {(() => {
                   const sug = orderDepositSuggestion(order);
@@ -2381,6 +2795,47 @@ export function WarehouseModule() {
           </div>
         )}
 
+        {/* Banner de aprobación de descuento (Supervisor+): llega al abrir la
+            orden desde la notificación accionable de la campana */}
+        {order.discountStatus === 'pending' && (order.discountPercent ?? 0) > 0 && canSupervise && (
+          <div className="text-sm bg-amber-50 border border-amber-300 rounded-xl px-3 py-3 space-y-2">
+            <p className="font-medium text-amber-900 flex items-center gap-2">
+              <Percent className="h-4 w-4" />
+              {t('wh.discount.bannerTitle')}
+            </p>
+            <p className="text-xs text-amber-800">
+              {tf('wh.discount.bannerDesc', {
+                name: order.discountName ?? '',
+                percent: order.discountPercent ?? 0,
+              })}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                onClick={() => settleDiscount(order, true)}
+                className="h-7 rounded-lg bg-green-600 hover:bg-green-600/90 text-xs"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                {t('wh.discount.approve')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => settleDiscount(order, false)}
+                className="h-7 rounded-lg border-red-300 text-red-700 hover:bg-red-50 text-xs"
+              >
+                <XCircle className="h-3.5 w-3.5 mr-1" />
+                {t('wh.discount.reject')}
+              </Button>
+            </div>
+          </div>
+        )}
+        {order.discountStatus === 'rejected' && (
+          <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+            {t('wh.discount.rejectedBadge')}
+          </div>
+        )}
+
         {/* Transiciones + puntos de extensión (WH-D2) */}
         {canOperate && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#E5E5E7]">
@@ -2392,12 +2847,13 @@ export function WarehouseModule() {
                 onClick={() => advanceOrder(order, target)}
               >
                 <ArrowRight className="h-3.5 w-3.5 mr-1" />
-                {tf('wh.detail.advanceTo', { name: statusName(target) })}
+                {advanceActionLabel(target)}
               </Button>
             ))}
             {/* WH-D2-dispatch: botón de despacho con escaneo QR, visible
-                cuando el estado actual es listo_despachar */}
-            {order.statusId === 'listo_despachar' && (
+                cuando el estado actual es listo_despachar y la orden tiene
+                productos serializados (sin seriales, avance simple) */}
+            {order.statusId === 'listo_despachar' && orderUsesSerials(order) && (
               <Button
                 size="sm"
                 className="rounded-xl bg-corporate hover:bg-corporate/90 text-xs"
@@ -2408,18 +2864,20 @@ export function WarehouseModule() {
               </Button>
             )}
             {/* WH-D2-return: botón de retorno con escaneo QR, visible cuando
-                el estado actual es despachado o entregado */}
-            {(order.statusId === 'despachado' || order.statusId === 'entregado') && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-xl border-[#E5E5E7] text-xs"
-                onClick={() => openReturn(order.id!)}
-              >
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                {t('wh.return.button')}
-              </Button>
-            )}
+                el estado actual es despachado o entregado y la orden tiene
+                seriales asignados (sin seriales, avance simple) */}
+            {(order.statusId === 'despachado' || order.statusId === 'entregado') &&
+              orderHasAssignedSerials(order) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-xl border-[#E5E5E7] text-xs"
+                  onClick={() => openReturn(order.id!)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                  {t('wh.return.button')}
+                </Button>
+              )}
             {/* Modo emergencia (discreto, Supervisor+): forzar el avance cuando
                 el escáner no funciona; motivo obligatorio y auditado */}
             {canSupervise &&
@@ -2454,12 +2912,44 @@ export function WarehouseModule() {
     );
   };
 
+  // Badges de la orden para tarjetas (pizarra y lista): descuento por
+  // aprobar + etiqueta de pago. Solo canSeeMoney ve cifras; STAFF ve solo la
+  // etiqueta sin montos
+  const renderOrderBadges = (order: RentalOrder) => {
+    const pb = paymentBadge(order);
+    return (
+      <div className="flex flex-wrap items-center gap-1" onClick={e => e.stopPropagation()}>
+        {order.discountStatus === 'pending' && (
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border bg-amber-50 text-amber-700 border-amber-200">
+            {t('wh.discount.pendingBadge')}
+          </span>
+        )}
+        {pb ? (
+          <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium border', pb.className)}>
+            {pb.text}
+          </span>
+        ) : (
+          <span
+            className={cn(
+              'rounded-full px-2 py-0.5 text-[10px] font-medium border',
+              order.paymentStatus === 'pagada'
+                ? 'bg-green-50 text-green-700 border-green-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            )}
+          >
+            {order.paymentStatus === 'pagada' ? t('wh.detail.authorized') : t('wh.detail.pendingAuth')}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   // Botones rápidos de cada tarjeta de orden (pizarra y lista): cada botón
   // hace exactamente lo que dice, sin confirmaciones extra. El contenedor
   // detiene la propagación para no disparar el clic de expansión/detalle.
   const renderQuickActions = (order: RentalOrder) => (
     <div className="flex flex-wrap items-center gap-1" onClick={e => e.stopPropagation()}>
-      {order.statusId === 'listo_despachar' && (
+      {order.statusId === 'listo_despachar' && orderUsesSerials(order) && (
         <Button
           size="sm"
           variant="outline"
@@ -2470,17 +2960,18 @@ export function WarehouseModule() {
           {t('wh.quick.dispatch')}
         </Button>
       )}
-      {(order.statusId === 'despachado' || order.statusId === 'entregado') && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 px-2 rounded-lg text-[11px] gap-1 border-[#E5E5E7] text-[#1D1D1F]"
-          onClick={() => openReturn(order.id!)}
-        >
-          <RotateCcw className="h-3 w-3" />
-          {t('wh.quick.return')}
-        </Button>
-      )}
+      {(order.statusId === 'despachado' || order.statusId === 'entregado') &&
+        orderHasAssignedSerials(order) && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 rounded-lg text-[11px] gap-1 border-[#E5E5E7] text-[#1D1D1F]"
+            onClick={() => openReturn(order.id!)}
+          >
+            <RotateCcw className="h-3 w-3" />
+            {t('wh.quick.return')}
+          </Button>
+        )}
       <Button
         size="sm"
         variant="ghost"
@@ -2507,26 +2998,72 @@ export function WarehouseModule() {
 
   return (
     <div className="space-y-4">
-      {/* Pills de sub-pestañas */}
-      <div className="flex flex-wrap items-center gap-2">
-        {tabs.map(tb => (
-          <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              tab === tb.id
-                ? 'bg-corporate text-white border-corporate'
-                : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
-            )}
-          >
-            {tb.label}
-          </button>
-        ))}
-      </div>
+      {whView === null && (
+        <>
+          {/* Tarjetas grandes tipo módulos: acciones principales. Tocar una
+              navega a una pantalla completa, no a un popup */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#86868B] mb-2 px-1">
+              {t('wh.home.actions')}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={openOrderModal}
+                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center mb-3">
+                  <ClipboardList className="w-5 h-5 text-corporate" />
+                </div>
+                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.newOrder')}</p>
+                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.newOrderDesc')}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => openDispatch()}
+                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
+                  <QrCode className="w-5 h-5 text-blue-600" />
+                </div>
+                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.dispatch')}</p>
+                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.dispatchDesc')}</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => openReturn()}
+                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+              >
+                <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mb-3">
+                  <RotateCcw className="w-5 h-5 text-teal-600" />
+                </div>
+                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.return')}</p>
+                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.returnDesc')}</p>
+              </button>
+            </div>
+          </div>
 
-      {/* ─── SUB-PESTAÑA: PIZARRA ─── */}
-      {tab === 'board' && (
+          {/* Pills de sub-pestañas (navegación tipo módulos) */}
+          <div className="flex flex-wrap items-center gap-2">
+            {tabs.map(tb => (
+              <button
+                key={tb.id}
+                onClick={() => setTab(tb.id)}
+                className={cn(
+                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
+                  tab === tb.id
+                    ? 'bg-corporate text-white border-corporate'
+                    : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
+                )}
+              >
+                {tb.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {whView === null && tab === 'board' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -2570,6 +3107,7 @@ export function WarehouseModule() {
                           {fmtTime(order.deliveryDate)}
                         </p>
                         <p className="text-xs text-[#86868B] mt-1 truncate">{itemsSummary(order)}</p>
+                        {renderOrderBadges(order)}
                         {canOperate && <div className="mt-2">{renderQuickActions(order)}</div>}
                       </div>
                     ))}
@@ -2650,7 +3188,7 @@ export function WarehouseModule() {
       )}
 
       {/* ─── SUB-PESTAÑA: ÓRDENES ─── */}
-      {tab === 'orders' && (
+      {whView === null && tab === 'orders' && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
@@ -2723,6 +3261,7 @@ export function WarehouseModule() {
                       {t('wh.orders.deliveryAt')}: {fmtDateTime(order.deliveryDate)}
                       {' · '}{t('wh.orders.createdBy')}: {order.createdByName || order.createdBy}
                     </div>
+                    {renderOrderBadges(order)}
                   </div>
                   {isOpen ? (
                     <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0" />
@@ -2747,7 +3286,7 @@ export function WarehouseModule() {
       )}
 
       {/* ─── SUB-PESTAÑA: RETORNOS (WH-D2) ─── */}
-      {tab === 'returns' && (
+      {whView === null && tab === 'returns' && (
         <div className="space-y-4">
           <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
             <div className="flex items-center gap-2 mb-1">
@@ -2925,12 +3464,10 @@ export function WarehouseModule() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── DIALOG: NUEVA ORDEN ─── */}
-      <Dialog open={orderModalOpen} onOpenChange={setOrderModalOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F]">{t('wh.orderForm.title')}</DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: NUEVA ORDEN (ancho completo, con Volver) ─── */}
+      {whView === 'create' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
+          <WhViewHeader title={t('wh.orderForm.title')} onBack={() => setWhView(null)} />
           <div className="space-y-4">
             {/* Tipo de cliente */}
             <div>
@@ -3073,10 +3610,11 @@ export function WarehouseModule() {
                           </option>
                         ))}
                       </select>
-                      {/* Precio de la línea (solo quien cobra): tier según cantidad o precio base */}
+                      {/* Precio de la línea justificado a la derecha con desglose
+                          (solo quien cobra): tier según cantidad o precio base */}
                       {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
-                        <p className="mt-0.5 text-[11px] text-[#86868B] pl-1">
-                          {t('wh.orderForm.unitPrice')}: ${formPricing.lines[idx].unitPrice} · ${formPricing.lines[idx].lineTotal}
+                        <p className="mt-0.5 text-[11px] text-[#86868B] pr-1 text-right whitespace-nowrap">
+                          ({formatMoney(formPricing.lines[idx].unitPrice)} × {formPricing.lines[idx].qty} = {formatMoney(formPricing.lines[idx].lineTotal)})
                         </p>
                       )}
                     </div>
@@ -3208,6 +3746,19 @@ export function WarehouseModule() {
                       className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
                     />
                   </div>
+                  <div>
+                    <Label className="text-xs text-[#86868B]">{t('wh.orderForm.amountPaid')}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={orderForm.amountPaid}
+                      onChange={e => setOrderForm(prev => ({ ...prev, amountPaid: e.target.value }))}
+                      placeholder={t('wh.orderForm.amountPaidPlaceholder')}
+                      className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
+                    />
+                    <p className="mt-1 text-[11px] text-[#86868B]">{t('wh.orderForm.amountPaidHelp')}</p>
+                  </div>
                 </div>
                 {formDepositSuggestion && (
                   <p className="text-xs text-[#86868B]">
@@ -3235,24 +3786,69 @@ export function WarehouseModule() {
                     ))}
                   </select>
                 </div>
-                {/* Totales: por ítem el tier que aplique; descuento sobre el total */}
+                {/* Impuestos y cargos: multi-select de los activos */}
+                <div>
+                  <Label className="text-xs text-[#86868B]">{t('wh.orderForm.fees')}</Label>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    {activeFees.length === 0 && (
+                      <span className="text-xs text-[#86868B]">{t('wh.orderForm.feesNone')}</span>
+                    )}
+                    {activeFees.map(f => {
+                      const selected = orderForm.feeIds.includes(f.id);
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() =>
+                            setOrderForm(prev => ({
+                              ...prev,
+                              feeIds: selected
+                                ? prev.feeIds.filter(id => id !== f.id)
+                                : [...prev.feeIds, f.id],
+                            }))
+                          }
+                          className={cn(
+                            'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                            selected
+                              ? 'bg-corporate text-white border-corporate'
+                              : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
+                          )}
+                        >
+                          <Receipt className="h-3 w-3 inline mr-1 -mt-0.5" />
+                          {f.name} ({f.mode === 'percent' ? `${f.value}%` : formatMoney(f.value)})
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#86868B]">{t('wh.orderForm.feesHelp')}</p>
+                </div>
+                {/* Totales: por ítem el tier que aplique; descuento sobre el
+                    subtotal; fees sobre (subtotal − descuento) */}
                 {formPricing && (
                   <div className="bg-white rounded-xl border border-[#E5E5E7] px-3 py-2 text-sm space-y-0.5">
                     <div className="flex justify-between text-[#86868B]">
                       <span>{t('wh.orderForm.subtotal')}</span>
-                      <span>${formPricing.subtotal}</span>
+                      <span>{formatMoney(formPricing.subtotal)}</span>
                     </div>
                     {formPricing.percent > 0 && (
                       <div className="flex justify-between text-[#86868B]">
                         <span>
                           {t('wh.orderForm.discount')}: {formPricing.discount?.name} (-{formPricing.percent}%)
                         </span>
-                        <span>-${round2(formPricing.subtotal * (formPricing.percent / 100))}</span>
+                        <span>-{formatMoney(formPricing.discountAmount)}</span>
                       </div>
                     )}
+                    {formPricing.feeLines.map(l => (
+                      <div key={l.fee.id} className="flex justify-between text-[#86868B]">
+                        <span>
+                          {l.fee.name} ({l.fee.mode === 'percent' ? `${l.fee.value}%` : formatMoney(l.fee.value)})
+                        </span>
+                        <span>+{formatMoney(l.amount)}</span>
+                      </div>
+                    ))}
                     <div className="flex justify-between font-medium text-[#1D1D1F] pt-0.5 border-t border-[#E5E5E7]">
                       <span>{t('wh.orderForm.total')}</span>
-                      <span>${formPricing.total}</span>
+                      <span>{formatMoney(formPricing.total)}</span>
                     </div>
                   </div>
                 )}
@@ -3311,10 +3907,10 @@ export function WarehouseModule() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setOrderModalOpen(false)}
+                onClick={() => setWhView(null)}
                 className="rounded-xl border-[#E5E5E7]"
               >
-                {t('wh.common.cancel')}
+                {t('wh.view.back')}
               </Button>
               <Button
                 size="sm"
@@ -3326,15 +3922,13 @@ export function WarehouseModule() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── DIALOG: DESPACHO (WH-D2, 3 pasos) ─── */}
-      <Dialog open={dispatchOpen} onOpenChange={open => !open && closeDispatch()}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F]">{t('wh.dispatch.title')}</DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: DESPACHO (WH-D2, 3 pasos) ─── */}
+      {whView === 'dispatch' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
+          <WhViewHeader title={t('wh.dispatch.title')} onBack={closeDispatch} />
           <div className="space-y-4">
             {/* Indicador de pasos */}
             <div className="flex flex-wrap items-center gap-1.5">
@@ -3524,7 +4118,7 @@ export function WarehouseModule() {
                   onClick={closeDispatch}
                   className="rounded-xl border-[#E5E5E7]"
                 >
-                  {t('wh.common.cancel')}
+                  {t('wh.view.back')}
                 </Button>
                 {dispatchStep < 3 ? (
                   <Button
@@ -3548,15 +4142,13 @@ export function WarehouseModule() {
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── DIALOG: VERIFICAR RETORNO (WH-D2, escaneo obligatorio) ─── */}
-      <Dialog open={returnOpen} onOpenChange={open => !open && closeReturn()}>
-        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F]">{t('wh.return.title')}</DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: VERIFICAR RETORNO (WH-D2, escaneo obligatorio) ─── */}
+      {whView === 'return' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
+          <WhViewHeader title={t('wh.return.title')} onBack={closeReturn} />
           {/* Paso 1: escanear o seleccionar la orden que regresa */}
           {returnStep === 1 && (
             <div className="space-y-3">
@@ -3744,7 +4336,7 @@ export function WarehouseModule() {
                       onClick={closeReturn}
                       className="rounded-xl border-[#E5E5E7]"
                     >
-                      {t('wh.common.cancel')}
+                      {t('wh.view.back')}
                     </Button>
                     <Button
                       size="sm"
@@ -3759,8 +4351,8 @@ export function WarehouseModule() {
               </div>
             );
           })()}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* ─── DIALOG: MODO EMERGENCIA (Supervisor+, motivo obligatorio) ─── */}
       <Dialog open={!!emergencyOrderId} onOpenChange={open => !open && setEmergencyOrderId(null)}>
@@ -3857,6 +4449,91 @@ export function WarehouseModule() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// ENCABEZADO DE PANTALLA INTERNA (whView): título + botón Volver. Las
+// acciones principales de Warehouse son pantallas completas, no pop-ups.
+// ═══════════════════════════════════════════════════════════════════
+
+function WhViewHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div className="flex items-center gap-3 pb-3 border-b border-[#E5E5E7]">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onBack}
+        className="h-8 rounded-xl border-[#E5E5E7] gap-1 text-xs"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        {t('wh.view.back')}
+      </Button>
+      <h3 className="text-sm font-semibold text-[#1D1D1F]">{title}</h3>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EDITOR SIMPLE DEL MONTO RECIBIDO (amountPaid) en el detalle de la orden.
+// Solo se monta para canSeeMoney y cuando la orden tiene total: escribe
+// amountPaid y la etiqueta de pago (pagado / pendiente / parcial con cuánto
+// falta) se recalcula sola desde el listener de órdenes.
+// ═══════════════════════════════════════════════════════════════════
+
+function AmountPaidEditor({ order, total }: { order: RentalOrder; total: number | null }) {
+  const [value, setValue] = useState(order.amountPaid != null ? String(order.amountPaid) : '');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(order.amountPaid != null ? String(order.amountPaid) : '');
+  }, [order.id, order.amountPaid]);
+
+  if (total == null) return null;
+
+  const save = async () => {
+    const num = value.trim() === '' ? 0 : Number(value);
+    if (!Number.isFinite(num) || num < 0) return;
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+        amountPaid: round2(num),
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('[WarehouseModule] AmountPaidEditor:', err);
+      toast.error(t('wh.toast.error'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const current = order.amountPaid ?? 0;
+  const next = value.trim() === '' ? 0 : Number(value);
+  const dirty = Number.isFinite(next) && round2(next) !== round2(current);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Label className="text-xs text-[#86868B]">{t('wh.detail.amountPaid')}</Label>
+      <Input
+        type="number"
+        min={0}
+        step="0.01"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        className="h-7 w-28 rounded-lg border-[#E5E5E7] text-xs"
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={save}
+        disabled={saving || !dirty}
+        className="h-7 rounded-lg border-[#E5E5E7] text-xs"
+      >
+        {t('wh.detail.amountPaidSave')}
+      </Button>
+      <span className="text-[11px] text-[#86868B]">{t('wh.detail.amountPaidHint')}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // MODAL ESCANER QR (html5-qrcode) del módulo Warehouse: parsea URLs de la
 // app con searchParams order / serial; si el contenido no es URL, se
 // interpreta como texto plano de serial (número de serie o id). Incluye
@@ -3865,8 +4542,12 @@ export function WarehouseModule() {
 // CONSTRUCTOR si el contenedor no está en el DOM todavía. Con el Dialog
 // de Radix el portal puede montarse después del efecto, así que la
 // instancia se crea SOLO cuando el contenedor ya existe (reintento por
-// requestAnimationFrame) y el id es único por instancia (useId), igual que
-// en el ScannerModal de InventarioModule.
+// requestAnimationFrame) y el id es único por instancia (useId).
+// CÁMARA DIRECTA (Ronda 3): se usa la clase baja Html5Qrcode (no el
+// Scanner) para arrancar de inmediato con facingMode 'environment' (trasera
+// en móvil) SIN dropdown de selección. Un botón pequeño de respaldo permite
+// conmutar entre cámaras si la directa falla (desktop sin trasera) o hay
+// varias.
 // ═══════════════════════════════════════════════════════════════════
 
 interface WhScannerModalProps {
@@ -3890,10 +4571,22 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
   // Entrada manual de código
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
+
+  // Conmutador de respaldo de cámaras: cameraIndex -1 = facingMode
+  // 'environment' (directa); >= 0 = deviceId exacto de la lista
+  const [cameras, setCameras] = useState<Array<{ id: string; label: string }>>([]);
+  const camerasRef = useRef(cameras);
+  useEffect(() => { camerasRef.current = cameras; }, [cameras]);
+  const [cameraIndex, setCameraIndex] = useState(-1);
+  const [scanError, setScanError] = useState(false);
+
   useEffect(() => {
     if (open) {
       setManualOpen(false);
       setManualCode('');
+      setCameraIndex(-1);
+      setScanError(false);
+      setCameras([]);
     }
   }, [open]);
 
@@ -3923,9 +4616,19 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
   useEffect(() => {
     if (!open) return;
     let disposed = false;
-    let scanner: Html5QrcodeScanner | null = null;
+    let scanner: Html5Qrcode | null = null;
     let rafId = 0;
     let attempts = 0;
+
+    const rememberCameras = () => {
+      Html5Qrcode.getCameras()
+        .then(list => {
+          if (!disposed && list && list.length > 1) {
+            setCameras(list.map(c => ({ id: c.id, label: c.label })));
+          }
+        })
+        .catch(() => undefined);
+    };
 
     const start = () => {
       if (disposed) return;
@@ -3938,27 +4641,47 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
         return;
       }
       try {
-        scanner = new Html5QrcodeScanner(
-          instanceId,
-          { fps: 10, qrbox: 250 },
-          /* verbose= */ false
-        );
-        scanner.render(
-          (decodedText) => {
-            const result = parseScan(decodedText);
-            if (!result) {
-              toast.error(t('wh.scanner.unrecognized'));
-              return;
+        scanner = new Html5Qrcode(instanceId, { verbose: false });
+        // Cámara directa: trasera por defecto en móvil; con deviceId exacto
+        // cuando el usuario conmuta con el botón de respaldo
+        const cameraConfig: MediaTrackConstraints =
+          cameraIndex < 0
+            ? { facingMode: 'environment' }
+            : { deviceId: { exact: camerasRef.current[cameraIndex]?.id ?? '' } };
+        scanner
+          .start(
+            cameraConfig,
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              const result = parseScan(decodedText);
+              if (!result) {
+                toast.error(t('wh.scanner.unrecognized'));
+                return;
+              }
+              // QR válido: detener la cámara y entregar el resultado
+              scanner?.stop().catch(() => undefined);
+              onScanRef.current(result.kind, result.id);
+            },
+            () => undefined // errores de lectura transitorios: se ignoran
+          )
+          .then(() => {
+            if (disposed) {
+              scanner?.stop().catch(() => undefined);
+            } else {
+              rememberCameras();
             }
-            // QR válido: detener la cámara y entregar el resultado
-            scanner?.clear().catch(() => undefined);
-            onScanRef.current(result.kind, result.id);
-          },
-          () => undefined // errores de lectura transitorios: se ignoran
-        );
+          })
+          .catch((err) => {
+            if (disposed) return;
+            console.error('[WhScannerModal]', err);
+            setScanError(true);
+            // Aunque falle la directa, ofrece las cámaras detectadas
+            rememberCameras();
+          });
       } catch (err) {
         console.error('[WhScannerModal]', err);
-        toast.error(t('wh.toast.error'));
+        setScanError(true);
+        rememberCameras();
       }
     };
 
@@ -3970,9 +4693,22 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
       cancelAnimationFrame(rafId);
       const active = scanner;
       scanner = null;
-      if (active) active.clear().catch(() => undefined);
+      if (active) {
+        if (active.isScanning) active.stop().catch(() => undefined);
+        active.clear();
+      }
     };
-  }, [open, instanceId]);
+  }, [open, instanceId, cameraIndex]);
+
+  // Conmuta entre la cámara directa (environment) y las cámaras detectadas
+  const switchCamera = () => {
+    const list = camerasRef.current;
+    if (list.length === 0) return;
+    setCameraIndex(prev => {
+      const next = prev + 1;
+      return next >= list.length ? -1 : next;
+    });
+  };
 
   const applyManualCode = () => {
     const result = parseScan(manualCode);
@@ -3995,8 +4731,27 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('wh.scanner.hint')}</p>
+          {scanError && (
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              {t('wh.scanner.cameraError')}
+            </p>
+          )}
           <div className="space-y-2">
-            <div id={instanceId} className="rounded-xl overflow-hidden" />
+            <div id={instanceId} className="rounded-xl overflow-hidden min-h-[120px]" />
+            {/* Botón pequeño de respaldo: solo cuando hay varias cámaras */}
+            {cameras.length > 1 && (
+              <button
+                type="button"
+                onClick={switchCamera}
+                className="inline-flex items-center gap-1 text-xs text-corporate underline"
+              >
+                <SwitchCamera className="h-3.5 w-3.5" />
+                {t('wh.scanner.switchCamera')}
+                {cameraIndex >= 0 && cameras[cameraIndex]?.label
+                  ? ` · ${cameras[cameraIndex].label}`
+                  : ''}
+              </button>
+            )}
             {!manualOpen ? (
               <button
                 type="button"

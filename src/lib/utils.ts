@@ -459,3 +459,16 @@ export function sortByDate<T>(
 export function sortShiftsByTime(shifts: Shift[]): Shift[] {
   return [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// MONEDA
+// ═══════════════════════════════════════════════════════════════════
+
+/**
+ * Formatea un monto como moneda USD.
+ * Ej: 18 → "$18.00", 1234.5 → "$1,234.50"
+ */
+export function formatMoney(amount: number | null | undefined): string {
+  const value = typeof amount === 'number' && Number.isFinite(amount) ? amount : 0;
+  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}

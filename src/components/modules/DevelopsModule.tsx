@@ -84,6 +84,12 @@ const BASE_ROLES = [
   { value: 'STAFF', label: 'Staff' },
 ];
 
+// Roles con permiso de venta (mismo criterio que canSeeMoney de Warehouse):
+// son los que pueden aplicar descuentos en órdenes de renta
+const SALES_PERMISSION_ROLES: string[] = [
+  'DIRECTOR_GENERAL', 'DIRECTOR', 'RRHH', 'GERENTE_OPERACIONES', 'GERENTE_DEPARTAMENTO', 'SUPERVISOR',
+];
+
 // ═══════════════════════════════════════════════════════════════════
 // CONFIG TABS
 // ═══════════════════════════════════════════════════════════════════
@@ -461,7 +467,7 @@ function UsuariosTab() {
     medications: '', emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelation: '',
     certificationNumber: '', certificationExpiry: '', apneaCert: '', bankCountry: '', bankName: '',
     accountType: '', accountNumber: '', routingNumber: '', photoURL: '', role: '', department: '',
-    position: '', level: 7, joinDate: '', isActive: true,
+    position: '', level: 7, joinDate: '', isActive: true, maxDiscountPercent: '',
   });
 
   const roleLabels: Record<string, string> = {};
@@ -574,6 +580,7 @@ function UsuariosTab() {
       level: u.level || 7,
       joinDate: u.joinDate || '',
       isActive: u.isActive !== false,
+      maxDiscountPercent: u.maxDiscountPercent != null ? String(u.maxDiscountPercent) : '',
     });
   };
 
@@ -625,6 +632,20 @@ function UsuariosTab() {
         updates.level = Number(profileFormData.level);
         updates.joinDate = profileFormData.joinDate;
         updates.isActive = profileFormData.isActive;
+      }
+      // Descuento máximo sin aprobación: solo DG/RRHH lo definen (Fase 1 Ronda 3)
+      if (user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.RRHH) {
+        const rawMax = String(profileFormData.maxDiscountPercent ?? '').trim();
+        if (rawMax === '') {
+          updates.maxDiscountPercent = null; // sin valor: default conservador (10 %)
+        } else {
+          const maxPct = Number(rawMax);
+          if (!Number.isFinite(maxPct) || maxPct < 0 || maxPct > 100) {
+            alert('El descuento máximo sin aprobación debe ser un número entre 0 y 100');
+            return;
+          }
+          updates.maxDiscountPercent = maxPct;
+        }
       }
       await updateUser(u.id, updates);
       await logAction({
@@ -1221,6 +1242,28 @@ function UsuariosTab() {
                                       <Label htmlFor={`isActive-${u.id}`} className="text-sm text-[#1D1D1F]">Usuario activo</Label>
                                     </div>
                                   </div>
+                                </div>
+                              )}
+
+                              {/* Ventas: descuento máximo sin aprobación (solo DG/RRHH,
+                                  visible cuando el usuario tiene permiso de venta) */}
+                              {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.RRHH) &&
+                                SALES_PERMISSION_ROLES.includes(profileFormData.role) && (
+                                <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
+                                  <h4 className="font-semibold text-[#1D1D1F] mb-4">Ventas</h4>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <EditableField
+                                      label="Descuento máximo sin aprobación (%)"
+                                      field="maxDiscountPercent"
+                                      type="number"
+                                      placeholder="10"
+                                    />
+                                  </div>
+                                  <p className="text-[11px] text-[#86868B] mt-2 leading-relaxed">
+                                    Porcentaje máximo de descuento que este vendedor puede aplicar a una orden de renta sin aprobación de un supervisor.
+                                    Si el descuento lo excede (o un producto no admite descuento), la orden queda "por aprobar" y un supervisor decide desde la campana.
+                                    Dejar vacío usa el valor por defecto (10 %).
+                                  </p>
                                 </div>
                               )}
 

@@ -1,9 +1,47 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-15 (FASE 1 — RONDA 2 de correcciones desplegada en GEMELA — pendiente re-prueba de los 6 puntos señalados)
+> Última actualización: 2026-09-16 (FASE 1 — RONDA 3 de correcciones desplegada en GEMELA — pendiente re-prueba)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — RONDA 3 DE CORRECCIONES (16 de septiembre) — DESPLEGADA EN GEMELA
+
+**Estado:** EN GEMELA (https://wve-pruebas-b3db5.web.app), pendiente re-prueba. NOTA: sección 4.22 de WAVEOPS_DESIGN.md aún no existe; spec aplicada = prompt del usuario. Deploy: hosting + firestore:rules (funciones sin cambios; las notificaciones nuevas se crean desde cliente). Fix de build del coordinador: `maxDiscountPercent` agregado también a `FirestoreUser` (useFirestoreUsers.ts) y `.clear().catch` inválido en ScannerModal (clear() retorna void).
+
+**Bugs corregidos:**
+1. **updateDoc undefined (módulos visibles en Departamentos)**: causa raíz = el árbol de `useDynamicDepartments` no mapeaba `description` (ni color), así que al editar desde las tarjetas el formulario llevaba `undefined` y Firestore rechazaba el guardado. Fix doble: `openEdit` ahora carga el registro completo desde `useFirestoreDepartments` con fallbacks, y `handleSave` construye el payload explícito y lo pasa por `sanitizeForFirestore` (helper nuevo; elimina claves undefined). Aplica a crear/editar/edición protegida.
+2. **Escáner cámara directa** (ambos módulos): reescrito con `Html5Qrcode` (API bajo nivel) — arranca con `facingMode 'environment'` (trasera en móvil) sin dropdown; botón pequeño "Cambiar cámara" solo si hay >1 cámara o falla. Nuevo prop `multiScan` (conteos/recepción): detener→entregar→reactivar tras cada lectura sin cerrar el modal (corrige bug previo: cámara apagada tras 1er escaneo). Entrada manual y parseo de URLs intactos.
+3. **Stock "En tránsito a X"**: línea por producto con cantidad y destino de transferencias pendiente/en_tránsito (memo `transitByOrigin`; informativo, el stock ya se descuenta al crear). Ambas vistas de Stock.
+4. **Transferencias**: lista completa (ninguna desaparece) con chips de filtro por estado (Todas/Pendiente/En tránsito/Recibida/Cancelada, con conteos); detalle expandido con despachador, receptor, fechas y seriales recibidos (`docToTransfer` extendido con shippedBy/shippedByName/shippedAt).
+5. **"Marcar en tránsito" → "Despachar"** (i18n `inv.transfers.dispatch`); al despachar pasa a en_tránsito automático.
+6. **Recepción ampliada**: puede recibir (a) responsable del destino (`locations.responsibleUserId`), (b) cualquier usuario del departamento de la ubicación (`responsibleDepartmentId` normalizado con `normalizeDeptCode` contra `currentUser.department`), o (c) Supervisor+. Crear solo no otorga derecho pero tampoco bloquea si cumple a/b/c. Bug extra corregido: `docToLocation` no parseaba `responsibleUserId`/`responsibleDepartmentId` (la regla (a) nunca funcionó). Botón "Recibir" solo para quien puede.
+
+**Módulos y roles:**
+7. **Módulos por departamento = ADITIVA**: `visibleModuleIds` ahora Suma módulos EXTRA a lo que el rol permite; NUNCA resta visibilidad. En `useAppConfig.visibleModules`: base (rol/flags) + extras (ids seleccionados que no estén ya en base; respetan isVisible/flag/development pero NO exigen requiredPermission — esa es su función). DG exento; anti-parpadeo intacto. Ayuda exacta: "Selecciona los módulos adicionales que verá este departamento. Se suman a lo que su rol permite; no quitan visibilidad." Label: "Módulos adicionales para este departamento".
+8. **Sin popups — sub-módulos** (Inventario y Warehouse): acciones principales como TARJETAS GRANDES tipo módulos (arriba) + pestañas tipo módulos (abajo); cada acción navega a PANTALLA completa interna (estado `invView`/`whView`) con botón Volver, no a diálogo. Inventario: movimiento, transferencia nueva, recibir, conteo, serial nuevo → pantallas; Stock/Movimientos/Transferencias/Conteos/Seriales/Catálogos se mantienen. Warehouse: crear orden, despachar, verificar retorno → pantallas (`WhViewHeader`); Pizarra/Órdenes/Retornos se mantienen; detalle de orden sigue en Dialog (preserva deep link `/warehouse?order=`). Acciones secundarias (QR, impresión, cancelar, ajuste, baja, modo emergencia) siguen en diálogo.
+
+**Órdenes (Warehouse):**
+9. **Estados solo por acción**: eliminado cualquier avance genérico de estado. Cada transición con su botón: Preparar → Listo para despachar → Despachar (SOLO escaneo si la orden usa seriales) → Entregar → retorno con escaneo → almacenado/a_reparación (resultado del retorno). EXCEPCIÓN: órdenes sin seriales asignados avanzan con confirmación simple (`isScanOnlyTarget` false cuando no hay unidades).
+10. **Precio por línea a la derecha** con desglose "(4.5 × 4 = $18)" (`formatMoney` en src/lib/utils.ts); subtotal y total abajo, siempre visibles para canSeeMoney.
+11. **Impuestos/fees configurables**: colección `rentalFees` {name, mode:'percent'|'fixed', value, isActive...} + CRUD en Catálogos → "Impuestos y cargos" (seeds idempotentes: IVA 15%, Servicio 5%). Multi-select por orden; se aplican sobre (subtotal − descuento): total = (subtotal − descuento) + feesTotal. Orden guarda `fees[]`, `feesTotal`, `total`. Auditoría RENTAL_FEE_*.
+12. **Estado de pago visible**: etiqueta "Pagada" / "Parcial — falta $X" / "Pendiente — falta $X" (con `amountPaid` editable por canSeeMoney; si se marca pagada sin monto, amountPaid=total). STAFF solo ve la etiqueta sin cifras.
+13. **Descuentos con aprobación**: (a) si el % del creador excede su `maxDiscountPercent` O algún ítem tiene `admitsDiscount === false` → orden guarda `discountStatus:'pending'` + notificación `DISCOUNT_APPROVAL` (high) a Supervisor+ del departamento del creador (fallback DG/RRHH) con `data.link '/warehouse?order=<id>'`; el drawer navega por ese link y en el detalle Supervisor+ ve banner Aprobar/Rechazar (`settleDiscount`: approve→'approved'; reject→'rejected', descuento anulado, total=subtotal+feesTotal). (b) `User.maxDiscountPercent` editable en Develops → Usuarios (solo DG/RRHH, solo roles de venta, 0–100, vacío→null, default 10). (c) `Product.admitsDiscount` (default true; select en formulario rentable + detalle en tarjeta). Auditoría RENTAL_DISCOUNT_APPROVED/REJECTED.
+14. **Verificado**: disponibilidad por ubicación en la orden sobrevivió la conversión a pantalla (stock por producto, rojo si excede); fecha/hora `datetime-local` (24h).
+
+**Inventario:**
+15. **Consumo por departamento**: en movimientos de salida/consumo, el selector de ubicación origen solo ofrece las ubicaciones cuyo `responsibleDepartmentId` coincide con el departamento del usuario (normalizado). Si hay UNA, se auto-selecciona y se muestra como caja de solo lectura ("Se descuenta de tu ubicación: {nombre}"). Sin departamento/ubicaciones → todas + aviso ámbar.
+16. **Pedido automático (borrador)**: en Stock, filas bajo mínimo muestran caja ámbar con cantidad sugerida (hasta máximo, o hasta mínimo si no hay máximo — misma fórmula que checkLowStock), proveedor preferido + condiciones de pago, y botón "Enviar pedido" → crea borrador en colección `purchaseRequisitions` {tenantId, productId, productName, quantity, unit, suggestedQty, supplierId/Name, locationId/Name, status:'draft', createdBy/Name, createdAt, notes} (NO toca stock; la OC formal es Fase 5). Deshabilitado con "Borrador pendiente" si ya hay draft para producto+ubicación. Notificación desde cliente a DG/RRHH + responsable (patrón HorariosModule; no hay function). Auditoría PURCHASE_REQUISITION_CREATED.
+
+**Shapes nuevos (aditivos):** `rentalFees` colección; `RentalOrder`: discountStatus, fees[], feesTotal, amountPaid; `Product.admitsDiscount`; `User.maxDiscountPercent`; `FirestoreUser.maxDiscountPercent`; `purchaseRequisitions` colección; NotificationType.DISCOUNT_APPROVAL; `notifications` create permitido a Supervisor+ en reglas (para aprobaciones desde cliente).
+
+**Reglas firestore:** match `rentalFees` (read auth, write isCatalogAdmin); segundo match de `/notifications/` ampliado a create para DG/Director/RRHH/GerOp/GerDept/Supervisor. `purchaseRequisitions` queda por match genérico (pendiente: match explícito si se endurecen reglas).
+
+**Archivos:** InventarioModule.tsx (+891/−5 aprox.), WarehouseModule.tsx (+1047/−…), CatalogosTab.tsx (+315), DepartamentosTab.tsx, DevelopsModule.tsx, useAppConfig.ts, useFirestoreUsers.ts, src/lib/utils.ts (formatMoney), types (catalogs/department/develops/index), firestore.rules.
+
+**Build:** exit 0 verificado por el coordinador (fix de 2 errores TS: FirestoreUser.maxDiscountPercent, clear().catch). **Deploy gemela:** hosting + firestore:rules, release verificada (asset index-5WXGb-WE.js).
 
 ---
 

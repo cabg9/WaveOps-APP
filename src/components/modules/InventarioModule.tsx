@@ -8,15 +8,17 @@
 import { useState, useEffect, useMemo, useRef, useId } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import QRCode from 'qrcode';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+import { Html5Qrcode } from 'html5-qrcode';
 import {
   collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, getDocs, query, orderBy, where,
+  serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
+import { normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { executeWithConfirm } from '@/lib/confirm-action';
 import { getCurrentTenantId } from '@/lib/tenant';
@@ -51,7 +53,7 @@ import {
   Box, ArrowDownUp, Tags, Package, MapPin, Plus, Search, QrCode,
   ChevronDown, ChevronUp, Pencil, Power, Construction,
   Truck, ClipboardList, Play, Send, Inbox, Ban, Printer, Upload,
-  ShoppingCart, ArrowUpRight, SlidersHorizontal,
+  ShoppingCart, ArrowUpRight, SlidersHorizontal, ArrowLeft, Camera,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -76,6 +78,7 @@ const AUDIT_ACTIONS = {
   serialCreated: 'SERIAL_CREATED' as AuditAction,
   serialStatusChanged: 'SERIAL_STATUS_CHANGED' as AuditAction,
   serialUpdated: 'SERIAL_UPDATED' as AuditAction,
+  purchaseRequisitionCreated: 'PURCHASE_REQUISITION_CREATED' as AuditAction,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -97,6 +100,16 @@ registerI18nKeys({
     'inv.error.save': 'Error al guardar',
     'inv.readOnly': 'Solo lectura. Solo Dirección General y RRHH pueden gestionar inventario.',
 
+    'inv.view.back': 'Volver',
+    'inv.home.movement': 'Registrar movimiento',
+    'inv.home.movementDesc': 'Compra, consumo, ajuste o salida de stock',
+    'inv.home.transfer': 'Transferencia',
+    'inv.home.transferDesc': 'Mueve stock entre ubicaciones con seguimiento',
+    'inv.home.count': 'Programar conteo',
+    'inv.home.countDesc': 'Conteo cíclico de una ubicación',
+    'inv.home.serial': 'Serial nuevo',
+    'inv.home.serialDesc': 'Alta de una unidad rentable',
+
     'inv.stock.viewByProduct': 'Por producto',
     'inv.stock.viewByLocation': 'Por ubicación',
     'inv.stock.scanQr': 'Escanear QR',
@@ -108,6 +121,14 @@ registerI18nKeys({
     'inv.stock.max': 'Máx',
     'inv.stock.minMaxHelp': 'Solo supervisores definen mínimos y máximos. Al bajar del mínimo avisaremos por campana con la sugerencia de compra.',
     'inv.stock.lowStock': 'Bajo mínimo',
+    'inv.stock.orderSuggestion': 'Sugerencia de pedido',
+    'inv.stock.suggestedQty': 'Cantidad sugerida',
+    'inv.stock.sendOrder': 'Enviar pedido',
+    'inv.stock.orderCreated': 'Pedido enviado (queda como borrador pendiente)',
+    'inv.stock.orderDraftPending': 'Borrador pendiente',
+    'inv.stock.preferredSupplier': 'Proveedor preferido',
+    'inv.stock.paymentTerms': 'Condiciones de pago',
+    'inv.stock.noPreferredSupplier': 'Sin proveedor preferido registrado',
     'inv.stock.noProducts': 'No hay productos activos con stock',
     'inv.stock.noProductsHint': 'Registra el primer movimiento para crear stock de un producto.',
     'inv.stock.emptyLocation': 'Sin productos con stock en esta ubicación',
@@ -139,6 +160,9 @@ registerI18nKeys({
     'inv.movementForm.originExternalHint': 'En los movimientos de entrada, el origen es siempre un proveedor externo o una compra directa; elige el proveedor si está registrado.',
     'inv.movementForm.help': 'En una compra, la mercadería entra desde un proveedor hacia tu ubicación. En un consumo, sale de tu ubicación y se gasta. En una transferencia, viaja entre dos ubicaciones tuyas.',
     'inv.movementForm.reasonRequired': 'El motivo es obligatorio para un ajuste',
+    'inv.movementForm.originAutoHelp': 'Se descuenta de tu ubicación: {location}',
+    'inv.movementForm.originDeptRestricted': 'Solo se listan las ubicaciones de tu departamento.',
+    'inv.movementForm.originNoDept': 'Tu usuario no tiene un departamento con ubicaciones asignadas: se muestran todas las ubicaciones.',
 
     'inv.movements.help': 'Bitácora inmutable: los movimientos no se editan ni se borran. Cada entrada queda registrada para siempre.',
     'inv.movements.filterProduct': 'Producto',
@@ -196,7 +220,7 @@ registerI18nKeys({
     'inv.validation.fromRequired': 'La ubicación origen es obligatoria para tipos que restan stock',
     'inv.validation.toRequired': 'La ubicación destino es obligatoria para tipos que suman stock',
 
-    'inv.transfers.help': 'Mueve stock entre ubicaciones con seguimiento de estado. Al crear se descuenta del origen; al recibir se suma al destino; al cancelar se devuelve al origen. Estados: pendiente, en tránsito, recibido y cancelado. Solo el responsable del destino (o un supervisor) confirma la recepción; quien crea o envía no puede recibirla.',
+    'inv.transfers.help': 'Mueve stock entre ubicaciones con seguimiento de estado. Al crear se descuenta del origen; al recibir se suma al destino; al cancelar se devuelve al origen. Nada desaparece: filtra por estado para ver el historial completo. Puede recibir quien sea responsable de la ubicación destino, pertenezca al departamento de esa ubicación o sea Supervisor o superior.',
     'inv.transfers.new': 'Nueva transferencia',
     'inv.transfers.empty': 'No hay transferencias registradas',
     'inv.transfers.quantity': 'Cantidad',
@@ -213,7 +237,11 @@ registerI18nKeys({
     'inv.transfers.validation.sameLocation': 'El origen y el destino deben ser distintos',
     'inv.transfers.validation.insufficientStock': 'Stock insuficiente en el origen (disponible: {available})',
     'inv.transfers.createConfirmDesc': 'Se descontará {quantity} del stock del origen de inmediato.',
-    'inv.transfers.markInTransit': 'Marcar en tránsito',
+    'inv.transfers.dispatch': 'Despachar',
+    'inv.transfers.filter.all': 'Todas',
+    'inv.transfers.shippedBy': 'Despachada por',
+    'inv.transfers.shippedAt': 'Despachada',
+    'inv.transfers.receivedUnits': 'Seriales recibidos',
     'inv.transfers.receive': 'Recibir',
     'inv.transfers.cancel': 'Cancelar',
     'inv.transfers.receiveTitle': 'Recibir transferencia',
@@ -224,15 +252,15 @@ registerI18nKeys({
     'inv.transfers.cancelReasonPlaceholder': 'Ej: se dañó el producto, se revirtió la solicitud...',
     'inv.transfers.createdBy': 'Creada por',
     'inv.transfers.responsibleLabel': 'Responsable',
-    'inv.transfers.inTransitTo': 'En tránsito a {location}: {quantity}',
+    'inv.transfers.inTransitTo': 'En tránsito a {location}: {quantity} {unit}',
     'inv.transfers.reasonCreated': 'Transferencia creada',
     'inv.transfers.reasonReceived': 'Transferencia recibida',
     'inv.transfers.reasonCancelled': 'Transferencia cancelada',
     'inv.transfers.stockLine': '{location}: {quantity} {unit}',
     'inv.transfers.stockOrigin': 'Disponible en el origen',
     'inv.transfers.stockDestination': 'En el destino',
-    'inv.transfers.receiveRule': 'Solo el responsable de la ubicación destino (o un supervisor) confirma la recepción; quien crea o envía la transferencia no puede recibirla.',
-    'inv.transfers.creatorCannotReceive': 'Quien crea o envía una transferencia no puede marcarla como recibida.',
+    'inv.transfers.receiveRule': 'Puede recibir quien sea responsable de la ubicación destino, pertenezca al departamento de esa ubicación o sea Supervisor o superior.',
+    'inv.transfers.creatorHint': 'Como creador solo puedes recibirla si eres responsable del destino o perteneces a su departamento.',
     'inv.transfers.serializedHint': 'Producto rentable con seriales: confirma las unidades que llegaron escaneando su QR o marcándolas en la lista.',
     'inv.transfers.unitsReceived': 'Unidades confirmadas',
     'inv.transfers.scanUnit': 'Escanear unidad',
@@ -340,6 +368,7 @@ registerI18nKeys({
     'inv.scanner.manual': 'Ingresar código manual',
     'inv.scanner.manualPlaceholder': 'Pega la URL del QR o el id del serial',
     'inv.scanner.manualSubmit': 'Buscar',
+    'inv.scanner.switchCamera': 'Cambiar cámara',
     'inv.catalogs.seedsAlreadyLoaded': 'Ya están cargadas',
   },
   en: {
@@ -356,6 +385,16 @@ registerI18nKeys({
     'inv.error.save': 'Error saving',
     'inv.readOnly': 'Read only. Only General Management and HR can manage inventory.',
 
+    'inv.view.back': 'Back',
+    'inv.home.movement': 'Register movement',
+    'inv.home.movementDesc': 'Purchase, consumption, adjustment or stock out',
+    'inv.home.transfer': 'Transfer',
+    'inv.home.transferDesc': 'Move stock between locations with tracking',
+    'inv.home.count': 'Schedule count',
+    'inv.home.countDesc': 'Cyclic count of a location',
+    'inv.home.serial': 'New serial',
+    'inv.home.serialDesc': 'Register a rentable unit',
+
     'inv.stock.viewByProduct': 'By product',
     'inv.stock.viewByLocation': 'By location',
     'inv.stock.scanQr': 'Scan QR',
@@ -367,6 +406,14 @@ registerI18nKeys({
     'inv.stock.max': 'Max',
     'inv.stock.minMaxHelp': 'Only supervisors set minimums and maximums. When stock drops below the minimum we will notify you with a purchase suggestion.',
     'inv.stock.lowStock': 'Below minimum',
+    'inv.stock.orderSuggestion': 'Order suggestion',
+    'inv.stock.suggestedQty': 'Suggested quantity',
+    'inv.stock.sendOrder': 'Send order',
+    'inv.stock.orderCreated': 'Order sent (saved as pending draft)',
+    'inv.stock.orderDraftPending': 'Pending draft',
+    'inv.stock.preferredSupplier': 'Preferred supplier',
+    'inv.stock.paymentTerms': 'Payment terms',
+    'inv.stock.noPreferredSupplier': 'No preferred supplier registered',
     'inv.stock.noProducts': 'No active products with stock',
     'inv.stock.noProductsHint': 'Register the first movement to create stock for a product.',
     'inv.stock.emptyLocation': 'No products with stock at this location',
@@ -398,6 +445,9 @@ registerI18nKeys({
     'inv.movementForm.originExternalHint': 'In incoming movements, the source is always an external supplier or a direct purchase; choose the supplier if it is registered.',
     'inv.movementForm.help': 'In a purchase, goods come in from a supplier to your location. In consumption, they leave your location and are used up. In a transfer, they travel between two of your locations.',
     'inv.movementForm.reasonRequired': 'Reason is required for an adjustment',
+    'inv.movementForm.originAutoHelp': 'It is subtracted from your location: {location}',
+    'inv.movementForm.originDeptRestricted': 'Only the locations of your department are listed.',
+    'inv.movementForm.originNoDept': 'Your user has no department with assigned locations: all locations are shown.',
 
     'inv.movements.help': 'Immutable log: movements are never edited or deleted. Every entry is recorded forever.',
     'inv.movements.filterProduct': 'Product',
@@ -455,7 +505,7 @@ registerI18nKeys({
     'inv.validation.fromRequired': 'Source location is required for types that subtract stock',
     'inv.validation.toRequired': 'Destination location is required for types that add stock',
 
-    'inv.transfers.help': 'Moves stock between locations with status tracking. Creating it subtracts from the source; receiving adds to the destination; cancelling returns it to the source. Statuses: pending, in transit, received and cancelled. Only the destination responsible (or a supervisor) confirms reception; whoever creates or ships cannot receive it.',
+    'inv.transfers.help': 'Moves stock between locations with status tracking. Creating it subtracts from the source; receiving adds to the destination; cancelling returns it to the source. Nothing disappears: filter by status to see the full history. Who can receive: the destination location responsible, anyone in that location\'s department, or a Supervisor or above.',
     'inv.transfers.new': 'New transfer',
     'inv.transfers.empty': 'No transfers recorded',
     'inv.transfers.quantity': 'Quantity',
@@ -472,7 +522,11 @@ registerI18nKeys({
     'inv.transfers.validation.sameLocation': 'Source and destination must be different',
     'inv.transfers.validation.insufficientStock': 'Insufficient stock at source (available: {available})',
     'inv.transfers.createConfirmDesc': '{quantity} will be subtracted from the source stock immediately.',
-    'inv.transfers.markInTransit': 'Mark in transit',
+    'inv.transfers.dispatch': 'Dispatch',
+    'inv.transfers.filter.all': 'All',
+    'inv.transfers.shippedBy': 'Dispatched by',
+    'inv.transfers.shippedAt': 'Dispatched',
+    'inv.transfers.receivedUnits': 'Received serials',
     'inv.transfers.receive': 'Receive',
     'inv.transfers.cancel': 'Cancel',
     'inv.transfers.receiveTitle': 'Receive transfer',
@@ -483,15 +537,15 @@ registerI18nKeys({
     'inv.transfers.cancelReasonPlaceholder': 'E.g.: product damaged, request reverted...',
     'inv.transfers.createdBy': 'Created by',
     'inv.transfers.responsibleLabel': 'Responsible',
-    'inv.transfers.inTransitTo': 'In transit to {location}: {quantity}',
+    'inv.transfers.inTransitTo': 'In transit to {location}: {quantity} {unit}',
     'inv.transfers.reasonCreated': 'Transfer created',
     'inv.transfers.reasonReceived': 'Transfer received',
     'inv.transfers.reasonCancelled': 'Transfer cancelled',
     'inv.transfers.stockLine': '{location}: {quantity} {unit}',
     'inv.transfers.stockOrigin': 'Available at source',
     'inv.transfers.stockDestination': 'At destination',
-    'inv.transfers.receiveRule': 'Only the destination location responsible (or a supervisor) confirms reception; whoever creates or ships a transfer cannot receive it.',
-    'inv.transfers.creatorCannotReceive': 'Whoever creates or ships a transfer cannot mark it as received.',
+    'inv.transfers.receiveRule': 'Who can receive: the destination location responsible, anyone in that location\'s department, or a Supervisor or above.',
+    'inv.transfers.creatorHint': 'As the creator you can only receive it if you are the destination responsible or belong to its department.',
     'inv.transfers.serializedHint': 'Rentable product with serials: confirm the units that arrived by scanning their QR or checking them in the list.',
     'inv.transfers.unitsReceived': 'Confirmed units',
     'inv.transfers.scanUnit': 'Scan unit',
@@ -599,6 +653,7 @@ registerI18nKeys({
     'inv.scanner.manual': 'Enter code manually',
     'inv.scanner.manualPlaceholder': 'Paste the QR URL or the serial id',
     'inv.scanner.manualSubmit': 'Look up',
+    'inv.scanner.switchCamera': 'Switch camera',
     'inv.catalogs.seedsAlreadyLoaded': 'Already loaded',
   },
 });
@@ -665,6 +720,7 @@ function docToSupplier(id: string, data: Record<string, unknown>): Supplier {
     contactName: data.contactName ? toStr(data.contactName) : undefined,
     email: data.email ? toStr(data.email) : undefined,
     phone: data.phone ? toStr(data.phone) : undefined,
+    paymentTerms: data.paymentTerms ? toStr(data.paymentTerms) : undefined,
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
@@ -784,6 +840,8 @@ function docToLocation(id: string, data: Record<string, unknown>): Location {
     relatedModules: Array.isArray(data.relatedModules)
       ? (data.relatedModules as unknown[]).filter((x): x is string => typeof x === 'string')
       : [],
+    responsibleUserId: data.responsibleUserId ? toStr(data.responsibleUserId) : undefined,
+    responsibleDepartmentId: data.responsibleDepartmentId ? toStr(data.responsibleDepartmentId) : undefined,
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
@@ -831,9 +889,54 @@ function docToTransfer(id: string, data: Record<string, unknown>): InventoryTran
     receivedUnitIds: Array.isArray(data.receivedUnitIds)
       ? data.receivedUnitIds.map(u => toStr(u)).filter(Boolean)
       : null,
+    shippedBy: data.shippedBy ? toStr(data.shippedBy) : null,
+    shippedByName: data.shippedByName ? toStr(data.shippedByName) : null,
+    shippedAt: data.shippedAt ? toStr(data.shippedAt) : null,
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
     createdByName: toStr(data.createdByName),
+  };
+}
+
+// Borrador de pedido automático (punto 16): sugerencia al bajar del mínimo.
+// NO toca stock ni genera movimiento; la orden de compra formal llega en Fase 5.
+export interface PurchaseRequisition {
+  id?: string;
+  tenantId: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unit: string;
+  suggestedQty: number;
+  supplierId: string | null;
+  supplierName: string | null;
+  locationId: string;
+  locationName: string;
+  status: 'draft' | 'ordered' | 'cancelled';
+  createdBy: string;
+  createdByName?: string;
+  createdAt: string;
+  notes?: string;
+}
+
+function docToPurchaseRequisition(id: string, data: Record<string, unknown>): PurchaseRequisition {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    productId: toStr(data.productId),
+    productName: toStr(data.productName),
+    quantity: toNum(data.quantity),
+    unit: toStr(data.unit),
+    suggestedQty: toNum(data.suggestedQty),
+    supplierId: data.supplierId ? toStr(data.supplierId) : null,
+    supplierName: data.supplierName ? toStr(data.supplierName) : null,
+    locationId: toStr(data.locationId),
+    locationName: toStr(data.locationName),
+    status: (data.status as PurchaseRequisition['status']) ?? 'draft',
+    createdBy: toStr(data.createdBy),
+    createdByName: data.createdByName ? toStr(data.createdByName) : undefined,
+    createdAt: toStr(data.createdAt),
+    notes: data.notes ? toStr(data.notes) : undefined,
   };
 }
 
@@ -910,6 +1013,13 @@ const SEED_SERIAL_STATUSES: Array<{ id: string; name: string; nameEn: string; bl
 
 type InvTab = 'stock' | 'movements' | 'transfers' | 'counts' | 'serials' | 'catalogs';
 type StockView = 'product' | 'location';
+
+// Vista interna del módulo (punto 8): las acciones principales ocupan una
+// PANTALLA completa en lugar de un popup. En 'main' se ven las tarjetas
+// grandes de acción y las sub-pestañas; cada acción cambia invView.
+type InvView = 'main' | 'movement' | 'transfer-new' | 'count-new' | 'serial-new' | 'receive';
+
+type TransferStatusFilter = 'all' | InventoryTransfer['status'];
 
 interface MovementFormState {
   productId: string;
@@ -1076,14 +1186,18 @@ export function InventarioModule() {
   // Navegación entre sub-pestañas
   const [tab, setTab] = useState<InvTab>('stock');
 
+  // Vista interna (punto 8): 'main' = tarjetas de acción + sub-pestañas;
+  // cualquier otro valor reemplaza el contenido por la pantalla del formulario
+  const [invView, setInvView] = useState<InvView>('main');
+
   // Tarjetas expandibles
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   // Vista de Stock
   const [stockView, setStockView] = useState<StockView>('product');
 
-  // Modal de movimiento (compartido: lo reusan Stock y los siguientes agentes)
-  const [movementModalOpen, setMovementModalOpen] = useState(false);
+  // Pantalla interna de movimiento (compartida: la reusan Stock, Movimientos
+  // y las tarjetas grandes de acción; ver invView)
   const [movementForm, setMovementForm] = useState<MovementFormState>(EMPTY_MOVEMENT_FORM);
   const [movementCategoryId, setMovementCategoryId] = useState('');
   const [savingMovement, setSavingMovement] = useState(false);
@@ -1116,7 +1230,6 @@ export function InventarioModule() {
 
   // Transferencias entre ubicaciones (FASE 1A-transfers)
   const [transfers, setTransfers] = useState<InventoryTransfer[]>([]);
-  const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [transferForm, setTransferForm] = useState<TransferFormState>(EMPTY_TRANSFER_FORM);
   const [savingTransfer, setSavingTransfer] = useState(false);
   const [receiveTransferId, setReceiveTransferId] = useState<string | null>(null);
@@ -1127,7 +1240,6 @@ export function InventarioModule() {
 
   // Conteos cíclicos (FASE 1A-counts)
   const [countSessions, setCountSessions] = useState<CountSession[]>([]);
-  const [countModalOpen, setCountModalOpen] = useState(false);
   const [countForm, setCountForm] = useState<CountFormState>(EMPTY_COUNT_FORM);
   const [savingCount, setSavingCount] = useState(false);
   const [countingId, setCountingId] = useState<string | null>(null);
@@ -1142,12 +1254,19 @@ export function InventarioModule() {
   // Órdenes de renta y sus estados: alimentan el historial de seriales (WH-D2)
   const [rentalOrders, setRentalOrders] = useState<RentalOrder[]>([]);
   const [rentalOrderStatuses, setRentalOrderStatuses] = useState<RentalOrderStatus[]>([]);
-  const [serialModalOpen, setSerialModalOpen] = useState(false);
   const [serialForm, setSerialForm] = useState<SerialFormState>(EMPTY_SERIAL_FORM);
   const [serialPhotoFile, setSerialPhotoFile] = useState<File | null>(null);
   const [savingSerial, setSavingSerial] = useState(false);
   const [editingSerialId, setEditingSerialId] = useState<string | null>(null);
   const [serialEditDraft, setSerialEditDraft] = useState<{ size: string; notes: string }>({ size: '', notes: '' });
+
+  // Filtro por estado de la pestaña Transferencias (punto 4): por defecto
+  // se listan TODAS; los chips filtran sin que nada desaparezca del historial
+  const [transferFilter, setTransferFilter] = useState<TransferStatusFilter>('all');
+
+  // Borradores de pedido automático (punto 16, colección purchaseRequisitions)
+  const [purchaseReqs, setPurchaseReqs] = useState<PurchaseRequisition[]>([]);
+  const [savingPurchaseReq, setSavingPurchaseReq] = useState(false);
 
   // Baja permanente de un serial (foto + motivo obligatorios, aprobadores ampliados)
   const [retiringUnit, setRetiringUnit] = useState<RentalUnit | null>(null);
@@ -1207,6 +1326,55 @@ export function InventarioModule() {
   const activeSerialStatuses = useMemo(() => serialStatuses.filter(s => s.isActive), [serialStatuses]);
   const rentableProducts = useMemo(() => activeProducts.filter(p => p.isRentable), [activeProducts]);
 
+  // Tipo de movimiento seleccionado en la pantalla de movimiento (campos
+  // adaptados al tipo). Se calcula arriba de los early returns porque la
+  // regla de ubicación automática (punto 15) lo usa en un efecto.
+  const selectedMt = movementTypes.find(m => m.id === movementForm.movementTypeId);
+  const isTransferMt = selectedMt?.id === 'transferencia';
+  const isInputMt = selectedMt ? !selectedMt.isOutput : false;
+  const isAdjustMt = selectedMt?.id === 'ajuste';
+  // Salidas (consumo/ajuste/daño, no transferencia): el origen se ofrece solo
+  // entre las ubicaciones del departamento del usuario actual (punto 15)
+  const isOutputNonTransfer = !!selectedMt?.isOutput && !isTransferMt;
+  const myDeptCode = useMemo(
+    () => normalizeDeptCode(currentUser?.department || ''),
+    [currentUser?.department]
+  );
+  const myDeptLocations = useMemo(
+    () =>
+      activeLocations.filter(
+        l => l.responsibleDepartmentId && normalizeDeptCode(l.responsibleDepartmentId) === myDeptCode
+      ),
+    [activeLocations, myDeptCode]
+  );
+  // Restricción activa: usuario con departamento y con ubicaciones en él
+  const restrictOrigin = isOutputNonTransfer && !!myDeptCode && myDeptLocations.length > 0;
+  // Una sola ubicación del departamento: se selecciona sola, sin pedir
+  const autoOriginLocation = restrictOrigin && myDeptLocations.length === 1 ? myDeptLocations[0] : null;
+  const movementOriginLocations = restrictOrigin ? myDeptLocations : activeLocations;
+
+  // Selección automática de la única ubicación del departamento (punto 15)
+  useEffect(() => {
+    if (autoOriginLocation && movementForm.fromLocationId !== autoOriginLocation.id) {
+      setMovementForm(f => ({ ...f, fromLocationId: autoOriginLocation.id }));
+    }
+  }, [autoOriginLocation, movementForm.fromLocationId]);
+
+  // Cantidades "en tránsito" por producto + ubicación origen → destino
+  // (punto 3): transferencias activas (pendiente o en_tránsito; el stock ya
+  // se descuenta al crear, esto es solo información).
+  const transitByOrigin = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    for (const tr of transfers) {
+      if (tr.status !== 'pendiente' && tr.status !== 'en_transito') continue;
+      const key = `${tr.productId}__${tr.fromLocationId}`;
+      const inner = map.get(key) || new Map<string, number>();
+      inner.set(tr.toLocationId, (inner.get(tr.toLocationId) || 0) + tr.quantity);
+      map.set(key, inner);
+    }
+    return map;
+  }, [transfers]);
+
   // Historial de un serial: órdenes donde algún ítem lo tiene asignado (WH-D2)
   const ordersForSerial = (unitId: string) =>
     rentalOrders.filter(o => o.items.some(it => it.assignedUnitIds?.includes(unitId)));
@@ -1229,6 +1397,23 @@ export function InventarioModule() {
     getLanguage() === 'en' && mt.nameEn ? mt.nameEn : mt.name;
   const stockFor = (productId: string, locationId: string) =>
     stocks.find(s => s.productId === productId && s.locationId === locationId);
+
+  // Líneas "En tránsito a {destino}: {cantidad} {unidad}" (punto 3):
+  // transferencias activas (pendiente/en_tránsito) desde una ubicación
+  // origen hacia cada destino, para una fila de stock concreta
+  const renderTransitLines = (productId: string, fromLocationId: string, unit: string) => {
+    const groups = transitByOrigin.get(`${productId}__${fromLocationId}`);
+    if (!groups) return null;
+    return [...groups.entries()].map(([toLocationId, qty]) => (
+      <div key={toLocationId} className="mt-1 flex items-center gap-1 text-[11px] text-blue-700">
+        <Truck className="h-3 w-3 shrink-0" />
+        {t('inv.transfers.inTransitTo')
+          .replace('{location}', locationName(toLocationId))
+          .replace('{quantity}', String(qty))
+          .replace('{unit}', unit)}
+      </div>
+    ));
+  };
 
   const toggleExpanded = (id: string) => {
     setExpandedIds(prev => {
@@ -1419,6 +1604,25 @@ export function InventarioModule() {
     return () => unsub();
   }, [enabled, tenantId]);
 
+  // Borradores de pedido automático (punto 16): colección nueva
+  // purchaseRequisitions (cuberta por el match genérico de firestore.rules)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, 'purchaseRequisitions'), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPurchaseReqs(
+          snap.docs
+            .map(d => docToPurchaseRequisition(d.id, d.data()))
+            .filter(x => !x.tenantId || x.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[InventarioModule] purchaseRequisitions:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
   useEffect(() => {
     if (!enabled) return;
     const q = query(collection(db, CATALOG_COLLECTIONS.countSessions), orderBy('scheduledAt', 'desc'));
@@ -1501,7 +1705,7 @@ export function InventarioModule() {
       fromLocationId: locationId || '',
       toLocationId: locationId || '',
     });
-    setMovementModalOpen(true);
+    setInvView('movement');
   };
 
   // Botones rápidos: abre el formulario con un tipo preseleccionado.
@@ -1520,7 +1724,7 @@ export function InventarioModule() {
     }
     setMovementCategoryId('');
     setMovementForm({ ...EMPTY_MOVEMENT_FORM, movementTypeId: mt?.id || '' });
-    setMovementModalOpen(true);
+    setInvView('movement');
   };
 
   const handleSaveMovement = async () => {
@@ -1604,7 +1808,7 @@ export function InventarioModule() {
           });
 
           toast.success(t('inv.movementForm.save'));
-          setMovementModalOpen(false);
+          setInvView('main');
           setMovementForm(EMPTY_MOVEMENT_FORM);
           setMovementCategoryId('');
         } catch (err: any) {
@@ -1622,7 +1826,7 @@ export function InventarioModule() {
 
   const openTransferForm = () => {
     setTransferForm(EMPTY_TRANSFER_FORM);
-    setTransferModalOpen(true);
+    setInvView('transfer-new');
   };
 
   const handleCreateTransfer = async () => {
@@ -1709,7 +1913,7 @@ export function InventarioModule() {
           });
 
           toast.success(t('inv.transfers.new'));
-          setTransferModalOpen(false);
+          setInvView('main');
           setTransferForm(EMPTY_TRANSFER_FORM);
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -1735,21 +1939,29 @@ export function InventarioModule() {
         targetId: transfer.id,
         targetName: `${productName(transfer.productId)} · ${transfer.quantity}`,
         impactLevel: 'minor',
-        description: `Transferencia marcada en tránsito: ${productName(transfer.productId)} · ${transfer.quantity} · ${locationName(transfer.fromLocationId)} → ${locationName(transfer.toLocationId)}`,
+        description: `Transferencia despachada: ${productName(transfer.productId)} · ${transfer.quantity} · ${locationName(transfer.fromLocationId)} → ${locationName(transfer.toLocationId)}`,
       });
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
     }
   };
 
-  // Quién puede confirmar la recepción: el responsable de la ubicación
-  // destino o un Supervisor+ / Director General. Quien creó o envió la
-  // transferencia NUNCA puede marcarla como recibida (regla de negocio).
+  // Quién puede confirmar la recepción (regla ampliada, punto 6), cumpliendo
+  // CUALQUIERA de estas condiciones:
+  // (a) es el responsable de la ubicación destino (locations.responsibleUserId)
+  // (b) pertenece al departamento de esa ubicación (locations.responsibleDepartmentId
+  //     comparado con el department del currentUser, normalizando códigos con
+  //     normalizeDeptCode, igual que useDynamicDepartments.getVisibleDepartmentCodes)
+  // (c) es Supervisor o superior (SUPERVISOR_PLUS_ROLES)
+  // El creador solo puede recibir si cumple (a), (b) o (c): crear la
+  // transferencia por sí solo NO otorga el derecho a recibirla.
   const canReceiveTransfer = (transfer: InventoryTransfer): boolean => {
     if (!currentUser || !transfer.id || transfer.status !== 'en_transito') return false;
-    if (transfer.createdBy && transfer.createdBy === currentUser.id) return false;
-    const destResponsibleId = locations.find(l => l.id === transfer.toLocationId)?.responsibleUserId;
-    if (destResponsibleId && destResponsibleId === currentUser.id) return true;
+    const destLocation = locations.find(l => l.id === transfer.toLocationId);
+    if (destLocation?.responsibleUserId && destLocation.responsibleUserId === currentUser.id) return true;
+    const destDeptCode = normalizeDeptCode(destLocation?.responsibleDepartmentId || '');
+    const userDeptCode = normalizeDeptCode(currentUser.department || '');
+    if (destDeptCode && userDeptCode && destDeptCode === userDeptCode) return true;
     return canSupervise;
   };
 
@@ -1762,12 +1974,17 @@ export function InventarioModule() {
 
   const openReceiveTransfer = (transfer: InventoryTransfer) => {
     if (!canReceiveTransfer(transfer)) {
-      toast.error(t('inv.transfers.creatorCannotReceive'));
+      toast.error(
+        currentUser?.id && transfer.createdBy === currentUser.id
+          ? t('inv.transfers.creatorHint')
+          : t('inv.transfers.receiveRule')
+      );
       return;
     }
     setReceiveTransferId(transfer.id!);
     setReceivedByName(currentUser?.name || '');
     setReceiveSerialIds(transfer.receivedUnitIds ?? []);
+    setInvView('receive');
   };
 
   const handleReceiveTransfer = async () => {
@@ -1857,6 +2074,7 @@ export function InventarioModule() {
           toast.success(t('inv.transfers.receive'));
           setReceiveTransferId(null);
           setReceiveSerialIds([]);
+          setInvView('main');
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         }
@@ -1936,6 +2154,103 @@ export function InventarioModule() {
   };
 
   // ═══════════════════════════════════════════════════════════════════
+  // PEDIDO AUTOMÁTICO — BORRADOR (punto 16)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ¿Ya existe un borrador pendiente para este producto + ubicación?
+  const purchaseDraftFor = (productId: string, locationId: string) =>
+    purchaseReqs.find(r => r.status === 'draft' && r.productId === productId && r.locationId === locationId);
+
+  // Sugerencia de cantidad: hasta el máximo (max - actual) o hasta el mínimo
+  // si no hay máximo (misma fórmula que la Cloud Function checkLowStock)
+  const purchaseSuggestedQty = (stock: InventoryStock): number =>
+    stock.maxStock != null ? stock.maxStock - stock.quantity : (stock.minStock ?? 0);
+
+  const handleCreatePurchaseRequisition = async (stock: InventoryStock) => {
+    if (!currentUser || savingPurchaseReq) return;
+    const product = products.find(p => p.id === stock.productId);
+    if (!product || stock.minStock == null) return;
+    const suggestedQty = purchaseSuggestedQty(stock);
+    if (suggestedQty <= 0) return;
+    const supplier = product.preferredSupplierId
+      ? suppliers.find(s => s.id === product.preferredSupplierId)
+      : undefined;
+    const unit = unitName(product.unitId);
+    const locName = locationName(stock.locationId);
+
+    await executeWithConfirm({
+      level: 'major',
+      title: t('inv.stock.orderSuggestion'),
+      description: `${product.name} · ${locName} · ${suggestedQty} ${unit}${supplier ? ` · ${supplier.name}` : ''}`,
+      action: async () => {
+        setSavingPurchaseReq(true);
+        try {
+          const now = new Date().toISOString();
+          const ref = await addDoc(collection(db, 'purchaseRequisitions'), {
+            tenantId,
+            productId: product.id,
+            productName: product.name,
+            quantity: suggestedQty,
+            unit,
+            suggestedQty,
+            supplierId: supplier?.id || null,
+            supplierName: supplier?.name || null,
+            locationId: stock.locationId,
+            locationName: locName,
+            status: 'draft',
+            createdBy: currentUser.id,
+            createdByName: currentUser.name,
+            createdAt: now,
+            notes: `Bajo mínimo: quedan ${stock.quantity} ${unit} (mínimo ${stock.minStock}). La orden de compra formal se gestiona en Compras & Pagos (Fase 5).`,
+          });
+
+          // Notificación desde cliente (patrón de HorariosModule): avisa a
+          // DG/RRHH y al responsable de la ubicación. Es lo mejor esfuerzo:
+          // nunca bloquea la creación del borrador.
+          try {
+            const targets = new Set<string>();
+            activeUsers
+              .filter(u => u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
+              .forEach(u => u.id && targets.add(u.id));
+            const locResponsible = locations.find(l => l.id === stock.locationId)?.responsibleUserId;
+            if (locResponsible) targets.add(locResponsible);
+            for (const uid of targets) {
+              await addDoc(collection(db, 'notifications'), {
+                userId: uid,
+                type: 'PURCHASE_REQUISITION_CREATED',
+                title: `Pedido sugerido: ${product.name}`,
+                body: `${currentUser.name} creó un borrador de pedido de ${suggestedQty} ${unit} de ${product.name} para ${locName}${supplier ? ` (proveedor: ${supplier.name})` : ''}.`,
+                data: { link: '/requisiciones' },
+                read: false,
+                createdAt: serverTimestamp(),
+                createdBy: currentUser.id,
+                priority: 'normal',
+              });
+            }
+          } catch (notifErr) {
+            console.error('[InventarioModule] notificación de pedido:', notifErr);
+          }
+
+          await logAction({
+            action: AUDIT_ACTIONS.purchaseRequisitionCreated,
+            targetType: 'purchase_requisition',
+            targetId: ref.id,
+            targetName: `${product.name} · ${suggestedQty} ${unit}`,
+            impactLevel: 'major',
+            description: `Borrador de pedido creado: ${product.name} · ${suggestedQty} ${unit} · ${locName}${supplier ? ` · proveedor: ${supplier.name}` : ''}`,
+          });
+
+          toast.success(t('inv.stock.orderCreated'));
+        } catch (err: any) {
+          toast.error(`${t('inv.error.save')}: ${err.message}`);
+        } finally {
+          setSavingPurchaseReq(false);
+        }
+      },
+    });
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
   // CONTEOS CÍCLICOS (FASE 1A-counts)
   // ═══════════════════════════════════════════════════════════════════
 
@@ -1964,7 +2279,7 @@ export function InventarioModule() {
         description: `Conteo programado: ${locationName(countForm.locationId)} · ${t(`inv.counts.frequency.${countForm.frequency}`)}${countForm.blind ? ` · ${t('inv.counts.blindYes').toLowerCase()}` : ''}`,
       });
       toast.success(t('inv.counts.schedule'));
-      setCountModalOpen(false);
+      setInvView('main');
       setCountForm(EMPTY_COUNT_FORM);
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -2216,7 +2531,7 @@ export function InventarioModule() {
     const defaultStatus = activeSerialStatuses.find(s => !s.blocksRental) ?? activeSerialStatuses[0];
     setSerialForm({ ...EMPTY_SERIAL_FORM, statusId: defaultStatus?.id || '' });
     setSerialPhotoFile(null);
-    setSerialModalOpen(true);
+    setInvView('serial-new');
   };
 
   const handleCreateSerial = async () => {
@@ -2259,7 +2574,7 @@ export function InventarioModule() {
             description: `Serial creado: ${productName(serialForm.productId)} · ${serialNumber}`,
           });
           toast.success(t('inv.serials.new'));
-          setSerialModalOpen(false);
+          setInvView('main');
           setSerialForm(EMPTY_SERIAL_FORM);
           setSerialPhotoFile(null);
         } catch (err: any) {
@@ -2416,6 +2731,7 @@ export function InventarioModule() {
 
   // Resultado de un escaneo (o deep link): abre la sub-pestaña y expande la tarjeta
   const revealTarget = (kind: 'product' | 'location' | 'serial', id: string) => {
+    setInvView('main');
     if (kind === 'product') {
       setTab('stock');
       setStockView('product');
@@ -2824,6 +3140,57 @@ export function InventarioModule() {
     });
   }, [movements, filterProductId, filterLocationId, filterTypeId]);
 
+  // Filtrado de la pestaña Transferencias (punto 4): la lista base ya trae
+  // TODAS las transferencias; el filtro solo decide cuáles se muestran
+  const filteredTransfers = useMemo(
+    () => (transferFilter === 'all' ? transfers : transfers.filter(tr => tr.status === transferFilter)),
+    [transfers, transferFilter]
+  );
+
+  // Tarjetas grandes de acción de la vista principal (punto 8): solo las
+  // acciones de creación rápida; la exploración va en las sub-pestañas
+  const homeActions: Array<{
+    id: InvView;
+    icon: typeof Truck;
+    title: string;
+    desc: string;
+    onClick: () => void;
+  }> = canWrite
+    ? [
+        {
+          id: 'movement',
+          icon: ArrowDownUp,
+          title: t('inv.home.movement'),
+          desc: t('inv.home.movementDesc'),
+          onClick: () => openMovementForm(),
+        },
+        {
+          id: 'transfer-new',
+          icon: Truck,
+          title: t('inv.home.transfer'),
+          desc: t('inv.home.transferDesc'),
+          onClick: openTransferForm,
+        },
+        {
+          id: 'count-new',
+          icon: ClipboardList,
+          title: t('inv.home.count'),
+          desc: t('inv.home.countDesc'),
+          onClick: () => {
+            setCountForm(EMPTY_COUNT_FORM);
+            setInvView('count-new');
+          },
+        },
+        {
+          id: 'serial-new',
+          icon: Box,
+          title: t('inv.home.serial'),
+          desc: t('inv.home.serialDesc'),
+          onClick: openSerialForm,
+        },
+      ]
+    : [];
+
   // ═══════════════════════════════════════════════════════════════════
   // RENDER: placeholder si el módulo no está habilitado
   // ═══════════════════════════════════════════════════════════════════
@@ -2875,14 +3242,33 @@ export function InventarioModule() {
   // RENDER
   // ═══════════════════════════════════════════════════════════════════
 
-  // Tipo de movimiento seleccionado en el formulario (campos adaptados al tipo)
-  const selectedMt = movementTypes.find(m => m.id === movementForm.movementTypeId);
-  const isTransferMt = selectedMt?.id === 'transferencia';
-  const isInputMt = selectedMt ? !selectedMt.isOutput : false;
-  const isAdjustMt = selectedMt?.id === 'ajuste';
+  // Transferencia en recepción (pantalla interna, punto 8)
+  const receivingTransfer = transfers.find(x => x.id === receiveTransferId) || null;
 
   return (
     <div className="space-y-4">
+      {invView === 'main' ? (
+      <>
+      {/* Tarjetas grandes de acción (punto 8): creación rápida tipo módulos */}
+      {homeActions.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {homeActions.map(action => (
+            <button
+              key={action.id}
+              type="button"
+              onClick={action.onClick}
+              className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 text-left transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+            >
+              <div className="h-10 w-10 rounded-xl bg-corporate/10 flex items-center justify-center mb-3">
+                <action.icon className="h-5 w-5 text-corporate" />
+              </div>
+              <div className="text-sm font-semibold text-[#1D1D1F]">{action.title}</div>
+              <div className="text-xs text-[#86868B] mt-0.5">{action.desc}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Pills de sub-pestañas */}
       <div className="flex flex-wrap items-center gap-2">
         {tabs.map(tb => (
@@ -2942,7 +3328,7 @@ export function InventarioModule() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setTransferModalOpen(true)}
+                    onClick={openTransferForm}
                     className="gap-2 rounded-xl border-[#E5E5E7]"
                   >
                     <Truck className="h-4 w-4" />
@@ -3097,6 +3483,49 @@ export function InventarioModule() {
                                   )}
                                 </div>
                               </div>
+                              {renderTransitLines(s.productId, s.locationId, unitName(product.unitId))}
+                              {isLow && s.minStock != null && product && (() => {
+                                const draft = purchaseDraftFor(s.productId, s.locationId);
+                                const supplier = product.preferredSupplierId
+                                  ? suppliers.find(x => x.id === product.preferredSupplierId)
+                                  : undefined;
+                                const suggested = purchaseSuggestedQty(s);
+                                const unit = unitName(product.unitId);
+                                return (
+                                  <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-1">
+                                    <div className="text-[11px] font-semibold text-amber-800">
+                                      {t('inv.stock.orderSuggestion')}
+                                    </div>
+                                    <div className="text-[11px] text-amber-800">
+                                      {t('inv.stock.suggestedQty')}: {suggested} {unit}
+                                    </div>
+                                    <div className="text-[11px] text-amber-800">
+                                      {t('inv.stock.preferredSupplier')}:{' '}
+                                      {supplier?.name || t('inv.stock.noPreferredSupplier')}
+                                      {supplier?.paymentTerms
+                                        ? ` · ${t('inv.stock.paymentTerms')}: ${supplier.paymentTerms}`
+                                        : ''}
+                                    </div>
+                                    <div className="pt-0.5">
+                                      {draft ? (
+                                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] bg-white text-[#86868B] border border-amber-200">
+                                          {t('inv.stock.orderDraftPending')}
+                                        </span>
+                                      ) : (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleCreatePurchaseRequisition(s)}
+                                          disabled={savingPurchaseReq || suggested <= 0}
+                                          className="h-7 text-xs rounded-lg bg-corporate"
+                                        >
+                                          <Send className="h-3.5 w-3.5 mr-1" />
+                                          {t('inv.stock.sendOrder')}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                               {isEditingMm && (
                                 <div className="mt-2 flex items-center gap-2">
                                   <Input
@@ -3196,15 +3625,6 @@ export function InventarioModule() {
                         {locationStocks.map(s => {
                           const product = products.find(p => p.id === s.productId);
                           const isLow = s.quantity <= (s.minStock ?? Infinity);
-                          // Transferencias en tránsito desde esta ubicación, agrupadas por destino
-                          const transitGroups: Array<{ toLocationId: string; qty: number }> = [];
-                          transfers
-                            .filter(tr => tr.status === 'en_transito' && tr.fromLocationId === location.id && tr.productId === s.productId)
-                            .forEach(tr => {
-                              const g = transitGroups.find(x => x.toLocationId === tr.toLocationId);
-                              if (g) g.qty += tr.quantity;
-                              else transitGroups.push({ toLocationId: tr.toLocationId, qty: tr.quantity });
-                            });
                           return (
                             <div key={s.id} className="p-3">
                               <div className="flex flex-wrap items-center gap-2">
@@ -3253,17 +3673,7 @@ export function InventarioModule() {
                                   </Button>
                                 )}
                               </div>
-                              {transitGroups.map(g => (
-                                <div
-                                  key={g.toLocationId}
-                                  className="mt-1 flex items-center gap-1 text-[11px] text-blue-700"
-                                >
-                                  <Truck className="h-3 w-3 shrink-0" />
-                                  {t('inv.transfers.inTransitTo')
-                                    .replace('{location}', locationName(g.toLocationId))
-                                    .replace('{quantity}', String(g.qty))}
-                                </div>
-                              ))}
+                              {renderTransitLines(s.productId, location.id, unitName(product?.unitId || ''))}
                             </div>
                           );
                         })}
@@ -3432,13 +3842,36 @@ export function InventarioModule() {
             )}
           </div>
 
+          {/* Filtro por estado (punto 4): la lista trae TODAS las transferencias */}
+          {transfers.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              {(['all', 'pendiente', 'en_transito', 'recibido', 'cancelado'] as TransferStatusFilter[]).map(f => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setTransferFilter(f)}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium border transition-colors',
+                    transferFilter === f
+                      ? 'bg-corporate text-white border-corporate'
+                      : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
+                  )}
+                >
+                  {f === 'all' ? t('inv.transfers.filter.all') : t(`inv.transfers.status.${f}`)}
+                  {' '}
+                  ({f === 'all' ? transfers.length : transfers.filter(tr => tr.status === f).length})
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="space-y-2">
-            {transfers.length === 0 && (
+            {filteredTransfers.length === 0 && (
               <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
                 {t('inv.transfers.empty')}
               </div>
             )}
-            {transfers.map(tr => {
+            {filteredTransfers.map(tr => {
               const isOpen = expandedIds.has(tr.id!);
               return (
                 <div
@@ -3495,6 +3928,15 @@ export function InventarioModule() {
                         label={t('inv.movements.date')}
                         value={tr.createdAt ? new Date(tr.createdAt).toLocaleString() : '—'}
                       />
+                      {tr.shippedByName && (
+                        <>
+                          <DetailRow label={t('inv.transfers.shippedBy')} value={tr.shippedByName} />
+                          <DetailRow
+                            label={t('inv.transfers.shippedAt')}
+                            value={tr.shippedAt ? new Date(tr.shippedAt).toLocaleString() : '—'}
+                          />
+                        </>
+                      )}
                       {tr.status === 'recibido' && (
                         <>
                           <DetailRow
@@ -3505,6 +3947,14 @@ export function InventarioModule() {
                             label={t('inv.movements.date')}
                             value={tr.receivedAt ? new Date(tr.receivedAt).toLocaleString() : '—'}
                           />
+                          {tr.receivedUnitIds && tr.receivedUnitIds.length > 0 && (
+                            <DetailRow
+                              label={t('inv.transfers.receivedUnits')}
+                              value={tr.receivedUnitIds
+                                .map(uid => rentalUnits.find(u => u.id === uid)?.serialNumber || uid)
+                                .join(', ')}
+                            />
+                          )}
                         </>
                       )}
                       {canWrite && tr.status === 'pendiente' && (
@@ -3515,7 +3965,7 @@ export function InventarioModule() {
                             className="h-7 text-xs rounded-lg bg-corporate"
                           >
                             <Send className="h-3.5 w-3.5 mr-1" />
-                            {t('inv.transfers.markInTransit')}
+                            {t('inv.transfers.dispatch')}
                           </Button>
                           <Button
                             variant="outline"
@@ -3552,7 +4002,7 @@ export function InventarioModule() {
                             </Button>
                           )}
                           {!canReceiveTransfer(tr) && currentUser?.id && tr.createdBy === currentUser.id && (
-                            <span className="text-[11px] text-[#86868B]">{t('inv.transfers.creatorCannotReceive')}</span>
+                            <span className="text-[11px] text-[#86868B]">{t('inv.transfers.creatorHint')}</span>
                           )}
                         </div>
                       )}
@@ -3576,7 +4026,7 @@ export function InventarioModule() {
               {canWrite && (
                 <Button
                   size="sm"
-                  onClick={() => { setCountForm(EMPTY_COUNT_FORM); setCountModalOpen(true); }}
+                  onClick={() => { setCountForm(EMPTY_COUNT_FORM); setInvView('count-new'); }}
                   className="h-8 text-xs rounded-xl bg-corporate gap-2 shrink-0"
                 >
                   <ClipboardList className="h-3.5 w-3.5" />
@@ -4442,12 +4892,25 @@ export function InventarioModule() {
         </div>
       )}
 
-      {/* ─── MODAL: REGISTRAR MOVIMIENTO (compartido) ─── */}
-      <Dialog open={movementModalOpen} onOpenChange={setMovementModalOpen}>
-        <DialogContent className="rounded-2xl max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F]">{t('inv.movementForm.title')}</DialogTitle>
-          </DialogHeader>
+      </>) : (
+      <>
+      {/* Botón Volver de las pantallas internas (punto 8) */}
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setInvView('main')}
+          className="gap-2 rounded-xl border-[#E5E5E7] text-xs"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('inv.view.back')}
+        </Button>
+      </div>
+
+      {/* ─── PANTALLA INTERNA: REGISTRAR MOVIMIENTO (punto 8) ─── */}
+      {invView === 'movement' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4">{t('inv.movementForm.title')}</h2>
           <div className="space-y-3">
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg px-3 py-2">
               {t('inv.movementForm.help')}
@@ -4534,16 +4997,35 @@ export function InventarioModule() {
                 <>
                   <div className="space-y-1">
                     <Label className="text-xs text-[#86868B]">{t('inv.movementForm.fromLocation')}</Label>
-                    <select
-                      value={movementForm.fromLocationId}
-                      onChange={e => setMovementForm(f => ({ ...f, fromLocationId: e.target.value }))}
-                      className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-                    >
-                      <option value="">{t('inv.movementForm.selectLocation')}</option>
-                      {activeLocations.map(l => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+                    {autoOriginLocation ? (
+                      <>
+                        <div className="h-9 flex items-center px-2 rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] text-sm text-[#1D1D1F]">
+                          {autoOriginLocation.name}
+                        </div>
+                        <p className="text-[11px] text-corporate">
+                          {t('inv.movementForm.originAutoHelp').replace('{location}', autoOriginLocation.name)}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <select
+                          value={movementForm.fromLocationId}
+                          onChange={e => setMovementForm(f => ({ ...f, fromLocationId: e.target.value }))}
+                          className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                        >
+                          <option value="">{t('inv.movementForm.selectLocation')}</option>
+                          {movementOriginLocations.map(l => (
+                            <option key={l.id} value={l.id}>{l.name}</option>
+                          ))}
+                        </select>
+                        {restrictOrigin && (
+                          <p className="text-[11px] text-[#86868B]">{t('inv.movementForm.originDeptRestricted')}</p>
+                        )}
+                        {isOutputNonTransfer && !restrictOrigin && (
+                          <p className="text-[11px] text-amber-700">{t('inv.movementForm.originNoDept')}</p>
+                        )}
+                      </>
+                    )}
                   </div>
                   {isTransferMt ? (
                     <div className="space-y-1">
@@ -4602,7 +5084,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setMovementModalOpen(false); setMovementForm(EMPTY_MOVEMENT_FORM); setMovementCategoryId(''); }}
+                onClick={() => { setInvView('main'); setMovementForm(EMPTY_MOVEMENT_FORM); setMovementCategoryId(''); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -4617,18 +5099,16 @@ export function InventarioModule() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── MODAL: NUEVA TRANSFERENCIA ─── */}
-      <Dialog open={transferModalOpen} onOpenChange={setTransferModalOpen}>
-        <DialogContent className="rounded-2xl max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
-              <Truck className="h-4 w-4 text-corporate" />
-              {t('inv.transfers.new')}
-            </DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: NUEVA TRANSFERENCIA (punto 8) ─── */}
+      {invView === 'transfer-new' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+            <Truck className="h-4 w-4 text-corporate" />
+            {t('inv.transfers.new')}
+          </h2>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
@@ -4720,7 +5200,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setTransferModalOpen(false); setTransferForm(EMPTY_TRANSFER_FORM); }}
+                onClick={() => { setInvView('main'); setTransferForm(EMPTY_TRANSFER_FORM); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -4735,20 +5215,17 @@ export function InventarioModule() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── MODAL: RECIBIR TRANSFERENCIA ─── */}
-      <Dialog open={receiveTransferId !== null} onOpenChange={open => { if (!open) { setReceiveTransferId(null); setReceiveSerialIds([]); } }}>
-        <DialogContent className="rounded-2xl max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
-              <Inbox className="h-4 w-4 text-corporate" />
-              {t('inv.transfers.receiveTitle')}
-            </DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: RECIBIR TRANSFERENCIA (punto 8) ─── */}
+      {invView === 'receive' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+            <Inbox className="h-4 w-4 text-corporate" />
+            {t('inv.transfers.receiveTitle')}
+          </h2>
           {(() => {
-            const receivingTransfer = transfers.find(x => x.id === receiveTransferId);
             const needsUnits = receivingTransfer ? transferNeedsUnits(receivingTransfer) : false;
             const unitOptions = needsUnits && receivingTransfer
               ? rentalUnits.filter(u => u.productId === receivingTransfer.productId)
@@ -4820,7 +5297,7 @@ export function InventarioModule() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => { setReceiveTransferId(null); setReceiveSerialIds([]); }}
+                    onClick={() => { setReceiveTransferId(null); setReceiveSerialIds([]); setInvView('main'); }}
                     className="text-xs text-[#86868B]"
                   >
                     {t('inv.common.cancel')}
@@ -4837,10 +5314,10 @@ export function InventarioModule() {
               </div>
             );
           })()}
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── MODAL: CANCELAR TRANSFERENCIA ─── */}
+      {/* ─── MODAL: CANCELAR TRANSFERENCIA (acción secundaria) ─── */}
       <Dialog open={cancelTransferId !== null} onOpenChange={open => { if (!open) setCancelTransferId(null); }}>
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
@@ -4876,15 +5353,13 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── MODAL: PROGRAMAR CONTEO ─── */}
-      <Dialog open={countModalOpen} onOpenChange={setCountModalOpen}>
-        <DialogContent className="rounded-2xl max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
-              <ClipboardList className="h-4 w-4 text-corporate" />
-              {t('inv.counts.schedule')}
-            </DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: PROGRAMAR CONTEO (punto 8) ─── */}
+      {invView === 'count-new' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+            <ClipboardList className="h-4 w-4 text-corporate" />
+            {t('inv.counts.schedule')}
+          </h2>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.counts.location')}</Label>
@@ -4924,7 +5399,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setCountModalOpen(false); setCountForm(EMPTY_COUNT_FORM); }}
+                onClick={() => { setInvView('main'); setCountForm(EMPTY_COUNT_FORM); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -4939,10 +5414,10 @@ export function InventarioModule() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── MODAL: APLICAR AJUSTE DE CONTEO ─── */}
+      {/* ─── MODAL: APLICAR AJUSTE DE CONTEO (acción secundaria) ─── */}
       <Dialog open={adjustmentSessionId !== null} onOpenChange={open => { if (!open) setAdjustmentSessionId(null); }}>
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
@@ -4975,15 +5450,13 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── MODAL: NUEVO SERIAL ─── */}
-      <Dialog open={serialModalOpen} onOpenChange={setSerialModalOpen}>
-        <DialogContent className="rounded-2xl max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
-              <Box className="h-4 w-4 text-corporate" />
-              {t('inv.serials.new')}
-            </DialogTitle>
-          </DialogHeader>
+      {/* ─── PANTALLA INTERNA: NUEVO SERIAL (punto 8) ─── */}
+      {invView === 'serial-new' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
+            <Box className="h-4 w-4 text-corporate" />
+            {t('inv.serials.new')}
+          </h2>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.serials.product')}</Label>
@@ -5064,7 +5537,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSerialModalOpen(false); setSerialForm(EMPTY_SERIAL_FORM); setSerialPhotoFile(null); }}
+                onClick={() => { setInvView('main'); setSerialForm(EMPTY_SERIAL_FORM); setSerialPhotoFile(null); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -5079,10 +5552,10 @@ export function InventarioModule() {
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
-      {/* ─── MODAL: BAJA PERMANENTE DE SERIAL ─── */}
+      {/* ─── MODAL: BAJA PERMANENTE DE SERIAL (acción secundaria) ─── */}
       <Dialog
         open={retiringUnit !== null}
         onOpenChange={open => { if (!open) { setRetiringUnit(null); setRetirePhotoFile(null); setRetireReason(''); } }}
@@ -5154,6 +5627,8 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
+      </>)}
+
       {/* ─── MODAL: QR (producto / ubicación / serial) ─── */}
       <QrDialog
         open={qrDialog !== null}
@@ -5169,6 +5644,7 @@ export function InventarioModule() {
         onOpenChange={setScannerOpen}
         onScan={handleScanResult}
         serialIds={rentalUnits.map(u => u.id || '')}
+        multiScan={scanContext !== 'navigate'}
       />
     </div>
   );
@@ -5276,6 +5752,12 @@ function QrDialog({ open, onOpenChange, title, subtitle, qrText }: QrDialogProps
 // MODAL ESCANER QR (html5-qrcode): parsea URLs de la app con
 // searchParams product / location / serial
 // ═══════════════════════════════════════════════════════════════════
+// CÁMARA DIRECTA (punto 2): se abre de inmediato con facingMode
+// 'environment' (trasera en móvil), SIN el selector de cámaras que muestra
+// Html5QrcodeScanner por defecto. Si la trasera falla (p. ej. desktop sin
+// cámara trasera), se reintenta automáticamente con la primera cámara
+// disponible y se ofrece un botón pequeño (icono de cámara) para alternar
+// entre las cámaras detectadas.
 // Bug "HTML Element with id=... not found": html5-qrcode LANZA en su
 // CONSTRUCTOR si el contenedor no está en el DOM todavía. Con el Dialog
 // de Radix el portal puede montarse después del efecto, así que la
@@ -5289,25 +5771,39 @@ interface ScannerModalProps {
   onScan: (kind: 'product' | 'location' | 'serial', id: string) => void;
   /** ids de seriales existentes: un texto plano que coincida se trata como serial */
   serialIds: string[];
+  /** true en conteos/recepción: la cámara se reactiva tras cada lectura
+   *  válida para poder escanear varias unidades sin cerrar el modal */
+  multiScan?: boolean;
 }
 
-function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalProps) {
+function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false }: ScannerModalProps) {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
+  // Cámaras detectadas (para el botón de respaldo) y cámara activa:
+  // -1 = facingMode 'environment' (trasera), >= 0 = índice en cameraList
+  const [cameraList, setCameraList] = useState<Array<{ id: string; label: string }>>([]);
+  const [cameraIndex, setCameraIndex] = useState(-1);
+  const [cameraFailed, setCameraFailed] = useState(false);
   // Id único por instancia: nunca colisiona entre dos ScannerModal montados
   const instanceId = `inv-qr-scanner-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   // Refs para que los callbacks siempre vean los valores actuales
   const onScanRef = useRef(onScan);
   const serialIdsRef = useRef(serialIds);
+  const multiScanRef = useRef(multiScan);
+  const cameraListRef = useRef(cameraList);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
   useEffect(() => { serialIdsRef.current = serialIds; }, [serialIds]);
+  useEffect(() => { multiScanRef.current = multiScan; }, [multiScan]);
+  useEffect(() => { cameraListRef.current = cameraList; }, [cameraList]);
 
-  // Reinicia la entrada manual cada vez que se abre el modal
+  // Reinicia la entrada manual y la cámara cada vez que se abre el modal
   useEffect(() => {
     if (open) {
       setManualOpen(false);
       setManualCode('');
+      setCameraIndex(-1);
+      setCameraFailed(false);
     }
   }, [open]);
 
@@ -5334,9 +5830,17 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalPro
   useEffect(() => {
     if (!open) return;
     let disposed = false;
-    let scanner: Html5QrcodeScanner | null = null;
+    let scanner: Html5Qrcode | null = null;
     let rafId = 0;
     let attempts = 0;
+
+    const stopScanner = () => {
+      const active = scanner;
+      scanner = null;
+      if (active) {
+        active.stop().then(() => active.clear()).catch(() => undefined);
+      }
+    };
 
     const start = () => {
       if (disposed) return;
@@ -5349,41 +5853,89 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalPro
         return;
       }
       try {
-        scanner = new Html5QrcodeScanner(
-          instanceId,
-          { fps: 10, qrbox: 250 },
-          /* verbose= */ false
-        );
-        scanner.render(
-          (decodedText) => {
-            const result = parseScan(decodedText);
-            if (!result) {
-              toast.error(t('inv.scanner.unrecognized'));
-              return;
-            }
-            // QR válido: detener la cámara y entregar el resultado
-            scanner?.clear().catch(() => undefined);
-            onScanRef.current(result.kind, result.id);
-          },
-          () => undefined // errores de lectura transitorios: se ignoran
-        );
+        scanner = new Html5Qrcode(instanceId, { verbose: false });
       } catch (err) {
         console.error('[ScannerModal]', err);
-        toast.error(t('inv.scanner.error'));
+        if (!disposed) setCameraFailed(true);
+        return;
       }
+      const onDecode = (decodedText: string) => {
+        const result = parseScan(decodedText);
+        if (!result) {
+          toast.error(t('inv.scanner.unrecognized'));
+          return;
+        }
+        if (multiScanRef.current) {
+          // Conteo/recepción: detener, entregar y reactivar la cámara para
+          // la siguiente unidad sin cerrar el modal
+          const active = scanner;
+          scanner = null;
+          if (active) {
+            active.stop().then(() => {
+              active.clear();
+              if (disposed) return;
+              onScanRef.current(result.kind, result.id);
+              rafId = requestAnimationFrame(start);
+            }).catch(() => undefined);
+          } else {
+            onScanRef.current(result.kind, result.id);
+          }
+        } else {
+          // QR válido: detener la cámara y entregar el resultado
+          stopScanner();
+          onScanRef.current(result.kind, result.id);
+        }
+      };
+      // Cámara directa: trasera (environment) salvo que el botón de respaldo
+      // haya elegido una cámara concreta
+      const cameraId = cameraIndex >= 0 ? cameraListRef.current[cameraIndex]?.id : undefined;
+      const cameraSel: string | MediaTrackConstraints = cameraId || { facingMode: 'environment' };
+      scanner.start(cameraSel, { fps: 10, qrbox: 250 }, onDecode, () => undefined)
+        .then(() => {
+          if (disposed) { stopScanner(); return; }
+          setCameraFailed(false);
+          // Lista de cámaras para el botón de respaldo (una sola vez)
+          if (cameraListRef.current.length === 0) {
+            Html5Qrcode.getCameras()
+              .then(cams => {
+                if (disposed) return;
+                setCameraList(cams.map(c => ({ id: c.id, label: c.label || c.id })));
+              })
+              .catch(() => undefined);
+          }
+        })
+        .catch((err) => {
+          console.error('[ScannerModal]', err);
+          if (disposed) return;
+          setCameraFailed(true);
+          toast.error(t('inv.scanner.error'));
+          // Respaldo: si la trasera falla (p. ej. desktop), se reintenta
+          // automáticamente con la primera cámara disponible
+          Html5Qrcode.getCameras()
+            .then(cams => {
+              if (disposed || cams.length === 0) return;
+              setCameraList(cams.map(c => ({ id: c.id, label: c.label || c.id })));
+              if (cameraIndex < 0) setCameraIndex(0);
+            })
+            .catch(() => undefined);
+        });
     };
 
     rafId = requestAnimationFrame(start);
 
-    // Apaga la cámara al desmontar / cerrar el modal
+    // Apaga la cámara al desmontar / cerrar el modal o cambiar de cámara
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
-      const active = scanner;
-      scanner = null;
-      if (active) active.clear().catch(() => undefined);
+      stopScanner();
     };
-  }, [open, instanceId]);
+  }, [open, instanceId, cameraIndex]);
+
+  // Botón de respaldo: alterna entre las cámaras disponibles
+  const switchCamera = () => {
+    if (cameraList.length === 0) return;
+    setCameraIndex(prev => (prev + 1 >= cameraList.length ? 0 : prev + 1));
+  };
 
   const handleManualSubmit = () => {
     const result = parseScan(manualCode);
@@ -5406,6 +5958,21 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds }: ScannerModalPro
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('inv.scanner.hint')}</p>
           <div id={instanceId} className="rounded-xl overflow-hidden" />
+          {(cameraFailed || cameraList.length > 1) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={switchCamera}
+              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-2"
+            >
+              <Camera className="h-3.5 w-3.5" />
+              {t('inv.scanner.switchCamera')}
+              {cameraIndex >= 0 && cameraList[cameraIndex] && (
+                <span className="text-[#86868B] truncate max-w-40">({cameraList[cameraIndex].label})</span>
+              )}
+            </Button>
+          )}
           {manualOpen ? (
             <div className="flex items-center gap-2">
               <Input

@@ -54,6 +54,7 @@ export interface FirestoreUser {
   invitationPending?: boolean;
   invitedAt?: string;
   visibleDepartments?: string[];
+  maxDiscountPercent?: number | null;
   updatedAt?: string;
   joinDate?: string;
   displayName?: string;

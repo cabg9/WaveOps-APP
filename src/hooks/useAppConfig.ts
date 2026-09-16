@@ -16,6 +16,13 @@ import type { AppModule, AppSettings, RoleTemplate } from '@/types/develops';
 import { hasPermission as hasStaticPermission } from '@/lib/permissions-config';
 import { normalizeDeptCode } from './firestore/useDynamicDepartments';
 
+// Clave de feature flag de un módulo: "inventario" -> "enableInventario"
+function moduleFlagKey(moduleId: string): string {
+  return `enable${moduleId.charAt(0).toUpperCase()}${moduleId
+    .slice(1)
+    .replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`;
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // ESTADO INICIAL
 // ═══════════════════════════════════════════════════════════════════
@@ -132,7 +139,7 @@ export function useAppConfig() {
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════
-  // ESCUCHAR DEPARTAMENTOS (filtro de módulos visibles por departamento)
+  // ESCUCHAR DEPARTAMENTOS (módulos adicionales por departamento)
   // ═══════════════════════════════════════════════════════════════════
 
   useEffect(() => {
@@ -234,7 +241,8 @@ export function useAppConfig() {
   /**
    * Departamento del usuario actual (match por código o por nombre, igual que
    * el resto de la app). undefined mientras no cargan los departamentos o si
-   * no hay match: en ambos casos NO se aplica restricción alguna.
+   * no hay match: en ambos casos NO se agregan módulos extra (anti-parpadeo,
+   * el menú queda definido solo por el rol).
    */
   const userDepartment = useMemo(() => {
     if (!user?.department || !departmentsLoaded) return undefined;
@@ -247,8 +255,9 @@ export function useAppConfig() {
   }, [departments, departmentsLoaded, user]);
 
   /**
-   * Selección concreta de módulos visibles del departamento. null = sin
-   * restricción (campo ausente/vacío, comportamiento actual de la app).
+   * Selección concreta de módulos adicionales del departamento. null = sin
+   * módulos extra (campo ausente/vacío; el menú queda definido solo por el
+   * rol, comportamiento actual de la app).
    */
   const departmentVisibleModuleIds = useMemo(() => {
     const ids = userDepartment?.visibleModuleIds;
@@ -261,34 +270,41 @@ export function useAppConfig() {
 
   const visibleModules = useMemo(() => {
     if (!user) return [];
-    return modules.filter((m) => {
+    // Base: lo que el rol/flags ya permite (sin intervención de departamento).
+    const base = modules.filter((m) => {
       // Debe ser visible
       if (!m.isVisible) return false;
       // Debe estar habilitado por feature flag
-      const flagKey = `enable${m.id.charAt(0).toUpperCase()}${m.id
-        .slice(1)
-        .replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`;
-      if (settings.featureFlags[flagKey] === false) return false;
+      if (settings.featureFlags[moduleFlagKey(m.id)] === false) return false;
       // Estado del modulo: development solo para quienes tienen acceso a Develops
       const moduleStatus = m.status || 'live';
       if (moduleStatus === 'development' && !hasDevelopAccess) return false;
       // Usuario debe tener el permiso requerido
       if (m.requiredPermission && !hasPermission(m.requiredPermission)) return false;
-      // Filtro por departamento (SE APLICA AL FINAL): si el departamento del
-      // usuario tiene una selección concreta de módulos visibles, el menú se
-      // limita a esos ids. Es solo visual (qué APARECE); los permisos del rol
-      // siguen definiendo qué puede HACER dentro de cada módulo. Ausente/vacío
-      // = sin restricción. El Director General nunca se filtra (es quien
-      // administra la configuración y no debe perder acceso por un mal ajuste).
-      if (
-        departmentVisibleModuleIds &&
-        user.role !== Role.DIRECTOR_GENERAL &&
-        !departmentVisibleModuleIds.includes(m.id)
-      ) {
-        return false;
-      }
       return true;
     });
+    // ADITIVO: los módulos seleccionados para el departamento se SUMAN a la
+    // base (visibilidad extra), NUNCA la reducen. Solo se respeta la
+    // visibilidad global del módulo (isVisible/feature flag/estado); el
+    // permiso del rol NO se exige aquí, porque precisamente la selección
+    // existe para mostrar módulos que el rol no concede por sí solo.
+    // Anti-parpadeo: mientras no cargan los departamentos o no hay match,
+    // departmentVisibleModuleIds es null y no se altera nada. El Director
+    // General ya ve todo (base sin permisos), así que la unión no le afecta.
+    if (!departmentVisibleModuleIds || user.role === Role.DIRECTOR_GENERAL) {
+      return base;
+    }
+    const baseIds = new Set(base.map((m) => m.id));
+    const extras = modules.filter((m) => {
+      if (!departmentVisibleModuleIds.includes(m.id)) return false;
+      if (baseIds.has(m.id)) return false; // unión sin duplicados
+      if (!m.isVisible) return false;
+      if (settings.featureFlags[moduleFlagKey(m.id)] === false) return false;
+      const moduleStatus = m.status || 'live';
+      if (moduleStatus === 'development' && !hasDevelopAccess) return false;
+      return true;
+    });
+    return [...base, ...extras];
   }, [modules, settings, user, hasPermission, hasDevelopAccess, departmentVisibleModuleIds]);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -297,10 +313,7 @@ export function useAppConfig() {
 
   const isModuleEnabled = useCallback(
     (moduleId: string): boolean => {
-      const flagKey = `enable${moduleId.charAt(0).toUpperCase()}${moduleId
-        .slice(1)
-        .replace(/-([a-z])/g, (_, c) => c.toUpperCase())}`;
-      return settings.featureFlags[flagKey] !== false;
+      return settings.featureFlags[moduleFlagKey(moduleId)] !== false;
     },
     [settings]
   );
@@ -327,7 +340,7 @@ export function useAppConfig() {
     // Módulos
     modules,
     visibleModules,
-    // Departamento del usuario (filtro de módulos visibles)
+    // Departamento del usuario (módulos adicionales)
     userDepartment,
     departmentVisibleModuleIds,
     // Settings

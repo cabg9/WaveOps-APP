@@ -13,7 +13,7 @@ import {
   Plus, Pencil, Package, Truck, Layers, Calculator, Megaphone, Users,
   Eye, EyeOff, Upload, Sparkles, Building2, Info, Lock, Tags, Scale,
   Search, Trash2, ArrowUpDown, Star, ChevronDown, ChevronUp, Percent,
-  ClipboardList,
+  ClipboardList, Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -28,6 +28,7 @@ import type { AuditAction } from '@/types/develops';
 import type {
   CatalogBase, Supplier, SupplierBankAccount, Product, ProductCategory, UnitOfMeasure,
   CostCenter, SalesChannel, Client, ClientType, PriceTier, RentalDiscount, RentalOrderStatus,
+  RentalFee,
 } from '@/types/catalogs';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -213,6 +214,26 @@ registerI18nKeys({
     'catalogs.orderStatuses.seedsConfirmTitle': 'Cargar estados iniciales',
     'catalogs.orderStatuses.seedsConfirmDesc': 'Se crearán los estados iniciales que falten. Los existentes no se modifican.',
     'catalogs.orderStatuses.seedsAlreadyLoaded': 'Ya están cargadas',
+    'catalogs.tabs.fees': 'Impuestos y cargos',
+    'catalogs.fees.title': 'Impuestos y cargos',
+    'catalogs.fees.count': '{count} impuesto(s)/cargo(s)',
+    'catalogs.fees.new': 'Nuevo impuesto o cargo',
+    'catalogs.fees.edit': 'Editar impuesto o cargo',
+    'catalogs.fees.name': 'Nombre',
+    'catalogs.fees.mode': 'Tipo de cálculo',
+    'catalogs.fees.modePercent': 'Porcentaje (%)',
+    'catalogs.fees.modeFixed': 'Monto fijo ($)',
+    'catalogs.fees.value': 'Valor',
+    'catalogs.fees.valueHelp': 'Con porcentaje, 15 significa 15 % sobre (subtotal − descuento). Con monto fijo, el valor se suma tal cual al total.',
+    'catalogs.fees.valueInvalid': 'El valor debe ser un número mayor que 0',
+    'catalogs.fees.linePercent': '{value}%',
+    'catalogs.fees.lineFixed': '${value}',
+    'catalogs.fees.help': 'Se suman al total de la orden de renta calculados sobre (subtotal − descuento). Los activos se pueden seleccionar al crear la orden. Semillas sugeridas: IVA 15 %, Servicio 5 %.',
+    'catalogs.fees.seedsConfirmTitle': 'Cargar impuestos iniciales',
+    'catalogs.fees.seedsConfirmDesc': 'Se crearán los impuestos/cargos iniciales que falten (IVA 15 % y Servicio 5 %). Los existentes no se modifican.',
+    'catalogs.fees.seedsAlreadyLoaded': 'Ya están cargadas',
+    'catalogs.products.admitsDiscount': 'Admite descuento',
+    'catalogs.products.admitsDiscountHelp': 'Si es "No", el descuento en esta línea solo aplica cuando un supervisor aprueba la orden (sin importar el %).',
   },
   en: {
     'catalogs.tabs.suppliers': 'Suppliers',
@@ -344,6 +365,26 @@ registerI18nKeys({
     'catalogs.orderStatuses.seedsConfirmTitle': 'Load initial statuses',
     'catalogs.orderStatuses.seedsConfirmDesc': 'Missing initial statuses will be created. Existing ones are not modified.',
     'catalogs.orderStatuses.seedsAlreadyLoaded': 'Already loaded',
+    'catalogs.tabs.fees': 'Taxes & fees',
+    'catalogs.fees.title': 'Taxes & fees',
+    'catalogs.fees.count': '{count} tax(es)/fee(s)',
+    'catalogs.fees.new': 'New tax or fee',
+    'catalogs.fees.edit': 'Edit tax or fee',
+    'catalogs.fees.name': 'Name',
+    'catalogs.fees.mode': 'Calculation type',
+    'catalogs.fees.modePercent': 'Percentage (%)',
+    'catalogs.fees.modeFixed': 'Fixed amount ($)',
+    'catalogs.fees.value': 'Value',
+    'catalogs.fees.valueHelp': 'With percentage, 15 means 15 % on (subtotal − discount). With fixed amount, the value is added as-is to the total.',
+    'catalogs.fees.valueInvalid': 'The value must be a number greater than 0',
+    'catalogs.fees.linePercent': '{value}%',
+    'catalogs.fees.lineFixed': '${value}',
+    'catalogs.fees.help': 'They are added to the rental order total calculated on (subtotal − discount). Active ones can be selected when creating an order. Suggested seeds: VAT 15 %, Service 5 %.',
+    'catalogs.fees.seedsConfirmTitle': 'Load initial taxes',
+    'catalogs.fees.seedsConfirmDesc': 'Missing initial taxes/fees will be created (VAT 15 % and Service 5 %). Existing ones are not modified.',
+    'catalogs.fees.seedsAlreadyLoaded': 'Already loaded',
+    'catalogs.products.admitsDiscount': 'Allows discount',
+    'catalogs.products.admitsDiscountHelp': 'If "No", the discount on this line only applies when a supervisor approves the order (regardless of the %).',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -623,7 +664,7 @@ function EmptyState({ icon, onCreate, canWrite }: { icon: React.ReactNode; onCre
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════
 
-type SubTab = 'suppliers' | 'products' | 'categories' | 'costCenters' | 'salesChannels' | 'clients' | 'discounts' | 'orderStatuses';
+type SubTab = 'suppliers' | 'products' | 'categories' | 'costCenters' | 'salesChannels' | 'clients' | 'discounts' | 'orderStatuses' | 'fees';
 
 const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ReactNode }[] = [
   { key: 'suppliers', labelKey: 'catalogs.tabs.suppliers', icon: <Truck className="w-4 h-4" /> },
@@ -634,6 +675,7 @@ const SUB_TABS: { key: SubTab; labelKey: string; icon: React.ReactNode }[] = [
   { key: 'clients', labelKey: 'catalogs.tabs.clients', icon: <Users className="w-4 h-4" /> },
   { key: 'discounts', labelKey: 'catalogs.tabs.discounts', icon: <Percent className="w-4 h-4" /> },
   { key: 'orderStatuses', labelKey: 'catalogs.tabs.orderStatuses', icon: <ClipboardList className="w-4 h-4" /> },
+  { key: 'fees', labelKey: 'catalogs.tabs.fees', icon: <Receipt className="w-4 h-4" /> },
 ];
 
 export function CatalogosTab() {
@@ -682,6 +724,7 @@ export function CatalogosTab() {
       {subTab === 'clients' && <ClientsSection canWrite={canWrite} />}
       {subTab === 'discounts' && <RentalDiscountsSection canWrite={canWrite} />}
       {subTab === 'orderStatuses' && <RentalOrderStatusesSection canWrite={canWrite} />}
+      {subTab === 'fees' && <RentalFeesSection canWrite={canWrite} />}
     </div>
   );
 }
@@ -1194,11 +1237,13 @@ interface ProductFormState {
   rentalPrice: string;
   depositPercent: string;
   priceTiers: PriceTierDraft[];
+  admitsDiscount: boolean;
 }
 
 const EMPTY_PRODUCT_FORM: ProductFormState = {
   name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false,
   isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '', priceTiers: [],
+  admitsDiscount: true,
 };
 
 function tiersToDrafts(tiers: PriceTier[] | null | undefined): PriceTierDraft[] {
@@ -1303,6 +1348,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       rentalPrice: p.rentalPricePerDay != null ? String(p.rentalPricePerDay) : '',
       depositPercent: p.depositPercent != null ? String(p.depositPercent) : '',
       priceTiers: tiersToDrafts(p.priceTiers),
+      admitsDiscount: p.admitsDiscount !== false,
     });
     setPhotoUrl(p.photoUrl || '');
     setPhotoFile(null);
@@ -1346,6 +1392,8 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
         rentalPricePerDay: form.rentalPrice.trim() === '' ? null : Number(form.rentalPrice),
         depositPercent: form.depositPercent.trim() === '' ? null : Number(form.depositPercent),
         priceTiers: form.isRentable && tiers && tiers.length > 0 ? tiers : null,
+        // Solo aplica a rentables; los demás siempre admiten descuento
+        admitsDiscount: form.isRentable ? form.admitsDiscount : true,
         photoUrl: finalPhotoUrl || null,
       };
       if (editing) {
@@ -1499,6 +1547,11 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             )}
             {p.isRentable && p.depositPercent != null && (
               <DetailItem label={t('catalogs.products.depositPercent')}>{p.depositPercent}%</DetailItem>
+            )}
+            {p.isRentable && (
+              <DetailItem label={t('catalogs.products.admitsDiscount')}>
+                {p.admitsDiscount !== false ? t('catalogs.common.yes') : t('catalogs.common.no')}
+              </DetailItem>
             )}
             {p.isRentable && (p.priceTiers ?? []).length > 0 && (
               <DetailItem label={t('catalogs.products.priceTiers')}>
@@ -1714,6 +1767,18 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                         onChange={(e) => setForm({ ...form, depositPercent: e.target.value })}
                       />
                       <p className="text-[11px] text-[#86868B]">{t('catalogs.products.depositPercentHelp')}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('catalogs.products.admitsDiscount')}</Label>
+                      <select
+                        value={form.admitsDiscount ? 'yes' : 'no'}
+                        onChange={(e) => setForm({ ...form, admitsDiscount: e.target.value === 'yes' })}
+                        className={SELECT_CLASS}
+                      >
+                        <option value="yes">{t('catalogs.products.yes')}</option>
+                        <option value="no">{t('catalogs.products.no')}</option>
+                      </select>
+                      <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.admitsDiscountHelp')}</p>
                     </div>
                   </>
                 )}
@@ -2620,6 +2685,252 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 bg-corporate hover:bg-corporate/90">
+                {editing ? t('catalogs.common.update') : t('catalogs.common.create')}
+              </Button>
+              <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">
+                {t('catalogs.common.cancel')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SECCIÓN: IMPUESTOS Y CARGOS DE RENTA (rentalFees)
+// Configurables: percent (sobre subtotal − descuento) o fixed (monto fijo).
+// Se suman al total de la orden; Warehouse los consume desde Firestore.
+// ═══════════════════════════════════════════════════════════════════
+
+// Semillas idempotentes (ids deterministas, nunca pisan renombres).
+// Valores alineados al impuesto local real: IVA Ecuador 15 %.
+const SEED_FEES: Array<{ id: string; name: string; mode: 'percent' | 'fixed'; value: number }> = [
+  { id: 'iva', name: 'IVA', mode: 'percent', value: 15 },
+  { id: 'servicio', name: 'Servicio', mode: 'percent', value: 5 },
+];
+
+function RentalFeesSection({ canWrite }: { canWrite: boolean }) {
+  const { user } = useAuth();
+  const { logAction } = useAudit();
+  const { items: fees } = useCatalog<RentalFee>('rentalFees');
+
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState<RentalFee | null>(null);
+  const [form, setForm] = useState({ name: '', mode: 'percent' as 'percent' | 'fixed', value: '' });
+  const [saving, setSaving] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const openCreate = () => { setEditing(null); setForm({ name: '', mode: 'percent', value: '' }); setShowModal(true); };
+  const openEdit = (f: RentalFee) => {
+    setEditing(f);
+    setForm({ name: f.name || '', mode: f.mode === 'fixed' ? 'fixed' : 'percent', value: f.value != null ? String(f.value) : '' });
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!user?.id) return;
+    if (!form.name.trim()) { toast.error(t('catalogs.common.required')); return; }
+    const value = Number(form.value);
+    if (!Number.isFinite(value) || value <= 0) {
+      toast.error(t('catalogs.fees.valueInvalid'));
+      return;
+    }
+    const payload = { name: form.name.trim(), mode: form.mode, value };
+    setSaving(true);
+    try {
+      if (editing) {
+        await updateDoc(doc(db, 'rentalFees', editing.id), { ...payload, ...touchPayload(user.id) });
+        await logAction({
+          action: 'RENTAL_FEE_UPDATED' as AuditAction,
+          targetType: 'rental_fee',
+          targetId: editing.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Impuesto/cargo de renta actualizado: ${payload.name} (${payload.mode === 'percent' ? payload.value + '%' : '$' + payload.value})`,
+        });
+        toast.success(t('catalogs.common.update'));
+      } else {
+        const ref = await addDoc(collection(db, 'rentalFees'), { ...payload, ...basePayload(user.id) });
+        await logAction({
+          action: 'RENTAL_FEE_CREATED' as AuditAction,
+          targetType: 'rental_fee',
+          targetId: ref.id,
+          targetName: payload.name,
+          impactLevel: 'major',
+          description: `Impuesto/cargo de renta creado: ${payload.name} (${payload.mode === 'percent' ? payload.value + '%' : '$' + payload.value})`,
+        });
+        toast.success(t('catalogs.common.create'));
+      }
+      setShowModal(false);
+    } catch (err: any) { toast.error(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async (f: RentalFee) => {
+    if (!user?.id) return;
+    const next = !f.isActive;
+    const done = await executeWithConfirm({
+      level: 'major',
+      title: next ? t('catalogs.common.confirmActivateTitle') : t('catalogs.common.confirmDeactivateTitle'),
+      message: fmt(next ? 'catalogs.common.confirmActivate' : 'catalogs.common.confirmDeactivate', { name: f.name }),
+      action: async () => {
+        await updateDoc(doc(db, 'rentalFees', f.id), { isActive: next, ...touchPayload(user.id) });
+      },
+    });
+    if (done !== null) {
+      await logAction({
+        action: (next ? 'RENTAL_FEE_ACTIVATED' : 'RENTAL_FEE_DEACTIVATED') as AuditAction,
+        targetType: 'rental_fee',
+        targetId: f.id,
+        targetName: f.name,
+        impactLevel: 'major',
+        description: `Impuesto/cargo de renta ${next ? 'activado' : 'desactivado'}: ${f.name}`,
+      });
+      toast.success(next ? t('catalogs.common.activate') : t('catalogs.common.deactivate'));
+    }
+  };
+
+  // Seeds idempotentes: crea solo los que falten, con ids deterministas
+  const loadSeeds = async () => {
+    if (!user?.id) return;
+    await executeWithConfirm(
+      {
+        level: 'important',
+        title: t('catalogs.fees.seedsConfirmTitle'),
+        message: t('catalogs.fees.seedsConfirmDesc'),
+      },
+      async () => {
+        setSaving(true);
+        try {
+          let created = 0;
+          let existing = 0;
+          for (const seed of SEED_FEES) {
+            const ref = doc(db, 'rentalFees', seed.id);
+            const snap = await getDoc(ref);
+            if (snap.exists()) { existing += 1; continue; }
+            const now = new Date().toISOString();
+            await setDoc(ref, {
+              tenantId: getCurrentTenantId(),
+              name: seed.name,
+              mode: seed.mode,
+              value: seed.value,
+              isActive: true,
+              createdAt: now,
+              createdBy: user.id,
+            });
+            created += 1;
+          }
+          if (created === 0) {
+            toast.info(t('catalogs.fees.seedsAlreadyLoaded'));
+          } else {
+            toast.success(fmt('catalogs.common.loadInitialDone', { created, existing }));
+            await logAction({
+              action: 'RENTAL_FEE_SEEDED' as AuditAction,
+              targetType: 'rental_fee',
+              targetId: 'seeds',
+              targetName: t('catalogs.fees.title'),
+              impactLevel: 'major',
+              description: `Impuestos/cargos iniciales de renta cargados: ${created} nuevos, ${existing} ya existían`,
+            });
+          }
+        } catch (err: any) { toast.error(err.message); }
+        finally { setSaving(false); }
+      }
+    );
+  };
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        title={t('catalogs.fees.title')}
+        subtitle={fmt('catalogs.fees.count', { count: fees.length })}
+        canWrite={canWrite}
+        onNew={openCreate}
+        newLabel={t('catalogs.fees.new')}
+        extra={
+          canWrite ? (
+            <Button variant="outline" onClick={loadSeeds} disabled={saving} className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> {t('catalogs.common.loadInitial')}
+            </Button>
+          ) : undefined
+        }
+      />
+      <div className="flex items-start gap-3 bg-[#F5F5F7] rounded-2xl p-4">
+        <Info className="w-4 h-4 text-corporate shrink-0 mt-0.5" />
+        <p className="text-xs text-[#86868B]">{t('catalogs.fees.help')}</p>
+      </div>
+      {fees.length === 0 ? (
+        <EmptyState icon={<Receipt className="w-12 h-12" />} onCreate={openCreate} canWrite={canWrite} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 items-start gap-3">
+          {fees.map((f) => (
+            <EntityCard
+              key={f.id}
+              name={f.name}
+              lines={[f.mode === 'percent' ? fmt('catalogs.fees.linePercent', { value: f.value }) : fmt('catalogs.fees.lineFixed', { value: f.value })]}
+              icon={<Receipt className="w-5 h-5" />}
+              isActive={f.isActive}
+              canWrite={canWrite}
+              onEdit={() => openEdit(f)}
+              onToggle={() => handleToggle(f)}
+              expanded={expandedIds.has(f.id)}
+              onToggleExpand={() => setExpandedIds((prev) => toggleId(prev, f.id))}
+              details={
+                <DetailsGrid>
+                  <DetailItem label={t('catalogs.fees.mode')}>
+                    {f.mode === 'percent' ? t('catalogs.fees.modePercent') : t('catalogs.fees.modeFixed')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.fees.value')}>
+                    {f.mode === 'percent' ? fmt('catalogs.fees.linePercent', { value: f.value }) : fmt('catalogs.fees.lineFixed', { value: f.value })}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.status')}>
+                    {f.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(f.createdAt)}</DetailItem>
+                  <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(f.updatedAt)}</DetailItem>
+                </DetailsGrid>
+              }
+            />
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showModal} onOpenChange={setShowModal}>
+        <DialogContent className="max-w-[95vw] sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editing ? t('catalogs.fees.edit') : t('catalogs.fees.new')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{t('catalogs.fees.name')} *</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.fees.mode')} *</Label>
+              <select
+                value={form.mode}
+                onChange={(e) => setForm({ ...form, mode: e.target.value === 'fixed' ? 'fixed' : 'percent' })}
+                className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+              >
+                <option value="percent">{t('catalogs.fees.modePercent')}</option>
+                <option value="fixed">{t('catalogs.fees.modeFixed')}</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.fees.value')} *</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.value}
+                onChange={(e) => setForm({ ...form, value: e.target.value })}
+              />
+              <p className="text-[11px] text-[#86868B]">{t('catalogs.fees.valueHelp')}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <Button onClick={handleSave} disabled={saving} className="flex-1 bg-corporate hover:bg-corporate/90">
                 {editing ? t('catalogs.common.update') : t('catalogs.common.create')}
               </Button>
               <Button variant="outline" onClick={() => setShowModal(false)} className="w-full sm:w-auto">
