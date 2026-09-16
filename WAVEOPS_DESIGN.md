@@ -5,7 +5,7 @@
 > este documento se convertirá en el **prompt estricto de ejecución para Kimi Code**.
 > Usuario sin conocimientos de código: todas las decisiones deben priorizar simplicidad, cero código o low-code.
 
-- Última actualización: 2026-09-16 v32 (validación post-ronda 3: 4 bugs + rediseño módulos-como-tarjetas en Warehouse e Inventario + escáner-centro-de-operaciones → RONDA 4 en 4.23) (validación ronda 2: 6 bugs/ajustes de transferencias y estados de orden detectados → 4.22 ronda 3 · correcciones 1-2 de UX de tarjetas) (RONDA 2 DESPLEGADA en gemela commit 091d1996: 16 correcciones aplicadas — despacho/retorno con QR obligatorio, separación envía/recibe, staff sin montos, precios por rol + escalones + descuentos, módulos por departamento (manual, desde Develops), escáner en conteos arreglado, botones rápidos, formulario adaptado por tipo · pendiente re-prueba del usuario)
+- Última actualización: 2026-09-16 v35 (ETAPA 1 validada con detalles · RONDA 6: estructura de módulos Inventario/Warehouse, proveedores mejorado (prefijo, crédito estructurado, cuentas intl.), tarjetas de productos) (DECISIÓN: reset ordenado de validación con guion de proceso real · RONDA 5: 8 correcciones en 4.24 — cámara inteligente con conteo, escáner por tipo, toggle vendedor, motivo en descuentos, pizarra fija, tarjetas angostas, volver arriba) (validación post-ronda 3: 4 bugs + rediseño módulos-como-tarjetas en Warehouse e Inventario + escáner-centro-de-operaciones → RONDA 4 en 4.23) (validación ronda 2: 6 bugs/ajustes de transferencias y estados de orden detectados → 4.22 ronda 3 · correcciones 1-2 de UX de tarjetas) (RONDA 2 DESPLEGADA en gemela commit 091d1996: 16 correcciones aplicadas — despacho/retorno con QR obligatorio, separación envía/recibe, staff sin montos, precios por rol + escalones + descuentos, módulos por departamento (manual, desde Develops), escáner en conteos arreglado, botones rápidos, formulario adaptado por tipo · pendiente re-prueba del usuario)
 - NOTA para Fase 2: la orden de renta cobra por 1 día porque aún no tiene fecha de devolución; al agregarla se multiplica por días (respuestas Guías/Movilidad/Cocina/Activity Ops/Dive Shop, propuesta completa FINANZAS 4.12, Vessels 4.15, Warehouse/Renta 4.16) (causales de cancelación dinámicas, Ventas/CRM ampliado con ventas fuera de Bokun, Mantenimiento = módulo transversal propio, Inventario & Compras confirmados dinámicos) (renombres de módulos + infraestructura de Ubicaciones + QR + conexión RRHH↔Compras & Pagos)
 - Estado: RRHH CERRADO ✅ · Ubicaciones (infra transversal) DEFINIDA ✅
 - Módulos definidos: RRHH ✅ · Ubicaciones ✅ · 2.6 ✅ · cero-hardcode ✅ · Activity Ops ✅ · Guías 🔄 · Movilidad 🔄 · Cocina 🔄 · Finanzas ✅ · Dive Shop 🔄 · Vessels 🔄 · Warehouse ✅ (cara operativa de Inventario) · Mantenimiento ✅ · Inventario y Compras & Pagos ✅ · Ventas/CRM ✅ concepto (detalle pendiente) · Reportes (detalle pendiente). Renombres aprobados: Requisiciones→Inventario/Requisiciones, Órdenes de Pago→Compras & Pagos
@@ -701,6 +701,47 @@ Pendientes (rondas anteriores, ya corregidos salvo indicación):
 - Módulos por departamento aditivos (punto 1 ronda 3)
 - Staff ve Warehouse sin montos (punto 2)
 - Consumo: DG ve todas las ubicaciones (correcto por jerarquía)
+
+---
+
+## 4.24 CORRECCIONES FASE 1 — RONDA 5 + DECISIÓN DE PROCESO (2026-09-16)
+
+### DECISIÓN IMPORTANTE DEL USUARIO: REINICIO ORDENADO DE VALIDACIÓN
+Las pruebas se hicieron en desorden y eso generó confusión. Nuevo método:
+1. **Reset de datos de prueba** (script): borrar SOLO datos de negocio creados en pruebas (productos, proveedores, clientes, stock, movimientos, órdenes, transferencias, conteos, seriales, asignaciones de controles). El código, flags y estructura quedan intactos.
+2. **Guion de pruebas EN ORDEN, siguiendo el proceso real de la empresa**: catálogos (tipos/unidades/categorías) → proveedores → productos (bien creados: serial/QR según corresponda) → compra/entrada → transferencias internas → consumo → renta externa → renta interna → alertas/descuentos/pedidos automáticos → reportes. Cada paso valida antes de seguir. Este guion además será la base del manual de capacitación.
+
+### Correcciones de la ronda (8)
+1. **Recepción: nombre de quien recibe NO editable** (es el usuario logueado, automático). **CÁMARA INTELIGENTE:** permanece abierta contando "escaneados 2/3" hasta completar la cantidad de la orden/recepción; botón "Detener" como respaldo; se cierra sola al completar.
+2. **Escáner por tipo:** escanear PRODUCTO → ficha del producto con todas sus acciones (Comprar/Transferir/Consumir/Ajuste/Rentar/Reparación/Historial — solo las que apliquen según el tipo de producto). Escanear UBICACIÓN → abre el inventario de esa ubicación.
+3. ✅
+4. **Órdenes: ítems agregados DEBAJO del buscador** (no arriba). **TOGGLE "es vendedor" en Develops → Usuarios:** los vendedores ven precios y cobran (según departamento). Re-verificar flujo de despacho con contador "faltan N" (no se observó en prueba).
+5. **Flujo de escaneo inteligente también en RETORNOS y VERIFICACIONES** (no solo transferencias): escanear un artículo en devolución/recepción abre el proceso de esa orden y permite seguir escaneando más artículos. (No se observó funcionando aún.)
+6. **DESCUENTO: falta la UI para seleccionar/solicitar descuento** en la orden. Al dar descuento: MOTIVO OBLIGATORIO (quien lo pide) y NOTA de aprobación (quien aprueba).
+7. **Las acciones del escáner no aparecen** (la ficha con Comprar/Transferir/etc. no se mostró).
+8. **PIZARRA NO es un módulo:** es una vista fija que siempre se ve (resumen arriba). Botón "Volver" ARRIBA en todas las pantallas (no abajo). **Tarjetas más angostas** para que quepan más por fila (especialmente en pantallas pequeñas), en tarjetas de datos y en módulos-dentro-de-módulos.
+
+---
+
+## 4.25 CORRECCIÓNES FASE 1 — RONDA 6 (feedback estructural + Etapa 1, 2026-09-16)
+
+### Estructura del módulo Inventario/Requisiciones
+1. El título del módulo no muestra el nombre correcto ("Inventario / Requisiciones").
+2. Tarjetas-módulo definitivas: **Stock · Escanear QR · Renta · Transferencias · Devolución · Consumo · Compra · Daño · Ajuste · Conteo · Seriales** (11). "Daño" = movimiento/salida por daño (nuevo). Catálogos SALE del módulo (se configura desde Develops).
+3. **Stock — rediseño:** sin botones de acción globales; las acciones (Compra/Transferencia/Consumo/Ajuste/Daño) aparecen AL PRESIONAR una categoría o un producto (quedan pre-rellenas según lo seleccionado). El escáner queda: al escanear, muestra DÓNDE está el producto en todo el stock (ubicaciones + cantidades). Filtro por defecto = POR UBICACIÓN (mantener por producto como opción).
+4. TODAS las pantallas: botón "Volver" ARRIBA (no abajo) + título/breadcrumb que indique en qué sub-módulo estás.
+
+### Warehouse
+5. Ordenar las tarjetas-módulo (orden lógico a definir visualmente: acciones primero).
+
+### Proveedores (detalles Etapa 1)
+6. Teléfono con selector de PREFIJO internacional (+593, +1, +39…).
+7. "Otro" en condiciones de pago: NO texto libre suelto — estructurado: tipo (crédito a X días / anticipo %) + valor (número) + frecuencia opcional → queda como dato uniforme.
+8. Tipos de cuenta: Personal Ahorros/Savings, Personal Corriente/Checkings, Empresarial Ahorros, Empresarial Corriente + opción INTERNACIONAL (campos: SWIFT, IBAN u otros necesarios).
+9. Tarjetas de productos: nombre no se lee — reducir tamaño de íconos (lápiz/ojo). PERMITIR ELIMINAR producto que nunca se ha usado (sin movimientos/seriales/órdenes) para no acumular basura. Investigar lentitud al subir foto.
+
+### Notas futuras
+- Conversiones de unidad (1 caja = N unidades): pendiente, fase futura.
 
 ## 5. Módulos pendientes por definir
 
