@@ -31,6 +31,10 @@ import type {
   RentalFee,
 } from '@/types/catalogs';
 
+// Utilidad compartida: alternar un id en una lista (multi-selects de catálogos)
+const toggleArrayId = (list: string[], id: string) =>
+  list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
+
 // ═══════════════════════════════════════════════════════════════════
 // I18N
 // ═══════════════════════════════════════════════════════════════════
@@ -106,8 +110,9 @@ registerI18nKeys({
     'catalogs.products.category': 'Categoría',
     'catalogs.products.unit': 'Unidad de medida',
     'catalogs.products.sku': 'SKU / Código',
-    'catalogs.products.isRentable': 'Es rentable',
-    'catalogs.products.isRentableHelp': 'Se presta a clientes y vuelve (ej: tanques, reguladores, wetsuits). Se controla por UNIDADES INDIVIDUALES (seriales) con su código y QR.',
+    'catalogs.products.isRentable': '¿Se controla por seriales/unidades individuales?',
+    'catalogs.products.isRentableHelp': 'Sí = cada unidad tiene su propio código y QR (ej: tanques, reguladores). Se renta y cuenta unidad por unidad. No = se maneja por cantidad (ej: cloro, papel).',
+    'catalogs.products.rentableBadge': 'Rentable',
     'catalogs.products.isConsumable': 'Es consumible',
     'catalogs.products.isConsumableHelp': 'Se gasta y se acaba (ej: cloro, papel, snacks). Se controla por CANTIDAD (ej: 20 galones) y baja con cada salida.',
     'catalogs.products.photo': 'Foto del producto',
@@ -197,6 +202,13 @@ registerI18nKeys({
     'catalogs.discounts.percent': 'Porcentaje de descuento',
     'catalogs.discounts.percentHelp': 'Valor positivo: 10 significa -10 % sobre el total de la orden.',
     'catalogs.discounts.percentInvalid': 'El porcentaje debe ser un número mayor que 0 y máximo 100',
+    'catalogs.discounts.preAuthorized': 'Pre-autorizado',
+    'catalogs.discounts.preAuthorizedHelp': 'Se aplica sin aprobación caso por caso porque ya está autorizado (ej: convenios, comisiones Bokun).',
+    'catalogs.discounts.badgePreAuthorized': 'Pre-autorizado',
+    'catalogs.discounts.appliesTo': 'Aplica a',
+    'catalogs.discounts.appliesToHelp': 'Si no eliges productos, aplica a todos.',
+    'catalogs.discounts.allProducts': 'Todos los productos',
+    'catalogs.discounts.noRentableProducts': 'No hay productos rentables activos',
     'catalogs.tabs.orderStatuses': 'Estados de orden de renta',
     'catalogs.orderStatuses.title': 'Estados de orden de renta',
     'catalogs.orderStatuses.count': '{count} estado(s)',
@@ -234,6 +246,8 @@ registerI18nKeys({
     'catalogs.fees.seedsAlreadyLoaded': 'Ya están cargadas',
     'catalogs.products.admitsDiscount': 'Admite descuento',
     'catalogs.products.admitsDiscountHelp': 'Si es "No", el descuento en esta línea solo aplica cuando un supervisor aprueba la orden (sin importar el %).',
+    'catalogs.products.hasQr': '¿Lleva código QR?',
+    'catalogs.products.hasQrHelp': 'Sí = se escanea en despachos, conteos y recepciones. No = se confirma con firma/foto (se pedirá al recibir o despachar).',
   },
   en: {
     'catalogs.tabs.suppliers': 'Suppliers',
@@ -305,8 +319,9 @@ registerI18nKeys({
     'catalogs.products.category': 'Category',
     'catalogs.products.unit': 'Unit of measure',
     'catalogs.products.sku': 'SKU / Code',
-    'catalogs.products.isRentable': 'Rentable',
-    'catalogs.products.isRentableHelp': 'Lent to customers and comes back (e.g. tanks, regulators, wetsuits). Tracked as INDIVIDUAL UNITS (serials) with their own code and QR.',
+    'catalogs.products.isRentable': 'Tracked by serials / individual units?',
+    'catalogs.products.isRentableHelp': 'Yes = each unit has its own code and QR (e.g. tanks, regulators). It is rented and counted unit by unit. No = managed by quantity (e.g. chlorine, paper).',
+    'catalogs.products.rentableBadge': 'Rentable',
     'catalogs.products.isConsumable': 'Consumable',
     'catalogs.products.isConsumableHelp': 'It gets used up (e.g. chlorine, paper, snacks). Tracked by QUANTITY (e.g. 20 gallons) and decreases with each outgoing movement.',
     'catalogs.products.photo': 'Product photo',
@@ -348,6 +363,13 @@ registerI18nKeys({
     'catalogs.discounts.percent': 'Discount percentage',
     'catalogs.discounts.percentHelp': 'Positive value: 10 means -10 % off the order total.',
     'catalogs.discounts.percentInvalid': 'The percentage must be a number greater than 0 and at most 100',
+    'catalogs.discounts.preAuthorized': 'Pre-authorized',
+    'catalogs.discounts.preAuthorizedHelp': 'It applies without case-by-case approval because it is already authorized (e.g. agreements, Bokun commissions).',
+    'catalogs.discounts.badgePreAuthorized': 'Pre-authorized',
+    'catalogs.discounts.appliesTo': 'Applies to',
+    'catalogs.discounts.appliesToHelp': 'If you pick no products, it applies to all.',
+    'catalogs.discounts.allProducts': 'All products',
+    'catalogs.discounts.noRentableProducts': 'No active rentable products',
     'catalogs.tabs.orderStatuses': 'Rental order statuses',
     'catalogs.orderStatuses.title': 'Rental order statuses',
     'catalogs.orderStatuses.count': '{count} status(es)',
@@ -385,6 +407,8 @@ registerI18nKeys({
     'catalogs.fees.seedsAlreadyLoaded': 'Already loaded',
     'catalogs.products.admitsDiscount': 'Allows discount',
     'catalogs.products.admitsDiscountHelp': 'If "No", the discount on this line only applies when a supervisor approves the order (regardless of the %).',
+    'catalogs.products.hasQr': 'Has QR code?',
+    'catalogs.products.hasQrHelp': 'Yes = scanned on dispatches, counts and receptions. No = confirmed with signature/photo (asked when receiving or dispatching).',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -1238,12 +1262,13 @@ interface ProductFormState {
   depositPercent: string;
   priceTiers: PriceTierDraft[];
   admitsDiscount: boolean;
+  hasQr: boolean;
 }
 
 const EMPTY_PRODUCT_FORM: ProductFormState = {
   name: '', nameEn: '', categoryId: '', unitId: '', sku: '', isRentable: false,
   isConsumable: true, preferredSupplierId: '', rentalPrice: '', depositPercent: '', priceTiers: [],
-  admitsDiscount: true,
+  admitsDiscount: true, hasQr: true,
 };
 
 function tiersToDrafts(tiers: PriceTier[] | null | undefined): PriceTierDraft[] {
@@ -1349,6 +1374,7 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
       depositPercent: p.depositPercent != null ? String(p.depositPercent) : '',
       priceTiers: tiersToDrafts(p.priceTiers),
       admitsDiscount: p.admitsDiscount !== false,
+      hasQr: p.hasQr !== false,
     });
     setPhotoUrl(p.photoUrl || '');
     setPhotoFile(null);
@@ -1394,6 +1420,8 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
         priceTiers: form.isRentable && tiers && tiers.length > 0 ? tiers : null,
         // Solo aplica a rentables; los demás siempre admiten descuento
         admitsDiscount: form.isRentable ? form.admitsDiscount : true,
+        // Default true (se guarda explícito); ausente en docs viejos = true
+        hasQr: form.hasQr,
         photoUrl: finalPhotoUrl || null,
       };
       if (editing) {
@@ -1495,7 +1523,10 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
               )}
               <div className="flex gap-1.5 pt-1">
                 {p.isRentable && (
-                  <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.isRentable')}</span>
+                  <span className="text-[10px] bg-corporate/10 text-corporate px-2 py-0.5 rounded-full">{t('catalogs.products.rentableBadge')}</span>
+                )}
+                {p.isRentable && p.hasQr === false && (
+                  <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.hasQr')}: {t('catalogs.products.no')}</span>
                 )}
                 {p.isConsumable && (
                   <span className="text-[10px] bg-[#F5F5F7] text-[#86868B] px-2 py-0.5 rounded-full">{t('catalogs.products.isConsumable')}</span>
@@ -1542,6 +1573,9 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             <DetailItem label={t('catalogs.products.preferredSupplier')}>{supplierName(p.preferredSupplierId)}</DetailItem>
             <DetailItem label={t('catalogs.products.isRentable')}>{p.isRentable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
             <DetailItem label={t('catalogs.products.isConsumable')}>{p.isConsumable ? t('catalogs.products.yes') : t('catalogs.products.no')}</DetailItem>
+            <DetailItem label={t('catalogs.products.hasQr')}>
+              {p.hasQr !== false ? t('catalogs.common.yes') : t('catalogs.common.no')}
+            </DetailItem>
             {p.isRentable && p.rentalPricePerDay != null && (
               <DetailItem label={t('catalogs.products.rentalPrice')}>{p.rentalPricePerDay}</DetailItem>
             )}
@@ -1742,6 +1776,18 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
                     <option value="no">{t('catalogs.products.no')}</option>
                   </select>
                   <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.isConsumableHelp')}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t('catalogs.products.hasQr')}</Label>
+                  <select
+                    value={form.hasQr ? 'yes' : 'no'}
+                    onChange={(e) => setForm({ ...form, hasQr: e.target.value === 'yes' })}
+                    className={SELECT_CLASS}
+                  >
+                    <option value="yes">{t('catalogs.products.yes')}</option>
+                    <option value="no">{t('catalogs.products.no')}</option>
+                  </select>
+                  <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.products.hasQrHelp')}</p>
                 </div>
                 {form.isRentable && (
                   <>
@@ -2547,16 +2593,29 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
   const { user } = useAuth();
   const { logAction } = useAudit();
   const { items: discounts } = useCatalog<RentalDiscount>('rentalDiscounts');
+  const { items: products } = useCatalog<Product>('products');
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<RentalDiscount | null>(null);
-  const [form, setForm] = useState({ name: '', percent: '' });
+  const [form, setForm] = useState({ name: '', percent: '', preAuthorized: false, productIds: [] as string[] });
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', percent: '' }); setShowModal(true); };
+  // Multi-select "Aplica a": solo productos rentables activos
+  const rentableProducts = useMemo(
+    () => products.filter((p) => p.isRentable && p.isActive),
+    [products]
+  );
+  const productName = (id: string) => products.find((p) => p.id === id)?.name || '';
+
+  const openCreate = () => { setEditing(null); setForm({ name: '', percent: '', preAuthorized: false, productIds: [] }); setShowModal(true); };
   const openEdit = (d: RentalDiscount) => {
     setEditing(d);
-    setForm({ name: d.name || '', percent: d.percent != null ? String(d.percent) : '' });
+    setForm({
+      name: d.name || '',
+      percent: d.percent != null ? String(d.percent) : '',
+      preAuthorized: d.preAuthorized === true,
+      productIds: d.productIds ? [...d.productIds] : [],
+    });
     setShowModal(true);
   };
 
@@ -2568,7 +2627,13 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
       toast.error(t('catalogs.discounts.percentInvalid'));
       return;
     }
-    const payload = { name: form.name.trim(), percent };
+    // productIds vacío/ausente = aplica a todos los productos
+    const payload = {
+      name: form.name.trim(),
+      percent,
+      preAuthorized: form.preAuthorized,
+      productIds: form.productIds.length > 0 ? [...form.productIds] : null,
+    };
     try {
       if (editing) {
         await updateDoc(doc(db, 'rentalDiscounts', editing.id), { ...payload, ...touchPayload(user.id) });
@@ -2638,7 +2703,13 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
             <EntityCard
               key={d.id}
               name={d.name}
-              lines={[`-${d.percent}%`]}
+              lines={[
+                `-${d.percent}%`,
+                d.preAuthorized ? t('catalogs.discounts.badgePreAuthorized') : '',
+                (d.productIds ?? []).length > 0
+                  ? (d.productIds ?? []).map(productName).filter(Boolean).join(', ')
+                  : t('catalogs.discounts.allProducts'),
+              ]}
               icon={<Percent className="w-5 h-5" />}
               isActive={d.isActive}
               canWrite={canWrite}
@@ -2649,6 +2720,14 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
               details={
                 <DetailsGrid>
                   <DetailItem label={t('catalogs.discounts.percent')}>-{d.percent}%</DetailItem>
+                  <DetailItem label={t('catalogs.discounts.preAuthorized')}>
+                    {d.preAuthorized ? t('catalogs.common.yes') : t('catalogs.common.no')}
+                  </DetailItem>
+                  <DetailItem label={t('catalogs.discounts.appliesTo')}>
+                    {(d.productIds ?? []).length > 0
+                      ? (d.productIds ?? []).map(productName).filter(Boolean).join(', ')
+                      : t('catalogs.discounts.allProducts')}
+                  </DetailItem>
                   <DetailItem label={t('catalogs.common.status')}>
                     {d.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
                   </DetailItem>
@@ -2682,6 +2761,43 @@ function RentalDiscountsSection({ canWrite }: { canWrite: boolean }) {
                 onChange={(e) => setForm({ ...form, percent: e.target.value })}
               />
               <p className="text-[11px] text-[#86868B]">{t('catalogs.discounts.percentHelp')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.discounts.preAuthorized')}</Label>
+              <select
+                value={form.preAuthorized ? 'yes' : 'no'}
+                onChange={(e) => setForm({ ...form, preAuthorized: e.target.value === 'yes' })}
+                className={SELECT_CLASS}
+              >
+                <option value="no">{t('catalogs.common.no')}</option>
+                <option value="yes">{t('catalogs.common.yes')}</option>
+              </select>
+              <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.discounts.preAuthorizedHelp')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.discounts.appliesTo')}</Label>
+              <div className="flex flex-wrap gap-1.5 bg-[#F5F5F7] rounded-xl p-3">
+                {rentableProducts.length === 0 && (
+                  <p className="text-xs text-[#86868B]">{t('catalogs.discounts.noRentableProducts')}</p>
+                )}
+                {rentableProducts.map((p) => {
+                  const selected = form.productIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, productIds: toggleArrayId(form.productIds, p.id) })}
+                      className={cn(
+                        'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                        selected ? 'bg-corporate text-white' : 'bg-white text-[#86868B] border border-[#E5E5E7] hover:text-[#1D1D1F]'
+                      )}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[11px] text-[#86868B] leading-relaxed">{t('catalogs.discounts.appliesToHelp')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <Button onClick={handleSave} className="flex-1 bg-corporate hover:bg-corporate/90">

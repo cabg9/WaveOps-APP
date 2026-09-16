@@ -108,13 +108,22 @@ export interface Product extends CatalogBase {
   // Admite descuento en la orden de renta (default true). Si es false, el
   // descuento de esa línea solo aplica vía solicitud aprobada (Supervisor+).
   admitsDiscount?: boolean;
+  // ¿Lleva código QR? (default true cuando está ausente: data.hasQr !== false).
+  // Sí = se escanea en despachos, conteos y recepciones; No = se confirma con
+  // firma/foto al recibir o despachar.
+  hasQr?: boolean;
 }
 
 // Descuento preconfigurado aplicable a órdenes de renta (catálogo Firestore
 // rentalDiscounts). percent es positivo: 10 = -10 % sobre el total.
+// preAuthorized = true: se aplica sin aprobación caso por caso porque ya está
+// autorizado (ej: convenios, comisiones Bokun). productIds restringe a qué
+// productos aplica (vacío/ausente = todos los productos).
 export interface RentalDiscount extends CatalogBase {
   name: string;
   percent: number;
+  preAuthorized?: boolean;
+  productIds?: string[];
 }
 
 // Impuesto o cargo configurable aplicable a órdenes de renta (catálogo

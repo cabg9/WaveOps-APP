@@ -36,6 +36,10 @@ export interface AppSettings {
   security: SecuritySettings;
   branding: BrandingSettings;
   modulesOrder: string[];
+  // Porcentaje máximo de descuento que un vendedor puede aplicar sin
+  // aprobación (default 10 cuando no está definido). Si lo excede, la orden
+  // queda "Descuento por aprobar" y la aprueba la jerarquía.
+  maxDiscountWithoutApproval?: number;
   updatedAt: string;
   updatedBy: string;
 }

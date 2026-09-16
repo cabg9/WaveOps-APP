@@ -6,7 +6,7 @@
 // tenantId; los catálogos se crean desde la app (nada hardcodeado salvo
 // seeds idempotentes).
 import { useState, useEffect, useMemo, useRef, useId } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { Html5Qrcode } from 'html5-qrcode';
 import {
@@ -54,6 +54,7 @@ import {
   ChevronDown, ChevronUp, Pencil, Power, Construction,
   Truck, ClipboardList, Play, Send, Inbox, Ban, Printer, Upload,
   ShoppingCart, ArrowUpRight, SlidersHorizontal, ArrowLeft, Camera,
+  History, Wrench, ScanLine, Eraser, Check,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -259,8 +260,9 @@ registerI18nKeys({
     'inv.transfers.stockLine': '{location}: {quantity} {unit}',
     'inv.transfers.stockOrigin': 'Disponible en el origen',
     'inv.transfers.stockDestination': 'En el destino',
-    'inv.transfers.receiveRule': 'Puede recibir quien sea responsable de la ubicación destino, pertenezca al departamento de esa ubicación o sea Supervisor o superior.',
-    'inv.transfers.creatorHint': 'Como creador solo puedes recibirla si eres responsable del destino o perteneces a su departamento.',
+    'inv.transfers.receiveRule': 'Puede recibir quien sea responsable de la ubicación destino, pertenezca al departamento de esa ubicación o sea Supervisor o superior. Quien creó la transferencia no puede recibirla.',
+    'inv.transfers.creatorHint': 'Quien crea o envía una transferencia no puede marcarla como recibida.',
+    'inv.transfers.noDeptWarning': 'Esta ubicación no tiene departamento asignado: solo su responsable o un Supervisor o superior puede recibir.',
     'inv.transfers.serializedHint': 'Producto rentable con seriales: confirma las unidades que llegaron escaneando su QR o marcándolas en la lista.',
     'inv.transfers.unitsReceived': 'Unidades confirmadas',
     'inv.transfers.scanUnit': 'Escanear unidad',
@@ -370,6 +372,59 @@ registerI18nKeys({
     'inv.scanner.manualSubmit': 'Buscar',
     'inv.scanner.switchCamera': 'Cambiar cámara',
     'inv.catalogs.seedsAlreadyLoaded': 'Ya están cargadas',
+
+    'inv.home.stock': 'Stock',
+    'inv.home.stockDesc': 'Disponibilidad por producto y ubicación',
+    'inv.home.movements': 'Movimientos',
+    'inv.home.movementsDesc': 'Kardex histórico del inventario',
+    'inv.home.transfers': 'Transferencias',
+    'inv.home.transfersDesc': 'Envíos y recepciones entre ubicaciones',
+    'inv.home.counts': 'Conteos',
+    'inv.home.countsDesc': 'Conteos cíclicos por ubicación',
+    'inv.home.serials': 'Seriales',
+    'inv.home.serialsDesc': 'Unidades individuales rentables',
+    'inv.home.catalogs': 'Catálogos',
+    'inv.home.catalogsDesc': 'Tipos de movimiento y estados',
+    'inv.home.adjustments': 'Ajustes',
+    'inv.home.adjustmentsDesc': 'Ajustes del kardex con motivo',
+    'inv.home.scan': 'Escanear QR',
+    'inv.home.scanDesc': 'Ficha de producto y acciones directas',
+    'inv.adjustments.title': 'Ajustes',
+    'inv.adjustments.help': 'Movimientos de tipo ajuste del kardex, con motivo, fecha y quién los registró. Solo lectura.',
+    'inv.adjustments.empty': 'No hay ajustes registrados',
+    'inv.product.title': 'Ficha de producto',
+    'inv.product.buy': 'Comprar',
+    'inv.product.transfer': 'Transferir',
+    'inv.product.consume': 'Consumir',
+    'inv.product.rent': 'Rentar',
+    'inv.product.repair': 'Enviar a reparación',
+    'inv.product.history': 'Ver historial',
+    'inv.product.stockByLocation': 'Stock por ubicación',
+    'inv.product.unitsByStatus': 'Unidades por estado',
+    'inv.product.noStock': 'Sin stock registrado',
+    'inv.product.notFound': 'Producto no encontrado',
+    'inv.product.scanToSelect': 'Escanear para buscar',
+    'inv.serialized.stockHint': 'Controlado por seriales',
+    'inv.serialized.blockTitle': 'Producto serializado',
+    'inv.serialized.blockHelp': 'Este producto se controla por unidades individuales (seriales): usa Seriales para darlo de alta, y renta/despacho para moverlo.',
+    'inv.serialized.buyHelp': 'Las compras de productos serializados se reciben dando de alta cada unidad con su serial.',
+    'inv.serialized.goSerials': 'Dar de alta seriales',
+    'inv.receive.scanConfirmHelp': 'Producto con QR: escanea el QR del producto que llega para confirmar la recepción.',
+    'inv.receive.scanConfirm': 'Escanear QR para confirmar',
+    'inv.receive.scanConfirmed': 'QR confirmado',
+    'inv.receive.noQrHelp': 'Este producto no tiene QR: adjunta una foto de lo recibido y la firma de quien recibe.',
+    'inv.receive.photo': 'Foto de lo recibido',
+    'inv.receive.signature': 'Firma de quien recibe',
+    'inv.receive.signatureHint': 'Dibuja la firma con el dedo o el mouse',
+    'inv.receive.signatureClear': 'Limpiar',
+    'inv.repair.title': 'Enviar a reparación',
+    'inv.repair.help': 'Selecciona las unidades disponibles que van a reparación e indica el motivo.',
+    'inv.repair.selectUnits': 'Unidades a reparación',
+    'inv.repair.reason': 'Motivo',
+    'inv.repair.reasonPlaceholder': 'Ej: válvula con fuga',
+    'inv.repair.noAvailable': 'No hay unidades disponibles de este producto.',
+    'inv.repair.noSerialsHelp': 'Este producto no tiene seriales: registra una salida por ajuste con motivo de reparación.',
+    'inv.repair.done': 'Unidades enviadas a reparación',
   },
   en: {
     'inv.devTitle': 'Module under development',
@@ -544,8 +599,9 @@ registerI18nKeys({
     'inv.transfers.stockLine': '{location}: {quantity} {unit}',
     'inv.transfers.stockOrigin': 'Available at source',
     'inv.transfers.stockDestination': 'At destination',
-    'inv.transfers.receiveRule': 'Who can receive: the destination location responsible, anyone in that location\'s department, or a Supervisor or above.',
-    'inv.transfers.creatorHint': 'As the creator you can only receive it if you are the destination responsible or belong to its department.',
+    'inv.transfers.receiveRule': 'Who can receive: the destination location responsible, anyone in that location\'s department, or a Supervisor or above. Whoever created the transfer cannot receive it.',
+    'inv.transfers.creatorHint': 'Whoever creates or sends a transfer cannot mark it as received.',
+    'inv.transfers.noDeptWarning': 'This location has no assigned department: only its responsible or a Supervisor or above can receive.',
     'inv.transfers.serializedHint': 'Rentable product with serials: confirm the units that arrived by scanning their QR or checking them in the list.',
     'inv.transfers.unitsReceived': 'Confirmed units',
     'inv.transfers.scanUnit': 'Scan unit',
@@ -655,6 +711,59 @@ registerI18nKeys({
     'inv.scanner.manualSubmit': 'Look up',
     'inv.scanner.switchCamera': 'Switch camera',
     'inv.catalogs.seedsAlreadyLoaded': 'Already loaded',
+
+    'inv.home.stock': 'Stock',
+    'inv.home.stockDesc': 'Availability by product and location',
+    'inv.home.movements': 'Movements',
+    'inv.home.movementsDesc': 'Historical inventory ledger',
+    'inv.home.transfers': 'Transfers',
+    'inv.home.transfersDesc': 'Shipments and receipts between locations',
+    'inv.home.counts': 'Counts',
+    'inv.home.countsDesc': 'Cyclic counts per location',
+    'inv.home.serials': 'Serials',
+    'inv.home.serialsDesc': 'Individual rentable units',
+    'inv.home.catalogs': 'Catalogs',
+    'inv.home.catalogsDesc': 'Movement types and statuses',
+    'inv.home.adjustments': 'Adjustments',
+    'inv.home.adjustmentsDesc': 'Ledger adjustments with reason',
+    'inv.home.scan': 'Scan QR',
+    'inv.home.scanDesc': 'Product sheet and direct actions',
+    'inv.adjustments.title': 'Adjustments',
+    'inv.adjustments.help': 'Adjustment-type movements from the ledger, with reason, date and who registered them. Read only.',
+    'inv.adjustments.empty': 'No adjustments recorded',
+    'inv.product.title': 'Product sheet',
+    'inv.product.buy': 'Buy',
+    'inv.product.transfer': 'Transfer',
+    'inv.product.consume': 'Consume',
+    'inv.product.rent': 'Rent',
+    'inv.product.repair': 'Send to repair',
+    'inv.product.history': 'View history',
+    'inv.product.stockByLocation': 'Stock by location',
+    'inv.product.unitsByStatus': 'Units by status',
+    'inv.product.noStock': 'No stock recorded',
+    'inv.product.notFound': 'Product not found',
+    'inv.product.scanToSelect': 'Scan to search',
+    'inv.serialized.stockHint': 'Controlled by serials',
+    'inv.serialized.blockTitle': 'Serialized product',
+    'inv.serialized.blockHelp': 'This product is controlled by individual units (serials): use Serials to register it, and rental/dispatch to move it.',
+    'inv.serialized.buyHelp': 'Purchases of serialized products are received by registering each unit with its serial.',
+    'inv.serialized.goSerials': 'Register serials',
+    'inv.receive.scanConfirmHelp': 'Product with QR: scan the QR of the product that arrived to confirm receipt.',
+    'inv.receive.scanConfirm': 'Scan QR to confirm',
+    'inv.receive.scanConfirmed': 'QR confirmed',
+    'inv.receive.noQrHelp': 'This product has no QR: attach a photo of what arrived and the signature of who receives it.',
+    'inv.receive.photo': 'Photo of what arrived',
+    'inv.receive.signature': 'Signature of who receives',
+    'inv.receive.signatureHint': 'Draw the signature with your finger or mouse',
+    'inv.receive.signatureClear': 'Clear',
+    'inv.repair.title': 'Send to repair',
+    'inv.repair.help': 'Select the available units going to repair and state the reason.',
+    'inv.repair.selectUnits': 'Units to repair',
+    'inv.repair.reason': 'Reason',
+    'inv.repair.reasonPlaceholder': 'E.g.: leaking valve',
+    'inv.repair.noAvailable': 'There are no available units of this product.',
+    'inv.repair.noSerialsHelp': 'This product has no serials: register an adjustment-type stock out with a repair reason.',
+    'inv.repair.done': 'Units sent to repair',
   },
 });
 
@@ -813,7 +922,7 @@ function docToRentalOrderStatus(id: string, data: Record<string, unknown>): Rent
 }
 
 function docToProduct(id: string, data: Record<string, unknown>): Product {
-  return {
+  const base: Product = {
     id,
     tenantId: toStr(data.tenantId),
     name: toStr(data.name),
@@ -828,7 +937,18 @@ function docToProduct(id: string, data: Record<string, unknown>): Product {
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
   };
+  // hasQr lo agrega el catálogo de productos (lado Develops/Catálogos):
+  // se preserva de forma defensiva; ausente = con QR (comportamiento actual)
+  if (data.hasQr !== undefined) {
+    return { ...base, hasQr: toBool(data.hasQr, true) } as Product;
+  }
+  return base;
 }
+
+// Regla del modelo final de seriales: un producto "con QR" es el default;
+// solo hasQr === false exige foto + firma al recibir transferencias
+const productHasQr = (p: Product | undefined | null): boolean =>
+  ((p as unknown as { hasQr?: unknown } | null)?.hasQr ?? true) !== false;
 
 function docToLocation(id: string, data: Record<string, unknown>): Location {
   return {
@@ -1011,13 +1131,26 @@ const SEED_SERIAL_STATUSES: Array<{ id: string; name: string; nameEn: string; bl
 // TIPOS INTERNOS
 // ═══════════════════════════════════════════════════════════════════
 
-type InvTab = 'stock' | 'movements' | 'transfers' | 'counts' | 'serials' | 'catalogs';
 type StockView = 'product' | 'location';
 
-// Vista interna del módulo (punto 8): las acciones principales ocupan una
-// PANTALLA completa en lugar de un popup. En 'main' se ven las tarjetas
-// grandes de acción y las sub-pestañas; cada acción cambia invView.
-type InvView = 'main' | 'movement' | 'transfer-new' | 'count-new' | 'serial-new' | 'receive';
+// Vista interna del módulo (puntos 8 y 12): las tarjetas-módulo son LA
+// navegación: cada sección (y cada acción de creación) ocupa una PANTALLA
+// completa con botón Volver, en lugar de sub-pestañas o popups.
+type InvView =
+  | 'main'
+  | 'stock'
+  | 'movements'
+  | 'transfers'
+  | 'counts'
+  | 'serials'
+  | 'catalogs'
+  | 'adjustments'
+  | 'product'
+  | 'movement'
+  | 'transfer-new'
+  | 'count-new'
+  | 'serial-new'
+  | 'receive';
 
 type TransferStatusFilter = 'all' | InventoryTransfer['status'];
 
@@ -1183,11 +1316,8 @@ export function InventarioModule() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  // Navegación entre sub-pestañas
-  const [tab, setTab] = useState<InvTab>('stock');
-
-  // Vista interna (punto 8): 'main' = tarjetas de acción + sub-pestañas;
-  // cualquier otro valor reemplaza el contenido por la pantalla del formulario
+  // Navegación interna (punto 12): las tarjetas-módulo reemplazan a las
+  // sub-pestañas; cada sección es una pantalla con botón Volver
   const [invView, setInvView] = useState<InvView>('main');
 
   // Tarjetas expandibles
@@ -1235,8 +1365,28 @@ export function InventarioModule() {
   const [receiveTransferId, setReceiveTransferId] = useState<string | null>(null);
   const [receivedByName, setReceivedByName] = useState('');
   const [receiveSerialIds, setReceiveSerialIds] = useState<string[]>([]);
+  // Verificación obligatoria al recibir (punto 11): consumibles con QR se
+  // confirman escaneando el QR del producto; productos SIN QR (hasQr === false)
+  // exigen foto + firma (dataURL) + nombre de quien recibe
+  const [receiveScanConfirmed, setReceiveScanConfirmed] = useState(false);
+  const [receivePhoto, setReceivePhoto] = useState<string | null>(null);
+  const [receiveSignature, setReceiveSignature] = useState<string | null>(null);
   const [cancelTransferId, setCancelTransferId] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // Ficha de producto (punto 13): el escáner abre la ficha con acciones
+  // directas (comprar/transferir/consumir/rentar/reparación/historial)
+  const [productDetailId, setProductDetailId] = useState<string | null>(null);
+
+  // Formulario de transferencia (punto 14): primero origen/destino, luego
+  // categoría y producto (buscador + escaneo opcional)
+  const [transferCategoryId, setTransferCategoryId] = useState('');
+
+  // Envío a reparación desde la ficha (punto 13): selección de unidades
+  // disponibles + motivo (diálogo)
+  const [repairProductId, setRepairProductId] = useState<string | null>(null);
+  const [repairUnitIds, setRepairUnitIds] = useState<string[]>([]);
+  const [repairReason, setRepairReason] = useState('');
 
   // Conteos cíclicos (FASE 1A-counts)
   const [countSessions, setCountSessions] = useState<CountSession[]>([]);
@@ -1283,7 +1433,13 @@ export function InventarioModule() {
 
   // Deep links (?product= / ?location= / ?serial=): solo se procesan una vez
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const deepLinkHandled = useRef(false);
+
+  // Escaneo opcional dentro de selectores de producto (puntos 13/14): cuando
+  // hay un callback pendiente, el resultado del escáner selecciona el producto
+  // en vez de abrir la ficha
+  const scanPickRef = useRef<((productId: string) => void) | null>(null);
 
   const { users } = useFirestoreUsers();
   const { uploadImage, uploading: uploadingSerialPhoto } = useStorageUpload();
@@ -1326,6 +1482,45 @@ export function InventarioModule() {
   const activeSerialStatuses = useMemo(() => serialStatuses.filter(s => s.isActive), [serialStatuses]);
   const rentableProducts = useMemo(() => activeProducts.filter(p => p.isRentable), [activeProducts]);
 
+  // Modelo final de seriales (punto 4): producto "serializado" = rentable con
+  // unidades registradas; su stock se muestra por estado, nunca como número plano
+  const isSerializedProduct = (productId: string) =>
+    !!products.find(p => p.id === productId)?.isRentable &&
+    rentalUnits.some(u => u.productId === productId);
+
+  // Conteo de unidades por estado de un producto serializado
+  // ({ statusId: cantidad }), para mostrar "12 disponibles · 3 rentados..."
+  const unitCountsByStatus = (productId: string): Array<{ status: SerialStatus; count: number }> => {
+    const counts = new Map<string, number>();
+    for (const u of rentalUnits) {
+      if (u.productId !== productId) continue;
+      counts.set(u.statusId, (counts.get(u.statusId) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([statusId, count]) => ({ status: serialStatuses.find(s => s.id === statusId), count }))
+      .filter((x): x is { status: SerialStatus; count: number } => !!x.status)
+      .sort((a, b) => a.status.name.localeCompare(b.status.name));
+  };
+
+  // Chips "N estado" del stock serializado (reutilizado en Stock y ficha)
+  const renderUnitStatusChips = (productId: string) => (
+    <div className="flex flex-wrap items-center gap-1">
+      {unitCountsByStatus(productId).map(({ status, count }) => (
+        <span
+          key={status.id}
+          className={cn(
+            'px-2 py-0.5 rounded-full text-[10px] font-medium',
+            status.blocksRental
+              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+              : 'bg-green-50 text-green-700 border border-green-200'
+          )}
+        >
+          {count} {getLanguage() === 'en' && status.nameEn ? status.nameEn : status.name}
+        </span>
+      ))}
+    </div>
+  );
+
   // Tipo de movimiento seleccionado en la pantalla de movimiento (campos
   // adaptados al tipo). Se calcula arriba de los early returns porque la
   // regla de ubicación automática (punto 15) lo usa en un efecto.
@@ -1333,6 +1528,9 @@ export function InventarioModule() {
   const isTransferMt = selectedMt?.id === 'transferencia';
   const isInputMt = selectedMt ? !selectedMt.isOutput : false;
   const isAdjustMt = selectedMt?.id === 'ajuste';
+  // Producto elegido en el formulario de movimiento: si es serializable
+  // (rentable), el formulario de CANTIDAD queda bloqueado (punto 4b)
+  const movementProduct = products.find(p => p.id === movementForm.productId);
   // Salidas (consumo/ajuste/daño, no transferencia): el origen se ofrece solo
   // entre las ubicaciones del departamento del usuario actual (punto 15)
   const isOutputNonTransfer = !!selectedMt?.isOutput && !isTransferMt;
@@ -1710,7 +1908,8 @@ export function InventarioModule() {
 
   // Botones rápidos: abre el formulario con un tipo preseleccionado.
   // Si el id semilla no existe en el catálogo, resuelve un equivalente activo.
-  const openMovementFormFor = (typeId: string) => {
+  // productId opcional: preselecciona categoría y producto (ficha / escaneo).
+  const openMovementFormFor = (typeId: string, productId?: string) => {
     let mt = activeMovementTypes.find(m => m.id === typeId);
     if (!mt) {
       if (typeId === 'compra') {
@@ -1722,8 +1921,13 @@ export function InventarioModule() {
         mt = activeMovementTypes.find(m => m.isOutput);
       }
     }
-    setMovementCategoryId('');
-    setMovementForm({ ...EMPTY_MOVEMENT_FORM, movementTypeId: mt?.id || '' });
+    const product = productId ? products.find(p => p.id === productId) : null;
+    setMovementCategoryId(product?.categoryId || '');
+    setMovementForm({
+      ...EMPTY_MOVEMENT_FORM,
+      movementTypeId: mt?.id || '',
+      productId: productId || '',
+    });
     setInvView('movement');
   };
 
@@ -1824,8 +2028,10 @@ export function InventarioModule() {
   // TRANSFERENCIAS ENTRE UBICACIONES (FASE 1A-transfers)
   // ═══════════════════════════════════════════════════════════════════
 
-  const openTransferForm = () => {
-    setTransferForm(EMPTY_TRANSFER_FORM);
+  const openTransferForm = (productId?: string) => {
+    const product = productId ? products.find(p => p.id === productId) : null;
+    setTransferCategoryId(product?.categoryId || '');
+    setTransferForm({ ...EMPTY_TRANSFER_FORM, productId: productId || '' });
     setInvView('transfer-new');
   };
 
@@ -1915,6 +2121,7 @@ export function InventarioModule() {
           toast.success(t('inv.transfers.new'));
           setInvView('main');
           setTransferForm(EMPTY_TRANSFER_FORM);
+          setTransferCategoryId('');
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -1946,23 +2153,46 @@ export function InventarioModule() {
     }
   };
 
-  // Quién puede confirmar la recepción (regla ampliada, punto 6), cumpliendo
+  // Quién puede confirmar la recepción (regla final, ronda 4), cumpliendo
   // CUALQUIERA de estas condiciones:
   // (a) es el responsable de la ubicación destino (locations.responsibleUserId)
   // (b) pertenece al departamento de esa ubicación (locations.responsibleDepartmentId
   //     comparado con el department del currentUser, normalizando códigos con
   //     normalizeDeptCode, igual que useDynamicDepartments.getVisibleDepartmentCodes)
   // (c) es Supervisor o superior (SUPERVISOR_PLUS_ROLES)
-  // El creador solo puede recibir si cumple (a), (b) o (c): crear la
-  // transferencia por sí solo NO otorga el derecho a recibirla.
+  // REGLA ABSOLUTA: quien CREÓ la transferencia NO puede recibirla NUNCA,
+  // aunque cumpla (a), (b) o (c).
+  // Si la ubicación destino no tiene departamento asignado en datos, el botón
+  // lo ven el responsable (a) y Supervisor+ (c); en el detalle se muestra aviso.
+  // Diagnóstico temporal en consola: si con datos reales el botón no aparece,
+  // aquí se ve qué regla falló (ubicación sin responsable/depto, depto del
+  // usuario distinto, etc.).
   const canReceiveTransfer = (transfer: InventoryTransfer): boolean => {
     if (!currentUser || !transfer.id || transfer.status !== 'en_transito') return false;
+    if (transfer.createdBy && transfer.createdBy === currentUser.id) {
+      console.info('[Inventario] Recibir bloqueado: quien creó la transferencia no puede recibirla', {
+        transferId: transfer.id,
+        createdBy: transfer.createdBy,
+        currentUserId: currentUser.id,
+      });
+      return false;
+    }
     const destLocation = locations.find(l => l.id === transfer.toLocationId);
     if (destLocation?.responsibleUserId && destLocation.responsibleUserId === currentUser.id) return true;
     const destDeptCode = normalizeDeptCode(destLocation?.responsibleDepartmentId || '');
     const userDeptCode = normalizeDeptCode(currentUser.department || '');
     if (destDeptCode && userDeptCode && destDeptCode === userDeptCode) return true;
-    return canSupervise;
+    if (canSupervise) return true;
+    console.info('[Inventario] Recibir no disponible para este usuario', {
+      transferId: transfer.id,
+      toLocationId: transfer.toLocationId,
+      destResponsibleUserId: destLocation?.responsibleUserId ?? null,
+      destResponsibleDepartmentId: destLocation?.responsibleDepartmentId ?? null,
+      destDeptCode: destDeptCode || null,
+      userDeptCode: userDeptCode || null,
+      userRole: currentUser.role,
+    });
+    return false;
   };
 
   // Producto rentable con unidades serializadas: la recepción exige confirmar
@@ -1984,6 +2214,9 @@ export function InventarioModule() {
     setReceiveTransferId(transfer.id!);
     setReceivedByName(currentUser?.name || '');
     setReceiveSerialIds(transfer.receivedUnitIds ?? []);
+    setReceiveScanConfirmed(false);
+    setReceivePhoto(null);
+    setReceiveSignature(null);
     setInvView('receive');
   };
 
@@ -1991,10 +2224,22 @@ export function InventarioModule() {
     const transfer = transfers.find(x => x.id === receiveTransferId);
     if (!currentUser || !transfer?.id || !canReceiveTransfer(transfer)) return;
     if (!receivedByName.trim()) return toast.error(t('inv.validation.nameRequired'));
-    if (transferNeedsUnits(transfer) && receiveSerialIds.length !== transfer.quantity) {
+    const needsUnits = transferNeedsUnits(transfer);
+    if (needsUnits && receiveSerialIds.length !== transfer.quantity) {
       return toast.error(
         t('inv.transfers.validation.unitsRequired').replace('{expected}', String(transfer.quantity))
       );
+    }
+    // Verificación obligatoria (punto 11): consumibles CON QR se confirman con
+    // el escaneo del QR del producto; productos SIN QR exigen foto + firma
+    const product = products.find(p => p.id === transfer.productId);
+    const hasQr = productHasQr(product);
+    if (!needsUnits && hasQr && !receiveScanConfirmed) {
+      return toast.error(t('inv.receive.scanConfirmHelp'));
+    }
+    if (!needsUnits && !hasQr) {
+      if (!receivePhoto) return toast.error(t('inv.receive.photo'));
+      if (!receiveSignature) return toast.error(t('inv.receive.signature'));
     }
     await executeWithConfirm({
       level: 'major',
@@ -2034,12 +2279,23 @@ export function InventarioModule() {
             createdByName: currentUser.name,
           });
 
-          await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), {
+          // Evidencia de recepción: foto + firma (dataURL) solo para productos
+          // sin QR; el cast local evita tocar el tipo compartido (el campo es
+          // aditivo y firestore lo acepta)
+          const receivedPayload: Record<string, unknown> = {
             status: 'recibido',
             receivedBy: receivedByName.trim(),
             receivedAt: now,
-            receivedUnitIds: transferNeedsUnits(transfer) ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
-          });
+            receivedUnitIds: needsUnits ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
+          };
+          if (!needsUnits && !hasQr) {
+            receivedPayload.receivedPhoto = receivePhoto;
+            receivedPayload.receivedSignature = receiveSignature;
+            receivedPayload.receivedQrConfirmed = false;
+          } else if (!needsUnits && hasQr) {
+            receivedPayload.receivedQrConfirmed = true;
+          }
+          await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), receivedPayload);
 
           // Las notificaciones de esta transferencia quedan leídas al recibirla
           try {
@@ -2074,6 +2330,9 @@ export function InventarioModule() {
           toast.success(t('inv.transfers.receive'));
           setReceiveTransferId(null);
           setReceiveSerialIds([]);
+          setReceiveScanConfirmed(false);
+          setReceivePhoto(null);
+          setReceiveSignature(null);
           setInvView('main');
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -2526,10 +2785,10 @@ export function InventarioModule() {
   // SERIALES / UNIDADES RENTABLES (FASE 1B-serials)
   // ═══════════════════════════════════════════════════════════════════
 
-  const openSerialForm = () => {
+  const openSerialForm = (productId?: string) => {
     // Estado inicial por defecto: el primero activo que NO bloquea renta
     const defaultStatus = activeSerialStatuses.find(s => !s.blocksRental) ?? activeSerialStatuses[0];
-    setSerialForm({ ...EMPTY_SERIAL_FORM, statusId: defaultStatus?.id || '' });
+    setSerialForm({ ...EMPTY_SERIAL_FORM, productId: productId || '', statusId: defaultStatus?.id || '' });
     setSerialPhotoFile(null);
     setInvView('serial-new');
   };
@@ -2690,6 +2949,57 @@ export function InventarioModule() {
     });
   };
 
+  // Envío a reparación desde la ficha del producto (punto 13): con seriales,
+  // selección de unidades disponibles + motivo; sin seriales, el botón de la
+  // ficha deriva a un movimiento de salida tipo ajuste con motivo "Reparación"
+  const openRepairDialog = (productId: string) => {
+    setRepairProductId(productId);
+    setRepairUnitIds([]);
+    setRepairReason('');
+  };
+
+  const handleSendRepair = async () => {
+    if (!currentUser || !canWrite || !repairProductId) return;
+    const reason = repairReason.trim() || 'Reparación';
+    const units = rentalUnits.filter(u => repairUnitIds.includes(u.id || ''));
+    if (units.length === 0) return toast.error(t('inv.repair.noAvailable'));
+    await executeWithConfirm({
+      level: 'major',
+      title: t('inv.repair.title'),
+      description: `${productName(repairProductId)} · ${units.length}`,
+      action: async () => {
+        try {
+          const now = new Date().toISOString();
+          const repairStatus = serialStatuses.find(s => s.id === 'en_reparacion')?.id
+            ?? serialStatuses.find(s => s.blocksRental)?.id;
+          if (!repairStatus) return toast.error(t('inv.error.save'));
+          for (const unit of units) {
+            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unit.id!), {
+              statusId: repairStatus,
+              notes: `${reason} · Enviado a reparación`,
+              updatedAt: now,
+              updatedBy: currentUser.name,
+            });
+          }
+          await logAction({
+            action: AUDIT_ACTIONS.serialStatusChanged,
+            targetType: 'rental_unit',
+            targetId: repairProductId,
+            targetName: `${productName(repairProductId)} · ${units.map(u => u.serialNumber).join(', ')}`,
+            impactLevel: 'major',
+            description: `Unidades enviadas a reparación: ${productName(repairProductId)} · ${units.length} · motivo: ${reason}`,
+          });
+          toast.success(t('inv.repair.done'));
+          setRepairProductId(null);
+          setRepairUnitIds([]);
+          setRepairReason('');
+        } catch (err: any) {
+          toast.error(`${t('inv.error.save')}: ${err.message}`);
+        }
+      },
+    });
+  };
+
   // Seriales agrupados por producto rentable (para el render)
   const serialGroups = useMemo(() => {
     const groups = new Map<string, RentalUnit[]>();
@@ -2729,17 +3039,19 @@ export function InventarioModule() {
       qrText: `${window.location.origin}/requisiciones?serial=${unit.id}`,
     });
 
-  // Resultado de un escaneo (o deep link): abre la sub-pestaña y expande la tarjeta
+  // Resultado de un escaneo (o deep link). Punto 13: el escáner es el centro
+  // de operaciones — un QR de producto abre su FICHA con acciones directas;
+  // cuando el escaneo nació de un selector de producto (escaneo opcional en
+  // formularios), selecciona el producto en ese formulario en vez de abrir la ficha
   const revealTarget = (kind: 'product' | 'location' | 'serial', id: string) => {
-    setInvView('main');
     if (kind === 'product') {
-      setTab('stock');
-      setStockView('product');
+      setProductDetailId(id);
+      setInvView('product');
     } else if (kind === 'location') {
-      setTab('stock');
       setStockView('location');
+      setInvView('stock');
     } else {
-      setTab('serials');
+      setInvView('serials');
     }
     setExpandedIds(new Set([id]));
   };
@@ -2751,6 +3063,18 @@ export function InventarioModule() {
     }
     if (scanContext === 'receive') {
       handleReceiveScan(kind, id);
+      return;
+    }
+    // Escaneo opcional dentro de un selector de producto: selecciona y listo
+    const pick = scanPickRef.current;
+    if (pick) {
+      if (kind !== 'product') {
+        toast.error(t('inv.scanner.unrecognized'));
+        return;
+      }
+      scanPickRef.current = null;
+      setScannerOpen(false);
+      pick(id);
       return;
     }
     setScannerOpen(false);
@@ -2801,12 +3125,22 @@ export function InventarioModule() {
     toast.error(t('inv.counts.productNotInCount'));
   };
 
-  // Escaneo en la recepción de una transferencia serializada: confirma la
-  // unidad que llegó (alternativa a marcarla en la lista)
+  // Escaneo en la recepción de una transferencia (punto 11):
+  // - seriales: confirma la unidad que llegó (alternativa a marcarla en la lista)
+  // - consumibles con QR: el QR del producto confirma la recepción
   const handleReceiveScan = (kind: 'product' | 'location' | 'serial', id: string) => {
     const transfer = transfers.find(x => x.id === receiveTransferId);
     if (!transfer) {
       setScannerOpen(false);
+      return;
+    }
+    if (kind === 'product') {
+      if (id !== transfer.productId) {
+        toast.error(t('inv.transfers.validation.serialNotForProduct'));
+        return;
+      }
+      setReceiveScanConfirmed(true);
+      toast.success(t('inv.receive.scanConfirmed'));
       return;
     }
     if (kind !== 'serial') {
@@ -2833,7 +3167,8 @@ export function InventarioModule() {
     setCountsDraft(d => ({ ...d, [productId]: String(Math.max(0, (Number.isFinite(current) ? current : 0) - 1)) }));
   };
 
-  // Deep links: ?product= / ?location= / ?serial= → sub-pestaña + tarjeta expandida
+  // Deep links: ?product= / ?location= / ?serial= → sección correspondiente
+  // (ficha de producto / stock por ubicación / seriales) con tarjeta expandida
   useEffect(() => {
     if (!enabled || deepLinkHandled.current) return;
     const product = searchParams.get('product');
@@ -2845,7 +3180,6 @@ export function InventarioModule() {
     else if (serial) revealTarget('serial', serial);
     setSearchParams({}, { replace: true });
     deepLinkHandled.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, searchParams, setSearchParams]);
 
   // ═══════════════════════════════════════════════════════════════════
@@ -3140,6 +3474,21 @@ export function InventarioModule() {
     });
   }, [movements, filterProductId, filterLocationId, filterTypeId]);
 
+  // Formulario de transferencia (punto 14): primero origen/destino, luego
+  // categoría y producto (buscador + escaneo opcional)
+  const transferFormProducts = useMemo(() => {
+    if (!transferCategoryId) return [];
+    if (transferCategoryId === '__none__') return activeProducts.filter(p => !p.categoryId);
+    return activeProducts.filter(p => p.categoryId === transferCategoryId);
+  }, [activeProducts, transferCategoryId]);
+
+  // Ajustes (punto 12): movimientos tipo 'ajuste' del kardex, con motivo,
+  // fecha y quién — vista de solo lectura
+  const adjustmentMovements = useMemo(
+    () => movements.filter(m => m.movementTypeId === 'ajuste'),
+    [movements]
+  );
+
   // Filtrado de la pestaña Transferencias (punto 4): la lista base ya trae
   // TODAS las transferencias; el filtro solo decide cuáles se muestran
   const filteredTransfers = useMemo(
@@ -3147,49 +3496,26 @@ export function InventarioModule() {
     [transfers, transferFilter]
   );
 
-  // Tarjetas grandes de acción de la vista principal (punto 8): solo las
-  // acciones de creación rápida; la exploración va en las sub-pestañas
-  const homeActions: Array<{
-    id: InvView;
-    icon: typeof Truck;
-    title: string;
-    desc: string;
-    onClick: () => void;
-  }> = canWrite
-    ? [
-        {
-          id: 'movement',
-          icon: ArrowDownUp,
-          title: t('inv.home.movement'),
-          desc: t('inv.home.movementDesc'),
-          onClick: () => openMovementForm(),
-        },
-        {
-          id: 'transfer-new',
-          icon: Truck,
-          title: t('inv.home.transfer'),
-          desc: t('inv.home.transferDesc'),
-          onClick: openTransferForm,
-        },
-        {
-          id: 'count-new',
-          icon: ClipboardList,
-          title: t('inv.home.count'),
-          desc: t('inv.home.countDesc'),
-          onClick: () => {
-            setCountForm(EMPTY_COUNT_FORM);
-            setInvView('count-new');
-          },
-        },
-        {
-          id: 'serial-new',
-          icon: Box,
-          title: t('inv.home.serial'),
-          desc: t('inv.home.serialDesc'),
-          onClick: openSerialForm,
-        },
-      ]
-    : [];
+  // Tarjetas-módulo (punto 12): SON la navegación del módulo. Pequeñas
+  // (2-3 por fila en desktop, apiladas en móvil); cada una abre la pantalla
+  // de su sección. La creación rápida vive DENTRO de cada sección (los botones
+  // rápidos de Stock y los botones de cada lista se mantienen).
+  const moduleCards: Array<{ id: string; icon: typeof Truck; title: string; desc: string; onClick: () => void }> = [
+    { id: 'stock', icon: Package, title: t('inv.home.stock'), desc: t('inv.home.stockDesc'), onClick: () => setInvView('stock') },
+    { id: 'movements', icon: ArrowDownUp, title: t('inv.home.movements'), desc: t('inv.home.movementsDesc'), onClick: () => setInvView('movements') },
+    { id: 'transfers', icon: Truck, title: t('inv.home.transfers'), desc: t('inv.home.transfersDesc'), onClick: () => setInvView('transfers') },
+    { id: 'counts', icon: ClipboardList, title: t('inv.home.counts'), desc: t('inv.home.countsDesc'), onClick: () => setInvView('counts') },
+    { id: 'serials', icon: Box, title: t('inv.home.serials'), desc: t('inv.home.serialsDesc'), onClick: () => setInvView('serials') },
+    { id: 'catalogs', icon: Tags, title: t('inv.home.catalogs'), desc: t('inv.home.catalogsDesc'), onClick: () => setInvView('catalogs') },
+    { id: 'adjustments', icon: SlidersHorizontal, title: t('inv.home.adjustments'), desc: t('inv.home.adjustmentsDesc'), onClick: () => setInvView('adjustments') },
+    {
+      id: 'scan',
+      icon: ScanLine,
+      title: t('inv.home.scan'),
+      desc: t('inv.home.scanDesc'),
+      onClick: () => { scanPickRef.current = null; setScanContext('navigate'); setScannerOpen(true); },
+    },
+  ];
 
   // ═══════════════════════════════════════════════════════════════════
   // RENDER: placeholder si el módulo no está habilitado
@@ -3229,15 +3555,6 @@ export function InventarioModule() {
     );
   }
 
-  const tabs: Array<{ id: InvTab; label: string }> = [
-    { id: 'stock', label: t('inv.tab.stock') },
-    { id: 'movements', label: t('inv.tab.movements') },
-    { id: 'transfers', label: t('inv.tab.transfers') },
-    { id: 'counts', label: t('inv.tab.counts') },
-    { id: 'serials', label: t('inv.tab.serials') },
-    { id: 'catalogs', label: t('inv.tab.catalogs') },
-  ];
-
   // ═══════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════
@@ -3247,51 +3564,37 @@ export function InventarioModule() {
 
   return (
     <div className="space-y-4">
-      {invView === 'main' ? (
+      {invView === 'main' && (
       <>
-      {/* Tarjetas grandes de acción (punto 8): creación rápida tipo módulos */}
-      {homeActions.length > 0 && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {homeActions.map(action => (
-            <button
-              key={action.id}
-              type="button"
-              onClick={action.onClick}
-              className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 text-left transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
-            >
-              <div className="h-10 w-10 rounded-xl bg-corporate/10 flex items-center justify-center mb-3">
-                <action.icon className="h-5 w-5 text-corporate" />
-              </div>
-              <div className="text-sm font-semibold text-[#1D1D1F]">{action.title}</div>
-              <div className="text-xs text-[#86868B] mt-0.5">{action.desc}</div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Pills de sub-pestañas */}
-      <div className="flex flex-wrap items-center gap-2">
-        {tabs.map(tb => (
+      {/* Tarjetas-módulo (punto 12): la navegación del módulo. 2-3 por fila
+          en desktop, apiladas en móvil. La tarjeta "Registrar movimiento"
+          grande se eliminó: los botones rápidos de Stock (Compra/Consumo/
+          Ajuste/Transferencia) y el botón genérico del kardex ya cubren esa
+          entrada; las creaciones viven dentro de cada sección. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {moduleCards.map(card => (
           <button
-            key={tb.id}
-            onClick={() => setTab(tb.id)}
-            className={cn(
-              'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-              tab === tb.id
-                ? 'bg-corporate text-white border-corporate'
-                : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
-            )}
+            key={card.id}
+            type="button"
+            onClick={card.onClick}
+            className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 text-left transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
           >
-            {tb.label}
+            <div className="h-8 w-8 rounded-lg bg-corporate/10 flex items-center justify-center mb-2">
+              <card.icon className="h-4 w-4 text-corporate" />
+            </div>
+            <div className="text-sm font-semibold text-[#1D1D1F]">{card.title}</div>
+            <div className="text-[11px] text-[#86868B] mt-0.5 leading-snug">{card.desc}</div>
           </button>
         ))}
-        {!canWrite && (
-          <span className="ml-auto text-xs text-[#86868B]">{t('inv.readOnly')}</span>
-        )}
       </div>
+      {!canWrite && (
+        <p className="text-xs text-[#86868B]">{t('inv.readOnly')}</p>
+      )}
+      </>
+      )}
 
-      {/* ─── SUB-PESTAÑA: STOCK ─── */}
-      {tab === 'stock' && (
+      {/* ─── SECCIÓN: STOCK (pantalla completa, punto 12) ─── */}
+      {invView === 'stock' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 bg-[#F5F5F7] rounded-full p-1">
@@ -3328,7 +3631,7 @@ export function InventarioModule() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={openTransferForm}
+                    onClick={() => openTransferForm()}
                     className="gap-2 rounded-xl border-[#E5E5E7]"
                   >
                     <Truck className="h-4 w-4" />
@@ -3375,9 +3678,13 @@ export function InventarioModule() {
                   <div className="mt-1 text-xs">{t('inv.stock.noProductsHint')}</div>
                 </div>
               )}
+              {/* Punto 3 (ronda 4): un producto con doc de stock registrado se
+                  muestra aunque su cantidad sea 0 (p. ej. "Cloro: 0 gal"); el
+                  filtro anterior (quantity !== 0) lo ocultaba por completo */}
               {activeProducts.map(product => {
-                const productStocks = stocks.filter(s => s.productId === product.id && s.quantity !== 0);
+                const productStocks = stocks.filter(s => s.productId === product.id);
                 if (productStocks.length === 0) return null;
+                const serialized = isSerializedProduct(product.id!);
                 const isOpen = expandedIds.has(product.id!);
                 return (
                   <div
@@ -3410,6 +3717,12 @@ export function InventarioModule() {
                           {product.sku && <span className="mr-2">{product.sku}</span>}
                           <span>{unitName(product.unitId)}</span>
                         </div>
+                        {/* Modelo final de seriales (punto 4): el stock de un
+                            producto serializado se muestra por estado
+                            ("12 disponibles · 3 rentados"), nunca plano */}
+                        {serialized && (
+                          <div className="mt-1">{renderUnitStatusChips(product.id!)}</div>
+                        )}
                       </div>
                       <Button
                         variant="ghost"
@@ -3439,9 +3752,15 @@ export function InventarioModule() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <MapPin className="h-3.5 w-3.5 text-[#86868B]" />
                                 <span className="text-sm text-[#1D1D1F]">{locationName(s.locationId)}</span>
-                                <span className="text-sm font-semibold text-[#1D1D1F]">
-                                  {s.quantity} {unitName(product.unitId)}
-                                </span>
+                                {serialized ? (
+                                  <span className="text-xs text-[#86868B]">
+                                    {t('inv.serialized.stockHint')}
+                                  </span>
+                                ) : (
+                                  <span className="text-sm font-semibold text-[#1D1D1F]">
+                                    {s.quantity} {unitName(product.unitId)}
+                                  </span>
+                                )}
                                 {s.minStock != null && (
                                   <span className="text-xs text-[#86868B]">
                                     {t('inv.stock.min')} {s.minStock} · {t('inv.stock.max')}{' '}
@@ -3574,7 +3893,9 @@ export function InventarioModule() {
           {stockView === 'location' && (
             <div className="space-y-2">
               {activeLocations.map(location => {
-                const locationStocks = stocks.filter(s => s.locationId === location.id && s.quantity !== 0);
+                // Punto 3 (ronda 4): misma regla que la vista por producto —
+                // el stock registrado en 0 sigue listándose
+                const locationStocks = stocks.filter(s => s.locationId === location.id);
                 const isOpen = expandedIds.has(location.id);
                 return (
                   <div
@@ -3625,15 +3946,25 @@ export function InventarioModule() {
                         {locationStocks.map(s => {
                           const product = products.find(p => p.id === s.productId);
                           const isLow = s.quantity <= (s.minStock ?? Infinity);
+                          const serialized = isSerializedProduct(s.productId);
                           return (
                             <div key={s.id} className="p-3">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="text-sm text-[#1D1D1F]">
                                   {product?.name || s.productId}
                                 </span>
-                                <span className="text-sm font-semibold text-[#1D1D1F]">
-                                  {s.quantity} {unitName(product?.unitId || '')}
-                                </span>
+                                {serialized ? (
+                                  <>
+                                    <span className="text-xs text-[#86868B]">
+                                      {t('inv.serialized.stockHint')}
+                                    </span>
+                                    {renderUnitStatusChips(s.productId)}
+                                  </>
+                                ) : (
+                                  <span className="text-sm font-semibold text-[#1D1D1F]">
+                                    {s.quantity} {unitName(product?.unitId || '')}
+                                  </span>
+                                )}
                                 {s.minStock != null && (
                                   <span className="text-xs text-[#86868B]">
                                     {t('inv.stock.min')} {s.minStock} · {t('inv.stock.max')}{' '}
@@ -3687,8 +4018,8 @@ export function InventarioModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: MOVIMIENTOS (kardex) ─── */}
-      {tab === 'movements' && (
+      {/* ─── SECCIÓN: MOVIMIENTOS (kardex) ─── */}
+      {invView === 'movements' && (
         <div className="space-y-4">
           <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7]">
             {t('inv.movements.help')}
@@ -3823,8 +4154,8 @@ export function InventarioModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: TRANSFERENCIAS (FASE 1A-transfers) ─── */}
-      {tab === 'transfers' && (
+      {/* ─── SECCIÓN: TRANSFERENCIAS (FASE 1A-transfers) ─── */}
+      {invView === 'transfers' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7] flex-1 min-w-[220px]">
@@ -3833,7 +4164,7 @@ export function InventarioModule() {
             {canWrite && (
               <Button
                 size="sm"
-                onClick={openTransferForm}
+                onClick={() => openTransferForm()}
                 className="h-8 text-xs rounded-xl bg-corporate gap-2 shrink-0"
               >
                 <Truck className="h-3.5 w-3.5" />
@@ -3957,6 +4288,11 @@ export function InventarioModule() {
                           )}
                         </>
                       )}
+                      {tr.status === 'en_transito' && !locations.find(l => l.id === tr.toLocationId)?.responsibleDepartmentId && (
+                        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                          {t('inv.transfers.noDeptWarning')}
+                        </p>
+                      )}
                       {canWrite && tr.status === 'pendiente' && (
                         <div className="flex flex-wrap items-center gap-2 pt-2">
                           <Button
@@ -4015,8 +4351,8 @@ export function InventarioModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: CONTEOS (FASE 1A-counts) ─── */}
-      {tab === 'counts' && (
+      {/* ─── SECCIÓN: CONTEOS (FASE 1A-counts) ─── */}
+      {invView === 'counts' && (
         <div className="space-y-4">
           {!countingSession && (
             <div className="flex flex-wrap items-center gap-2">
@@ -4323,7 +4659,8 @@ export function InventarioModule() {
       )}
 
       {/* ─── SUB-PESTAÑA: SERIALES (FASE 1B-serials) ─── */}
-      {tab === 'serials' && (
+      {/* ─── SECCIÓN: SERIALES (FASE 1B-serials) ─── */}
+      {invView === 'serials' && (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7] flex-1 min-w-[220px]">
@@ -4332,7 +4669,7 @@ export function InventarioModule() {
             {canWrite && (
               <Button
                 size="sm"
-                onClick={openSerialForm}
+                onClick={() => openSerialForm()}
                 className="h-8 text-xs rounded-xl bg-corporate gap-2 shrink-0"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -4604,7 +4941,8 @@ export function InventarioModule() {
       )}
 
       {/* ─── SUB-PESTAÑA: CATÁLOGOS ─── */}
-      {tab === 'catalogs' && (
+      {/* ─── SECCIÓN: CATÁLOGOS (movementTypes + serialStatuses) ─── */}
+      {invView === 'catalogs' && (
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Catálogo: Tipos de movimiento */}
           <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 space-y-3">
@@ -4892,9 +5230,10 @@ export function InventarioModule() {
         </div>
       )}
 
-      </>) : (
+      {invView !== 'main' && (
       <>
-      {/* Botón Volver de las pantallas internas (punto 8) */}
+      {/* Botón Volver de las pantallas internas (punto 8): secciones y
+          formularios viven en pantalla completa con el mismo patrón */}
       <div className="flex items-center gap-2">
         <Button
           variant="outline"
@@ -4936,14 +5275,60 @@ export function InventarioModule() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
-              <ProductSearchSelect
-                products={movementFormProducts}
-                value={movementForm.productId}
-                onChange={id => setMovementForm(f => ({ ...f, productId: id }))}
-                selectPlaceholder={movementCategoryId ? t('inv.movementForm.selectProduct') : t('inv.movementForm.selectCategory')}
-                searchPlaceholder={t('inv.movementForm.noMatches')}
-              />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <ProductSearchSelect
+                    products={movementFormProducts}
+                    value={movementForm.productId}
+                    onChange={id => setMovementForm(f => ({ ...f, productId: id }))}
+                    selectPlaceholder={movementCategoryId ? t('inv.movementForm.selectProduct') : t('inv.movementForm.selectCategory')}
+                    searchPlaceholder={t('inv.movementForm.noMatches')}
+                  />
+                </div>
+                {/* Escaneo opcional (puntos 13/14): selecciona el producto
+                    escaneado en este formulario; nunca obligatorio */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    scanPickRef.current = id => {
+                      const p = products.find(x => x.id === id);
+                      setMovementCategoryId(p?.categoryId || '');
+                      setMovementForm(f => ({ ...f, productId: id }));
+                    };
+                    setScanContext('navigate');
+                    setScannerOpen(true);
+                  }}
+                  className="h-9 w-9 p-0 rounded-lg border-[#E5E5E7] shrink-0"
+                  title={t('inv.product.scanToSelect')}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
+            {/* Modelo final de seriales (punto 4b): los movimientos de
+                CANTIDAD son solo para productos NO serializados */}
+            {movementProduct?.isRentable && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-2">
+                <div className="text-[11px] font-semibold text-amber-800">
+                  {t('inv.serialized.blockTitle')}
+                </div>
+                <p className="text-[11px] text-amber-800">
+                  {isInputMt ? t('inv.serialized.buyHelp') : t('inv.serialized.blockHelp')}
+                </p>
+                {isInputMt && (
+                  <Button
+                    size="sm"
+                    onClick={() => openSerialForm(movementForm.productId)}
+                    className="h-7 text-xs rounded-lg bg-corporate"
+                  >
+                    <Box className="h-3.5 w-3.5 mr-1" />
+                    {t('inv.serialized.goSerials')}
+                  </Button>
+                )}
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.movementForm.type')}</Label>
               <select
@@ -5092,7 +5477,7 @@ export function InventarioModule() {
               <Button
                 size="sm"
                 onClick={handleSaveMovement}
-                disabled={savingMovement}
+                disabled={savingMovement || !!movementProduct?.isRentable}
                 className="text-xs bg-corporate"
               >
                 {t('inv.movementForm.save')}
@@ -5110,27 +5495,7 @@ export function InventarioModule() {
             {t('inv.transfers.new')}
           </h2>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
-              <ProductSearchSelect
-                products={activeProducts}
-                value={transferForm.productId}
-                onChange={id => setTransferForm(f => ({ ...f, productId: id }))}
-                selectPlaceholder={t('inv.movementForm.selectProduct')}
-                searchPlaceholder={t('inv.movementForm.noMatches')}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.transfers.quantity')}</Label>
-              <Input
-                type="number"
-                min="0"
-                step="any"
-                value={transferForm.quantity}
-                onChange={e => setTransferForm(f => ({ ...f, quantity: e.target.value }))}
-                className="h-9 text-sm rounded-lg"
-              />
-            </div>
+            {/* Punto 14: origen y destino PRIMERO, luego categoría → producto */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label className="text-xs text-[#86868B]">{t('inv.transfers.from')}</Label>
@@ -5160,6 +5525,68 @@ export function InventarioModule() {
                     ))}
                 </select>
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.category')}</Label>
+              <select
+                value={transferCategoryId}
+                onChange={e => {
+                  setTransferCategoryId(e.target.value);
+                  setTransferForm(f => ({ ...f, productId: '' }));
+                }}
+                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+              >
+                <option value="">{t('inv.movementForm.selectCategory')}</option>
+                {activeCategories.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                {activeProducts.some(p => !p.categoryId) && (
+                  <option value="__none__">{t('inv.movementForm.noCategory')}</option>
+                )}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <ProductSearchSelect
+                    products={transferFormProducts}
+                    value={transferForm.productId}
+                    onChange={id => setTransferForm(f => ({ ...f, productId: id }))}
+                    selectPlaceholder={transferCategoryId ? t('inv.movementForm.selectProduct') : t('inv.movementForm.selectCategory')}
+                    searchPlaceholder={t('inv.movementForm.noMatches')}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    scanPickRef.current = id => {
+                      const p = products.find(x => x.id === id);
+                      setTransferCategoryId(p?.categoryId || '');
+                      setTransferForm(f => ({ ...f, productId: id }));
+                    };
+                    setScanContext('navigate');
+                    setScannerOpen(true);
+                  }}
+                  className="h-9 w-9 p-0 rounded-lg border-[#E5E5E7] shrink-0"
+                  title={t('inv.product.scanToSelect')}
+                >
+                  <QrCode className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.transfers.quantity')}</Label>
+              <Input
+                type="number"
+                min="0"
+                step="any"
+                value={transferForm.quantity}
+                onChange={e => setTransferForm(f => ({ ...f, quantity: e.target.value }))}
+                className="h-9 text-sm rounded-lg"
+              />
             </div>
             {transferForm.productId && (
               <div className="rounded-lg bg-[#F5F5F7] border border-[#E5E5E7] px-3 py-2 space-y-1">
@@ -5200,7 +5627,7 @@ export function InventarioModule() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setInvView('main'); setTransferForm(EMPTY_TRANSFER_FORM); }}
+                onClick={() => { setInvView('main'); setTransferForm(EMPTY_TRANSFER_FORM); setTransferCategoryId(''); }}
                 className="text-xs text-[#86868B]"
               >
                 {t('inv.common.cancel')}
@@ -5230,7 +5657,18 @@ export function InventarioModule() {
             const unitOptions = needsUnits && receivingTransfer
               ? rentalUnits.filter(u => u.productId === receivingTransfer.productId)
               : [];
-            const unitsReady = !needsUnits || !receivingTransfer || receiveSerialIds.length === receivingTransfer.quantity;
+            // Verificación obligatoria (punto 11): seriales → unidades
+            // confirmadas; consumible con QR → QR del producto escaneado;
+            // producto SIN QR → foto + firma obligatorias
+            const receiveProduct = receivingTransfer
+              ? products.find(p => p.id === receivingTransfer.productId)
+              : undefined;
+            const hasQr = productHasQr(receiveProduct);
+            const unitsReady = !receivingTransfer || (needsUnits
+              ? receiveSerialIds.length === receivingTransfer.quantity
+              : hasQr
+                ? receiveScanConfirmed
+                : !!(receivePhoto && receiveSignature));
             return (
               <div className="space-y-3">
                 {receivingTransfer && (
@@ -5293,11 +5731,83 @@ export function InventarioModule() {
                     </div>
                   </div>
                 )}
+                {/* Punto 11: consumible CON QR → escaneo obligatorio de
+                    confirmación; SIN QR → foto + recuadro de firma */}
+                {!needsUnits && receivingTransfer && hasQr && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-[#86868B]">{t('inv.receive.scanConfirmHelp')}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={cn(
+                        'inline-flex items-center gap-1 text-xs font-medium',
+                        receiveScanConfirmed ? 'text-green-700' : 'text-[#1D1D1F]'
+                      )}
+                      >
+                        {receiveScanConfirmed && <Check className="h-3.5 w-3.5" />}
+                        {receiveScanConfirmed
+                          ? t('inv.receive.scanConfirmed')
+                          : `${t('inv.transfers.quantity')}: ${receivingTransfer.quantity}`}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setScanContext('receive'); setScannerOpen(true); }}
+                        className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-2"
+                      >
+                        <QrCode className="h-3.5 w-3.5" />
+                        {t('inv.receive.scanConfirm')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {!needsUnits && receivingTransfer && !hasQr && (
+                  <div className="space-y-2">
+                    <p className="text-[11px] text-[#86868B]">{t('inv.receive.noQrHelp')}</p>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.receive.photo')}</Label>
+                      <div className="flex items-center gap-3">
+                        {receivePhoto && (
+                          <img
+                            src={receivePhoto}
+                            alt={t('inv.receive.photo')}
+                            className="h-16 w-16 rounded-lg object-cover border border-[#E5E5E7]"
+                          />
+                        )}
+                        <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-corporate hover:underline">
+                          <Upload className="h-3.5 w-3.5" />
+                          {t('inv.receive.photo')}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={e => {
+                              const file = e.target.files?.[0] || null;
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => setReceivePhoto(typeof reader.result === 'string' ? reader.result : null);
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.receive.signature')}</Label>
+                      <SignatureCanvas value={receiveSignature} onChange={setReceiveSignature} />
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-end gap-2 pt-1">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => { setReceiveTransferId(null); setReceiveSerialIds([]); setInvView('main'); }}
+                    onClick={() => {
+                      setReceiveTransferId(null);
+                      setReceiveSerialIds([]);
+                      setReceiveScanConfirmed(false);
+                      setReceivePhoto(null);
+                      setReceiveSignature(null);
+                      setInvView('main');
+                    }}
                     className="text-xs text-[#86868B]"
                   >
                     {t('inv.common.cancel')}
@@ -5627,6 +6137,238 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
+      {/* ─── SECCIÓN: AJUSTES (punto 12): movimientos tipo 'ajuste', lectura ─── */}
+      {invView === 'adjustments' && (
+        <div className="space-y-4">
+          <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7]">
+            {t('inv.adjustments.help')}
+          </p>
+          <div className="space-y-2">
+            {adjustmentMovements.length === 0 && (
+              <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
+                {t('inv.adjustments.empty')}
+              </div>
+            )}
+            {adjustmentMovements.map(m => {
+              const isOpen = expandedIds.has(m.id!);
+              return (
+                <div
+                  key={m.id}
+                  className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] overflow-hidden"
+                >
+                  <button
+                    onClick={() => toggleExpanded(m.id!)}
+                    className="w-full flex items-center gap-3 p-3 text-left"
+                  >
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-semibold shrink-0',
+                        m.quantity > 0
+                          ? 'bg-green-50 text-green-700 border border-green-200'
+                          : 'bg-red-50 text-red-700 border border-red-200'
+                      )}
+                    >
+                      {m.quantity > 0 ? '+' : ''}{m.quantity}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-[#1D1D1F] truncate">
+                        {productName(m.productId)}
+                      </div>
+                      <div className="text-xs text-[#86868B] truncate">
+                        {m.reason || t('inv.movements.noReason')}
+                      </div>
+                    </div>
+                    <span className="text-xs text-[#86868B] shrink-0">
+                      {m.createdAt ? new Date(m.createdAt).toLocaleString() : '—'}
+                    </span>
+                    {isOpen ? (
+                      <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-[#86868B] shrink-0" />
+                    )}
+                  </button>
+                  {isOpen && (
+                    <div className="border-t border-[#E5E5E7] p-3 space-y-1.5">
+                      <DetailRow label={t('inv.movements.product')} value={productName(m.productId)} />
+                      <DetailRow
+                        label={t('inv.movements.from')}
+                        value={m.fromLocationId ? locationName(m.fromLocationId) : '—'}
+                      />
+                      <DetailRow
+                        label={t('inv.movements.to')}
+                        value={m.toLocationId ? locationName(m.toLocationId) : '—'}
+                      />
+                      <DetailRow label={t('inv.movements.reason')} value={m.reason || t('inv.movements.noReason')} />
+                      <DetailRow label={t('inv.movements.user')} value={m.createdByName || '—'} />
+                      <DetailRow
+                        label={t('inv.movements.date')}
+                        value={m.createdAt ? new Date(m.createdAt).toLocaleString() : '—'}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PANTALLA: FICHA DE PRODUCTO (punto 13, centro de operaciones) ─── */}
+      {invView === 'product' && (() => {
+        const product = products.find(p => p.id === productDetailId);
+        if (!product) {
+          return (
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
+              {t('inv.product.notFound')}
+            </div>
+          );
+        }
+        const serialized = isSerializedProduct(product.id!);
+        const productStocks = stocks.filter(s => s.productId === product.id);
+        const repairUnits = rentalUnits.filter(
+          u => u.productId === product.id && u.statusId === 'disponible'
+        );
+        return (
+          <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              {product.photoUrl ? (
+                <img
+                  src={product.photoUrl}
+                  alt={product.name}
+                  className="h-12 w-12 rounded-xl object-cover border border-[#E5E5E7]"
+                />
+              ) : (
+                <div className="h-12 w-12 rounded-xl bg-[#F5F5F7] flex items-center justify-center">
+                  <Package className="h-6 w-6 text-[#86868B]" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold text-[#1D1D1F] truncate">{product.name}</h2>
+                <div className="text-xs text-[#86868B]">
+                  {product.sku && <span className="mr-2">{product.sku}</span>}
+                  <span>{unitName(product.unitId)}</span>
+                  {product.isRentable && <span className="ml-2">· {t('inv.serialized.stockHint')}</span>}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openProductQr(product)}
+                className="h-8 w-8 p-0 text-[#86868B] shrink-0"
+                title={t('inv.qr.scanProduct')}
+              >
+                <QrCode className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Stock: serializado → conteo por estado; no serializado → por ubicación */}
+            {serialized ? (
+              <div className="space-y-1">
+                <Label className="text-xs text-[#86868B]">{t('inv.product.unitsByStatus')}</Label>
+                {renderUnitStatusChips(product.id!)}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="text-xs text-[#86868B]">{t('inv.product.stockByLocation')}</Label>
+                {productStocks.length === 0 && (
+                  <p className="text-xs text-[#86868B]">{t('inv.product.noStock')}</p>
+                )}
+                {productStocks.map(s => (
+                  <div key={s.id} className="text-sm text-[#1D1D1F]">
+                    {locationName(s.locationId)}: <span className="font-semibold">{s.quantity}</span>{' '}
+                    {unitName(product.unitId)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Acciones directas (punto 13) */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {canWrite && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => openMovementFormFor('compra', product.id)}
+                    className="h-9 text-xs rounded-xl bg-corporate gap-2"
+                  >
+                    <ShoppingCart className="h-3.5 w-3.5" />
+                    {t('inv.product.buy')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openTransferForm(product.id)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <Truck className="h-3.5 w-3.5" />
+                    {t('inv.product.transfer')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMovementFormFor('consumo', product.id)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                    {t('inv.product.consume')}
+                  </Button>
+                  {product.isRentable && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(`/warehouse?newOrder=1&productId=${product.id}`)}
+                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                    >
+                      <Box className="h-3.5 w-3.5" />
+                      {t('inv.product.rent')}
+                    </Button>
+                  )}
+                  {serialized ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openRepairDialog(product.id!)}
+                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                    >
+                      <Wrench className="h-3.5 w-3.5" />
+                      {t('inv.product.repair')}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        openMovementFormFor('ajuste', product.id);
+                        setMovementForm(f => ({ ...f, reason: 'Reparación' }));
+                      }}
+                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                    >
+                      <Wrench className="h-3.5 w-3.5" />
+                      {t('inv.product.repair')}
+                    </Button>
+                  )}
+                </>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFilterProductId(product.id!);
+                  setInvView('movements');
+                }}
+                className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+              >
+                <History className="h-3.5 w-3.5" />
+                {t('inv.product.history')}
+              </Button>
+            </div>
+            {repairUnits.length === 0 && product.isRentable && (
+              <p className="text-[11px] text-[#86868B]">{t('inv.repair.noAvailable')}</p>
+            )}
+          </div>
+        );
+      })()}
+
       </>)}
 
       {/* ─── MODAL: QR (producto / ubicación / serial) ─── */}
@@ -5638,10 +6380,102 @@ export function InventarioModule() {
         qrText={qrDialog?.qrText || ''}
       />
 
+      {/* ─── MODAL: ENVIAR A REPARACIÓN (punto 13, desde ficha de producto) ─── */}
+      <Dialog
+        open={repairProductId !== null}
+        onOpenChange={open => { if (!open) { setRepairProductId(null); setRepairUnitIds([]); setRepairReason(''); } }}
+      >
+        <DialogContent className="rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-corporate" />
+              {t('inv.repair.title')}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const available = repairProductId
+              ? rentalUnits.filter(u => u.productId === repairProductId && u.statusId === 'disponible')
+              : [];
+            return (
+              <div className="space-y-3">
+                <p className="text-xs text-[#86868B]">
+                  {repairProductId ? `${productName(repairProductId)} — ` : ''}{t('inv.repair.help')}
+                </p>
+                {available.length === 0 ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    {t('inv.repair.noAvailable')}
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.repair.selectUnits')}</Label>
+                    <div className="max-h-40 overflow-y-auto rounded-lg border border-[#E5E5E7] divide-y divide-[#F5F5F7]">
+                      {available.map(u => {
+                        const checked = repairUnitIds.includes(u.id || '');
+                        return (
+                          <label
+                            key={u.id}
+                            className="flex items-center gap-2 px-3 py-2 text-xs text-[#1D1D1F] cursor-pointer hover:bg-[#F5F5F7]"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setRepairUnitIds(prev =>
+                                  checked ? prev.filter(x => x !== u.id) : [...prev, u.id || '']
+                                )
+                              }
+                              className="h-3.5 w-3.5 accent-corporate"
+                            />
+                            <span className="font-medium">{u.serialNumber}</span>
+                            {u.size && <span className="text-[#86868B]">{u.size}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.repair.reason')}</Label>
+                  <Input
+                    value={repairReason}
+                    onChange={e => setRepairReason(e.target.value)}
+                    placeholder={t('inv.repair.reasonPlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setRepairProductId(null); setRepairUnitIds([]); setRepairReason(''); }}
+                    className="text-xs text-[#86868B]"
+                  >
+                    {t('inv.common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSendRepair}
+                    disabled={repairUnitIds.length === 0}
+                    className="text-xs bg-corporate"
+                  >
+                    {t('inv.repair.title')}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
+
       {/* ─── MODAL: ESCANER QR ─── */}
       <ScannerModal
         open={scannerOpen}
-        onOpenChange={setScannerOpen}
+        onOpenChange={open => {
+          setScannerOpen(open);
+          // Al cerrar sin escanear se anula cualquier selección pendiente:
+          // el próximo escaneo en modo navegación abre la ficha normal
+          if (!open) scanPickRef.current = null;
+        }}
         onScan={handleScanResult}
         serialIds={rentalUnits.map(u => u.id || '')}
         multiScan={scanContext !== 'navigate'}
@@ -5659,6 +6493,90 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
     <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-3 text-xs">
       <span className="sm:w-32 shrink-0 text-[#86868B] font-medium">{label}</span>
       <span className="text-[#1D1D1F] break-words">{value || '—'}</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RECUADRO DE FIRMA (punto 11): canvas simple donde quien recibe dibuja
+// su firma con el dedo o el mouse; entrega un dataURL (o null si está vacío)
+// ═══════════════════════════════════════════════════════════════════
+
+function SignatureCanvas({ value, onChange }: { value: string | null; onChange: (dataUrl: string | null) => void }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const drawingRef = useRef(false);
+  const hasInkRef = useRef(false);
+
+  const getPos = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const rect = canvas!.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  const handleDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    drawingRef.current = true;
+    canvas.setPointerCapture(e.pointerId);
+    const { x, y } = getPos(e);
+    ctx.strokeStyle = '#1D1D1F';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    hasInkRef.current = true;
+  };
+
+  const handleMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!drawingRef.current) return;
+    const ctx = canvasRef.current?.getContext('2d');
+    if (!ctx) return;
+    const { x, y } = getPos(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const handleUp = () => {
+    if (!drawingRef.current) return;
+    drawingRef.current = false;
+    const canvas = canvasRef.current;
+    onChange(canvas && hasInkRef.current ? canvas.toDataURL('image/png') : null);
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hasInkRef.current = false;
+    onChange(null);
+  };
+
+  return (
+    <div className="space-y-1">
+      <canvas
+        ref={canvasRef}
+        width={520}
+        height={160}
+        onPointerDown={handleDown}
+        onPointerMove={handleMove}
+        onPointerUp={handleUp}
+        onPointerLeave={handleUp}
+        className="w-full h-36 rounded-lg border border-[#E5E5E7] bg-white touch-none"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] text-[#86868B]">{t('inv.receive.signatureHint')}</p>
+        <button
+          type="button"
+          onClick={clear}
+          className="inline-flex items-center gap-1 text-[11px] text-corporate hover:underline shrink-0"
+        >
+          <Eraser className="h-3 w-3" />
+          {t('inv.receive.signatureClear')}
+        </button>
+      </div>
     </div>
   );
 }
@@ -5760,10 +6678,16 @@ function QrDialog({ open, onOpenChange, title, subtitle, qrText }: QrDialogProps
 // entre las cámaras detectadas.
 // Bug "HTML Element with id=... not found": html5-qrcode LANZA en su
 // CONSTRUCTOR si el contenedor no está en el DOM todavía. Con el Dialog
-// de Radix el portal puede montarse después del efecto, así que la
-// instancia se crea SOLO cuando el contenedor ya existe (reintento por
+// de Radix el portal puede montarse después del efecto, así que la instancia
+// se crea SOLO cuando el contenedor ya existe (reintento por
 // requestAnimationFrame) y el id es único por instancia (useId), así el
-// escáner funciona igual en Stock, Seriales, Conteos y Transferencias.
+// escáner funciona igual en Stock, Seriales, Conteos, Transferencias y la
+// ficha de producto.
+// RONDA 4 (punto 2): "abre la cámara pero no registra nada" — html5-qrcode
+// NO permite start() tras stop() en la MISMA instancia; ahora cada sesión de
+// escaneo (apertura del modal y cada reactivación multiScan) crea una
+// instancia NUEVA con el callback de éxito bien cableado, y hay un log
+// temporal en consola ([ScannerModal] QR detectado) para diagnosticar.
 
 interface ScannerModalProps {
   open: boolean;
@@ -5792,10 +6716,12 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
   const serialIdsRef = useRef(serialIds);
   const multiScanRef = useRef(multiScan);
   const cameraListRef = useRef(cameraList);
+  const cameraIndexRef = useRef(cameraIndex);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
   useEffect(() => { serialIdsRef.current = serialIds; }, [serialIds]);
   useEffect(() => { multiScanRef.current = multiScan; }, [multiScan]);
   useEffect(() => { cameraListRef.current = cameraList; }, [cameraList]);
+  useEffect(() => { cameraIndexRef.current = cameraIndex; }, [cameraIndex]);
 
   // Reinicia la entrada manual y la cámara cada vez que se abre el modal
   useEffect(() => {
@@ -5834,65 +6760,82 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
     let rafId = 0;
     let attempts = 0;
 
-    const stopScanner = () => {
+    // Detiene y limpia la instancia actual (la misma instancia de
+    // html5-qrcode NO puede volver a arrancar tras stop(): por eso cada
+    // sesión de escaneo crea una instancia NUEVA, ver startSession)
+    const stopScanner = async () => {
       const active = scanner;
       scanner = null;
       if (active) {
-        active.stop().then(() => active.clear()).catch(() => undefined);
+        try { await active.stop(); } catch { /* ya detenida */ }
+        try { active.clear(); } catch { /* contenedor ya limpio */ }
       }
     };
 
-    const start = () => {
+    const startSession = () => {
       if (disposed) return;
       // El contenedor vive en el portal del Dialog: no se crea la instancia
       // hasta verificar que existe (reintento durante ~1s).
       const el = document.getElementById(instanceId);
       if (!el) {
         attempts += 1;
-        if (attempts < 60) rafId = requestAnimationFrame(start);
+        if (attempts < 60) rafId = requestAnimationFrame(startSession);
         return;
       }
+      // INSTANCIA NUEVA por cada sesión de escaneo: apertura del modal y cada
+      // reactivación multiScan. html5-qrcode no soporta start() tras stop() en
+      // la misma instancia; crear una nueva por sesión es el cableado correcto
+      let session: Html5Qrcode;
       try {
-        scanner = new Html5Qrcode(instanceId, { verbose: false });
+        session = new Html5Qrcode(instanceId, { verbose: false });
       } catch (err) {
         console.error('[ScannerModal]', err);
         if (!disposed) setCameraFailed(true);
         return;
       }
+      scanner = session;
+
       const onDecode = (decodedText: string) => {
+        // Diagnóstico temporal (ronda 4): verifica que onSuccess dispara con
+        // un string decodificado; si la cámara abre pero "no pasa nada", este
+        // log confirma si el problema está en el decode o en el parseo
+        console.info('[ScannerModal] QR detectado:', decodedText);
         const result = parseScan(decodedText);
         if (!result) {
           toast.error(t('inv.scanner.unrecognized'));
           return;
         }
         if (multiScanRef.current) {
-          // Conteo/recepción: detener, entregar y reactivar la cámara para
-          // la siguiente unidad sin cerrar el modal
-          const active = scanner;
-          scanner = null;
-          if (active) {
-            active.stop().then(() => {
-              active.clear();
+          // Conteo/recepción: detener → entregar → NUEVA instancia para la
+          // siguiente unidad, sin cerrar el modal
+          void session.stop()
+            .then(() => {
+              session.clear();
+              if (scanner === session) scanner = null;
               if (disposed) return;
               onScanRef.current(result.kind, result.id);
-              rafId = requestAnimationFrame(start);
-            }).catch(() => undefined);
-          } else {
-            onScanRef.current(result.kind, result.id);
-          }
+              rafId = requestAnimationFrame(startSession);
+            })
+            .catch(() => {
+              if (disposed) return;
+              rafId = requestAnimationFrame(startSession);
+            });
         } else {
           // QR válido: detener la cámara y entregar el resultado
-          stopScanner();
-          onScanRef.current(result.kind, result.id);
+          void stopScanner().finally(() => {
+            if (disposed) return;
+            onScanRef.current(result.kind, result.id);
+          });
         }
       };
+
       // Cámara directa: trasera (environment) salvo que el botón de respaldo
       // haya elegido una cámara concreta
-      const cameraId = cameraIndex >= 0 ? cameraListRef.current[cameraIndex]?.id : undefined;
+      const cameraId = cameraIndexRef.current >= 0 ? cameraListRef.current[cameraIndexRef.current]?.id : undefined;
       const cameraSel: string | MediaTrackConstraints = cameraId || { facingMode: 'environment' };
-      scanner.start(cameraSel, { fps: 10, qrbox: 250 }, onDecode, () => undefined)
+      session.start(cameraSel, { fps: 10, qrbox: 250 }, onDecode, () => undefined)
         .then(() => {
-          if (disposed) { stopScanner(); return; }
+          if (disposed) { void stopScanner(); return; }
           setCameraFailed(false);
           // Lista de cámaras para el botón de respaldo (una sola vez)
           if (cameraListRef.current.length === 0) {
@@ -5915,19 +6858,19 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
             .then(cams => {
               if (disposed || cams.length === 0) return;
               setCameraList(cams.map(c => ({ id: c.id, label: c.label || c.id })));
-              if (cameraIndex < 0) setCameraIndex(0);
+              if (cameraIndexRef.current < 0) setCameraIndex(0);
             })
             .catch(() => undefined);
         });
     };
 
-    rafId = requestAnimationFrame(start);
+    rafId = requestAnimationFrame(startSession);
 
     // Apaga la cámara al desmontar / cerrar el modal o cambiar de cámara
     return () => {
       disposed = true;
       cancelAnimationFrame(rafId);
-      stopScanner();
+      void stopScanner();
     };
   }, [open, instanceId, cameraIndex]);
 

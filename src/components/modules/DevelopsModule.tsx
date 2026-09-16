@@ -13,6 +13,7 @@ import {
   Briefcase, User, Upload, List,
   Phone, MapPin, Calendar, Globe, Droplets, Pill, Award, CreditCard, Camera,
   Check, Heart, UserCircle, Flag, Droplet, BadgeCheck, IdCard, Edit3, Database,
+  Percent,
 } from 'lucide-react';
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
@@ -253,12 +254,20 @@ function GeneralTab() {
   const [branding, setBranding] = useState(settings.branding);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(settings.branding.logoUrl);
+  // Porcentaje máximo de descuento sin aprobación (default 10 si no está definido)
+  const [maxDiscountStr, setMaxDiscountStr] = useState(
+    String(settings.maxDiscountWithoutApproval ?? 10)
+  );
 
   useEffect(() => {
     setBranding(settings.branding);
     setLogoPreview(settings.branding.logoUrl);
     setLogoFile(null);
   }, [settings.branding]);
+
+  useEffect(() => {
+    setMaxDiscountStr(String(settings.maxDiscountWithoutApproval ?? 10));
+  }, [settings.maxDiscountWithoutApproval]);
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -319,6 +328,38 @@ function GeneralTab() {
     }
   };
 
+  const saveMaxDiscount = async () => {
+    const value = Number(maxDiscountStr);
+    if (maxDiscountStr.trim() === '' || !Number.isFinite(value) || value < 0 || value > 100) {
+      alert('El descuento maximo sin aprobacion debe ser un numero entre 0 y 100');
+      return;
+    }
+    const previous = settings.maxDiscountWithoutApproval ?? 10;
+    if (value === previous) return;
+    setSaving('maxDiscount');
+    try {
+      await updateDoc(doc(db, 'appSettings', 'global'), {
+        maxDiscountWithoutApproval: value,
+        updatedAt: new Date().toISOString(),
+      });
+      await logAction({
+        action: 'SETTINGS_UPDATED',
+        targetType: 'settings',
+        targetId: 'global',
+        targetName: 'Descuento maximo sin aprobacion',
+        impactLevel: 'major',
+        description: `Descuento maximo sin aprobacion actualizado de ${previous}% a ${value}%`,
+        previousValue: { maxDiscountWithoutApproval: previous },
+        newValue: { maxDiscountWithoutApproval: value },
+      });
+    } catch (err) {
+      console.error('Error saving max discount:', err);
+      alert('Error al guardar el descuento maximo sin aprobacion');
+    } finally {
+      setSaving(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
@@ -371,6 +412,38 @@ function GeneralTab() {
         <div className="flex justify-end mt-4">
           <button onClick={saveBranding} disabled={saving === 'branding'} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-corporate hover:bg-corporate/90 disabled:opacity-50 transition-colors">
             {saving === 'branding' ? 'Guardando...' : 'Guardar cambios'}
+          </button>
+        </div>
+      </div>
+
+      {/* Descuento maximo sin aprobacion */}
+      <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+        <div className="flex items-center gap-2 mb-4">
+          <Percent className="w-5 h-5 text-corporate" />
+          <h3 className="font-semibold text-[#1D1D1F]">Descuentos de venta</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-medium text-[#86868B] mb-1">Descuento maximo sin aprobacion (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={maxDiscountStr}
+              onChange={(e) => setMaxDiscountStr(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm focus:outline-none focus:ring-2 focus:ring-corporate/20"
+            />
+          </div>
+          <div className="flex items-end">
+            <p className="text-[11px] text-[#86868B] leading-relaxed pb-2">
+              Si un vendedor aplica un descuento mayor, la orden queda "Descuento por aprobar" y lo aprueba la jerarquia (gerente de su departamento y arriba). Valor actual: {settings.maxDiscountWithoutApproval ?? 10}%.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button onClick={saveMaxDiscount} disabled={saving === 'maxDiscount'} className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-corporate hover:bg-corporate/90 disabled:opacity-50 transition-colors">
+            {saving === 'maxDiscount' ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </div>
       </div>

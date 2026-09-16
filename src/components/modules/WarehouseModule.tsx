@@ -21,6 +21,7 @@ import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { useShifts } from '@/hooks/useShifts';
 import { useAudit } from '@/hooks/useAudit';
 import { executeWithConfirm } from '@/lib/confirm-action';
+import { hasPermission } from '@/lib/permissions-config';
 import { getCurrentTenantId } from '@/lib/tenant';
 import { registerI18nKeys, t, getLanguage } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ import type {
   SerialStatus,
   RentalUnit,
   Product,
+  ProductCategory,
   Location,
   Client,
   InventoryStock,
@@ -46,6 +48,7 @@ import type {
   RentalOrderFee,
 } from '@/types/catalogs';
 import type { AuditAction } from '@/types/develops';
+import type { User } from '@/types';
 import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
   ClipboardList, Plus, Search, ChevronDown, ChevronUp,
@@ -347,7 +350,7 @@ registerI18nKeys({
     'wh.discount.pendingBadge': 'Descuento por aprobar',
     'wh.discount.rejectedBadge': 'Descuento rechazado',
     'wh.discount.bannerTitle': 'Aprobar descuento',
-    'wh.discount.bannerDesc': 'El descuento "{name}" (-{percent}%) excede el máximo del vendedor o incluye un producto que no admite descuento. Apruébalo para aplicarlo o recházalo para quitarlo del total.',
+    'wh.discount.bannerDesc': 'El descuento "{name}" (-{percent}%) supera el tope general sin aprobación o incluye un producto que no admite descuento. Apruébalo para aplicarlo o recházalo para quitarlo del total.',
     'wh.discount.approve': 'Aprobar',
     'wh.discount.reject': 'Rechazar',
     'wh.confirm.discountApproveTitle': 'Aprobar descuento',
@@ -361,6 +364,31 @@ registerI18nKeys({
 
     'wh.scanner.switchCamera': 'Cambiar cámara',
     'wh.scanner.cameraError': 'No se pudo abrir la cámara. Intenta con otra o ingresa el código manual.',
+
+    'wh.home.boardDesc': 'Resumen abierto: órdenes activas agrupadas por estado.',
+    'wh.home.ordersDesc': 'Todas las órdenes de renta, con búsqueda y filtros.',
+    'wh.home.returnsDesc': 'Verificación de retornos y equipo en poder del cliente.',
+    'wh.home.activeCount': '{count} activa(s)',
+
+    'wh.orderForm.locationFirst': 'Selecciona primero la ubicación de entrega para ver la disponibilidad real de cada producto.',
+    'wh.orderForm.category': 'Categoría',
+    'wh.orderForm.allCategories': 'Todas',
+    'wh.orderForm.searchProduct': 'Buscar producto...',
+    'wh.orderForm.add': 'Agregar',
+    'wh.orderForm.availableShort': '{count} disp.',
+    'wh.orderForm.noProducts': 'No hay productos rentables en esta categoría',
+    'wh.orderForm.scanAdd': 'Escanear para agregar',
+    'wh.orderForm.lines': 'Ítems de la orden',
+    'wh.orderForm.emptyLines': 'Aún no agregas ítems. Elige productos abajo o escanéalos.',
+    'wh.orderForm.validation.locationRequired': 'Selecciona la ubicación de entrega para agregar ítems',
+    'wh.orderForm.validation.exceedsStock': 'No hay suficiente stock de {product} en esa ubicación (disponible: {count})',
+
+    'wh.dispatch.progress': '{scanned} de {total} escaneados · faltan {missing}',
+    'wh.dispatch.simpleConfirm': 'Sin QR: se confirma con un toque, sin escaneo.',
+
+    'wh.discount.preAuthorized': 'Pre-autorizado',
+    'wh.discount.preAuthorizedHint': 'Descuento pre-autorizado: se aplica sin aprobación, aunque supere el tope general.',
+    'wh.discount.maxHint': 'Tope general sin aprobación: {percent}%',
   },
   en: {
     'wh.devTitle': 'Module under development',
@@ -650,7 +678,7 @@ registerI18nKeys({
     'wh.discount.pendingBadge': 'Discount pending approval',
     'wh.discount.rejectedBadge': 'Discount rejected',
     'wh.discount.bannerTitle': 'Approve discount',
-    'wh.discount.bannerDesc': 'The discount "{name}" (-{percent}%) exceeds the seller\'s maximum or includes a product that does not allow discounts. Approve it to apply it or reject it to remove it from the total.',
+    'wh.discount.bannerDesc': 'The discount "{name}" (-{percent}%) exceeds the general no-approval cap or includes a product that does not allow discounts. Approve it to apply it or reject it to remove it from the total.',
     'wh.discount.approve': 'Approve',
     'wh.discount.reject': 'Reject',
     'wh.confirm.discountApproveTitle': 'Approve discount',
@@ -664,6 +692,31 @@ registerI18nKeys({
 
     'wh.scanner.switchCamera': 'Switch camera',
     'wh.scanner.cameraError': 'Could not open the camera. Try another one or enter the code manually.',
+
+    'wh.home.boardDesc': 'Open summary: active orders grouped by status.',
+    'wh.home.ordersDesc': 'All rental orders, with search and filters.',
+    'wh.home.returnsDesc': 'Return verification and gear in the client\'s possession.',
+    'wh.home.activeCount': '{count} active',
+
+    'wh.orderForm.locationFirst': 'Select the delivery location first to see real availability per product.',
+    'wh.orderForm.category': 'Category',
+    'wh.orderForm.allCategories': 'All',
+    'wh.orderForm.searchProduct': 'Search product...',
+    'wh.orderForm.add': 'Add',
+    'wh.orderForm.availableShort': '{count} avail.',
+    'wh.orderForm.noProducts': 'No rentable products in this category',
+    'wh.orderForm.scanAdd': 'Scan to add',
+    'wh.orderForm.lines': 'Order items',
+    'wh.orderForm.emptyLines': 'No items yet. Pick products below or scan them.',
+    'wh.orderForm.validation.locationRequired': 'Select the delivery location to add items',
+    'wh.orderForm.validation.exceedsStock': 'Not enough stock of {product} at that location (available: {count})',
+
+    'wh.dispatch.progress': '{scanned} of {total} scanned · {missing} remaining',
+    'wh.dispatch.simpleConfirm': 'No QR: confirmed with a single tap, no scanning.',
+
+    'wh.discount.preAuthorized': 'Pre-authorized',
+    'wh.discount.preAuthorizedHint': 'Pre-authorized discount: applies without approval, even above the general cap.',
+    'wh.discount.maxHint': 'General no-approval cap: {percent}%',
   },
 });
 
@@ -893,11 +946,29 @@ function docToRentalDiscount(id: string, data: Record<string, unknown>): RentalD
     tenantId: toStr(data.tenantId),
     name: toStr(data.name),
     percent: toNum(data.percent),
+    // MODELO V2: pre-autorizado (se aplica sin aprobación) y productos a los
+    // que aplica (vacío/ausente = aplica a todos)
+    preAuthorized: data.preAuthorized === true,
+    productIds: Array.isArray(data.productIds)
+      ? (data.productIds as unknown[]).filter((x): x is string => typeof x === 'string')
+      : undefined,
     isActive: toBool(data.isActive, true),
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
     updatedAt: data.updatedAt ? toStr(data.updatedAt) : undefined,
     updatedBy: data.updatedBy ? toStr(data.updatedBy) : undefined,
+  };
+}
+
+function docToProductCategory(id: string, data: Record<string, unknown>): ProductCategory {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    name: toStr(data.name),
+    nameEn: data.nameEn ? toStr(data.nameEn) : undefined,
+    isActive: toBool(data.isActive, true),
+    createdAt: toStr(data.createdAt),
+    createdBy: toStr(data.createdBy),
   };
 }
 
@@ -973,11 +1044,11 @@ function unitPriceForQty(product: Product | undefined, qty: number): number | nu
 // TIPOS INTERNOS
 // ═══════════════════════════════════════════════════════════════════
 
-type WhTab = 'board' | 'orders' | 'returns';
-
 // Vista interna de pantalla completa (sin pop-ups): las acciones principales
-// navegan entre pantallas con botón Volver, no entre diálogos
-type WhView = 'create' | 'dispatch' | 'return' | null;
+// y las secciones (Pizarra / Órdenes / Retornos) navegan entre pantallas con
+// botón Volver; las tarjetas-módulo de la pantalla principal son LA navegación
+// (ya no hay pills/pestañas)
+type WhView = 'create' | 'dispatch' | 'return' | 'board' | 'orders' | 'returns' | null;
 
 interface OrderItemDraft {
   productId: string;
@@ -1098,7 +1169,7 @@ const DEPOSIT_STATUS_BADGE: Record<string, string> = {
 
 export function WarehouseModule() {
   const { user: currentUser } = useAuth();
-  const { isFeatureEnabled } = useAppConfig();
+  const { isFeatureEnabled, settings } = useAppConfig();
   const { users } = useFirestoreUsers();
   const { uploadImage, uploading: uploadingFile } = useStorageUpload();
   const { getUserShifts } = useShifts();
@@ -1107,6 +1178,7 @@ export function WarehouseModule() {
   const [orders, setOrders] = useState<RentalOrder[]>([]);
   const [statuses, setStatuses] = useState<RentalOrderStatus[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [rentalUnits, setRentalUnits] = useState<RentalUnit[]>([]);
@@ -1119,11 +1191,8 @@ export function WarehouseModule() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
-  // Navegación entre sub-pestañas
-  const [tab, setTab] = useState<WhTab>('board');
-
-  // Vista interna de pantalla completa (crear orden / despachar / retorno).
-  // null = pantalla principal con tarjetas de acción y sub-pestañas
+  // Vista interna de pantalla completa (tarjetas-módulo = navegación).
+  // null = pantalla principal con tarjetas-módulo y la Pizarra abierta
   const [whView, setWhView] = useState<WhView>(null);
 
   // Tarjetas expandibles (lista de órdenes)
@@ -1143,6 +1212,11 @@ export function WarehouseModule() {
   // Formulario de nueva orden (pantalla interna: whView === 'create')
   const [orderForm, setOrderForm] = useState<OrderFormState>(EMPTY_ORDER_FORM);
   const [orderItems, setOrderItems] = useState<OrderItemDraft[]>([]);
+  // Selector de ítems por CATEGORÍA (Ronda 4): ubicación primero, luego
+  // categoría → productos con disponibilidad real (stock − lo ya pedido)
+  const [formCategoryId, setFormCategoryId] = useState('');
+  const [formProductSearch, setFormProductSearch] = useState('');
+  const [formScanOpen, setFormScanOpen] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [savingOrder, setSavingOrder] = useState(false);
   // La sugerencia de fianza solo rellena el campo mientras el usuario no lo
@@ -1199,6 +1273,10 @@ export function WarehouseModule() {
   const canSeeMoney = !!role && MONEY_ROLES.includes(role);
   const canApprove = !!role && APPROVE_ROLES.includes(role);
   const canSupervise = !!role && SUPERVISOR_PLUS_ROLES.includes(role);
+  // Aprobación de descuentos: Supervisor+ o cualquiera con el permiso de
+  // aprobar días libres (misma jerarquía que recibe la notificación)
+  const canApproveDiscount =
+    canSupervise || (!!currentUser && hasPermission(currentUser as unknown as User, 'canApproveTimeOff'));
   const canOperate = !!currentUser; // cualquier usuario autenticado opera órdenes
 
   const activeStatuses = useMemo(
@@ -1211,6 +1289,7 @@ export function WarehouseModule() {
   );
   const activeProducts = useMemo(() => products.filter(p => p.isActive), [products]);
   const rentableProducts = useMemo(() => activeProducts.filter(p => p.isRentable), [activeProducts]);
+  const activeCategories = useMemo(() => categories.filter(c => c.isActive), [categories]);
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
   const activeClients = useMemo(() => clients.filter(c => c.isActive), [clients]);
   const activeUsers = useMemo(() => users.filter(u => u.isActive), [users]);
@@ -1226,13 +1305,16 @@ export function WarehouseModule() {
   const stockAtLocation = (productId: string, locationId: string) =>
     stocks.find(s => s.productId === productId && s.locationId === locationId)?.quantity ?? 0;
 
-  // Unidades disponibles por producto (solo lectura, anti-sobre-renta visual)
-  const availableUnitsCount = (productId: string) =>
-    rentalUnits.filter(u => {
-      if (u.productId !== productId) return false;
-      const st = serialStatuses.find(s => s.id === u.statusId);
-      return st ? !st.blocksRental : false;
-    }).length;
+  // Disponibilidad REAL en la ubicación de entrega elegida: stock menos lo ya
+  // seleccionado en la orden (todas las líneas del mismo producto). Base del
+  // selector por categorías del formulario (Ronda 4).
+  const formAvailability = (productId: string) => {
+    if (!orderForm.locationId) return 0;
+    const reserved = orderItems
+      .filter(it => it.productId === productId)
+      .reduce((acc, it) => acc + (Number(it.quantity) || 0), 0);
+    return Math.max(0, stockAtLocation(productId, orderForm.locationId) - reserved);
+  };
 
   const productName = (id: string) => products.find(p => p.id === id)?.name || id;
   const locationName = (id: string) => locations.find(l => l.id === id)?.name || id;
@@ -1350,6 +1432,41 @@ export function WarehouseModule() {
   }, [enabled, searchParams, setSearchParams]);
 
   // ═══════════════════════════════════════════════════════════════════
+  // DEEP LINK /warehouse?newOrder=1&productId=<id> (desde Inventario →
+  // "Rentar"): abre la pantalla de crear orden con ese producto agregado
+  // (cantidad 1) y la ubicación preseleccionada = la primera con stock del
+  // producto. Espera a que carguen catálogos/stock antes de prellenar.
+  // ═══════════════════════════════════════════════════════════════════
+
+  const newOrderDeepLinkHandled = useRef(false);
+  const [stocksLoaded, setStocksLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!enabled || loading || !stocksLoaded || newOrderDeepLinkHandled.current) return;
+    if (searchParams.get('newOrder') !== '1') return;
+    const productId = searchParams.get('productId') ?? '';
+    newOrderDeepLinkHandled.current = true;
+    openOrderModal();
+    const product = rentableProducts.find(p => p.id === productId);
+    if (product) {
+      // Primera ubicación con stock de ese producto (consulta directa:
+      // stockAtLocation es helper no memoizado y rompería exhaustive-deps)
+      const withStock = activeLocations.find(l =>
+        (stocks.find(s => s.productId === productId && s.locationId === l.id)?.quantity ?? 0) > 0
+      );
+      setOrderForm(prev => ({
+        ...prev,
+        locationId: withStock?.id ?? activeLocations[0]?.id ?? '',
+      }));
+      setOrderItems([{ productId, quantity: '1', tallaRef: '' }]);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('newOrder');
+    next.delete('productId');
+    setSearchParams(next, { replace: true });
+  }, [enabled, loading, stocksLoaded, searchParams, setSearchParams, rentableProducts, activeLocations, stocks]);
+
+  // ═══════════════════════════════════════════════════════════════════
   // LISTENERS FIRESTORE (solo si el feature flag está activo)
   // ═══════════════════════════════════════════════════════════════════
 
@@ -1371,6 +1488,24 @@ export function WarehouseModule() {
         setLoadError(true);
         setLoading(false);
       }
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
+  // Categorías de producto (selector del formulario de orden, Ronda 4)
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.productCategories), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setCategories(
+          snap.docs
+            .map(d => docToProductCategory(d.id, d.data()))
+            .filter(c => !c.tenantId || c.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[WarehouseModule] productCategories:', err)
     );
     return () => unsub();
   }, [enabled, tenantId]);
@@ -1487,8 +1622,12 @@ export function WarehouseModule() {
             .map(d => docToInventoryStock(d.id, d.data()))
             .filter(s => !s.tenantId || s.tenantId === tenantId)
         );
+        setStocksLoaded(true);
       },
-      (err) => console.error('[WarehouseModule] inventoryStocks:', err)
+      (err) => {
+        console.error('[WarehouseModule] inventoryStocks:', err);
+        setStocksLoaded(true);
+      }
     );
     return () => unsub();
   }, [enabled, tenantId]);
@@ -1567,7 +1706,10 @@ export function WarehouseModule() {
 
   const openOrderModal = () => {
     setOrderForm(EMPTY_ORDER_FORM);
-    setOrderItems([{ productId: '', quantity: '1', tallaRef: '' }]);
+    setOrderItems([]);
+    setFormCategoryId('');
+    setFormProductSearch('');
+    setFormScanOpen(false);
     setProofFile(null);
     setQuickClientOpen(false);
     setQuickClientName('');
@@ -1577,6 +1719,58 @@ export function WarehouseModule() {
 
   const updateItem = (index: number, patch: Partial<OrderItemDraft>) => {
     setOrderItems(prev => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
+  };
+
+  // Agrega 1 unidad de un producto al pedido: incrementa la línea existente o
+  // crea una nueva (cantidad 1). La validación anti-exceso vive en
+  // formAvailability (stock − lo ya pedido) y en saveOrder.
+  const addFormItem = (productId: string) => {
+    if (formAvailability(productId) <= 0) {
+      toast.error(
+        tf('wh.orderForm.validation.exceedsStock', {
+          product: productName(productId),
+          count: stockAtLocation(productId, orderForm.locationId),
+        })
+      );
+      return;
+    }
+    setOrderItems(prev => {
+      const idx = prev.findIndex(it => it.productId === productId);
+      if (idx === -1) return [...prev, { productId, quantity: '1', tallaRef: '' }];
+      return prev.map((it, i) =>
+        i === idx ? { ...it, quantity: String((Number(it.quantity) || 0) + 1) } : it
+      );
+    });
+  };
+
+  // ESCANEAR OPCIONAL del formulario (jamás obligatorio): un serial escaneado
+  // agrega su producto al pedido si es rentable y hay disponibilidad
+  const handleFormScan = (kind: 'order' | 'serial', id: string) => {
+    setFormScanOpen(false);
+    if (kind !== 'serial') {
+      toast.error(t('wh.dispatch.unrecognizedQr'));
+      return;
+    }
+    const unit = rentalUnits.find(u => u.id === id || u.serialNumber === id);
+    const product = unit ? products.find(p => p.id === unit.productId) : products.find(p => p.id === id);
+    if (!product || !product.isRentable) {
+      toast.error(t('wh.orderForm.noProducts'));
+      return;
+    }
+    if (!orderForm.locationId) {
+      toast.error(t('wh.orderForm.validation.locationRequired'));
+      return;
+    }
+    if (formAvailability(product.id!) <= 0) {
+      toast.error(
+        tf('wh.orderForm.validation.exceedsStock', {
+          product: product.name,
+          count: stockAtLocation(product.id!, orderForm.locationId),
+        })
+      );
+      return;
+    }
+    addFormItem(product.id!);
   };
 
   const saveOrder = async () => {
@@ -1599,6 +1793,19 @@ export function WarehouseModule() {
       if (!Number.isFinite(qty) || qty <= 0) {
         toast.error(t('wh.orderForm.validation.quantityPositive'));
         return;
+      }
+      // Anti-sobre-renta: nunca más de lo disponible en la ubicación de entrega
+      if (orderForm.locationId) {
+        const available = stockAtLocation(it.productId, orderForm.locationId);
+        if (qty > available) {
+          toast.error(
+            tf('wh.orderForm.validation.exceedsStock', {
+              product: productName(it.productId),
+              count: available,
+            })
+          );
+          return;
+        }
       }
     }
     if (!orderForm.deliveryDate) {
@@ -1633,19 +1840,30 @@ export function WarehouseModule() {
       const subtotal = canSeeMoney && formPricing ? formPricing.subtotal : null;
       const discount = canSeeMoney ? formPricing?.discount ?? null : null;
       const percent = discount?.percent ?? 0;
-      // Aprobación del descuento: si excede el máximo del vendedor o algún
-      // producto no admite descuento, queda "por aprobar" y se notifica a
-      // supervisores (aprueban/rechazan con un toque desde la campana).
-      const creatorProfile = users.find(u => u.id === currentUser!.id);
-      const maxDiscountPercent =
-        typeof creatorProfile?.maxDiscountPercent === 'number'
-          ? creatorProfile.maxDiscountPercent
-          : 10; // default conservador cuando el campo no está definido
+      // DESCUENTOS MODELO V2 (Ronda 4):
+      // - Tope ÚNICO general sin aprobación: appSettings/global
+      //   maxDiscountWithoutApproval (default 10). Debajo del tope se aplica
+      //   directo ('approved'); al superarlo queda 'pending'.
+      // - DESCUENTOS PRE-AUTORIZADOS: si el descuento tiene preAuthorized y
+      //   (sin productIds o TODOS los ítems de la orden están en productIds),
+      //   se aplica SIN aprobación aunque supere el tope general.
+      // - Producto con admitsDiscount === false: el % solo aplica vía
+      //   excepción aprobada (igual que superar el tope → 'pending').
+      // - Ya NO se usa el tope por usuario (maxDiscountPercent del perfil);
+      //   el tope ahora es el general de la empresa.
+      const maxDiscountPercent = settings.maxDiscountWithoutApproval ?? 10;
       const hasRestrictedItem = orderItems.some(it => {
         const p = products.find(pr => pr.id === it.productId);
         return !!p && p.admitsDiscount === false;
       });
-      const needsDiscountApproval = percent > 0 && (percent > maxDiscountPercent || hasRestrictedItem);
+      const discountCoversOrder =
+        !!discount &&
+        (discount.productIds == null ||
+          discount.productIds.length === 0 ||
+          orderItems.every(it => !it.productId || discount.productIds!.includes(it.productId)));
+      const isPreAuthorized = !!discount?.preAuthorized && discountCoversOrder;
+      const needsDiscountApproval =
+        percent > 0 && !isPreAuthorized && (percent > maxDiscountPercent || hasRestrictedItem);
       const discountStatus: RentalDiscountStatus | null =
         percent === 0 ? null : needsDiscountApproval ? 'pending' : 'approved';
       const fees: RentalOrderFee[] = canSeeMoney && formPricing
@@ -1746,26 +1964,42 @@ export function WarehouseModule() {
   // el deep link /warehouse?order=<id> con el banner de aprobación.
   // ═══════════════════════════════════════════════════════════════════
 
+  // Destinatarios de la aprobación (MODELO V2): usuarios activos, distintos
+  // del creador, con permiso 'canApproveTimeOff' (mismo árbol que las
+  // aprobaciones de días libres) que sean del MISMO departamento del creador
+  // O de nivel jerárquico superior (level menor = rango mayor). RRHH, Gerente
+  // de Operaciones y Director General se incluyen SIEMPRE. Si nadie califica,
+  // fallback a DG/Director/RRHH.
+  const APPROVER_ALWAYS_ROLES: Role[] = [
+    Role.DIRECTOR_GENERAL,
+    Role.RRHH,
+    Role.GERENTE_OPERACIONES,
+  ];
+
   const notifyDiscountApproval = async (
     info: { clientName: string; discountName: string; discountPercent: number },
     orderId: string
   ) => {
     if (!currentUser) return;
-    // Supervisores del departamento del creador; si no hay, DG/RRHH
     const creator = users.find(u => u.id === currentUser.id);
-    let targets = users.filter(
-      u => u.isActive && u.id !== currentUser.id && SUPERVISOR_PLUS_ROLES.includes(u.role)
-    );
-    const deptTargets = creator?.department
-      ? targets.filter(u => u.department === creator.department)
-      : [];
-    if (deptTargets.length > 0) targets = deptTargets;
+    const creatorDept = creator?.department ?? currentUser.department ?? '';
+    const creatorLevel = creator?.level ?? currentUser.level ?? 7;
+    let targets = users.filter(u => {
+      if (!u.isActive || u.id === currentUser.id) return false;
+      if (APPROVER_ALWAYS_ROLES.includes(u.role)) return true;
+      if (!hasPermission(u as unknown as User, 'canApproveTimeOff')) return false;
+      const sameDept = !!creatorDept && u.department === creatorDept;
+      const superior = typeof u.level === 'number' && u.level < creatorLevel;
+      return sameDept || superior;
+    });
     if (targets.length === 0) {
       targets = users.filter(
         u =>
           u.isActive &&
           u.id !== currentUser.id &&
-          (u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
+          (u.role === Role.DIRECTOR_GENERAL ||
+            u.role === Role.DIRECTOR ||
+            u.role === Role.RRHH)
       );
     }
     for (const target of targets) {
@@ -1795,7 +2029,7 @@ export function WarehouseModule() {
   };
 
   const settleDiscount = async (order: RentalOrder, approve: boolean) => {
-    if (!canSupervise || !currentUser || order.discountStatus !== 'pending') return;
+    if (!canApproveDiscount || !currentUser || order.discountStatus !== 'pending') return;
     await executeWithConfirm(
       {
         level: 'major',
@@ -1858,11 +2092,16 @@ export function WarehouseModule() {
   const orderHasAssignedSerials = (order: RentalOrder) =>
     order.items.some(it => (it.assignedUnitIds ?? []).length > 0);
 
-  // La orden incluye al menos un producto con unidades serializadas (hay
-  // seriales físicos que escanear). Si no, el despache avanza con confirmación
-  // simple: no hay nada que escanear (excepción anti-atasco).
+  // La orden incluye al menos un producto con unidades serializadas controladas
+  // por QR (hay seriales físicos que escanear). Producto con hasQr === false:
+  // NO usa escaneo — despacho/retorno por confirmación simple. Si no hay
+  // seriales registrados tampoco hay nada que escanear (excepción anti-atasco).
   const orderUsesSerials = (order: RentalOrder) =>
-    order.items.some(it => rentalUnits.some(u => u.productId === it.productId));
+    order.items.some(it => {
+      const p = products.find(pr => pr.id === it.productId);
+      if (p && p.hasQr === false) return false;
+      return rentalUnits.some(u => u.productId === it.productId);
+    });
 
   const isScanOnlyTarget = (order: RentalOrder, targetId: string) => {
     if (!SCAN_ONLY_STATUS_IDS.includes(targetId)) return false;
@@ -2173,12 +2412,29 @@ export function WarehouseModule() {
   const dispatchComplete =
     !!dispatchOrder &&
     dispatchOrder.items.every((it, idx) => {
-      // Ítems de productos sin seriales registrados no bloquean el despacho
-      // (nada que escanear): cumplen automáticamente
+      // Ítems de productos sin seriales registrados o con hasQr=false no
+      // bloquean el despacho (nada que escanear): cumplen automáticamente
+      const p = products.find(pr => pr.id === it.productId);
+      if (p && p.hasQr === false) return true;
       const hasUnits = rentalUnits.some(u => u.productId === it.productId);
       if (!hasUnits) return true;
       return (dispatchAssignments[idx] ?? []).length === it.quantity;
     });
+
+  // Contador de progreso del despacho (MODELO DE SERIALES): unidades
+  // serializadas por QR requeridas vs. ya escaneadas en toda la orden
+  const dispatchProgress = (order: RentalOrder) => {
+    let total = 0;
+    let scanned = 0;
+    order.items.forEach((it, idx) => {
+      const p = products.find(pr => pr.id === it.productId);
+      if (p && p.hasQr === false) return;
+      if (!rentalUnits.some(u => u.productId === it.productId)) return;
+      total += it.quantity;
+      scanned += (dispatchAssignments[idx] ?? []).length;
+    });
+    return { total, scanned, missing: Math.max(0, total - scanned) };
+  };
 
   const confirmDispatch = async () => {
     const order = dispatchOrder;
@@ -2256,10 +2512,14 @@ export function WarehouseModule() {
   // auditoría genérica adecuada (sin inventar tipos nuevos).
   // ═══════════════════════════════════════════════════════════════════
 
-  // Seriales asignados de la orden, con el índice del ítem al que pertenecen
+  // Seriales asignados de la orden, con el índice del ítem al que pertenecen.
+  // Los seriales de productos con hasQr=false no se verifican por escaneo:
+  // su retorno es confirmación simple.
   const assignedUnitEntries = (order: RentalOrder) => {
     const out: Array<{ unitId: string; itemIdx: number }> = [];
     order.items.forEach((it, idx) => {
+      const p = products.find(pr => pr.id === it.productId);
+      if (p && p.hasQr === false) return;
       (it.assignedUnitIds ?? []).forEach(unitId => out.push({ unitId, itemIdx: idx }));
     });
     return out;
@@ -2549,12 +2809,9 @@ export function WarehouseModule() {
     );
   }
 
-  const tabs: Array<{ id: WhTab; label: string }> = [
-    { id: 'board', label: t('wh.tab.board') },
-    { id: 'orders', label: t('wh.tab.orders') },
-    { id: 'returns', label: t('wh.tab.returns') },
-  ];
-
+  // Contenido de la Pizarra (resumen abierto en la pantalla principal y
+  // reutilizado en su pantalla completa de tarjeta-módulo). Sin bloques de
+  // texto explicativo: solo el tablero real.
   // Contenido completo del detalle de una orden (reused: tarjeta expandida y Dialog)
   const renderOrderDetail = (order: RentalOrder) => {
     const currentStatus = statusById(order.statusId);
@@ -2795,9 +3052,9 @@ export function WarehouseModule() {
           </div>
         )}
 
-        {/* Banner de aprobación de descuento (Supervisor+): llega al abrir la
-            orden desde la notificación accionable de la campana */}
-        {order.discountStatus === 'pending' && (order.discountPercent ?? 0) > 0 && canSupervise && (
+        {/* Banner de aprobación de descuento (Supervisor+ o quien pueda aprobar
+            días libres): llega al abrir la orden desde la notificación de la campana */}
+        {order.discountStatus === 'pending' && (order.discountPercent ?? 0) > 0 && canApproveDiscount && (
           <div className="text-sm bg-amber-50 border border-amber-300 rounded-xl px-3 py-3 space-y-2">
             <p className="font-medium text-amber-900 flex items-center gap-2">
               <Percent className="h-4 w-4" />
@@ -3000,79 +3257,118 @@ export function WarehouseModule() {
     <div className="space-y-4">
       {whView === null && (
         <>
-          {/* Tarjetas grandes tipo módulos: acciones principales. Tocar una
-              navega a una pantalla completa, no a un popup */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-[#86868B] mb-2 px-1">
-              {t('wh.home.actions')}
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                type="button"
-                onClick={openOrderModal}
-                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-corporate/10 flex items-center justify-center mb-3">
-                  <ClipboardList className="w-5 h-5 text-corporate" />
+          {/* Tarjetas-módulo PEQUEÑAS (LA navegación del módulo; reemplaza a
+              las pills/pestañas). 1 columna en móvil, 2-3 en desktop. Tocar
+              una tarjeta navega a la pantalla de esa sección con botón Volver
+              (patrón whView). La Pizarra queda además como resumen abierto
+              debajo de las tarjetas. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setWhView('board')}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-corporate/10 flex items-center justify-center shrink-0">
+                  <LayoutGrid className="w-4 h-4 text-corporate" />
                 </div>
-                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.newOrder')}</p>
-                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.newOrderDesc')}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => openDispatch()}
-                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center mb-3">
-                  <QrCode className="w-5 h-5 text-blue-600" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.board')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.boardDesc')}</p>
                 </div>
-                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.dispatch')}</p>
-                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.dispatchDesc')}</p>
-              </button>
-              <button
-                type="button"
-                onClick={() => openReturn()}
-                className="text-left bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-5 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-              >
-                <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mb-3">
-                  <RotateCcw className="w-5 h-5 text-teal-600" />
+                <span className="text-[11px] text-[#86868B] shrink-0">
+                  {tf('wh.home.activeCount', { count: activeOrders.length })}
+                </span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWhView('orders')}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <ClipboardList className="w-4 h-4 text-blue-600" />
                 </div>
-                <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.return')}</p>
-                <p className="text-xs text-[#86868B] mt-1">{t('wh.home.returnDesc')}</p>
-              </button>
-            </div>
-          </div>
-
-          {/* Pills de sub-pestañas (navegación tipo módulos) */}
-          <div className="flex flex-wrap items-center gap-2">
-            {tabs.map(tb => (
-              <button
-                key={tb.id}
-                onClick={() => setTab(tb.id)}
-                className={cn(
-                  'px-3 py-1.5 rounded-full text-xs font-medium border transition-colors',
-                  tab === tb.id
-                    ? 'bg-corporate text-white border-corporate'
-                    : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
-                )}
-              >
-                {tb.label}
-              </button>
-            ))}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.orders')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.ordersDesc')}</p>
+                </div>
+                <span className="text-[11px] text-[#86868B] shrink-0">{orders.length}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWhView('returns')}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                  <RotateCcw className="w-4 h-4 text-teal-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.returns')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.returnsDesc')}</p>
+                </div>
+                <span className="text-[11px] text-[#86868B] shrink-0">{returnedQueue.length}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={openOrderModal}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-corporate/10 flex items-center justify-center shrink-0">
+                  <Plus className="w-4 h-4 text-corporate" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.newOrder')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.newOrderDesc')}</p>
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => openDispatch()}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <QrCode className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.dispatch')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.dispatchDesc')}</p>
+                </div>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => openReturn()}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center shrink-0">
+                  <CheckCircle2 className="w-4 h-4 text-teal-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.return')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.returnDesc')}</p>
+                </div>
+              </div>
+            </button>
           </div>
         </>
       )}
 
-      {whView === null && tab === 'board' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <LayoutGrid className="h-4 w-4 text-corporate" />
-              <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.board')}</h3>
-            </div>
-            <p className="text-xs text-[#86868B]">{t('wh.board.help')}</p>
-          </div>
-
+      {/* PIZARRA: pantalla de tarjeta-módulo (Volver) y resumen abierto en la
+          pantalla principal. Sin bloque de texto explicatorio. */}
+      {(whView === null || whView === 'board') && (
+        <div className={cn('space-y-4', whView === 'board' && 'bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6')}>
+          {whView === 'board' && (
+            <WhViewHeader title={t('wh.tab.board')} onBack={() => setWhView(null)} />
+          )}
           {activeOrders.length === 0 ? (
             <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
               {t('wh.board.empty')}
@@ -3187,9 +3483,10 @@ export function WarehouseModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: ÓRDENES ─── */}
-      {whView === null && tab === 'orders' && (
-        <div className="space-y-3">
+      {/* ─── PANTALLA: ÓRDENES (tarjeta-módulo) ─── */}
+      {whView === 'orders' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-3">
+          <WhViewHeader title={t('wh.tab.orders')} onBack={() => setWhView(null)} />
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
               <Search className="h-4 w-4 text-[#86868B] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -3285,16 +3582,10 @@ export function WarehouseModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: RETORNOS (WH-D2) ─── */}
-      {whView === null && tab === 'returns' && (
-        <div className="space-y-4">
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <RotateCcw className="h-4 w-4 text-corporate" />
-              <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.returns')}</h3>
-            </div>
-            <p className="text-xs text-[#86868B]">{t('wh.returns.help')}</p>
-          </div>
+      {/* ─── PANTALLA: RETORNOS (tarjeta-módulo, WH-D2) ─── */}
+      {whView === 'returns' && (
+        <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
+          <WhViewHeader title={t('wh.tab.returns')} onBack={() => setWhView(null)} />
 
           {/* Cola de verificación: órdenes devueltas pendientes */}
           <div>
@@ -3580,122 +3871,219 @@ export function WarehouseModule() {
               </div>
             )}
 
-            {/* Ítems dinámicos */}
+            {/* PRIMERO: ubicación de entrega (disponibilidad real de ítems) */}
+            <div>
+              <Label className="text-xs text-[#86868B]">{t('wh.orderForm.location')}</Label>
+              <select
+                value={orderForm.locationId}
+                onChange={e => {
+                  setOrderForm(prev => ({ ...prev, locationId: e.target.value }));
+                  setFormCategoryId('');
+                  setFormProductSearch('');
+                }}
+                className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
+              >
+                <option value="">{t('wh.orderForm.selectLocation')}</option>
+                {activeLocations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+              {!orderForm.locationId && (
+                <p className="mt-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  {t('wh.orderForm.locationFirst')}
+                </p>
+              )}
+            </div>
+
+            {/* LUEGO: ítems por CATEGORÍAS con disponibilidad real + buscador +
+                escaneo OPCIONAL (jamás obligatorio). Las líneas quedan como
+                factura, arriba del bloque subtotal/descuento/impuestos/total */}
             <div>
               <div className="flex items-center justify-between mb-1">
                 <Label className="text-xs text-[#86868B]">{t('wh.orderForm.items')}</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-xs text-corporate"
-                  onClick={() => setOrderItems(prev => [...prev, { productId: '', quantity: '1', tallaRef: '' }])}
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  {t('wh.orderForm.addItem')}
-                </Button>
+                {orderForm.locationId && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-corporate"
+                    onClick={() => setFormScanOpen(true)}
+                  >
+                    <QrCode className="h-3.5 w-3.5 mr-1" />
+                    {t('wh.orderForm.scanAdd')}
+                  </Button>
+                )}
               </div>
-              <div className="space-y-2">
-                {orderItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-12 sm:col-span-5">
-                      <select
-                        value={item.productId}
-                        onChange={e => updateItem(idx, { productId: e.target.value })}
-                        className="w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
-                      >
-                        <option value="">{t('wh.orderForm.selectProduct')}</option>
-                        {rentableProducts.map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.name} ({tf('wh.orderForm.available', { count: availableUnitsCount(p.id!) })})
-                          </option>
-                        ))}
-                      </select>
-                      {/* Precio de la línea justificado a la derecha con desglose
-                          (solo quien cobra): tier según cantidad o precio base */}
-                      {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
-                        <p className="mt-0.5 text-[11px] text-[#86868B] pr-1 text-right whitespace-nowrap">
-                          ({formatMoney(formPricing.lines[idx].unitPrice)} × {formPricing.lines[idx].qty} = {formatMoney(formPricing.lines[idx].lineTotal)})
-                        </p>
-                      )}
-                    </div>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={item.quantity}
-                      onChange={e => updateItem(idx, { quantity: e.target.value })}
-                      placeholder={t('wh.orderForm.quantity')}
-                      className="col-span-4 sm:col-span-2 rounded-xl border-[#E5E5E7] text-sm"
-                    />
-                    <Input
-                      value={item.tallaRef}
-                      onChange={e => updateItem(idx, { tallaRef: e.target.value })}
-                      placeholder={t('wh.orderForm.tallaRefPlaceholder')}
-                      className="col-span-6 sm:col-span-4 rounded-xl border-[#E5E5E7] text-sm"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="col-span-2 sm:col-span-1 h-8 w-8 p-0 rounded-lg justify-self-end text-[#86868B] hover:text-red-600"
-                      onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
-                    >
-                      <span className="text-lg leading-none">×</span>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
 
-            {/* Entrega */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-[#86868B]">{t('wh.orderForm.deliveryDate')}</Label>
-                <Input
-                  type="datetime-local"
-                  value={orderForm.deliveryDate}
-                  onChange={e => setOrderForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
-                  className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
-                />
+              {/* Líneas de factura */}
+              <div className="space-y-2">
+                {orderItems.length === 0 && (
+                  <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-3 py-2">
+                    {t('wh.orderForm.emptyLines')}
+                  </p>
+                )}
+                {orderItems.map((item, idx) => {
+                  const product = item.productId ? products.find(p => p.id === item.productId) : undefined;
+                  const qty = Number(item.quantity) || 0;
+                  const lineAvailability = item.productId && orderForm.locationId
+                    ? stockAtLocation(item.productId, orderForm.locationId)
+                    : 0;
+                  const exceeds = qty > lineAvailability;
+                  return (
+                    <div key={idx} className="rounded-xl border border-[#E5E5E7] p-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-[#86868B] shrink-0" />
+                        <span className="text-sm font-medium text-[#1D1D1F] truncate">
+                          {product?.name ?? item.productId}
+                        </span>
+                        {exceeds && orderForm.locationId && (
+                          <span className="text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5 shrink-0">
+                            {tf('wh.orderForm.availableShort', { count: lineAvailability })}
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-7 w-7 p-0 rounded-lg justify-self-end text-[#86868B] hover:text-red-600 shrink-0"
+                          onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                        >
+                          <span className="text-lg leading-none">×</span>
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={lineAvailability > 0 ? lineAvailability : undefined}
+                          value={item.quantity}
+                          onChange={e => updateItem(idx, { quantity: e.target.value })}
+                          placeholder={t('wh.orderForm.quantity')}
+                          className={cn(
+                            'col-span-3 sm:col-span-2 rounded-xl border-[#E5E5E7] text-sm',
+                            exceeds && 'border-red-300'
+                          )}
+                        />
+                        <Input
+                          value={item.tallaRef}
+                          onChange={e => updateItem(idx, { tallaRef: e.target.value })}
+                          placeholder={t('wh.orderForm.tallaRefPlaceholder')}
+                          className="col-span-9 sm:col-span-6 rounded-xl border-[#E5E5E7] text-sm"
+                        />
+                        {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
+                          <p className="col-span-12 sm:col-span-4 text-[11px] text-[#86868B] sm:text-right whitespace-nowrap">
+                            ({formatMoney(formPricing.lines[idx].unitPrice)} × {formPricing.lines[idx].qty} = {formatMoney(formPricing.lines[idx].lineTotal)})
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div>
-                <Label className="text-xs text-[#86868B]">{t('wh.orderForm.location')}</Label>
-                <select
-                  value={orderForm.locationId}
-                  onChange={e => setOrderForm(prev => ({ ...prev, locationId: e.target.value }))}
-                  className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] bg-white text-sm text-[#1D1D1F]"
-                >
-                  <option value="">{t('wh.orderForm.selectLocation')}</option>
-                  {activeLocations.map(l => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-                {/* Disponibilidad por ubicación de cada producto rentable pedido */}
-                {orderForm.locationId &&
-                  orderItems.some(it => it.productId) && (
-                    <div className="mt-2 bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-0.5">
-                      <p className="text-[11px] font-medium text-[#86868B]">
-                        {tf('wh.orderForm.locationAvailability', { location: locationName(orderForm.locationId) })}
-                      </p>
-                      {orderItems
-                        .filter(it => it.productId)
-                        .map((it, idx) => {
-                          const available = stockAtLocation(it.productId, orderForm.locationId);
-                          const qty = Number(it.quantity) || 0;
-                          const short = qty > 0 && available < qty;
+
+              {/* Selector categoría → productos (solo con ubicación elegida) */}
+              {orderForm.locationId && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setFormCategoryId('')}
+                      className={cn(
+                        'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                        formCategoryId === ''
+                          ? 'bg-corporate text-white border-corporate'
+                          : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
+                      )}
+                    >
+                      {t('wh.orderForm.allCategories')}
+                    </button>
+                    {activeCategories.map(c => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => setFormCategoryId(c.id!)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-full text-xs font-medium border transition-colors',
+                          formCategoryId === c.id
+                            ? 'bg-corporate text-white border-corporate'
+                            : 'bg-white text-[#1D1D1F] border-[#E5E5E7] hover:bg-[#F5F5F7]'
+                        )}
+                      >
+                        {getLanguage() === 'en' && c.nameEn ? c.nameEn : c.name}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="relative">
+                    <Search className="h-4 w-4 text-[#86868B] absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Input
+                      value={formProductSearch}
+                      onChange={e => setFormProductSearch(e.target.value)}
+                      placeholder={t('wh.orderForm.searchProduct')}
+                      className="pl-9 rounded-xl border-[#E5E5E7] text-sm"
+                    />
+                  </div>
+                  {(() => {
+                    const q = formProductSearch.trim().toLowerCase();
+                    const list = rentableProducts.filter(p => {
+                      if (formCategoryId && p.categoryId !== formCategoryId) return false;
+                      if (q && !p.name.toLowerCase().includes(q)) return false;
+                      return true;
+                    });
+                    if (list.length === 0) {
+                      return (
+                        <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-3 py-2">
+                          {t('wh.orderForm.noProducts')}
+                        </p>
+                      );
+                    }
+                    return (
+                      <div className="space-y-1.5">
+                        {list.map(p => {
+                          const avail = formAvailability(p.id!);
                           return (
-                            <p
-                              key={idx}
-                              className={cn('text-xs', short ? 'text-red-700 font-medium' : 'text-[#1D1D1F]')}
+                            <div
+                              key={p.id}
+                              className="flex items-center gap-2 bg-[#F5F5F7] rounded-xl px-3 py-2"
                             >
-                              {tf('wh.orderForm.availableInLocation', {
-                                product: productName(it.productId),
-                                count: available,
-                              })}
-                            </p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-[#1D1D1F] truncate">{p.name}</p>
+                                <p
+                                  className={cn(
+                                    'text-[11px]',
+                                    avail > 0 ? 'text-[#86868B]' : 'text-red-700 font-medium'
+                                  )}
+                                >
+                                  {tf('wh.orderForm.availableShort', { count: avail })}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={avail <= 0}
+                                onClick={() => addFormItem(p.id!)}
+                                className="h-7 rounded-lg border-[#E5E5E7] text-xs gap-1 shrink-0"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                                {t('wh.orderForm.add')}
+                              </Button>
+                            </div>
                           );
                         })}
-                    </div>
-                  )}
-              </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Entrega: fecha y hora */}
+            <div>
+              <Label className="text-xs text-[#86868B]">{t('wh.orderForm.deliveryDate')}</Label>
+              <Input
+                type="datetime-local"
+                value={orderForm.deliveryDate}
+                onChange={e => setOrderForm(prev => ({ ...prev, deliveryDate: e.target.value }))}
+                className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
+              />
             </div>
 
             {/* Quién prepara */}
@@ -3770,9 +4158,15 @@ export function WarehouseModule() {
                     })}
                   </p>
                 )}
-                {/* Descuento preconfigurado: un toque modifica el total */}
+                {/* Descuento preconfigurado: un toque modifica el total.
+                    MODELO V2: distintivo "Pre-autorizado" y tope general. */}
                 <div>
-                  <Label className="text-xs text-[#86868B]">{t('wh.orderForm.discount')}</Label>
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs text-[#86868B]">{t('wh.orderForm.discount')}</Label>
+                    <span className="text-[11px] text-[#86868B]">
+                      {tf('wh.discount.maxHint', { percent: settings.maxDiscountWithoutApproval ?? 10 })}
+                    </span>
+                  </div>
                   <select
                     value={orderForm.discountId}
                     onChange={e => setOrderForm(prev => ({ ...prev, discountId: e.target.value }))}
@@ -3781,10 +4175,15 @@ export function WarehouseModule() {
                     <option value="">{t('wh.orderForm.discountNone')}</option>
                     {activeDiscounts.map(d => (
                       <option key={d.id} value={d.id}>
-                        {d.name} (-{d.percent}%)
+                        {d.name} (-{d.percent}%){d.preAuthorized ? ` · ${t('wh.discount.preAuthorized')}` : ''}
                       </option>
                     ))}
                   </select>
+                  {activeDiscounts.find(d => d.id === orderForm.discountId)?.preAuthorized && (
+                    <p className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
+                      {t('wh.discount.preAuthorizedHint')}
+                    </p>
+                  )}
                 </div>
                 {/* Impuestos y cargos: multi-select de los activos */}
                 <div>
@@ -3850,6 +4249,24 @@ export function WarehouseModule() {
                       <span>{t('wh.orderForm.total')}</span>
                       <span>{formatMoney(formPricing.total)}</span>
                     </div>
+                    {/* Badge de estado de pago en vivo: total vs. monto recibido */}
+                    {(() => {
+                      const paid = Number(orderForm.amountPaid) || 0;
+                      const missing = round2(formPricing.total - paid);
+                      const badge =
+                        missing <= 0
+                          ? { text: t('wh.payment.paidFull'), cls: 'bg-green-50 text-green-700 border-green-200' }
+                          : paid > 0
+                            ? { text: tf('wh.payment.partialMissing', { amount: formatMoney(missing) }), cls: 'bg-blue-50 text-blue-700 border-blue-200' }
+                            : { text: tf('wh.payment.pendingMissing', { amount: formatMoney(missing) }), cls: 'bg-amber-50 text-amber-700 border-amber-200' };
+                      return (
+                        <div className="flex justify-end pt-1">
+                          <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium border', badge.cls)}>
+                            {badge.text}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
                 <div>
@@ -3993,41 +4410,85 @@ export function WarehouseModule() {
             )}
 
             {/* Paso 2: asignar seriales exactos por ítem */}
-            {dispatchStep === 2 && dispatchOrder && (
+            {dispatchStep === 2 && dispatchOrder && (() => {
+              const progress = dispatchProgress(dispatchOrder);
+              return (
               <div className="space-y-3">
+                {/* Contador de progreso: N de M escaneados / faltan N */}
+                {progress.total > 0 && (
+                  <div className="bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span
+                        className={cn(
+                          'font-medium',
+                          progress.missing === 0 ? 'text-green-700' : 'text-[#1D1D1F]'
+                        )}
+                      >
+                        {tf('wh.dispatch.progress', {
+                          scanned: progress.scanned,
+                          total: progress.total,
+                          missing: progress.missing,
+                        })}
+                      </span>
+                      <span className="text-[#86868B]">{progress.scanned}/{progress.total}</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-[#E5E5E7] overflow-hidden">
+                      <div
+                        className={cn(
+                          'h-full rounded-full transition-all',
+                          progress.missing === 0 ? 'bg-green-500' : 'bg-corporate'
+                        )}
+                        style={{ width: `${progress.total > 0 ? (progress.scanned / progress.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 {dispatchOrder.items.map((it, idx) => {
                   const selected = dispatchAssignments[idx] ?? [];
                   const unitsOfProduct = rentalUnits.filter(u => u.productId === it.productId);
+                  const itemProduct = products.find(pr => pr.id === it.productId);
+                  const itemUsesQr = itemProduct ? itemProduct.hasQr !== false : true;
+                  const itemHasUnits = unitsOfProduct.length > 0;
+                  const simpleConfirm = !itemUsesQr || !itemHasUnits;
                   const availableCount = unitsOfProduct.filter(serialAvailable).length;
-                  const insufficient = availableCount < it.quantity;
+                  const insufficient = !simpleConfirm && availableCount < it.quantity;
                   return (
                     <div key={idx} className="rounded-xl border border-[#E5E5E7] p-3 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <Package className="h-4 w-4 text-[#86868B]" />
                         <span className="text-sm font-medium text-[#1D1D1F]">{productName(it.productId)}</span>
-                        <span
-                          className={cn(
-                            'text-xs font-medium',
-                            selected.length === it.quantity ? 'text-green-700' : 'text-[#86868B]'
-                          )}
-                        >
-                          {tf('wh.dispatch.assigned', { assigned: selected.length, quantity: it.quantity })}
-                        </span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setScanTarget(idx)}
-                          className="ml-auto h-7 rounded-lg border-[#E5E5E7] text-xs gap-1"
-                        >
-                          <QrCode className="h-3.5 w-3.5" />
-                          {t('wh.dispatch.scanSerial')}
-                        </Button>
+                        {simpleConfirm ? (
+                          <span className="text-xs text-[#86868B]">
+                            ×{it.quantity} · {t('wh.dispatch.simpleConfirm')}
+                          </span>
+                        ) : (
+                          <>
+                            <span
+                              className={cn(
+                                'text-xs font-medium',
+                                selected.length === it.quantity ? 'text-green-700' : 'text-[#86868B]'
+                              )}
+                            >
+                              {tf('wh.dispatch.assigned', { assigned: selected.length, quantity: it.quantity })}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setScanTarget(idx)}
+                              className="ml-auto h-7 rounded-lg border-[#E5E5E7] text-xs gap-1"
+                            >
+                              <QrCode className="h-3.5 w-3.5" />
+                              {t('wh.dispatch.scanSerial')}
+                            </Button>
+                          </>
+                        )}
                       </div>
                       {insufficient && (
                         <p className="text-xs text-red-700 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
                           {tf('wh.dispatch.insufficient', { available: availableCount, quantity: it.quantity })}
                         </p>
                       )}
+                      {!simpleConfirm && (
                       <div className="flex flex-wrap gap-1.5">
                         {unitsOfProduct.map(u => {
                           const available = serialAvailable(u);
@@ -4062,6 +4523,7 @@ export function WarehouseModule() {
                           <span className="text-xs text-[#86868B]">{t('wh.dispatch.noSerials')}</span>
                         )}
                       </div>
+                      )}
                     </div>
                   );
                 })}
@@ -4069,7 +4531,8 @@ export function WarehouseModule() {
                   <p className="text-xs text-[#86868B]">{t('wh.dispatch.allAssigned')}</p>
                 )}
               </div>
-            )}
+              );
+            })()}
 
             {/* Paso 3: resumen y confirmación */}
             {dispatchStep === 3 && dispatchOrder && (
@@ -4429,17 +4892,20 @@ export function WarehouseModule() {
         order={qrOrderId ? orders.find(o => o.id === qrOrderId) ?? null : null}
       />
 
-      {/* ─── MODAL: ESCANER QR (WH-D2: orden / serial / texto plano) ─── */}
+      {/* ─── MODAL: ESCANER QR (WH-D2: orden / serial / texto plano; también
+          el escaneo OPCIONAL del formulario de orden) ─── */}
       <WhScannerModal
-        open={scanTarget !== null || returnScanTarget !== null}
+        open={scanTarget !== null || returnScanTarget !== null || formScanOpen}
         onOpenChange={open => {
           if (!open) {
             setScanTarget(null);
             setReturnScanTarget(null);
+            setFormScanOpen(false);
           }
         }}
         onScan={(kind, id) => {
-          if (returnScanTarget !== null) handleReturnScan(kind, id);
+          if (formScanOpen) handleFormScan(kind, id);
+          else if (returnScanTarget !== null) handleReturnScan(kind, id);
           else handleDispatchScan(kind, id);
         }}
         resolveManual={resolveManualScanCode}
@@ -4543,11 +5009,15 @@ function AmountPaidEditor({ order, total }: { order: RentalOrder; total: number 
 // de Radix el portal puede montarse después del efecto, así que la
 // instancia se crea SOLO cuando el contenedor ya existe (reintento por
 // requestAnimationFrame) y el id es único por instancia (useId).
-// CÁMARA DIRECTA (Ronda 3): se usa la clase baja Html5Qrcode (no el
-// Scanner) para arrancar de inmediato con facingMode 'environment' (trasera
-// en móvil) SIN dropdown de selección. Un botón pequeño de respaldo permite
-// conmutar entre cámaras si la directa falla (desktop sin trasera) o hay
-// varias.
+// BUG RONDA 4 "abre la cámara pero no registra nada": (a) html5-qrcode NO
+// rearranca una misma instancia tras stop() y (b) detener el escáner desde
+// dentro del callback de decodificación colgaba la entrega del resultado.
+// FIX: cada sesión crea una instancia NUEVA; el callback entrega primero y
+// apaga la cámara después, asincrónico; sessionId invalida lecturas atrasadas.
+// CÁMARA DIRECTA: se usa la clase baja Html5Qrcode (no el Scanner) para
+// arrancar de inmediato con facingMode 'environment' (trasera en móvil) SIN
+// dropdown de selección. Un botón pequeño de respaldo permite conmutar entre
+// cámaras si la directa falla (desktop sin trasera) o hay varias.
 // ═══════════════════════════════════════════════════════════════════
 
 interface WhScannerModalProps {
@@ -4613,12 +5083,20 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
     return null;
   };
 
+  // SESIÓN DE ESCANEO (fix Ronda 4): html5-qrcode NO soporta rearrancar una
+  // instancia tras stop() — la cámara encendía pero ninguna lectura volvía a
+  // registrarse. Por eso cada sesión (apertura, reconexión y reactivación)
+  // crea una instancia NUEVA de Html5Qrcode, y el callback de éxito NUNCA
+  // detiene el escáner directamente (eso rompía la entrega del resultado):
+  // primero se entrega la lectura y luego se apaga la cámara de forma
+  // asincrónica. Un sessionId invalida callbacks de sesiones anteriores.
   useEffect(() => {
     if (!open) return;
     let disposed = false;
     let scanner: Html5Qrcode | null = null;
     let rafId = 0;
     let attempts = 0;
+    let sessionId = 0;
 
     const rememberCameras = () => {
       Html5Qrcode.getCameras()
@@ -4628,6 +5106,21 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
           }
         })
         .catch(() => undefined);
+    };
+
+    // Apaga la cámara de forma asincrónica y libera el DOM del video. La
+    // instancia NUNCA se reutiliza: tras stop() queda descartada.
+    const stopAndClear = (instance: Html5Qrcode) => {
+      Promise.resolve()
+        .then(() => (instance.isScanning ? instance.stop() : Promise.resolve()))
+        .catch(() => undefined)
+        .then(() => {
+          try {
+            instance.clear();
+          } catch {
+            // el contenedor puede ya no existir: se ignora
+          }
+        });
     };
 
     const start = () => {
@@ -4640,49 +5133,62 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
         if (attempts < 60) rafId = requestAnimationFrame(start);
         return;
       }
+      attempts = 0;
+      const currentSession = ++sessionId;
+      let instance: Html5Qrcode;
       try {
-        scanner = new Html5Qrcode(instanceId, { verbose: false });
-        // Cámara directa: trasera por defecto en móvil; con deviceId exacto
-        // cuando el usuario conmuta con el botón de respaldo
-        const cameraConfig: MediaTrackConstraints =
-          cameraIndex < 0
-            ? { facingMode: 'environment' }
-            : { deviceId: { exact: camerasRef.current[cameraIndex]?.id ?? '' } };
-        scanner
-          .start(
-            cameraConfig,
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-              const result = parseScan(decodedText);
-              if (!result) {
-                toast.error(t('wh.scanner.unrecognized'));
-                return;
-              }
-              // QR válido: detener la cámara y entregar el resultado
-              scanner?.stop().catch(() => undefined);
-              onScanRef.current(result.kind, result.id);
-            },
-            () => undefined // errores de lectura transitorios: se ignoran
-          )
-          .then(() => {
-            if (disposed) {
-              scanner?.stop().catch(() => undefined);
-            } else {
-              rememberCameras();
-            }
-          })
-          .catch((err) => {
-            if (disposed) return;
-            console.error('[WhScannerModal]', err);
-            setScanError(true);
-            // Aunque falle la directa, ofrece las cámaras detectadas
-            rememberCameras();
-          });
+        instance = new Html5Qrcode(instanceId, { verbose: false });
       } catch (err) {
         console.error('[WhScannerModal]', err);
         setScanError(true);
         rememberCameras();
+        return;
       }
+      scanner = instance;
+
+      // Cámara directa: trasera por defecto en móvil; con deviceId exacto
+      // cuando el usuario conmuta con el botón de respaldo
+      const cameraConfig: MediaTrackConstraints =
+        cameraIndex < 0
+          ? { facingMode: 'environment' }
+          : { deviceId: { exact: camerasRef.current[cameraIndex]?.id ?? '' } };
+
+      instance
+        .start(
+          cameraConfig,
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            if (disposed || sessionId !== currentSession) return;
+            // Una sola entrega por sesión: se invalida la sesión ANTES de
+            // entregar, para que un doble disparo del decoder no duplique.
+            sessionId += 1;
+            const result = parseScan(decodedText);
+            const active = scanner;
+            scanner = null;
+            // La cámara se apaga DESPUÉS y asincrónicamente, nunca dentro del
+            // callback de decodificación (eso colgaba la entrega del resultado)
+            if (active) stopAndClear(active);
+            if (!result) {
+              toast.error(t('wh.scanner.unrecognized'));
+              // QR inválido: se reactiva la cámara con una instancia NUEVA
+              if (!disposed) rafId = requestAnimationFrame(start);
+              return;
+            }
+            onScanRef.current(result.kind, result.id);
+          },
+          () => undefined // errores de lectura transitorios: se ignoran
+        )
+        .then(() => {
+          if (!disposed && sessionId === currentSession) rememberCameras();
+        })
+        .catch((err) => {
+          if (disposed || sessionId !== currentSession) return;
+          scanner = null;
+          console.error('[WhScannerModal]', err);
+          setScanError(true);
+          // Aunque falle la directa, ofrece las cámaras detectadas
+          rememberCameras();
+        });
     };
 
     rafId = requestAnimationFrame(start);
@@ -4690,13 +5196,11 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
     // Apaga la cámara al desmontar / cerrar el modal
     return () => {
       disposed = true;
+      sessionId += 1;
       cancelAnimationFrame(rafId);
       const active = scanner;
       scanner = null;
-      if (active) {
-        if (active.isScanning) active.stop().catch(() => undefined);
-        active.clear();
-      }
+      if (active) stopAndClear(active);
     };
   }, [open, instanceId, cameraIndex]);
 
