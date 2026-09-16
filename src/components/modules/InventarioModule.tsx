@@ -54,7 +54,7 @@ import {
   ChevronDown, ChevronUp, Pencil, Power, Construction,
   Truck, ClipboardList, Play, Send, Inbox, Ban, Printer, Upload,
   ShoppingCart, ArrowUpRight, SlidersHorizontal, ArrowLeft, Camera,
-  History, Wrench, ScanLine, Eraser, Check,
+  History, Wrench, ScanLine, Eraser, Check, RotateCcw, AlertTriangle, KeyRound,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -110,6 +110,19 @@ registerI18nKeys({
     'inv.home.countDesc': 'Conteo cíclico de una ubicación',
     'inv.home.serial': 'Serial nuevo',
     'inv.home.serialDesc': 'Alta de una unidad rentable',
+    'inv.home.renta': 'Renta',
+    'inv.home.rentaDesc': 'Nueva orden de renta en Warehouse',
+    'inv.home.devolucion': 'Devolución',
+    'inv.home.devolucionDesc': 'Entrada de stock por devolución',
+    'inv.home.consumo': 'Consumo',
+    'inv.home.consumoDesc': 'Salida de stock por consumo',
+    'inv.home.compra': 'Compra',
+    'inv.home.compraDesc': 'Entrada de stock por compra',
+    'inv.home.dano': 'Daño',
+    'inv.home.danoDesc': 'Salida de stock por daño',
+    'inv.home.ajuste': 'Ajuste',
+    'inv.home.ajusteDesc': 'Ajuste de stock con motivo',
+    'inv.home.danoMissing': 'Carga el catálogo inicial desde Develops → Catálogos',
 
     'inv.stock.viewByProduct': 'Por producto',
     'inv.stock.viewByLocation': 'Por ubicación',
@@ -214,6 +227,8 @@ registerI18nKeys({
     'inv.common.create': 'Crear',
     'inv.common.active': 'Activo',
     'inv.common.inactive': 'Inactivo',
+    'inv.common.expand': 'Ver stock por ubicación',
+    'inv.common.collapse': 'Ocultar stock por ubicación',
     'inv.validation.nameRequired': 'El nombre es obligatorio',
     'inv.validation.productRequired': 'Selecciona un producto',
     'inv.validation.typeRequired': 'Selecciona un tipo de movimiento',
@@ -391,7 +406,8 @@ registerI18nKeys({
     'inv.home.adjustments': 'Ajustes',
     'inv.home.adjustmentsDesc': 'Ajustes del kardex con motivo',
     'inv.home.scan': 'Escanear QR',
-    'inv.home.scanDesc': 'Ficha de producto y acciones directas',
+    'inv.home.scanDesc': 'Ver la ubicación de un producto en todo el stock',
+    'inv.stock.pressHint': 'Presiona una categoría o un producto para actuar',
     'inv.adjustments.title': 'Ajustes',
     'inv.adjustments.help': 'Movimientos de tipo ajuste del kardex, con motivo, fecha y quién los registró. Solo lectura.',
     'inv.adjustments.empty': 'No hay ajustes registrados',
@@ -454,6 +470,19 @@ registerI18nKeys({
     'inv.home.countDesc': 'Cyclic count of a location',
     'inv.home.serial': 'New serial',
     'inv.home.serialDesc': 'Register a rentable unit',
+    'inv.home.renta': 'Rental',
+    'inv.home.rentaDesc': 'New rental order in Warehouse',
+    'inv.home.devolucion': 'Return',
+    'inv.home.devolucionDesc': 'Stock in from a return',
+    'inv.home.consumo': 'Consumption',
+    'inv.home.consumoDesc': 'Stock out for consumption',
+    'inv.home.compra': 'Purchase',
+    'inv.home.compraDesc': 'Stock in from a purchase',
+    'inv.home.dano': 'Damage',
+    'inv.home.danoDesc': 'Stock out due to damage',
+    'inv.home.ajuste': 'Adjustment',
+    'inv.home.ajusteDesc': 'Stock adjustment with reason',
+    'inv.home.danoMissing': 'Load the initial catalog from Develops → Catalogs',
 
     'inv.stock.viewByProduct': 'By product',
     'inv.stock.viewByLocation': 'By location',
@@ -558,6 +587,8 @@ registerI18nKeys({
     'inv.common.create': 'Create',
     'inv.common.active': 'Active',
     'inv.common.inactive': 'Inactive',
+    'inv.common.expand': 'View stock by location',
+    'inv.common.collapse': 'Hide stock by location',
     'inv.validation.nameRequired': 'Name is required',
     'inv.validation.productRequired': 'Select a product',
     'inv.validation.typeRequired': 'Select a movement type',
@@ -735,7 +766,8 @@ registerI18nKeys({
     'inv.home.adjustments': 'Adjustments',
     'inv.home.adjustmentsDesc': 'Ledger adjustments with reason',
     'inv.home.scan': 'Scan QR',
-    'inv.home.scanDesc': 'Product sheet and direct actions',
+    'inv.home.scanDesc': 'See where a product is stocked across all locations',
+    'inv.stock.pressHint': 'Press a category or a product to act',
     'inv.adjustments.title': 'Adjustments',
     'inv.adjustments.help': 'Adjustment-type movements from the ledger, with reason, date and who registered them. Read only.',
     'inv.adjustments.empty': 'No adjustments recorded',
@@ -1153,7 +1185,6 @@ type InvView =
   | 'transfers'
   | 'counts'
   | 'serials'
-  | 'catalogs'
   | 'adjustments'
   | 'product'
   | 'movement'
@@ -1333,8 +1364,17 @@ export function InventarioModule() {
   // Tarjetas expandibles
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  // Vista de Stock
-  const [stockView, setStockView] = useState<StockView>('product');
+  // Vista de Stock (ronda 6): por defecto POR UBICACIÓN; la vista por
+  // producto queda como opción con el toggle del encabezado
+  const [stockView, setStockView] = useState<StockView>('location');
+
+  // Menú de acciones de una categoría en Stock (ronda 6, punto 3): presionar
+  // una categoría despliega pequeñas acciones con la categoría preseleccionada
+  const [categoryMenuId, setCategoryMenuId] = useState<string | null>(null);
+
+  // Producto resaltado tras escanear (ronda 6, punto 3b): su tarjeta de stock
+  // se expande y sus filas por ubicación se resaltan
+  const [stockScanHighlightId, setStockScanHighlightId] = useState<string | null>(null);
 
   // Pantalla interna de movimiento (compartida: la reusan Stock, Movimientos
   // y las tarjetas grandes de acción; ver invView)
@@ -1916,21 +1956,43 @@ export function InventarioModule() {
     setInvView('movement');
   };
 
-  // Botones rápidos: abre el formulario con un tipo preseleccionado.
-  // Si el id semilla no existe en el catálogo, resuelve un equivalente activo.
-  // productId opcional: preselecciona categoría y producto (ficha / escaneo).
-  const openMovementFormFor = (typeId: string, productId?: string) => {
-    let mt = activeMovementTypes.find(m => m.id === typeId);
+  // Resolución dinámica de un tipo de movimiento (ronda 6, punto 2): los
+  // tipos son DATO del catálogo movementTypes. Se busca por id de semilla,
+  // luego por nombre (tolerante a acentos/mayúsculas) y, si no aparece, por
+  // el sentido del movimiento (isOutput). Nunca se hardcodea: si el catálogo
+  // no trae el tipo (p. ej. 'dano'), devuelve undefined y la UI lo refleja.
+  const normalizeTypeKey = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const resolveMovementType = (key: string): MovementType | undefined => {
+    let mt = activeMovementTypes.find(m => m.id === key);
     if (!mt) {
-      if (typeId === 'compra') {
+      mt = activeMovementTypes.find(
+        m => normalizeTypeKey(m.name) === key || (!!m.nameEn && normalizeTypeKey(m.nameEn) === key)
+      );
+    }
+    if (!mt) {
+      if (key === 'compra' || key === 'devolucion') {
+        // Entradas: cualquier tipo activo que sume stock
         mt = activeMovementTypes.find(m => !m.isOutput);
-      } else if (typeId === 'consumo') {
-        mt = activeMovementTypes.find(m => m.isOutput && m.id !== 'transferencia' && m.id !== 'ajuste');
+      } else if (key === 'ajuste') {
+        mt =
+          activeMovementTypes.find(m => normalizeTypeKey(m.name) === 'ajuste') ||
+          activeMovementTypes.find(m => m.isOutput);
       } else {
-        // 'ajuste' u otro id de salida: comportamiento genérico
-        mt = activeMovementTypes.find(m => m.isOutput);
+        // Salidas (consumo, daño, genéricas): se excluyen transferencia y ajuste
+        mt = activeMovementTypes.find(
+          m => m.isOutput && m.id !== 'transferencia' && normalizeTypeKey(m.name) !== 'ajuste'
+        );
       }
     }
+    return mt;
+  };
+
+  // Botones rápidos: abre el formulario con un tipo preseleccionado.
+  // productId opcional: preselecciona categoría y producto (ficha / escaneo).
+  const openMovementFormFor = (typeId: string, productId?: string) => {
+    const mt = resolveMovementType(typeId);
     const product = productId ? products.find(p => p.id === productId) : null;
     setMovementCategoryId(product?.categoryId || '');
     setMovementForm({
@@ -1938,6 +2000,16 @@ export function InventarioModule() {
       movementTypeId: mt?.id || '',
       productId: productId || '',
     });
+    setInvView('movement');
+  };
+
+  // Acciones de categoría en Stock (ronda 6, punto 3): abre el formulario de
+  // movimiento con la categoría y el tipo ya preseleccionados (el producto se
+  // elige dentro del formulario, filtrado por esa categoría)
+  const openMovementFormForCategory = (typeId: string, categoryId: string) => {
+    const mt = resolveMovementType(typeId);
+    setMovementCategoryId(categoryId);
+    setMovementForm({ ...EMPTY_MOVEMENT_FORM, movementTypeId: mt?.id || '' });
     setInvView('movement');
   };
 
@@ -3048,10 +3120,23 @@ export function InventarioModule() {
       qrText: `${window.location.origin}/requisiciones?serial=${unit.id}`,
     });
 
-  // Resultado de un escaneo (o deep link). Punto 13: el escáner es el centro
-  // de operaciones — un QR de producto abre su FICHA con acciones directas;
-  // cuando el escaneo nació de un selector de producto (escaneo opcional en
-  // formularios), selecciona el producto en ese formulario en vez de abrir la ficha
+  // Resultado de un escaneo (o deep link). Ronda 6 (punto 3b): escanear un
+  // PRODUCTO muestra SU UBICACIÓN en todo el stock — se abre la vista por
+  // producto con su tarjeta expandida y sus filas por ubicación resaltadas.
+  // Los deep links (?product= / ?location= / ?serial=) siguen abriendo la
+  // ficha/vista clásica; cuando el escaneo nació de un selector de producto
+  // (escaneo opcional en formularios), selecciona el producto en ese formulario
+  const revealProductInStock = (productId: string) => {
+    setStockView('product');
+    setInvView('stock');
+    setExpandedIds(prev => new Set([...prev, productId]));
+    setStockScanHighlightId(productId);
+    setTimeout(() => {
+      document.getElementById(`stock-product-${productId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+    setTimeout(() => setStockScanHighlightId(null), 3000);
+  };
+
   const revealTarget = (kind: 'product' | 'location' | 'serial', id: string) => {
     if (kind === 'product') {
       setProductDetailId(id);
@@ -3087,6 +3172,10 @@ export function InventarioModule() {
       return;
     }
     setScannerOpen(false);
+    if (kind === 'product') {
+      revealProductInStock(id);
+      return;
+    }
     revealTarget(kind, id);
   };
 
@@ -3508,6 +3597,32 @@ export function InventarioModule() {
     [movements]
   );
 
+  // Grupos de stock por categoría (ronda 6, punto 3): la vista por producto
+  // agrupa por categoría para que presionar una categoría despliegue sus
+  // acciones y presionar un producto abra su formulario de movimiento
+  const stockCategoryGroups = useMemo(() => {
+    const byCat = new Map<string, Product[]>();
+    for (const p of activeProducts) {
+      if (!stocks.some(s => s.productId === p.id)) continue;
+      const key = p.categoryId || '__none__';
+      const list = byCat.get(key) || [];
+      list.push(p);
+      byCat.set(key, list);
+    }
+    const groups: Array<{ categoryId: string; categoryName: string; products: Product[] }> = [];
+    for (const c of activeCategories) {
+      const list = byCat.get(c.id!);
+      if (list && list.length) {
+        groups.push({ categoryId: c.id!, categoryName: c.name, products: list });
+      }
+    }
+    const none = byCat.get('__none__');
+    if (none && none.length) {
+      groups.push({ categoryId: '__none__', categoryName: t('inv.movementForm.noCategory'), products: none });
+    }
+    return groups;
+  }, [activeProducts, activeCategories, stocks]);
+
   // Filtrado de la pestaña Transferencias (punto 4): la lista base ya trae
   // TODAS las transferencias; el filtro solo decide cuáles se muestran
   const filteredTransfers = useMemo(
@@ -3515,18 +3630,23 @@ export function InventarioModule() {
     [transfers, transferFilter]
   );
 
-  // Tarjetas-módulo (punto 12): SON la navegación del módulo. Pequeñas
-  // (2-3 por fila en desktop, apiladas en móvil); cada una abre la pantalla
-  // de su sección. La creación rápida vive DENTRO de cada sección (los botones
-  // rápidos de Stock y los botones de cada lista se mantienen).
-  const moduleCards: Array<{ id: string; icon: typeof Truck; title: string; desc: string; onClick: () => void }> = [
+  // Tarjetas-módulo DEFINITIVAS (ronda 6, punto 2): SON la navegación del
+  // módulo (2-3 por fila en desktop, apiladas en móvil). Las tarjetas de
+  // acción de movimiento abren el formulario con ese tipo preseleccionado
+  // (resolución dinámica contra el catálogo movementTypes, sin hardcodear);
+  // "Renta" navega a Warehouse igual que la acción Rentar de la ficha.
+  // Los catálogos viven en Develops → Catálogos: su tarjeta y su vista
+  // interna se eliminaron de este módulo.
+  const danoType = resolveMovementType('dano');
+  const moduleCards: Array<{
+    id: string;
+    icon: typeof Truck;
+    title: string;
+    desc: string;
+    onClick: () => void;
+    disabled?: boolean;
+  }> = [
     { id: 'stock', icon: Package, title: t('inv.home.stock'), desc: t('inv.home.stockDesc'), onClick: () => setInvView('stock') },
-    { id: 'movements', icon: ArrowDownUp, title: t('inv.home.movements'), desc: t('inv.home.movementsDesc'), onClick: () => setInvView('movements') },
-    { id: 'transfers', icon: Truck, title: t('inv.home.transfers'), desc: t('inv.home.transfersDesc'), onClick: () => setInvView('transfers') },
-    { id: 'counts', icon: ClipboardList, title: t('inv.home.counts'), desc: t('inv.home.countsDesc'), onClick: () => setInvView('counts') },
-    { id: 'serials', icon: Box, title: t('inv.home.serials'), desc: t('inv.home.serialsDesc'), onClick: () => setInvView('serials') },
-    { id: 'catalogs', icon: Tags, title: t('inv.home.catalogs'), desc: t('inv.home.catalogsDesc'), onClick: () => setInvView('catalogs') },
-    { id: 'adjustments', icon: SlidersHorizontal, title: t('inv.home.adjustments'), desc: t('inv.home.adjustmentsDesc'), onClick: () => setInvView('adjustments') },
     {
       id: 'scan',
       icon: ScanLine,
@@ -3534,6 +3654,30 @@ export function InventarioModule() {
       desc: t('inv.home.scanDesc'),
       onClick: () => { scanPickRef.current = null; setScanContext('navigate'); setScannerOpen(true); },
     },
+    {
+      id: 'renta',
+      icon: KeyRound,
+      title: t('inv.home.renta'),
+      desc: t('inv.home.rentaDesc'),
+      onClick: () => navigate('/warehouse?newOrder=1'),
+    },
+    { id: 'transfers', icon: Truck, title: t('inv.home.transfers'), desc: t('inv.home.transfersDesc'), onClick: () => setInvView('transfers') },
+    { id: 'devolucion', icon: RotateCcw, title: t('inv.home.devolucion'), desc: t('inv.home.devolucionDesc'), onClick: () => openMovementFormFor('devolucion') },
+    { id: 'consumo', icon: ArrowUpRight, title: t('inv.home.consumo'), desc: t('inv.home.consumoDesc'), onClick: () => openMovementFormFor('consumo') },
+    { id: 'compra', icon: ShoppingCart, title: t('inv.home.compra'), desc: t('inv.home.compraDesc'), onClick: () => openMovementFormFor('compra') },
+    {
+      id: 'dano',
+      icon: AlertTriangle,
+      title: t('inv.home.dano'),
+      // Si el tipo "Daño" no existe en el catálogo, la tarjeta se muestra
+      // igualmente con ayuda y el botón deshabilitado (nunca se hardcodea)
+      desc: danoType ? t('inv.home.danoDesc') : t('inv.home.danoMissing'),
+      onClick: () => openMovementFormFor('dano'),
+      disabled: !danoType,
+    },
+    { id: 'ajuste', icon: SlidersHorizontal, title: t('inv.home.ajuste'), desc: t('inv.home.ajusteDesc'), onClick: () => openMovementFormFor('ajuste') },
+    { id: 'counts', icon: ClipboardList, title: t('inv.home.counts'), desc: t('inv.home.countsDesc'), onClick: () => setInvView('counts') },
+    { id: 'serials', icon: Box, title: t('inv.home.serials'), desc: t('inv.home.serialsDesc'), onClick: () => setInvView('serials') },
   ];
 
   // ═══════════════════════════════════════════════════════════════════
@@ -3597,20 +3741,52 @@ export function InventarioModule() {
 
   return (
     <div className="space-y-4">
+      {/* Encabezado de TODAS las pantallas internas (ronda 6, punto 4):
+          Volver arriba a la izquierda + título del sub-módulo actual */}
+      {invView !== 'main' && (
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setInvView('main')}
+            className="gap-2 rounded-xl border-[#E5E5E7] text-xs shrink-0"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            {t('inv.view.back')}
+          </Button>
+          <h2 className="text-base font-semibold text-[#1D1D1F] truncate">
+            {invView === 'stock' && t('inv.home.stock')}
+            {invView === 'movements' && t('inv.home.movements')}
+            {invView === 'transfers' && t('inv.home.transfers')}
+            {invView === 'counts' && t('inv.home.counts')}
+            {invView === 'serials' && t('inv.home.serials')}
+            {invView === 'adjustments' && t('inv.home.adjustments')}
+            {invView === 'product' && (products.find(p => p.id === productDetailId)?.name || t('inv.home.stock'))}
+            {invView === 'movement' && t('inv.movementForm.title')}
+            {invView === 'transfer-new' && t('inv.transfers.new')}
+            {invView === 'receive' && t('inv.transfers.receiveTitle')}
+            {invView === 'count-new' && t('inv.counts.schedule')}
+            {invView === 'serial-new' && t('inv.serials.new')}
+          </h2>
+        </div>
+      )}
       {invView === 'main' && (
       <>
-      {/* Tarjetas-módulo (punto 12): la navegación del módulo. 2-3 por fila
-          en desktop, apiladas en móvil. La tarjeta "Registrar movimiento"
-          grande se eliminó: los botones rápidos de Stock (Compra/Consumo/
-          Ajuste/Transferencia) y el botón genérico del kardex ya cubren esa
-          entrada; las creaciones viven dentro de cada sección. */}
+      {/* Tarjetas-módulo (ronda 6, punto 2): la navegación definitiva del
+          módulo. 2-3 por fila en desktop, apiladas en móvil. */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
         {moduleCards.map(card => (
           <button
             key={card.id}
             type="button"
             onClick={card.onClick}
-            className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 text-left transition-shadow hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]"
+            disabled={card.disabled}
+            className={cn(
+              'bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 text-left transition-shadow',
+              card.disabled
+                ? 'opacity-60 cursor-not-allowed'
+                : 'hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)]'
+            )}
           >
             <div className="h-8 w-8 rounded-lg bg-corporate/10 flex items-center justify-center mb-2">
               <card.icon className="h-4 w-4 text-corporate" />
@@ -3629,6 +3805,11 @@ export function InventarioModule() {
       {/* ─── SECCIÓN: STOCK (pantalla completa, punto 12) ─── */}
       {invView === 'stock' && (
         <div className="space-y-4">
+          {/* Ronda 6 (punto 3): SIN botones globales de acción. Las acciones
+              aparecen al presionar una categoría (menú de acciones con la
+              categoría preseleccionada) o un producto (formulario con el
+              producto ya seleccionado). El escáner resalta la ubicación del
+              producto escaneado en todo el stock. */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 bg-[#F5F5F7] rounded-full p-1">
               <button
@@ -3651,49 +3832,10 @@ export function InventarioModule() {
               </button>
             </div>
             <div className="flex flex-wrap items-center gap-2 ml-auto">
-              {canWrite && (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={() => openMovementFormFor('compra')}
-                    className="gap-2 rounded-xl bg-corporate hover:bg-corporate/90"
-                  >
-                    <ShoppingCart className="h-4 w-4" />
-                    {t('inv.quick.compra')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openTransferForm()}
-                    className="gap-2 rounded-xl border-[#E5E5E7]"
-                  >
-                    <Truck className="h-4 w-4" />
-                    {t('inv.quick.transferencia')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openMovementFormFor('consumo')}
-                    className="gap-2 rounded-xl border-[#E5E5E7]"
-                  >
-                    <ArrowUpRight className="h-4 w-4" />
-                    {t('inv.quick.consumo')}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openMovementFormFor('ajuste')}
-                    className="gap-2 rounded-xl border-[#E5E5E7]"
-                  >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    {t('inv.quick.ajuste')}
-                  </Button>
-                </>
-              )}
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => { setScanContext('navigate'); setScannerOpen(true); }}
+                onClick={() => { scanPickRef.current = null; setScanContext('navigate'); setScannerOpen(true); }}
                 className="gap-2 rounded-xl border-[#E5E5E7]"
               >
                 <QrCode className="h-4 w-4" />
@@ -3701,224 +3843,340 @@ export function InventarioModule() {
               </Button>
             </div>
           </div>
+          <p className="text-[11px] text-[#86868B]">{t('inv.stock.pressHint')}</p>
 
           {/* Vista por producto */}
           {stockView === 'product' && (
-            <div className="space-y-2">
+            <div className="space-y-4">
               {activeProducts.length === 0 && (
                 <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
                   {t('inv.stock.noProducts')}
                   <div className="mt-1 text-xs">{t('inv.stock.noProductsHint')}</div>
                 </div>
               )}
-              {/* Punto 3 (ronda 4): un producto con doc de stock registrado se
-                  muestra aunque su cantidad sea 0 (p. ej. "Cloro: 0 gal"); el
-                  filtro anterior (quantity !== 0) lo ocultaba por completo */}
-              {activeProducts.map(product => {
-                const productStocks = stocks.filter(s => s.productId === product.id);
-                if (productStocks.length === 0) return null;
-                const serialized = isSerializedProduct(product.id!);
-                const isOpen = expandedIds.has(product.id!);
-                return (
-                  <div
-                    key={product.id}
-                    className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] overflow-hidden"
-                  >
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => toggleExpanded(product.id!)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') toggleExpanded(product.id!);
-                      }}
-                      className="w-full flex items-center gap-3 p-3 text-left cursor-pointer"
+              {/* Ronda 6 (punto 3): los productos se agrupan por categoría.
+                  Presionar la CATEGORÍA despliega un menú de pequeñas acciones
+                  con la categoría preseleccionada; presionar un PRODUCTO abre
+                  el formulario de movimiento con ese producto ya seleccionado
+                  (la acción se elige dentro del formulario). */}
+              {stockCategoryGroups.map(group => (
+                <div key={group.categoryId} className="space-y-2">
+                  <div className="bg-white rounded-xl border border-[#E5E5E7] overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCategoryMenuId(categoryMenuId === group.categoryId ? null : group.categoryId)
+                      }
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left"
                     >
-                      {product.photoUrl ? (
-                        <img
-                          src={product.photoUrl}
-                          alt={product.name}
-                          className="h-10 w-10 rounded-lg object-cover border border-[#E5E5E7]"
-                        />
+                      <Tags className="h-4 w-4 text-corporate shrink-0" />
+                      <span className="text-sm font-semibold text-[#1D1D1F] truncate">{group.categoryName}</span>
+                      <span className="text-xs text-[#86868B]">{group.products.length}</span>
+                      {categoryMenuId === group.categoryId ? (
+                        <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0 ml-auto" />
                       ) : (
-                        <div className="h-10 w-10 rounded-lg bg-[#F5F5F7] flex items-center justify-center">
-                          <Package className="h-5 w-5 text-[#86868B]" />
-                        </div>
+                        <ChevronDown className="h-4 w-4 text-[#86868B] shrink-0 ml-auto" />
                       )}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-sm font-medium text-[#1D1D1F] truncate">{product.name}</div>
-                        <div className="text-xs text-[#86868B]">
-                          {product.sku && <span className="mr-2">{product.sku}</span>}
-                          <span>{unitName(product.unitId)}</span>
-                        </div>
-                        {/* Modelo final de seriales (punto 4): el stock de un
-                            producto serializado se muestra por estado
-                            ("12 disponibles · 3 rentados"), nunca plano */}
-                        {serialized && (
-                          <div className="mt-1">{renderUnitStatusChips(product.id!)}</div>
+                    </button>
+                    {categoryMenuId === group.categoryId && (
+                      <div className="border-t border-[#E5E5E7] px-3 py-2 flex flex-wrap items-center gap-2">
+                        {canWrite && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => openMovementFormForCategory('compra', group.categoryId)}
+                              className="h-7 text-xs rounded-lg bg-corporate gap-1.5"
+                            >
+                              <ShoppingCart className="h-3.5 w-3.5" />
+                              {t('inv.home.compra')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openMovementFormForCategory('consumo', group.categoryId)}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                            >
+                              <ArrowUpRight className="h-3.5 w-3.5" />
+                              {t('inv.home.consumo')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openMovementFormForCategory('dano', group.categoryId)}
+                              disabled={!danoType}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                            >
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              {t('inv.home.dano')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openMovementFormForCategory('ajuste', group.categoryId)}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                            >
+                              <SlidersHorizontal className="h-3.5 w-3.5" />
+                              {t('inv.home.ajuste')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setTransferCategoryId(group.categoryId);
+                                setTransferForm(EMPTY_TRANSFER_FORM);
+                                setInvView('transfer-new');
+                              }}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                            >
+                              <Truck className="h-3.5 w-3.5" />
+                              {t('inv.home.transfers')}
+                            </Button>
+                          </>
+                        )}
+                        {!canWrite && (
+                          <span className="text-[11px] text-[#86868B]">{t('inv.readOnly')}</span>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={e => {
-                          e.stopPropagation();
-                          openProductQr(product);
-                        }}
-                        className="h-7 w-7 p-0 text-[#86868B] shrink-0"
-                        title={t('inv.qr.scanProduct')}
+                    )}
+                  </div>
+                  {/* Punto 3 (ronda 4): un producto con doc de stock registrado se
+                      muestra aunque su cantidad sea 0 (p. ej. "Cloro: 0 gal"); el
+                      filtro anterior (quantity !== 0) lo ocultaba por completo */}
+                  {group.products.map(product => {
+                    const productStocks = stocks.filter(s => s.productId === product.id);
+                    const serialized = isSerializedProduct(product.id!);
+                    const isOpen = expandedIds.has(product.id!);
+                    const scanHighlighted = stockScanHighlightId === product.id;
+                    return (
+                      <div
+                        key={product.id}
+                        id={`stock-product-${product.id}`}
+                        className={cn(
+                          'bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] overflow-hidden',
+                          scanHighlighted && 'ring-2 ring-corporate/40'
+                        )}
                       >
-                        <QrCode className="h-4 w-4" />
-                      </Button>
-                      {isOpen ? (
-                        <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-[#86868B] shrink-0" />
-                      )}
-                    </div>
-                    {isOpen && (
-                      <div className="border-t border-[#E5E5E7] divide-y divide-[#F5F5F7]">
-                        {productStocks.map(s => {
-                          const isLow = s.quantity <= (s.minStock ?? Infinity);
-                          const isEditingMm = editingMinMaxId === s.id;
-                          return (
-                            <div key={s.id} className="p-3">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <MapPin className="h-3.5 w-3.5 text-[#86868B]" />
-                                <span className="text-sm text-[#1D1D1F]">{locationName(s.locationId)}</span>
-                                {serialized ? (
-                                  <span className="text-xs text-[#86868B]">
-                                    {t('inv.serialized.stockHint')}
-                                  </span>
-                                ) : (
-                                  <span className="text-sm font-semibold text-[#1D1D1F]">
-                                    {s.quantity} {unitName(product.unitId)}
-                                  </span>
-                                )}
-                                {s.minStock != null && (
-                                  <span className="text-xs text-[#86868B]">
-                                    {t('inv.stock.min')} {s.minStock} · {t('inv.stock.max')}{' '}
-                                    {s.maxStock ?? '—'}
-                                  </span>
-                                )}
-                                {s.minStock != null && (
-                                  <span className="text-[10px] text-[#86868B] w-full sm:w-auto">
-                                    {t('inv.stock.minMaxHelp')}
-                                  </span>
-                                )}
-                                {isLow && s.minStock != null && (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                                    {t('inv.stock.lowStock')}
-                                  </span>
-                                )}
-                                <div className="ml-auto flex items-center gap-1">
-                                  {canWrite && (
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openMovementForm(product.id, s.locationId)}
-                                      className="h-7 text-xs rounded-lg border-[#E5E5E7]"
-                                    >
-                                      <ArrowDownUp className="h-3.5 w-3.5 mr-1" />
-                                      {t('inv.stock.registerMovement')}
-                                    </Button>
-                                  )}
-                                  {canSupervise && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => startEditMinMax(s)}
-                                      title={t('inv.stock.editMinMax')}
-                                      className="h-7 w-7 p-0 text-[#86868B]"
-                                    >
-                                      <Pencil className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
-                              {renderTransitLines(s.productId, s.locationId, unitName(product.unitId))}
-                              {isLow && s.minStock != null && product && (() => {
-                                const draft = purchaseDraftFor(s.productId, s.locationId);
-                                const supplier = product.preferredSupplierId
-                                  ? suppliers.find(x => x.id === product.preferredSupplierId)
-                                  : undefined;
-                                const suggested = purchaseSuggestedQty(s);
-                                const unit = unitName(product.unitId);
-                                return (
-                                  <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-1">
-                                    <div className="text-[11px] font-semibold text-amber-800">
-                                      {t('inv.stock.orderSuggestion')}
-                                    </div>
-                                    <div className="text-[11px] text-amber-800">
-                                      {t('inv.stock.suggestedQty')}: {suggested} {unit}
-                                    </div>
-                                    <div className="text-[11px] text-amber-800">
-                                      {t('inv.stock.preferredSupplier')}:{' '}
-                                      {supplier?.name || t('inv.stock.noPreferredSupplier')}
-                                      {supplier?.paymentTerms
-                                        ? ` · ${t('inv.stock.paymentTerms')}: ${supplier.paymentTerms}`
-                                        : ''}
-                                    </div>
-                                    <div className="pt-0.5">
-                                      {draft ? (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] bg-white text-[#86868B] border border-amber-200">
-                                          {t('inv.stock.orderDraftPending')}
-                                        </span>
-                                      ) : (
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            // Ronda 6 (punto 3): presionar el producto abre el
+                            // formulario de acción con el producto preseleccionado;
+                            // la expansión queda en la flecha
+                            if (canWrite) openMovementForm(product.id);
+                            else toggleExpanded(product.id!);
+                          }}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              if (canWrite) openMovementForm(product.id);
+                              else toggleExpanded(product.id!);
+                            }
+                          }}
+                          className="w-full flex items-center gap-3 p-3 text-left cursor-pointer"
+                        >
+                          {product.photoUrl ? (
+                            <img
+                              src={product.photoUrl}
+                              alt={product.name}
+                              className="h-10 w-10 rounded-lg object-cover border border-[#E5E5E7]"
+                            />
+                          ) : (
+                            <div className="h-10 w-10 rounded-lg bg-[#F5F5F7] flex items-center justify-center">
+                              <Package className="h-5 w-5 text-[#86868B]" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium text-[#1D1D1F] truncate">{product.name}</div>
+                            <div className="text-xs text-[#86868B]">
+                              {product.sku && <span className="mr-2">{product.sku}</span>}
+                              <span>{unitName(product.unitId)}</span>
+                            </div>
+                            {/* Modelo final de seriales (punto 4): el stock de un
+                                producto serializado se muestra por estado
+                                ("12 disponibles · 3 rentados"), nunca plano */}
+                            {serialized && (
+                              <div className="mt-1">{renderUnitStatusChips(product.id!)}</div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={e => {
+                              e.stopPropagation();
+                              openProductQr(product);
+                            }}
+                            className="h-7 w-7 p-0 text-[#86868B] shrink-0"
+                            title={t('inv.qr.scanProduct')}
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={e => {
+                              e.stopPropagation();
+                              toggleExpanded(product.id!);
+                            }}
+                            className="h-7 w-7 p-0 text-[#86868B] shrink-0"
+                            title={isOpen ? t('inv.common.collapse') : t('inv.common.expand')}
+                          >
+                            {isOpen ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                        {isOpen && (
+                          <div className="border-t border-[#E5E5E7] divide-y divide-[#F5F5F7]">
+                            {productStocks.map(s => {
+                              const isLow = s.quantity <= (s.minStock ?? Infinity);
+                              const isEditingMm = editingMinMaxId === s.id;
+                              return (
+                                <div
+                                  key={s.id}
+                                  id={`stock-row-${s.id}`}
+                                  className={cn('p-3', scanHighlighted && 'bg-corporate/10')}
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <MapPin className="h-3.5 w-3.5 text-[#86868B]" />
+                                    <span className="text-sm text-[#1D1D1F]">{locationName(s.locationId)}</span>
+                                    {serialized ? (
+                                      <span className="text-xs text-[#86868B]">
+                                        {t('inv.serialized.stockHint')}
+                                      </span>
+                                    ) : (
+                                      <span className="text-sm font-semibold text-[#1D1D1F]">
+                                        {s.quantity} {unitName(product.unitId)}
+                                      </span>
+                                    )}
+                                    {s.minStock != null && (
+                                      <span className="text-xs text-[#86868B]">
+                                        {t('inv.stock.min')} {s.minStock} · {t('inv.stock.max')}{' '}
+                                        {s.maxStock ?? '—'}
+                                      </span>
+                                    )}
+                                    {s.minStock != null && (
+                                      <span className="text-[10px] text-[#86868B] w-full sm:w-auto">
+                                        {t('inv.stock.minMaxHelp')}
+                                      </span>
+                                    )}
+                                    {isLow && s.minStock != null && (
+                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                        {t('inv.stock.lowStock')}
+                                      </span>
+                                    )}
+                                    <div className="ml-auto flex items-center gap-1">
+                                      {canWrite && (
                                         <Button
+                                          variant="outline"
                                           size="sm"
-                                          onClick={() => handleCreatePurchaseRequisition(s)}
-                                          disabled={savingPurchaseReq || suggested <= 0}
-                                          className="h-7 text-xs rounded-lg bg-corporate"
+                                          onClick={() => openMovementForm(product.id, s.locationId)}
+                                          className="h-7 text-xs rounded-lg border-[#E5E5E7]"
                                         >
-                                          <Send className="h-3.5 w-3.5 mr-1" />
-                                          {t('inv.stock.sendOrder')}
+                                          <ArrowDownUp className="h-3.5 w-3.5 mr-1" />
+                                          {t('inv.stock.registerMovement')}
+                                        </Button>
+                                      )}
+                                      {canSupervise && (
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => startEditMinMax(s)}
+                                          title={t('inv.stock.editMinMax')}
+                                          className="h-7 w-7 p-0 text-[#86868B]"
+                                        >
+                                          <Pencil className="h-3.5 w-3.5" />
                                         </Button>
                                       )}
                                     </div>
                                   </div>
-                                );
-                              })()}
-                              {isEditingMm && (
-                                <div className="mt-2 flex items-center gap-2">
-                                  <Input
-                                    type="number"
-                                    value={minMaxDraft.min}
-                                    onChange={e => setMinMaxDraft(d => ({ ...d, min: e.target.value }))}
-                                    placeholder={t('inv.stock.min')}
-                                    className="h-8 w-24 text-xs rounded-lg"
-                                  />
-                                  <Input
-                                    type="number"
-                                    value={minMaxDraft.max}
-                                    onChange={e => setMinMaxDraft(d => ({ ...d, max: e.target.value }))}
-                                    placeholder={t('inv.stock.max')}
-                                    className="h-8 w-24 text-xs rounded-lg"
-                                  />
-                                  <Button
-                                    size="sm"
-                                    onClick={() => handleSaveMinMax(s)}
-                                    className="h-8 text-xs rounded-lg bg-corporate"
-                                  >
-                                    {t('inv.common.save')}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setEditingMinMaxId(null)}
-                                    className="h-8 text-xs text-[#86868B]"
-                                  >
-                                    {t('inv.common.cancel')}
-                                  </Button>
+                                  {renderTransitLines(s.productId, s.locationId, unitName(product.unitId))}
+                                  {isLow && s.minStock != null && product && (() => {
+                                    const draft = purchaseDraftFor(s.productId, s.locationId);
+                                    const supplier = product.preferredSupplierId
+                                      ? suppliers.find(x => x.id === product.preferredSupplierId)
+                                      : undefined;
+                                    const suggested = purchaseSuggestedQty(s);
+                                    const unit = unitName(product.unitId);
+                                    return (
+                                      <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-1">
+                                        <div className="text-[11px] font-semibold text-amber-800">
+                                          {t('inv.stock.orderSuggestion')}
+                                        </div>
+                                        <div className="text-[11px] text-amber-800">
+                                          {t('inv.stock.suggestedQty')}: {suggested} {unit}
+                                        </div>
+                                        <div className="text-[11px] text-amber-800">
+                                          {t('inv.stock.preferredSupplier')}:{' '}
+                                          {supplier?.name || t('inv.stock.noPreferredSupplier')}
+                                          {supplier?.paymentTerms
+                                            ? ` · ${t('inv.stock.paymentTerms')}: ${supplier.paymentTerms}`
+                                            : ''}
+                                        </div>
+                                        <div className="pt-0.5">
+                                          {draft ? (
+                                            <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] bg-white text-[#86868B] border border-amber-200">
+                                              {t('inv.stock.orderDraftPending')}
+                                            </span>
+                                          ) : (
+                                            <Button
+                                              size="sm"
+                                              onClick={() => handleCreatePurchaseRequisition(s)}
+                                              disabled={savingPurchaseReq || suggested <= 0}
+                                              className="h-7 text-xs rounded-lg bg-corporate"
+                                            >
+                                              <Send className="h-3.5 w-3.5 mr-1" />
+                                              {t('inv.stock.sendOrder')}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                  {isEditingMm && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                      <Input
+                                        type="number"
+                                        value={minMaxDraft.min}
+                                        onChange={e => setMinMaxDraft(d => ({ ...d, min: e.target.value }))}
+                                        placeholder={t('inv.stock.min')}
+                                        className="h-8 w-24 text-xs rounded-lg"
+                                      />
+                                      <Input
+                                        type="number"
+                                        value={minMaxDraft.max}
+                                        onChange={e => setMinMaxDraft(d => ({ ...d, max: e.target.value }))}
+                                        placeholder={t('inv.stock.max')}
+                                        className="h-8 w-24 text-xs rounded-lg"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleSaveMinMax(s)}
+                                        className="h-8 text-xs rounded-lg bg-corporate"
+                                      >
+                                        {t('inv.common.save')}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setEditingMinMaxId(null)}
+                                        className="h-8 text-xs text-[#86868B]"
+                                      >
+                                        {t('inv.common.cancel')}
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
 
@@ -4973,316 +5231,11 @@ export function InventarioModule() {
         </div>
       )}
 
-      {/* ─── SUB-PESTAÑA: CATÁLOGOS ─── */}
-      {/* ─── SECCIÓN: CATÁLOGOS (movementTypes + serialStatuses) ─── */}
-      {invView === 'catalogs' && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {/* Catálogo: Tipos de movimiento */}
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-[#1D1D1F] flex items-center gap-2">
-                  <ArrowDownUp className="h-4 w-4 text-corporate" />
-                  {t('inv.catalogs.mt.title')}
-                </h3>
-                <p className="text-xs text-[#86868B] mt-0.5">{t('inv.catalogs.mt.subtitle')}</p>
-              </div>
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSeedMovementTypes}
-                  disabled={savingCatalogs}
-                  className="h-7 text-xs rounded-lg border-[#E5E5E7] shrink-0"
-                >
-                  <Tags className="h-3.5 w-3.5 mr-1" />
-                  {t('inv.catalogs.mt.loadSeeds')}
-                </Button>
-              )}
-            </div>
-
-            {/* Crear */}
-            {canWrite && (
-              <div className="space-y-2">
-                <Input
-                  value={mtNewName}
-                  onChange={e => setMtNewName(e.target.value)}
-                  placeholder={t('inv.catalogs.mt.name')}
-                  className="h-8 text-xs rounded-lg"
-                />
-                <Input
-                  value={mtNewNameEn}
-                  onChange={e => setMtNewNameEn(e.target.value)}
-                  placeholder={t('inv.catalogs.mt.nameEn')}
-                  className="h-8 text-xs rounded-lg"
-                />
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-[#1D1D1F]">
-                    <input
-                      type="checkbox"
-                      checked={mtNewIsOutput}
-                      onChange={e => setMtNewIsOutput(e.target.checked)}
-                      className="h-3.5 w-3.5"
-                    />
-                    {t('inv.catalogs.mt.isOutput')}
-                  </label>
-                  <Button
-                    size="sm"
-                    onClick={handleCreateMovementType}
-                    disabled={savingCatalogs}
-                    className="h-7 text-xs rounded-lg bg-corporate ml-auto"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    {t('inv.catalogs.mt.new')}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Lista */}
-            <div className="divide-y divide-[#F5F5F7]">
-              {sortedMovementTypes.length === 0 && (
-                <p className="text-xs text-[#86868B] py-3">{t('inv.catalogs.mt.empty')}</p>
-              )}
-              {sortedMovementTypes.map(mt =>
-                editingMtId === mt.id ? (
-                  <div key={mt.id} className="py-2 space-y-1.5">
-                    <Input
-                      value={editingMtName}
-                      onChange={e => setEditingMtName(e.target.value)}
-                      placeholder={t('inv.catalogs.mt.name')}
-                      className="h-8 text-xs rounded-lg"
-                    />
-                    <Input
-                      value={editingMtNameEn}
-                      onChange={e => setEditingMtNameEn(e.target.value)}
-                      placeholder={t('inv.catalogs.mt.nameEn')}
-                      className="h-8 text-xs rounded-lg"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        onClick={handleRenameMovementType}
-                        disabled={savingCatalogs}
-                        className="h-7 text-xs rounded-lg bg-corporate"
-                      >
-                        {t('inv.common.save')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setEditingMtId(null); setEditingMtName(''); setEditingMtNameEn(''); }}
-                        className="h-7 text-xs text-[#86868B]"
-                      >
-                        {t('inv.common.cancel')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={mt.id} className="py-2 flex items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className={cn('text-sm truncate', mt.isActive ? 'text-[#1D1D1F]' : 'text-[#86868B] line-through')}>
-                        {movementTypeName(mt)}
-                      </div>
-                      <div className="text-[11px] text-[#86868B]">
-                        {mt.isOutput ? t('inv.catalogs.mt.isOutput') : t('inv.movements.in')}
-                      </div>
-                    </div>
-                    {canWrite && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingMtId(mt.id!);
-                            setEditingMtName(mt.name);
-                            setEditingMtNameEn(mt.nameEn || '');
-                          }}
-                          className="h-7 w-7 p-0 text-[#86868B]"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleMovementTypeActive(mt)}
-                          className={cn('h-7 w-7 p-0', mt.isActive ? 'text-green-600' : 'text-[#86868B]')}
-                          title={mt.isActive ? t('inv.common.active') : t('inv.common.inactive')}
-                        >
-                          <Power className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* Catálogo: Estados de ciclo de vida (seriales) */}
-          <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-semibold text-[#1D1D1F] flex items-center gap-2">
-                  <Box className="h-4 w-4 text-corporate" />
-                  {t('inv.catalogs.ss.title')}
-                </h3>
-                <p className="text-xs text-[#86868B] mt-0.5">{t('inv.catalogs.ss.subtitle')}</p>
-              </div>
-              {canWrite && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSeedSerialStatuses}
-                  disabled={savingCatalogs}
-                  className="h-7 text-xs rounded-lg border-[#E5E5E7] shrink-0"
-                >
-                  <Tags className="h-3.5 w-3.5 mr-1" />
-                  {t('inv.catalogs.ss.loadSeeds')}
-                </Button>
-              )}
-            </div>
-
-            {/* Crear */}
-            {canWrite && (
-              <div className="space-y-2">
-                <Input
-                  value={ssNewName}
-                  onChange={e => setSsNewName(e.target.value)}
-                  placeholder={t('inv.catalogs.ss.name')}
-                  className="h-8 text-xs rounded-lg"
-                />
-                <Input
-                  value={ssNewNameEn}
-                  onChange={e => setSsNewNameEn(e.target.value)}
-                  placeholder={t('inv.catalogs.ss.nameEn')}
-                  className="h-8 text-xs rounded-lg"
-                />
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs text-[#1D1D1F]">
-                    <input
-                      type="checkbox"
-                      checked={ssNewBlocksRental}
-                      onChange={e => setSsNewBlocksRental(e.target.checked)}
-                      className="h-3.5 w-3.5"
-                    />
-                    {t('inv.catalogs.ss.blocksRental')}
-                  </label>
-                  <Button
-                    size="sm"
-                    onClick={handleCreateSerialStatus}
-                    disabled={savingCatalogs}
-                    className="h-7 text-xs rounded-lg bg-corporate ml-auto"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    {t('inv.catalogs.ss.new')}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Lista */}
-            <div className="divide-y divide-[#F5F5F7]">
-              {sortedSerialStatuses.length === 0 && (
-                <p className="text-xs text-[#86868B] py-3">{t('inv.catalogs.ss.empty')}</p>
-              )}
-              {sortedSerialStatuses.map(ss =>
-                editingSsId === ss.id ? (
-                  <div key={ss.id} className="py-2 space-y-1.5">
-                    <Input
-                      value={editingSsName}
-                      onChange={e => setEditingSsName(e.target.value)}
-                      placeholder={t('inv.catalogs.ss.name')}
-                      className="h-8 text-xs rounded-lg"
-                    />
-                    <Input
-                      value={editingSsNameEn}
-                      onChange={e => setEditingSsNameEn(e.target.value)}
-                      placeholder={t('inv.catalogs.ss.nameEn')}
-                      className="h-8 text-xs rounded-lg"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        onClick={handleRenameSerialStatus}
-                        disabled={savingCatalogs}
-                        className="h-7 text-xs rounded-lg bg-corporate"
-                      >
-                        {t('inv.common.save')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => { setEditingSsId(null); setEditingSsName(''); setEditingSsNameEn(''); }}
-                        className="h-7 text-xs text-[#86868B]"
-                      >
-                        {t('inv.common.cancel')}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={ss.id} className="py-2 flex items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                      <div className={cn('text-sm truncate', ss.isActive ? 'text-[#1D1D1F]' : 'text-[#86868B] line-through')}>
-                        {getLanguage() === 'en' && ss.nameEn ? ss.nameEn : ss.name}
-                      </div>
-                      {ss.blocksRental && (
-                        <div className="text-[11px] text-amber-700">{t('inv.catalogs.ss.blocksRental')}</div>
-                      )}
-                    </div>
-                    {canWrite && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingSsId(ss.id!);
-                            setEditingSsName(ss.name);
-                            setEditingSsNameEn(ss.nameEn || '');
-                          }}
-                          className="h-7 w-7 p-0 text-[#86868B]"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggleSerialStatusActive(ss)}
-                          className={cn('h-7 w-7 p-0', ss.isActive ? 'text-green-600' : 'text-[#86868B]')}
-                          title={ss.isActive ? t('inv.common.active') : t('inv.common.inactive')}
-                        >
-                          <Power className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {invView !== 'main' && (
       <>
-      {/* Botón Volver de las pantallas internas (punto 8): secciones y
-          formularios viven en pantalla completa con el mismo patrón */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setInvView('main')}
-          className="gap-2 rounded-xl border-[#E5E5E7] text-xs"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {t('inv.view.back')}
-        </Button>
-      </div>
-
       {/* ─── PANTALLA INTERNA: REGISTRAR MOVIMIENTO (punto 8) ─── */}
       {invView === 'movement' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4">{t('inv.movementForm.title')}</h2>
           <div className="space-y-3">
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg px-3 py-2">
               {t('inv.movementForm.help')}
@@ -5523,10 +5476,6 @@ export function InventarioModule() {
       {/* ─── PANTALLA INTERNA: NUEVA TRANSFERENCIA (punto 8) ─── */}
       {invView === 'transfer-new' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-            <Truck className="h-4 w-4 text-corporate" />
-            {t('inv.transfers.new')}
-          </h2>
           <div className="space-y-3">
             {/* Punto 14: origen y destino PRIMERO, luego categoría → producto */}
             <div className="grid grid-cols-2 gap-2">
@@ -5681,10 +5630,6 @@ export function InventarioModule() {
       {/* ─── PANTALLA INTERNA: RECIBIR TRANSFERENCIA (punto 8) ─── */}
       {invView === 'receive' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-            <Inbox className="h-4 w-4 text-corporate" />
-            {t('inv.transfers.receiveTitle')}
-          </h2>
           {(() => {
             const needsUnits = receivingTransfer ? transferNeedsUnits(receivingTransfer) : false;
             const unitOptions = needsUnits && receivingTransfer
@@ -5903,10 +5848,6 @@ export function InventarioModule() {
       {/* ─── PANTALLA INTERNA: PROGRAMAR CONTEO (punto 8) ─── */}
       {invView === 'count-new' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-corporate" />
-            {t('inv.counts.schedule')}
-          </h2>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.counts.location')}</Label>
@@ -6000,10 +5941,6 @@ export function InventarioModule() {
       {/* ─── PANTALLA INTERNA: NUEVO SERIAL (punto 8) ─── */}
       {invView === 'serial-new' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
-          <h2 className="text-base font-semibold text-[#1D1D1F] mb-4 flex items-center gap-2">
-            <Box className="h-4 w-4 text-corporate" />
-            {t('inv.serials.new')}
-          </h2>
           <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.serials.product')}</Label>

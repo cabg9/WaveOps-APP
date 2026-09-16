@@ -326,6 +326,9 @@ registerI18nKeys({
     'wh.home.dispatchDesc': 'Escanear el QR de la orden y asignar los seriales que salen.',
     'wh.home.return': 'Verificar retorno',
     'wh.home.returnDesc': 'Escanear los seriales que regresan y marcarlos OK o dañados.',
+    'wh.home.scanQr': 'Escanear QR',
+    'wh.home.scanQrDesc': 'Apunta al QR de una orden o de un serial para localizarlo.',
+    'wh.home.scanSerialNoOrder': 'No se encontró una orden con ese serial',
 
     'wh.action.prepare': 'Preparar',
     'wh.action.ready': 'Listo para despachar',
@@ -680,6 +683,9 @@ registerI18nKeys({
     'wh.home.dispatchDesc': 'Scan the order QR and assign the serials going out.',
     'wh.home.return': 'Verify return',
     'wh.home.returnDesc': 'Scan the returning serials and mark them OK or damaged.',
+    'wh.home.scanQr': 'Scan QR',
+    'wh.home.scanQrDesc': 'Point at an order or serial QR to locate it.',
+    'wh.home.scanSerialNoOrder': 'No order was found with that serial',
 
     'wh.action.prepare': 'Prepare',
     'wh.action.ready': 'Ready to dispatch',
@@ -1325,6 +1331,12 @@ export function WarehouseModule() {
   const [savingReturn, setSavingReturn] = useState(false);
   // Destino del escáner en el flujo de retorno: QR de orden o serial devuelto
   const [returnScanTarget, setReturnScanTarget] = useState<'order' | 'serial' | null>(null);
+
+  // Escáner genérico desde el home (Ronda 6): QR de orden → detalle de la
+  // orden; QR de serial → localiza su orden (misma lógica de localización de
+  // los retornos inteligentes de Ronda 5). La cámara persiste hasta que el
+  // resultado sea válido (persist en WhScannerModal).
+  const [homeScanOpen, setHomeScanOpen] = useState(false);
 
   // Modo emergencia (Supervisor+): forzar avance con motivo obligatorio
   const [emergencyOrderId, setEmergencyOrderId] = useState<string | null>(null);
@@ -2737,6 +2749,41 @@ export function WarehouseModule() {
     }
   };
 
+  // ESCANEAR QR desde el home (Ronda 6). QR de ORDEN → abre el detalle de esa
+  // orden. QR de SERIAL → localiza su orden (retornos inteligentes Ronda 5):
+  // si está despachada/entregada abre su verificación de retorno; si está en
+  // otra etapa abre el detalle de la orden. Cualquier lectura inválida avisa y
+  // la cámara sigue abierta (persist): solo un resultado válido cierra.
+  const handleHomeScan = (kind: 'order' | 'serial', id: string) => {
+    if (kind === 'order') {
+      const order = orders.find(o => o.id === id);
+      if (!order) {
+        toast.error(t('wh.dispatch.orderUnknown'));
+        return;
+      }
+      setHomeScanOpen(false);
+      setDetailOrderId(order.id!);
+      return;
+    }
+    const unit = rentalUnits.find(u => u.id === id || u.serialNumber === id);
+    if (!unit) {
+      toast.error(t('wh.return.serialUnknown'));
+      return;
+    }
+    // Localiza la orden que tiene ese serial asignado (cualquier etapa)
+    const owner = orders.find(o => assignedUnitEntries(o).some(e => e.unitId === unit.id));
+    if (!owner) {
+      toast.error(t('wh.home.scanSerialNoOrder'));
+      return;
+    }
+    setHomeScanOpen(false);
+    if (owner.statusId === 'despachado' || owner.statusId === 'entregado') {
+      openReturn(owner.id!);
+    } else {
+      setDetailOrderId(owner.id!);
+    }
+  };
+
   const finalizeReturn = async () => {
     const order = returnOrder;
     if (!order || !currentUser) return;
@@ -3442,10 +3489,13 @@ export function WarehouseModule() {
         <>
           {/* Tarjetas-módulo PEQUEÑAS (LA navegación del módulo; reemplaza a
               las pills/pestañas). Más angostas: 2 columnas en móvil pequeño,
-              hasta 5 en desktop. Tocar una tarjeta navega a la pantalla de esa
-              sección con botón Volver (patrón whView). La Pizarra NO es una
-              tarjeta: es la vista fija/resumen que siempre se ve debajo. */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              hasta 6 en desktop. Orden (Ronda 6): acciones principales
+              PRIMERO — Órdenes · Retornos · Escanear QR — y luego las demás
+              (Nueva orden · Despachar · Verificar retorno). Tocar una tarjeta
+              navega a la pantalla de esa sección con botón Volver (patrón
+              whView). La Pizarra NO es una tarjeta: es la vista fija/resumen
+              que siempre se ve debajo. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
             <button
               type="button"
               onClick={() => setWhView('orders')}
@@ -3476,6 +3526,21 @@ export function WarehouseModule() {
                   <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.returnsDesc')}</p>
                 </div>
                 <span className="text-[11px] text-[#86868B] shrink-0">{returnedQueue.length}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHomeScanOpen(true)}
+              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center shrink-0">
+                  <QrCode className="w-4 h-4 text-violet-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.home.scanQr')}</p>
+                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.scanQrDesc')}</p>
+                </div>
               </div>
             </button>
             <button
@@ -5176,24 +5241,29 @@ export function WarehouseModule() {
       />
 
       {/* ─── MODAL: ESCANER QR (WH-D2: orden / serial / texto plano; también
-          el escaneo OPCIONAL del formulario de orden). En despacho y retorno
-          funciona como CÁMARA INTELIGENTE: queda abierto contando en vivo y
-          se cierra solo al completar los seriales esperados. ─── */}
+          el escaneo OPCIONAL del formulario de orden y el ESCANEAR QR del
+          home, Ronda 6). En despacho y retorno funciona como CÁMARA
+          INTELIGENTE: queda abierto contando en vivo y se cierra solo al
+          completar los seriales esperados. En el home queda abierto
+          (persist) hasta obtener un resultado válido. ─── */}
       <WhScannerModal
-        open={scanTarget !== null || returnScanTarget !== null || formScanOpen}
+        open={scanTarget !== null || returnScanTarget !== null || formScanOpen || homeScanOpen}
         onOpenChange={open => {
           if (!open) {
             setScanTarget(null);
             setReturnScanTarget(null);
             setFormScanOpen(false);
+            setHomeScanOpen(false);
           }
         }}
         onScan={(kind, id) => {
           if (formScanOpen) handleFormScan(kind, id);
           else if (returnScanTarget !== null) handleReturnScan(kind, id);
+          else if (homeScanOpen) handleHomeScan(kind, id);
           else handleDispatchScan(kind, id);
         }}
         resolveManual={resolveManualScanCode}
+        persist={homeScanOpen}
         multiScan={
           scanTarget === 'serials' && dispatchOrder
             ? (() => {
@@ -5329,9 +5399,13 @@ interface WhScannerModalProps {
       (count >= expected) o con el botón "Detener". expected = null cuando aún
       no hay orden seleccionada (retorno: el serial abre su orden). */
   multiScan?: { expected: number | null; count: number } | null;
+  /** La cámara PERMANECE ABIERTA tras cada lectura (sin contador): el padre
+      decide cuándo cerrar según el resultado (escáner genérico del home,
+      Ronda 6). Texto no reconocido: aviso y la cámara sigue. */
+  persist?: boolean;
 }
 
-function WhScannerModal({ open, onOpenChange, onScan, resolveManual, multiScan }: WhScannerModalProps) {
+function WhScannerModal({ open, onOpenChange, onScan, resolveManual, multiScan, persist }: WhScannerModalProps) {
   // Ref para que el callback del escáner siempre vea el handler actual
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
@@ -5339,6 +5413,8 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual, multiScan }
   useEffect(() => { resolveManualRef.current = resolveManual; }, [resolveManual]);
   const multiScanRef = useRef(multiScan);
   useEffect(() => { multiScanRef.current = multiScan; }, [multiScan]);
+  const persistRef = useRef(persist);
+  useEffect(() => { persistRef.current = persist; }, [persist]);
   // Anti doble-entrega en modo multiScan: el mismo código leído de nuevo en
   // menos de 3 s se ignora (el QR sigue enfocado frente a la cámara)
   const lastMultiScanRef = useRef<{ text: string; at: number } | null>(null);
@@ -5468,10 +5544,11 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual, multiScan }
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
             if (disposed || sessionId !== currentSession) return;
-            // MODO CÁMARA INTELIGENTE (multiScan): la sesión se mantiene viva
-            // y la cámara sigue abierta contando; el cierre lo decide el padre
-            // (completado → cierra sola; respaldo manual → "Detener").
-            if (multiScanRef.current) {
+            // MODO CÁMARA INTELIGENTE (multiScan) o PERSISTENTE (persist):
+            // la sesión se mantiene viva y la cámara sigue abierta; el cierre
+            // lo decide el padre (completado → cierra sola; respaldo manual →
+            // "Detener"; resultado válido del home → cierra el padre).
+            if (multiScanRef.current || persistRef.current) {
               const now = Date.now();
               const last = lastMultiScanRef.current;
               if (last && last.text === decodedText && now - last.at < 3000) return;

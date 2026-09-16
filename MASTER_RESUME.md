@@ -1,9 +1,36 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-16 (FASE 1 — RONDA 5 + RESET de datos de prueba ejecutado en GEMELA — gemela limpia, pendiente re-prueba)
+> Última actualización: 2026-09-16 (FASE 1 — RONDA 6 estructura+detalles desplegada en GEMELA — pendiente re-prueba)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — RONDA 6: ESTRUCTURA + DETALLES (16 de septiembre) — DESPLEGADA EN GEMELA
+
+**Estado:** EN GEMELA, pendiente re-prueba. Spec = prompt del usuario (§4.25 del doc aún no existe). Deploy: hosting (rules/functions sin cambios). Fix del coordinador: título del módulo en `App.tsx:259` → "Inventario / Requisiciones" (el agente no podía tocar App.tsx). Verificado en datos: movementTypes incluye `dano` (activo, isOutput).
+
+**Inventario/Requisiciones:**
+1. **Título**: "Inventario / Requisiciones" (App.tsx Layout title; el displayName del menú es dato Firestore, no se toca).
+2. **Tarjetas-módulo definitivas (11, en orden)**: Stock · Escanear QR · Renta · Transferencias · Devolución · Consumo · Compra · Daño · Ajuste · Conteo · Seriales. "Catálogos" ELIMINADO del módulo (vista interna borrada ~290 líneas; la gestión vive en Develops → Catálogos). Resolución dinámica de tipos `resolveMovementType(key)` (por id de semilla → nombre normalizado → fallback isOutput); si el tipo no existe en datos, la tarjeta muestra ayuda "Carga el catálogo inicial desde Develops → Catálogos" y queda deshabilitada (nada hardcodeado). "Renta" navega a `/warehouse?newOrder=1`.
+3. **Stock rediseñado**: SIN botones globales de acción; la vista por producto agrupa por CATEGORÍA — presionar categoría despliega menú de acciones (Compra/Consumo/Daño/Ajuste/Transferir) con categoría preseleccionada; presionar producto abre el formulario con el producto ya elegido (la acción se elige dentro). Escáner con QR de producto → abre Stock, expande y resalta sus filas por ubicación 3 s con scroll. **Filtro por defecto = POR UBICACIÓN** (por producto queda como toggle).
+4. **Encabezados**: "Volver" arriba a la izquierda + título del sub-módulo para TODAS las vistas internas (se eliminó el bloque viejo de Volver que quedaba debajo del contenido — era el problema principal); h2 duplicados removidos.
+
+**Warehouse:**
+5. Tarjetas ordenadas: **Órdenes · Retornos · Escanear QR** (nueva: orden→detalle; serial→localiza su orden y abre verificación si está despachada/entregada; lectura inválida → toast y cámara sigue; modo `persist` en WhScannerModal) · Nueva orden · Despachar · Verificar retorno. Grid `grid-cols-2 sm:grid-cols-3 lg:grid-cols-6`. "Volver" arriba verificado en las 5 pantallas internas.
+
+**Proveedores y productos (Develops → Catálogos):**
+6. **Teléfono internacional**: `PhoneField` (prefijo +593 por defecto y 10 opciones + parseo de prefijos desconocidos); guardado uniforme `phone = "+prefijoNúmero"` + `phonePrefix`/`phoneNumber` estructurados (null si vacío); compatibilidad con teléfonos viejos. Aplicado en proveedores y clientes.
+7. **Condiciones de pago "Otro" estructurado**: tipo (Crédito a X días / Anticipo %) + número + frecuencia opcional (única/semanal/quincenal/mensual); guardado como string uniforme compuesto ("Crédito 45 días · mensual"); parseo de valores viejos; si no logra parsear, se conserva en solo lectura.
+8. **Tipo de cuenta bancaria**: Personal/Empresarial × Ahorros/Corriente + **Internacional** (campos SWIFT/IBAN/código extra, mayúsculas, solo persistidos para ese tipo); valores legacy como opción extra conservada.
+9. **Productos**: (a) lápiz/ojo fuera del encabezado (nombre legible; acciones al pie del detalle expandido); (b) **ELIMINAR producto** (solo DG/RRHH) verificando en vivo sin uso: sin movimientos, sin seriales, sin ítems en órdenes — si se usó, deshabilitado con tooltip "Tiene historial"; borrado duro + executeWithConfirm critical + auditoría `PRODUCT_DELETED`; (c) **fotos lentas — causa**: useStorageUpload no comprimía (fotos 3-8 MB íntegras; progress simulado). Fix: `compressImage` en el hook (createImageBitmap → canvas máx 1280px → JPEG 0.8 ≈150-400 KB; respeta <1MB JPEG y no-imágenes; fallback al original si falla). Contrato del hook intacto — beneficios para toda la app (Warehouse, Inventario, Controles, Tasks, Horarios).
+
+**Shapes nuevos (aditivos):** supplier `phonePrefix?/phoneNumber?` (+phone compuesto); `SupplierBankAccount` extensión local `swift?/iban?/extraCode?`; `AuditAction.PRODUCT_DELETED`. WhScannerModal `persist?`.
+
+**Archivos:** InventarioModule.tsx (+529/−592), WarehouseModule.tsx (+90/−13), CatalogosTab.tsx (+363), App.tsx (título), src/types/develops.ts (PRODUCT_DELETED), useStorageUpload.ts (compresión). **Build:** exit 0 (tsbuildinfo fresco). **Deploy gemela:** hosting index-DedLTqJA.js verificado.
+
+**Pendientes:** handlers CRUD de movementTypes/serialStatuses huérfanos en InventarioModule (vista Catálogos eliminada; inofensivos, limpiar en ronda futura); vista "Movimientos" solo accesible desde ficha de producto y "Ajustes" sin entrada directa (retirar o re-entrar en ronda futura si el usuario lo pide); foto en Storage queda huérfana al eliminar producto (sin deleteObject); retirar bloque temporal de reset y logs de diagnóstico tras las pruebas.
 
 ---
 

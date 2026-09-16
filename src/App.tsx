@@ -256,7 +256,7 @@ function AppRoutes() {
         element={
           <RequireProfileComplete>
             <ProtectedRoute>
-              <Layout title="Requisiciones">
+              <Layout title="Inventario / Requisiciones">
                 <InventarioModule />
               </Layout>
             </ProtectedRoute>

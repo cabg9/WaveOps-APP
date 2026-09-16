@@ -2,7 +2,7 @@
 // Piso de los futuros módulos Inventario y Compras & Pagos.
 // Cero datos hardcodeados: todo se crea desde la app.
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,7 +97,6 @@ registerI18nKeys({
     'catalogs.suppliers.noCostCenters': 'No hay centros de costo activos',
     'catalogs.suppliers.paymentTerms': 'Condiciones de pago',
     'catalogs.suppliers.paymentTermsOther': 'Otro',
-    'catalogs.suppliers.paymentTermsOtherPlaceholder': 'Especifica las condiciones de pago',
     'catalogs.suppliers.notes': 'Notas',
     'catalogs.suppliers.preferredProducts': 'Productos donde es proveedor preferido',
     'catalogs.suppliers.preferredProductsNone': 'No es proveedor preferido de ningún producto',
@@ -248,6 +247,32 @@ registerI18nKeys({
     'catalogs.products.admitsDiscountHelp': 'Si es "No", el descuento en esta línea solo aplica cuando un supervisor aprueba la orden (sin importar el %).',
     'catalogs.products.hasQr': '¿Lleva código QR?',
     'catalogs.products.hasQrHelp': 'Sí = se escanea en despachos, conteos y recepciones. No = se confirma con firma/foto (se pedirá al recibir o despachar).',
+    'catalogs.common.phonePrefix': 'Prefijo',
+    'catalogs.suppliers.paymentTermsOtherKind': 'Tipo',
+    'catalogs.suppliers.paymentTermsOtherKindCredit': 'Crédito a X días',
+    'catalogs.suppliers.paymentTermsOtherKindAdvance': 'Anticipo %',
+    'catalogs.suppliers.paymentTermsOtherValueCredit': 'Días de crédito',
+    'catalogs.suppliers.paymentTermsOtherValueAdvance': 'Porcentaje de anticipo',
+    'catalogs.suppliers.paymentTermsOtherFrequency': 'Frecuencia (opcional)',
+    'catalogs.suppliers.paymentTermsFreqUnique': 'Única',
+    'catalogs.suppliers.paymentTermsFreqWeekly': 'Semanal',
+    'catalogs.suppliers.paymentTermsFreqBiweekly': 'Quincenal',
+    'catalogs.suppliers.paymentTermsFreqMonthly': 'Mensual',
+    'catalogs.suppliers.paymentTermsOtherInvalid': 'Completa el tipo y el valor de las condiciones de pago',
+    'catalogs.suppliers.paymentTermsOtherLegacy': 'Valor guardado actualmente (solo lectura)',
+    'catalogs.suppliers.accountTypePlaceholder': 'Selecciona el tipo de cuenta',
+    'catalogs.suppliers.accountTypePersonalSavings': 'Personal Ahorros',
+    'catalogs.suppliers.accountTypePersonalChecking': 'Personal Corriente',
+    'catalogs.suppliers.accountTypeBusinessSavings': 'Empresarial Ahorros',
+    'catalogs.suppliers.accountTypeBusinessChecking': 'Empresarial Corriente',
+    'catalogs.suppliers.accountTypeInternational': 'Internacional',
+    'catalogs.suppliers.swift': 'SWIFT',
+    'catalogs.suppliers.iban': 'IBAN',
+    'catalogs.suppliers.extraCode': 'Otro código (opcional)',
+    'catalogs.products.delete': 'Eliminar producto',
+    'catalogs.products.deleteTitle': 'Eliminar producto',
+    'catalogs.products.deleteConfirm': '¿Eliminar "{name}" definitivamente? Esta acción no se puede deshacer.',
+    'catalogs.products.deleteBlocked': 'Tiene historial: no se puede eliminar',
   },
   en: {
     'catalogs.tabs.suppliers': 'Suppliers',
@@ -306,7 +331,6 @@ registerI18nKeys({
     'catalogs.suppliers.noCostCenters': 'No active cost centers',
     'catalogs.suppliers.paymentTerms': 'Payment terms',
     'catalogs.suppliers.paymentTermsOther': 'Other',
-    'catalogs.suppliers.paymentTermsOtherPlaceholder': 'Specify the payment terms',
     'catalogs.suppliers.notes': 'Notes',
     'catalogs.suppliers.preferredProducts': 'Products where preferred supplier',
     'catalogs.suppliers.preferredProductsNone': 'Not the preferred supplier of any product',
@@ -409,6 +433,32 @@ registerI18nKeys({
     'catalogs.products.admitsDiscountHelp': 'If "No", the discount on this line only applies when a supervisor approves the order (regardless of the %).',
     'catalogs.products.hasQr': 'Has QR code?',
     'catalogs.products.hasQrHelp': 'Yes = scanned on dispatches, counts and receptions. No = confirmed with signature/photo (asked when receiving or dispatching).',
+    'catalogs.common.phonePrefix': 'Prefix',
+    'catalogs.suppliers.paymentTermsOtherKind': 'Type',
+    'catalogs.suppliers.paymentTermsOtherKindCredit': 'Credit at X days',
+    'catalogs.suppliers.paymentTermsOtherKindAdvance': 'Advance %',
+    'catalogs.suppliers.paymentTermsOtherValueCredit': 'Credit days',
+    'catalogs.suppliers.paymentTermsOtherValueAdvance': 'Advance percentage',
+    'catalogs.suppliers.paymentTermsOtherFrequency': 'Frequency (optional)',
+    'catalogs.suppliers.paymentTermsFreqUnique': 'One-time',
+    'catalogs.suppliers.paymentTermsFreqWeekly': 'Weekly',
+    'catalogs.suppliers.paymentTermsFreqBiweekly': 'Biweekly',
+    'catalogs.suppliers.paymentTermsFreqMonthly': 'Monthly',
+    'catalogs.suppliers.paymentTermsOtherInvalid': 'Fill in the type and value of the payment terms',
+    'catalogs.suppliers.paymentTermsOtherLegacy': 'Currently saved value (read-only)',
+    'catalogs.suppliers.accountTypePlaceholder': 'Select the account type',
+    'catalogs.suppliers.accountTypePersonalSavings': 'Personal Savings',
+    'catalogs.suppliers.accountTypePersonalChecking': 'Personal Checking',
+    'catalogs.suppliers.accountTypeBusinessSavings': 'Business Savings',
+    'catalogs.suppliers.accountTypeBusinessChecking': 'Business Checking',
+    'catalogs.suppliers.accountTypeInternational': 'International',
+    'catalogs.suppliers.swift': 'SWIFT',
+    'catalogs.suppliers.iban': 'IBAN',
+    'catalogs.suppliers.extraCode': 'Other code (optional)',
+    'catalogs.products.delete': 'Delete product',
+    'catalogs.products.deleteTitle': 'Delete product',
+    'catalogs.products.deleteConfirm': 'Delete "{name}" permanently? This action cannot be undone.',
+    'catalogs.products.deleteBlocked': 'Has history: cannot be deleted',
     'catalogs.categories.title': 'Categories & units',
     'catalogs.categories.categories': 'Product categories',
     'catalogs.categories.units': 'Units of measure',
@@ -509,6 +559,78 @@ function toggleId(set: Set<string>, id: string): Set<string> {
   return next;
 }
 
+// ─── Teléfono con prefijo internacional (Ronda 6, punto 6) ───
+// Shape guardado (uniforme): `phone` siempre compuesto "+prefijoNúmero" sin
+// espacios ni guiones (ej. "+593991234567"), junto con `phonePrefix` y
+// `phoneNumber` por separado para edición estructurada. Compatibilidad:
+// teléfonos legacy sin "+" se precargan con prefijo por defecto y el número
+// tal cual; si empieza con "+", se separa el prefijo (aunque no esté en la
+// lista, se ofrece como opción extra en el selector).
+const PHONE_PREFIXES = ['+593', '+1', '+34', '+52', '+57', '+51', '+56', '+598', '+502', '+506', '+507'];
+const DEFAULT_PHONE_PREFIX = '+593';
+
+function parsePhoneParts(phone?: string | null): { prefix: string; number: string } {
+  const raw = (phone || '').trim();
+  const m = raw.match(/^(\+\d{1,3})[\s-]?(.*)$/);
+  if (m) return { prefix: m[1], number: m[2].replace(/[\s-]/g, '') };
+  return { prefix: DEFAULT_PHONE_PREFIX, number: raw.replace(/[\s-]/g, '') };
+}
+
+function composePhone(prefix: string, number: string): string | null {
+  const digits = number.replace(/\D/g, '');
+  return digits ? `${prefix}${digits}` : null;
+}
+
+// ─── Condiciones de pago "Otro" estructurado (Ronda 6, punto 7) ───
+// Se guarda UN solo string uniforme compuesto: "Crédito 45 días · mensual" /
+// "Anticipo 30%". Nada de texto libre abierto. Valores viejos no estándar se
+// parsean al abrir edición; si no se reconocen, se muestran solo lectura.
+const PAYMENT_TERMS_FREQUENCIES = ['única', 'semanal', 'quincenal', 'mensual'];
+
+interface ParsedOtherTerms {
+  kind: 'credit' | 'advance' | '';
+  value: string;
+  frequency: string;
+  legacy: string; // texto viejo no parseable (se conserva al guardar si no se rellena lo estructurado)
+}
+
+function parseOtherTerms(raw: string): ParsedOtherTerms {
+  const text = (raw || '').trim();
+  if (!text) return { kind: '', value: '', frequency: '', legacy: '' };
+  const lower = text.toLowerCase();
+  const frequency = PAYMENT_TERMS_FREQUENCIES.find((f) => f !== 'única' && lower.includes(f)) || '';
+  let m = text.match(/cr[eé]dito\D+(\d+(?:[.,]\d+)?)/i) || text.match(/^(\d+(?:[.,]\d+)?)\s*d[ií]as?/i);
+  if (m) return { kind: 'credit', value: m[1].replace(',', '.'), frequency, legacy: '' };
+  m = text.match(/anticipo\D+(\d+(?:[.,]\d+)?)\s*%/i) || text.match(/^(\d+(?:[.,]\d+)?)\s*%/);
+  if (m) return { kind: 'advance', value: m[1].replace(',', '.'), frequency, legacy: '' };
+  return { kind: '', value: '', frequency: '', legacy: text };
+}
+
+function composeOtherTerms(kind: 'credit' | 'advance', value: string, frequency: string): string {
+  const base = kind === 'credit' ? `Crédito ${value} días` : `Anticipo ${value}%`;
+  return frequency && frequency !== 'única' ? `${base} · ${frequency}` : base;
+}
+
+// ─── Tipo de cuenta bancaria (Ronda 6, punto 8) ───
+// Valores fijos guardados tal cual (shape uniforme en español). Las cuentas
+// "Internacional" llevan swift/iban/extraCode opcionales. accountType libre de
+// datos viejos se conserva y se muestra como opción extra del selector.
+const ACCOUNT_TYPE_OPTIONS = ['Personal Ahorros', 'Personal Corriente', 'Empresarial Ahorros', 'Empresarial Corriente', 'Internacional'];
+const ACCOUNT_TYPE_INTERNATIONAL = 'Internacional';
+const ACCOUNT_TYPE_LABEL_KEYS: Record<string, string> = {
+  'Personal Ahorros': 'catalogs.suppliers.accountTypePersonalSavings',
+  'Personal Corriente': 'catalogs.suppliers.accountTypePersonalChecking',
+  'Empresarial Ahorros': 'catalogs.suppliers.accountTypeBusinessSavings',
+  'Empresarial Corriente': 'catalogs.suppliers.accountTypeBusinessChecking',
+  'Internacional': 'catalogs.suppliers.accountTypeInternational',
+};
+
+function accountTypeLabel(value?: string): string {
+  if (!value) return '';
+  const key = ACCOUNT_TYPE_LABEL_KEYS[value];
+  return key ? t(key) : value; // valor legacy libre: se muestra tal cual
+}
+
 // Fila de detalle: etiqueta gris + valor, para los paneles expandibles
 function DetailItem({ label, children }: { label: string; children?: React.ReactNode }) {
   return (
@@ -559,6 +681,35 @@ function useCatalog<T extends CatalogBase & { name?: string }>(collectionName: s
 }
 
 const SELECT_CLASS = 'w-full h-10 rounded-lg border border-[#E5E5E7] bg-white px-3 text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20';
+
+// Campo de teléfono compartido (punto 6): select de prefijo internacional +
+// input numérico. El padre guarda prefijo y número por separado.
+function PhoneField({ prefix, number, onPrefixChange, onNumberChange }: {
+  prefix: string;
+  number: string;
+  onPrefixChange: (v: string) => void;
+  onNumberChange: (v: string) => void;
+}) {
+  const options = PHONE_PREFIXES.includes(prefix) ? PHONE_PREFIXES : [...PHONE_PREFIXES, prefix];
+  return (
+    <div className="flex gap-2">
+      <select
+        value={prefix}
+        onChange={(e) => onPrefixChange(e.target.value)}
+        aria-label={t('catalogs.common.phonePrefix')}
+        className={cn(SELECT_CLASS, 'w-auto shrink-0 pr-8')}
+      >
+        {options.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
+      <Input
+        value={number}
+        onChange={(e) => onNumberChange(e.target.value.replace(/\D/g, ''))}
+        inputMode="numeric"
+        className="flex-1 min-w-0"
+      />
+    </div>
+  );
+}
 
 interface SectionHeaderProps {
   title: string;
@@ -757,29 +908,42 @@ export function CatalogosTab() {
 // SECCIÓN: PROVEEDORES
 // ═══════════════════════════════════════════════════════════════════
 
+// Cuenta bancaria en edición (punto 8): extiende el tipo del catálogo con
+// swift/iban/extraCode opcionales para cuentas internacionales.
+interface SupplierBankAccountForm extends SupplierBankAccount {
+  swift?: string;
+  iban?: string;
+  extraCode?: string;
+}
+
 interface SupplierFormState {
   identification: string;
   name: string;
   contactName: string;
   email: string;
-  phone: string;
-  bankAccounts: SupplierBankAccount[];
+  phonePrefix: string;
+  phoneNumber: string;
+  bankAccounts: SupplierBankAccountForm[];
   productCategoryIds: string[];
   costCenterIds: string[];
-  paymentTerms: string; // opción fija elegida ('__other__' = texto libre)
-  paymentTermsOther: string; // texto libre cuando la opción es "Otro"
+  paymentTerms: string; // opción fija elegida ('__other__' = estructurado)
+  paymentTermsOtherKind: 'credit' | 'advance' | ''; // tipo cuando es "Otro"
+  paymentTermsOtherValue: string; // días o % según el tipo
+  paymentTermsOtherFrequency: string; // '' | 'única' | 'semanal' | 'quincenal' | 'mensual'
+  paymentTermsOtherLegacy: string; // valor viejo no estándar no parseable (solo lectura)
   notes: string;
 }
 
-// Condiciones de pago: opciones fijas (spec) + "Otro" con texto libre.
-// Los valores ya guardados que no coincidan con una fija se muestran
-// como "Otro" con su texto (compatibilidad hacia atrás).
+// Condiciones de pago: opciones fijas (spec) + "Otro" estructurado.
+// Los valores ya guardados que no coincidan con una fija se precargan en
+// "Otro" (parseados a lo estructuro o como texto legacy solo lectura).
 const PAYMENT_TERMS_OPTIONS = ['Contado', 'Crédito 15', 'Crédito 30', 'Crédito 60', 'Anticipo 50%'];
 const PAYMENT_TERMS_OTHER = '__other__';
 
 const EMPTY_SUPPLIER: SupplierFormState = {
-  identification: '', name: '', contactName: '', email: '', phone: '',
-  bankAccounts: [], productCategoryIds: [], costCenterIds: [], paymentTerms: '', paymentTermsOther: '', notes: '',
+  identification: '', name: '', contactName: '', email: '', phonePrefix: DEFAULT_PHONE_PREFIX, phoneNumber: '',
+  bankAccounts: [], productCategoryIds: [], costCenterIds: [], paymentTerms: '',
+  paymentTermsOtherKind: '', paymentTermsOtherValue: '', paymentTermsOtherFrequency: '', paymentTermsOtherLegacy: '', notes: '',
 };
 
 function newAccountId(): string {
@@ -807,9 +971,9 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
   const openEdit = (s: Supplier) => {
     setEditing(s);
     // Migración legacy: si no hay bankAccounts pero sí bankData, migrarlo como cuenta principal
-    const existingAccounts: SupplierBankAccount[] =
+    const existingAccounts: SupplierBankAccountForm[] =
       s.bankAccounts && s.bankAccounts.length > 0
-        ? s.bankAccounts
+        ? s.bankAccounts.map((a) => ({ ...a }))
         : s.bankData && (s.bankData.bank || s.bankData.accountType || s.bankData.accountNumber)
           ? [{
               id: newAccountId(),
@@ -819,17 +983,25 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
               isPrimary: true,
             }]
           : [];
+    const phoneParts = parsePhoneParts(s.phone);
+    const otherTerms = s.paymentTerms && !PAYMENT_TERMS_OPTIONS.includes(s.paymentTerms)
+      ? parseOtherTerms(s.paymentTerms)
+      : { kind: '' as const, value: '', frequency: '', legacy: '' };
     setForm({
       identification: s.identification || '',
       name: s.name || '',
       contactName: s.contactName || '',
       email: s.email || '',
-      phone: s.phone || '',
+      phonePrefix: phoneParts.prefix,
+      phoneNumber: phoneParts.number,
       bankAccounts: existingAccounts,
       productCategoryIds: s.productCategoryIds ? [...s.productCategoryIds] : [],
       costCenterIds: s.costCenterIds ? [...s.costCenterIds] : [],
       paymentTerms: s.paymentTerms && !PAYMENT_TERMS_OPTIONS.includes(s.paymentTerms) ? PAYMENT_TERMS_OTHER : (s.paymentTerms || ''),
-      paymentTermsOther: s.paymentTerms && !PAYMENT_TERMS_OPTIONS.includes(s.paymentTerms) ? s.paymentTerms : '',
+      paymentTermsOtherKind: otherTerms.kind,
+      paymentTermsOtherValue: otherTerms.value,
+      paymentTermsOtherFrequency: otherTerms.frequency,
+      paymentTermsOtherLegacy: otherTerms.legacy,
       notes: s.notes || '',
     });
     setShowModal(true);
@@ -844,7 +1016,7 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       ],
     }));
 
-  const updateAccount = (id: string, patch: Partial<SupplierBankAccount>) =>
+  const updateAccount = (id: string, patch: Partial<SupplierBankAccountForm>) =>
     setForm((f) => ({ ...f, bankAccounts: f.bankAccounts.map((a) => (a.id === id ? { ...a, ...patch } : a)) }));
 
   const removeAccount = (id: string) =>
@@ -880,13 +1052,37 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
       toast.error(t('catalogs.common.required'));
       return;
     }
+    // Condiciones "Otro": validar tipo + valor antes de componer el dato uniforme
+    let paymentTermsValue: string | null;
+    if (form.paymentTerms === PAYMENT_TERMS_OTHER) {
+      const value = form.paymentTermsOtherValue.trim();
+      if (form.paymentTermsOtherKind && value) {
+        const num = Number(value);
+        if (!Number.isFinite(num) || num <= 0) {
+          toast.error(t('catalogs.suppliers.paymentTermsOtherInvalid'));
+          return;
+        }
+        paymentTermsValue = composeOtherTerms(form.paymentTermsOtherKind, value, form.paymentTermsOtherFrequency);
+      } else if (form.paymentTermsOtherKind && !value) {
+        toast.error(t('catalogs.suppliers.paymentTermsOtherInvalid'));
+        return;
+      } else {
+        // Sin tipo estructurado: se conserva el valor legacy si existía
+        paymentTermsValue = form.paymentTermsOtherLegacy.trim() || null;
+      }
+    } else {
+      paymentTermsValue = form.paymentTerms.trim() || null;
+    }
+    const phone = composePhone(form.phonePrefix, form.phoneNumber);
     setSaving(true);
     const payload: Record<string, any> = {
       identification: form.identification.trim(),
       name: form.name.trim(),
       contactName: form.contactName.trim() || null,
       email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
+      phone,
+      phonePrefix: phone ? form.phonePrefix : null,
+      phoneNumber: phone ? form.phoneNumber.replace(/\D/g, '') : null,
       bankAccounts: form.bankAccounts
         .filter((a) => (a.bank || '').trim() || (a.accountType || '').trim() || (a.accountNumber || '').trim())
         .map((a) => ({
@@ -895,13 +1091,15 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
           accountType: (a.accountType || '').trim() || null,
           accountNumber: (a.accountNumber || '').trim() || null,
           isPrimary: !!a.isPrimary,
+          // swift/iban/extraCode solo aplican a cuentas internacionales
+          swift: a.accountType === ACCOUNT_TYPE_INTERNATIONAL ? (a.swift || '').trim() || null : null,
+          iban: a.accountType === ACCOUNT_TYPE_INTERNATIONAL ? (a.iban || '').trim() || null : null,
+          extraCode: a.accountType === ACCOUNT_TYPE_INTERNATIONAL ? (a.extraCode || '').trim() || null : null,
         })),
       bankData: null, // legacy migrado a bankAccounts
       productCategoryIds: [...form.productCategoryIds],
       costCenterIds: [...form.costCenterIds],
-      paymentTerms: form.paymentTerms === PAYMENT_TERMS_OTHER
-        ? form.paymentTermsOther.trim() || null
-        : form.paymentTerms.trim() || null,
+      paymentTerms: paymentTermsValue,
       notes: form.notes.trim() || null,
     };
     try {
@@ -1011,14 +1209,23 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
                           t('catalogs.suppliers.noAccounts')
                         ) : (
                           <div className="space-y-1.5">
-                            {accounts.map((acc) => (
-                              <div key={acc.id} className="flex items-center gap-2 flex-wrap">
-                                <span>{[acc.bank, acc.accountType, acc.accountNumber].filter(Boolean).join(' · ') || '—'}</span>
-                                {!!acc.isPrimary && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-corporate/10 text-corporate">
-                                    <Star className="w-3 h-3 fill-current" />
-                                    {t('catalogs.suppliers.primary')}
-                                  </span>
+                            {(accounts as SupplierBankAccountForm[]).map((acc) => (
+                              <div key={acc.id}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span>{[acc.bank, accountTypeLabel(acc.accountType), acc.accountNumber].filter(Boolean).join(' · ') || '—'}</span>
+                                  {!!acc.isPrimary && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-corporate/10 text-corporate">
+                                      <Star className="w-3 h-3 fill-current" />
+                                      {t('catalogs.suppliers.primary')}
+                                    </span>
+                                  )}
+                                </div>
+                                {acc.accountType === ACCOUNT_TYPE_INTERNATIONAL && (acc.swift || acc.iban || acc.extraCode) && (
+                                  <p className="text-[11px] text-[#86868B]">
+                                    {[acc.swift && `SWIFT: ${acc.swift}`, acc.iban && `IBAN: ${acc.iban}`, acc.extraCode && `${t('catalogs.suppliers.extraCode')}: ${acc.extraCode}`]
+                                      .filter(Boolean)
+                                      .join(' · ')}
+                                  </p>
                                 )}
                               </div>
                             ))}
@@ -1077,7 +1284,12 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
               </div>
               <div className="space-y-2">
                 <Label>{t('catalogs.suppliers.phone')}</Label>
-                <Input value={form.phone} onChange={set('phone')} />
+                <PhoneField
+                  prefix={form.phonePrefix}
+                  number={form.phoneNumber}
+                  onPrefixChange={(v) => setForm({ ...form, phonePrefix: v })}
+                  onNumberChange={(v) => setForm({ ...form, phoneNumber: v })}
+                />
               </div>
               <div className="space-y-2">
                 <Label>{t('catalogs.suppliers.email')}</Label>
@@ -1115,11 +1327,64 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
                   </button>
                 </div>
                 {form.paymentTerms === PAYMENT_TERMS_OTHER && (
-                  <Input
-                    value={form.paymentTermsOther}
-                    onChange={set('paymentTermsOther')}
-                    placeholder={t('catalogs.suppliers.paymentTermsOtherPlaceholder')}
-                  />
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {(['credit', 'advance'] as const).map((kind) => (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() =>
+                            setForm((f) => ({
+                              ...f,
+                              paymentTermsOtherKind: f.paymentTermsOtherKind === kind ? '' : kind,
+                              paymentTermsOtherValue: f.paymentTermsOtherKind === kind ? '' : f.paymentTermsOtherValue,
+                            }))
+                          }
+                          className={cn(
+                            'px-2.5 h-8 rounded-lg text-xs font-medium transition-colors border',
+                            form.paymentTermsOtherKind === kind
+                              ? 'bg-corporate text-white border-corporate'
+                              : 'bg-white border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                          )}
+                        >
+                          {kind === 'credit'
+                            ? t('catalogs.suppliers.paymentTermsOtherKindCredit')
+                            : t('catalogs.suppliers.paymentTermsOtherKindAdvance')}
+                        </button>
+                      ))}
+                    </div>
+                    {form.paymentTermsOtherKind && (
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={form.paymentTermsOtherValue}
+                          onChange={(e) => setForm({ ...form, paymentTermsOtherValue: e.target.value })}
+                          placeholder={
+                            form.paymentTermsOtherKind === 'credit'
+                              ? t('catalogs.suppliers.paymentTermsOtherValueCredit')
+                              : t('catalogs.suppliers.paymentTermsOtherValueAdvance')
+                          }
+                        />
+                        <select
+                          value={form.paymentTermsOtherFrequency}
+                          onChange={(e) => setForm({ ...form, paymentTermsOtherFrequency: e.target.value })}
+                          className={cn(SELECT_CLASS, 'sm:w-48 shrink-0')}
+                        >
+                          <option value="">{t('catalogs.suppliers.paymentTermsOtherFrequency')}</option>
+                          {PAYMENT_TERMS_FREQUENCIES.map((f) => (
+                            <option key={f} value={f}>{f}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {form.paymentTermsOtherLegacy && (
+                      <p className="text-[11px] text-[#86868B] bg-[#F5F5F7] rounded-lg p-2">
+                        {t('catalogs.suppliers.paymentTermsOtherLegacy')}:{' '}
+                        <span className="font-medium text-[#1D1D1F]">{form.paymentTermsOtherLegacy}</span>
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -1135,32 +1400,55 @@ function SuppliersSection({ canWrite }: { canWrite: boolean }) {
               ) : (
                 <div className="space-y-2">
                   {form.bankAccounts.map((acc) => (
-                    <div key={acc.id} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-[#F5F5F7] rounded-xl p-3">
-                      <Input placeholder={t('catalogs.suppliers.bank')} value={acc.bank || ''} onChange={(e) => updateAccount(acc.id, { bank: e.target.value })} className="sm:flex-1" />
-                      <Input placeholder={t('catalogs.suppliers.accountType')} value={acc.accountType || ''} onChange={(e) => updateAccount(acc.id, { accountType: e.target.value })} className="sm:flex-1" />
-                      <Input placeholder={t('catalogs.suppliers.accountNumber')} value={acc.accountNumber || ''} onChange={(e) => updateAccount(acc.id, { accountNumber: e.target.value })} className="sm:flex-1" />
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setPrimaryAccount(acc.id)}
-                          title={t('catalogs.suppliers.primary')}
-                          className={cn(
-                            'flex items-center gap-1 px-2.5 h-9 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
-                            acc.isPrimary ? 'bg-corporate text-white' : 'bg-white border border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                    <div key={acc.id} className="bg-[#F5F5F7] rounded-xl p-3 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <Input placeholder={t('catalogs.suppliers.bank')} value={acc.bank || ''} onChange={(e) => updateAccount(acc.id, { bank: e.target.value })} className="sm:flex-1" />
+                        <select
+                          value={acc.accountType || ''}
+                          onChange={(e) => updateAccount(acc.id, { accountType: e.target.value })}
+                          className={cn(SELECT_CLASS, 'sm:flex-1')}
+                        >
+                          <option value="">{t('catalogs.suppliers.accountTypePlaceholder')}</option>
+                          {ACCOUNT_TYPE_OPTIONS.map((opt) => (
+                            <option key={opt} value={opt}>{accountTypeLabel(opt)}</option>
+                          ))}
+                          {/* Compatibilidad: tipo libre de datos viejos se conserva tal cual */}
+                          {acc.accountType && !ACCOUNT_TYPE_OPTIONS.includes(acc.accountType) && (
+                            <option value={acc.accountType}>{acc.accountType}</option>
                           )}
-                        >
-                          <Star className={cn('w-3.5 h-3.5', acc.isPrimary && 'fill-current')} />
-                          {t('catalogs.suppliers.primary')}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeAccount(acc.id)}
-                          title={t('catalogs.suppliers.removeAccount')}
-                          className="p-2 rounded-lg hover:bg-white text-[#86868B] hover:text-red-500 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        </select>
+                        <Input placeholder={t('catalogs.suppliers.accountNumber')} value={acc.accountNumber || ''} onChange={(e) => updateAccount(acc.id, { accountNumber: e.target.value })} className="sm:flex-1" />
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setPrimaryAccount(acc.id)}
+                            title={t('catalogs.suppliers.primary')}
+                            className={cn(
+                              'flex items-center gap-1 px-2.5 h-9 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                              acc.isPrimary ? 'bg-corporate text-white' : 'bg-white border border-[#E5E5E7] text-[#86868B] hover:text-[#1D1D1F]'
+                            )}
+                          >
+                            <Star className={cn('w-3.5 h-3.5', acc.isPrimary && 'fill-current')} />
+                            {t('catalogs.suppliers.primary')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeAccount(acc.id)}
+                            title={t('catalogs.suppliers.removeAccount')}
+                            className="p-2 rounded-lg hover:bg-white text-[#86868B] hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
+                      {/* Cuenta internacional: campos adicionales */}
+                      {acc.accountType === ACCOUNT_TYPE_INTERNATIONAL && (
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Input placeholder={t('catalogs.suppliers.swift')} value={acc.swift || ''} onChange={(e) => updateAccount(acc.id, { swift: e.target.value.toUpperCase() })} className="sm:flex-1" />
+                          <Input placeholder={t('catalogs.suppliers.iban')} value={acc.iban || ''} onChange={(e) => updateAccount(acc.id, { iban: e.target.value.toUpperCase() })} className="sm:flex-1" />
+                          <Input placeholder={t('catalogs.suppliers.extraCode')} value={acc.extraCode || ''} onChange={(e) => updateAccount(acc.id, { extraCode: e.target.value })} className="sm:flex-1" />
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1295,6 +1583,15 @@ function draftsToTiers(drafts: PriceTierDraft[]): PriceTier[] | null {
   return tiers.sort((a, b) => a.minQty - b.minQty);
 }
 
+// Shape mínimo de los docs que referencian productos (para saber si uno "se
+// usó" y bloquear su eliminación): movimientos de inventario, seriales
+// (rentalUnits) e ítems de órdenes de renta (rentalOrders items[].productId).
+interface ProductUsageDoc extends CatalogBase {
+  name?: string;
+  productId?: string;
+  items?: Array<{ productId?: string }>;
+}
+
 function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const { user } = useAuth();
   const { logAction } = useAudit();
@@ -1302,6 +1599,10 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
   const { items: categories } = useCatalog<ProductCategory>('productCategories');
   const { items: units } = useCatalog<UnitOfMeasure>('unitsOfMeasure');
   const { items: suppliers } = useCatalog<Supplier>('suppliers');
+  // Referencias de uso del producto: si existe alguna, no se puede eliminar
+  const { items: inventoryMovements } = useCatalog<ProductUsageDoc>('inventoryMovements');
+  const { items: rentalUnits } = useCatalog<ProductUsageDoc>('rentalUnits');
+  const { items: rentalOrders } = useCatalog<ProductUsageDoc>('rentalOrders');
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(EMPTY_PRODUCT_FORM);
@@ -1480,6 +1781,36 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
     }
   };
 
+  // Un producto "se usó" si tiene movimientos de inventario, seriales
+  // (rentalUnits) o ítems en órdenes de renta: en ese caso no es eliminable.
+  const productHasUsage = (id: string) =>
+    inventoryMovements.some((m) => m.productId === id) ||
+    rentalUnits.some((u) => u.productId === id) ||
+    rentalOrders.some((o) => (o.items ?? []).some((it) => it.productId === id));
+
+  const handleDelete = async (p: Product) => {
+    if (!user?.id) return;
+    const done = await executeWithConfirm({
+      level: 'critical',
+      title: t('catalogs.products.deleteTitle'),
+      message: fmt('catalogs.products.deleteConfirm', { name: p.name }),
+      action: async () => {
+        await deleteDoc(doc(db, 'products', p.id));
+      },
+    });
+    if (done !== null) {
+      await logAction({
+        action: 'PRODUCT_DELETED' as AuditAction,
+        targetType: 'product',
+        targetId: p.id,
+        targetName: p.name,
+        impactLevel: 'critical',
+        description: `Producto eliminado: ${p.name}`,
+      });
+      toast.success(t('catalogs.products.delete'));
+    }
+  };
+
   const renderProductCard = (p: Product) => (
     <div
       key={p.id}
@@ -1538,21 +1869,6 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             {expandedIds.has(p.id) ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </span>
         </div>
-        {/* Botones de acción: fuera del área clickeable */}
-        {canWrite && (
-          <div className="flex gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => openEdit(p)} title={t('catalogs.common.edit')} className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]">
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => handleToggle(p)}
-              title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
-              className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
-            >
-              {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-        )}
       </div>
       {/* Detalle completo del producto */}
       {expandedIds.has(p.id) && (
@@ -1607,6 +1923,42 @@ function ProductsSection({ canWrite }: { canWrite: boolean }) {
             <DetailItem label={t('catalogs.common.createdAt')}>{fmtDate(p.createdAt)}</DetailItem>
             <DetailItem label={t('catalogs.common.updatedAt')}>{fmtDate(p.updatedAt)}</DetailItem>
           </DetailsGrid>
+          {/* Acciones dentro del detalle expandido: el encabezado queda limpio
+              para que se lea el nombre. Eliminar solo si el producto nunca se usó. */}
+          {canWrite && (
+            <div className="mt-4 pt-3 border-t border-[#F5F5F7] flex items-center justify-end gap-0.5">
+              <button
+                onClick={() => openEdit(p)}
+                title={t('catalogs.common.edit')}
+                className="p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => handleToggle(p)}
+                title={p.isActive ? t('catalogs.common.deactivate') : t('catalogs.common.activate')}
+                className={cn('p-1.5 rounded-lg hover:bg-[#F5F5F7] text-[#86868B]', !p.isActive && 'hover:text-emerald-600')}
+              >
+                {p.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+              {(() => {
+                const hasUsage = productHasUsage(p.id);
+                return (
+                  <button
+                    onClick={() => !hasUsage && handleDelete(p)}
+                    disabled={hasUsage}
+                    title={hasUsage ? t('catalogs.products.deleteBlocked') : t('catalogs.products.delete')}
+                    className={cn(
+                      'p-1.5 rounded-lg text-[#86868B]',
+                      hasUsage ? 'opacity-40 cursor-not-allowed' : 'hover:bg-[#F5F5F7] hover:text-red-500'
+                    )}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -3335,7 +3687,8 @@ interface ClientFormState {
   name: string;
   contactName: string;
   email: string;
-  phone: string;
+  phonePrefix: string;
+  phoneNumber: string;
   businessName: string;
   taxId: string;
   address: string;
@@ -3360,7 +3713,7 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientFormState>({
-    type: 'persona', identification: '', name: '', contactName: '', email: '', phone: '',
+    type: 'persona', identification: '', name: '', contactName: '', email: '', phonePrefix: DEFAULT_PHONE_PREFIX, phoneNumber: '',
     businessName: '', taxId: '', address: '', departmentId: '',
   });
   const [generating, setGenerating] = useState(false);
@@ -3370,19 +3723,21 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ type: 'persona', identification: '', name: '', contactName: '', email: '', phone: '', businessName: '', taxId: '', address: '', departmentId: '' });
+    setForm({ type: 'persona', identification: '', name: '', contactName: '', email: '', phonePrefix: DEFAULT_PHONE_PREFIX, phoneNumber: '', businessName: '', taxId: '', address: '', departmentId: '' });
     setShowModal(true);
   };
 
   const openEdit = (c: Client) => {
     setEditing(c);
+    const phoneParts = parsePhoneParts(c.phone);
     setForm({
       type: c.type || 'persona',
       identification: c.identification || '',
       name: c.name || '',
       contactName: c.contactName || '',
       email: c.email || '',
-      phone: c.phone || '',
+      phonePrefix: phoneParts.prefix,
+      phoneNumber: phoneParts.number,
       businessName: c.billingData?.businessName || '',
       taxId: c.billingData?.taxId || '',
       address: c.billingData?.address || '',
@@ -3414,13 +3769,16 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
       toast.error(fmt('catalogs.clients.duplicate', { name: duplicate.name }));
       return;
     }
+    const phone = composePhone(form.phonePrefix, form.phoneNumber);
     const payload: Record<string, any> = {
       type: form.type,
       identification: form.identification.trim() || null,
       name: form.name.trim(),
       contactName: form.contactName.trim() || null,
       email: form.email.trim() || null,
-      phone: form.phone.trim() || null,
+      phone,
+      phonePrefix: phone ? form.phonePrefix : null,
+      phoneNumber: phone ? form.phoneNumber.replace(/\D/g, '') : null,
       billingData: {
         businessName: form.businessName.trim() || null,
         taxId: form.taxId.trim() || null,
@@ -3626,7 +3984,12 @@ function ClientsSection({ canWrite }: { canWrite: boolean }) {
               </div>
               <div className="space-y-2">
                 <Label>{t('catalogs.clients.phone')}</Label>
-                <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                <PhoneField
+                  prefix={form.phonePrefix}
+                  number={form.phoneNumber}
+                  onPrefixChange={(v) => setForm({ ...form, phonePrefix: v })}
+                  onNumberChange={(v) => setForm({ ...form, phoneNumber: v })}
+                />
               </div>
             </div>
 
