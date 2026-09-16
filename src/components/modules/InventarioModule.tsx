@@ -248,6 +248,7 @@ registerI18nKeys({
     'inv.transfers.receiveTitle': 'Recibir transferencia',
     'inv.transfers.receivedByLabel': 'Recibido por',
     'inv.transfers.receivedByPlaceholder': 'Nombre de quien recibe',
+    'inv.transfers.receivedByAuto': 'Se registra automáticamente con tu usuario iniciado; no se puede editar.',
     'inv.transfers.cancelTitle': 'Cancelar transferencia',
     'inv.transfers.cancelReason': 'Motivo (opcional)',
     'inv.transfers.cancelReasonPlaceholder': 'Ej: se dañó el producto, se revirtió la solicitud...',
@@ -371,6 +372,8 @@ registerI18nKeys({
     'inv.scanner.manualPlaceholder': 'Pega la URL del QR o el id del serial',
     'inv.scanner.manualSubmit': 'Buscar',
     'inv.scanner.switchCamera': 'Cambiar cámara',
+    'inv.scanner.progress': 'Escaneados {count} de {expected}',
+    'inv.scanner.stop': 'Detener',
     'inv.catalogs.seedsAlreadyLoaded': 'Ya están cargadas',
 
     'inv.home.stock': 'Stock',
@@ -399,6 +402,8 @@ registerI18nKeys({
     'inv.product.rent': 'Rentar',
     'inv.product.repair': 'Enviar a reparación',
     'inv.product.history': 'Ver historial',
+    'inv.product.adjust': 'Ajuste',
+    'inv.product.registerSerials': 'Dar de alta seriales',
     'inv.product.stockByLocation': 'Stock por ubicación',
     'inv.product.unitsByStatus': 'Unidades por estado',
     'inv.product.noStock': 'Sin stock registrado',
@@ -587,6 +592,7 @@ registerI18nKeys({
     'inv.transfers.receiveTitle': 'Receive transfer',
     'inv.transfers.receivedByLabel': 'Received by',
     'inv.transfers.receivedByPlaceholder': 'Name of who receives',
+    'inv.transfers.receivedByAuto': 'Recorded automatically with your signed-in user; it cannot be edited.',
     'inv.transfers.cancelTitle': 'Cancel transfer',
     'inv.transfers.cancelReason': 'Reason (optional)',
     'inv.transfers.cancelReasonPlaceholder': 'E.g.: product damaged, request reverted...',
@@ -710,6 +716,8 @@ registerI18nKeys({
     'inv.scanner.manualPlaceholder': 'Paste the QR URL or the serial id',
     'inv.scanner.manualSubmit': 'Look up',
     'inv.scanner.switchCamera': 'Switch camera',
+    'inv.scanner.progress': 'Scanned {count} of {expected}',
+    'inv.scanner.stop': 'Stop',
     'inv.catalogs.seedsAlreadyLoaded': 'Already loaded',
 
     'inv.home.stock': 'Stock',
@@ -738,6 +746,8 @@ registerI18nKeys({
     'inv.product.rent': 'Rent',
     'inv.product.repair': 'Send to repair',
     'inv.product.history': 'View history',
+    'inv.product.adjust': 'Adjust',
+    'inv.product.registerSerials': 'Register serial units',
     'inv.product.stockByLocation': 'Stock by location',
     'inv.product.unitsByStatus': 'Units by status',
     'inv.product.noStock': 'No stock recorded',
@@ -1363,11 +1373,11 @@ export function InventarioModule() {
   const [transferForm, setTransferForm] = useState<TransferFormState>(EMPTY_TRANSFER_FORM);
   const [savingTransfer, setSavingTransfer] = useState(false);
   const [receiveTransferId, setReceiveTransferId] = useState<string | null>(null);
-  const [receivedByName, setReceivedByName] = useState('');
   const [receiveSerialIds, setReceiveSerialIds] = useState<string[]>([]);
   // Verificación obligatoria al recibir (punto 11): consumibles con QR se
   // confirman escaneando el QR del producto; productos SIN QR (hasQr === false)
-  // exigen foto + firma (dataURL) + nombre de quien recibe
+  // exigen foto + firma (dataURL). Quien recibe es SIEMPRE el usuario logueado
+  // (ronda 5): se guarda automáticamente, sin campo editable.
   const [receiveScanConfirmed, setReceiveScanConfirmed] = useState(false);
   const [receivePhoto, setReceivePhoto] = useState<string | null>(null);
   const [receiveSignature, setReceiveSignature] = useState<string | null>(null);
@@ -2212,7 +2222,6 @@ export function InventarioModule() {
       return;
     }
     setReceiveTransferId(transfer.id!);
-    setReceivedByName(currentUser?.name || '');
     setReceiveSerialIds(transfer.receivedUnitIds ?? []);
     setReceiveScanConfirmed(false);
     setReceivePhoto(null);
@@ -2223,7 +2232,7 @@ export function InventarioModule() {
   const handleReceiveTransfer = async () => {
     const transfer = transfers.find(x => x.id === receiveTransferId);
     if (!currentUser || !transfer?.id || !canReceiveTransfer(transfer)) return;
-    if (!receivedByName.trim()) return toast.error(t('inv.validation.nameRequired'));
+    // Quien recibe es el usuario logueado (automático, no editable — ronda 5)
     const needsUnits = transferNeedsUnits(transfer);
     if (needsUnits && receiveSerialIds.length !== transfer.quantity) {
       return toast.error(
@@ -2284,7 +2293,7 @@ export function InventarioModule() {
           // aditivo y firestore lo acepta)
           const receivedPayload: Record<string, unknown> = {
             status: 'recibido',
-            receivedBy: receivedByName.trim(),
+            receivedBy: currentUser.name,
             receivedAt: now,
             receivedUnitIds: needsUnits ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
           };
@@ -2324,7 +2333,7 @@ export function InventarioModule() {
             targetId: transfer.id,
             targetName: `${productName(transfer.productId)} · ${transfer.quantity}`,
             impactLevel: 'major',
-            description: `Transferencia recibida: ${productName(transfer.productId)} · ${transfer.quantity} · recibido por ${receivedByName.trim()}`,
+            description: `Transferencia recibida: ${productName(transfer.productId)} · ${transfer.quantity} · recibido por ${currentUser.name}`,
           });
 
           toast.success(t('inv.transfers.receive'));
@@ -3085,34 +3094,36 @@ export function InventarioModule() {
   // - QR de serial (producto serializado): suma 1 a ese producto; no admite
   //   doble conteo del mismo serial y no permite entrada manual.
   // - QR de producto (consumibles u otros): salta a ese producto de la lista.
-  const handleCountScan = (kind: 'product' | 'location' | 'serial', id: string) => {
+  // Ronda 5 (punto 2): retorna true si la lectura se aceptó (cuenta para el
+  // objetivo del escáner) o false si fue rechazada (la cámara sigue abierta).
+  const handleCountScan = (kind: 'product' | 'location' | 'serial', id: string): boolean => {
     const session = countingSession;
     if (!session) {
       setScannerOpen(false);
-      return;
+      return false;
     }
     if (kind === 'serial') {
       const unit = rentalUnits.find(u => u.id === id);
       const productId = unit?.productId;
       if (!productId || !countRows.some(r => r.productId === productId)) {
         toast.error(t('inv.counts.serialNotInCount'));
-        return;
+        return false;
       }
       const already = scannedSerials[productId] ?? [];
       if (already.includes(id)) {
         toast.error(t('inv.counts.serialAlreadyCounted'));
-        return;
+        return false;
       }
       setScannedSerials(prev => ({ ...prev, [productId]: [...already, id] }));
       const current = Number(countsDraft[productId] ?? 0);
       setCountsDraft(d => ({ ...d, [productId]: String((Number.isFinite(current) ? current : 0) + 1) }));
       toast.success(productName(productId));
-      return;
+      return true;
     }
     if (kind === 'product') {
       if (!countRows.some(r => r.productId === id)) {
         toast.error(t('inv.counts.productNotInCount'));
-        return;
+        return false;
       }
       setScannerOpen(false);
       setCountHighlightId(id);
@@ -3120,42 +3131,50 @@ export function InventarioModule() {
         document.getElementById(`count-row-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 60);
       setTimeout(() => setCountHighlightId(null), 1800);
-      return;
+      return false;
     }
     toast.error(t('inv.counts.productNotInCount'));
+    return false;
   };
 
   // Escaneo en la recepción de una transferencia (punto 11):
   // - seriales: confirma la unidad que llegó (alternativa a marcarla en la lista)
   // - consumibles con QR: el QR del producto confirma la recepción
-  const handleReceiveScan = (kind: 'product' | 'location' | 'serial', id: string) => {
+  // Ronda 5 (punto 2): retorna true si la lectura cuenta para el objetivo del
+  // escáner (unidad confirmada nueva / producto confirmado); false si no.
+  const handleReceiveScan = (kind: 'product' | 'location' | 'serial', id: string): boolean => {
     const transfer = transfers.find(x => x.id === receiveTransferId);
     if (!transfer) {
       setScannerOpen(false);
-      return;
+      return false;
     }
     if (kind === 'product') {
       if (id !== transfer.productId) {
         toast.error(t('inv.transfers.validation.serialNotForProduct'));
-        return;
+        return false;
       }
+      if (receiveScanConfirmed) return false;
       setReceiveScanConfirmed(true);
       toast.success(t('inv.receive.scanConfirmed'));
-      return;
+      return true;
     }
     if (kind !== 'serial') {
       toast.error(t('inv.transfers.validation.serialNotForProduct'));
-      return;
+      return false;
     }
     const unit = rentalUnits.find(u => u.id === id);
     if (!unit || unit.productId !== transfer.productId) {
       toast.error(t('inv.transfers.validation.serialNotForProduct'));
-      return;
+      return false;
     }
-    setReceiveSerialIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    if (receiveSerialIds.includes(id)) {
+      // ya confirmada: idempotente (no desconfirma ni cuenta de nuevo)
+      toast.error(t('inv.counts.serialAlreadyCounted'));
+      return false;
+    }
+    setReceiveSerialIds(prev => [...prev, id]);
     toast.success(unit.serialNumber);
+    return true;
   };
 
   // Deshace el último serial escaneado de un producto (conteo por QR)
@@ -3561,6 +3580,20 @@ export function InventarioModule() {
 
   // Transferencia en recepción (pantalla interna, punto 8)
   const receivingTransfer = transfers.find(x => x.id === receiveTransferId) || null;
+
+  // RONDA 5 (punto 2): objetivo de cantidad del escáner en modos conteo y
+  // recepción. Conteo: unidades esperadas de los productos serializados del
+  // conteo. Recepción: seriales → cantidad transferida; consumible con QR →
+  // 1 confirmación; sin QR no hay escaneo (foto + firma).
+  const scannerExpectedCount = scanContext === 'count'
+    ? countRows.filter(r => productRequiresScan(r.productId)).reduce((acc, r) => acc + r.quantity, 0) || undefined
+    : scanContext === 'receive' && receivingTransfer
+      ? transferNeedsUnits(receivingTransfer)
+        ? receivingTransfer.quantity
+        : productHasQr(products.find(p => p.id === receivingTransfer.productId))
+          ? 1
+          : undefined
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -5676,14 +5709,18 @@ export function InventarioModule() {
                     {productName(receivingTransfer.productId)} · {receivingTransfer.quantity} · {locationName(receivingTransfer.toLocationId)}
                   </p>
                 )}
+                {/* Ronda 5 (punto 1): quien recibe es SIEMPRE el usuario logueado,
+                    automático — se muestra como etiqueta de solo lectura, no como
+                    input editable */}
                 <div className="space-y-1">
                   <Label className="text-xs text-[#86868B]">{t('inv.transfers.receivedByLabel')}</Label>
-                  <Input
-                    value={receivedByName}
-                    onChange={e => setReceivedByName(e.target.value)}
-                    placeholder={t('inv.transfers.receivedByPlaceholder')}
-                    className="h-9 text-sm rounded-lg"
-                  />
+                  <div className="flex items-center gap-2 rounded-lg border border-[#E5E5E7] bg-[#F5F5F7] px-3 h-9">
+                    <Check className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                    <span className="text-sm text-[#1D1D1F] font-medium truncate">
+                      {currentUser?.name || '—'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#86868B]">{t('inv.transfers.receivedByAuto')}</p>
                 </div>
                 {needsUnits && receivingTransfer && (
                   <div className="space-y-2">
@@ -6282,9 +6319,14 @@ export function InventarioModule() {
               </div>
             )}
 
-            {/* Acciones directas (punto 13) */}
+            {/* Acciones directas (punto 13 + ronda 5 punto 3): SOLO las que
+                aplican al tipo de producto. No rentable: Comprar / Transferir
+                / Consumir / Ajuste / Ver historial. Rentable (controlado por
+                seriales): "Dar de alta seriales" / Transferir / Rentar /
+                Reparación / Ver historial — NUNCA Consumir/Ajuste por
+                cantidad (los bloquea el modelo de ronda 4). */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {canWrite && (
+              {canWrite && !product.isRentable && (
                 <>
                   <Button
                     size="sm"
@@ -6312,41 +6354,54 @@ export function InventarioModule() {
                     <ArrowUpRight className="h-3.5 w-3.5" />
                     {t('inv.product.consume')}
                   </Button>
-                  {product.isRentable && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(`/warehouse?newOrder=1&productId=${product.id}`)}
-                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
-                    >
-                      <Box className="h-3.5 w-3.5" />
-                      {t('inv.product.rent')}
-                    </Button>
-                  )}
-                  {serialized ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openRepairDialog(product.id!)}
-                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
-                    >
-                      <Wrench className="h-3.5 w-3.5" />
-                      {t('inv.product.repair')}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        openMovementFormFor('ajuste', product.id);
-                        setMovementForm(f => ({ ...f, reason: 'Reparación' }));
-                      }}
-                      className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
-                    >
-                      <Wrench className="h-3.5 w-3.5" />
-                      {t('inv.product.repair')}
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openMovementFormFor('ajuste', product.id)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <SlidersHorizontal className="h-3.5 w-3.5" />
+                    {t('inv.product.adjust')}
+                  </Button>
+                </>
+              )}
+              {canWrite && product.isRentable && (
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => openSerialForm(product.id)}
+                    className="h-9 text-xs rounded-xl bg-corporate gap-2"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('inv.product.registerSerials')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openTransferForm(product.id)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <Truck className="h-3.5 w-3.5" />
+                    {t('inv.product.transfer')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => navigate(`/warehouse?newOrder=1&productId=${product.id}`)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <Box className="h-3.5 w-3.5" />
+                    {t('inv.product.rent')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openRepairDialog(product.id!)}
+                    className="h-9 text-xs rounded-xl border-[#E5E5E7] gap-2"
+                  >
+                    <Wrench className="h-3.5 w-3.5" />
+                    {t('inv.product.repair')}
+                  </Button>
                 </>
               )}
               <Button
@@ -6479,6 +6534,7 @@ export function InventarioModule() {
         onScan={handleScanResult}
         serialIds={rentalUnits.map(u => u.id || '')}
         multiScan={scanContext !== 'navigate'}
+        expectedCount={scannerExpectedCount}
       />
     </div>
   );
@@ -6692,15 +6748,24 @@ function QrDialog({ open, onOpenChange, title, subtitle, qrText }: QrDialogProps
 interface ScannerModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onScan: (kind: 'product' | 'location' | 'serial', id: string) => void;
+  /** retorna false si la lectura NO se acepta (no cuenta y la cámara sigue) */
+  onScan: (kind: 'product' | 'location' | 'serial', id: string) => void | boolean;
   /** ids de seriales existentes: un texto plano que coincida se trata como serial */
   serialIds: string[];
   /** true en conteos/recepción: la cámara se reactiva tras cada lectura
    *  válida para poder escanear varias unidades sin cerrar el modal */
   multiScan?: boolean;
+  /** RONDA 5 (punto 2): cantidad esperada de lecturas válidas. Con multiScan,
+   *  la cámara PERMANECE ABIERTA contando en vivo ("Escaneados 2/3"); al
+   *  llegar a expectedCount se detiene sola y cierra el modal (el resultado
+   *  final ya fue entregado por onScan). undefined = comportamiento anterior */
+  expectedCount?: number;
+  /** RONDA 5 (punto 2): callback con el contador actualizado tras cada
+   *  lectura aceptada (opcional) */
+  onProgress?: (count: number) => void;
 }
 
-function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false }: ScannerModalProps) {
+function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false, expectedCount, onProgress }: ScannerModalProps) {
   const [manualOpen, setManualOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
   // Cámaras detectadas (para el botón de respaldo) y cámara activa:
@@ -6708,6 +6773,8 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
   const [cameraList, setCameraList] = useState<Array<{ id: string; label: string }>>([]);
   const [cameraIndex, setCameraIndex] = useState(-1);
   const [cameraFailed, setCameraFailed] = useState(false);
+  // Ronda 5 (punto 2): lecturas válidas aceptadas en la sesión actual
+  const [scanCount, setScanCount] = useState(0);
   // Id único por instancia: nunca colisiona entre dos ScannerModal montados
   const instanceId = `inv-qr-scanner-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
@@ -6715,21 +6782,37 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
   const onScanRef = useRef(onScan);
   const serialIdsRef = useRef(serialIds);
   const multiScanRef = useRef(multiScan);
+  const expectedCountRef = useRef(expectedCount);
+  const onProgressRef = useRef(onProgress);
+  const onOpenChangeRef = useRef(onOpenChange);
+  const scanCountRef = useRef(0);
+  // Anti-duplicado con la cámara abierta (modo conteo): html5-qrcode sigue
+  // disparando onSuccess sobre el mismo QR visible; se ignora el mismo texto
+  // durante 2 s
+  const lastTextRef = useRef('');
+  const lastTimeRef = useRef(0);
   const cameraListRef = useRef(cameraList);
   const cameraIndexRef = useRef(cameraIndex);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
   useEffect(() => { serialIdsRef.current = serialIds; }, [serialIds]);
   useEffect(() => { multiScanRef.current = multiScan; }, [multiScan]);
+  useEffect(() => { expectedCountRef.current = expectedCount; }, [expectedCount]);
+  useEffect(() => { onProgressRef.current = onProgress; }, [onProgress]);
+  useEffect(() => { onOpenChangeRef.current = onOpenChange; }, [onOpenChange]);
   useEffect(() => { cameraListRef.current = cameraList; }, [cameraList]);
   useEffect(() => { cameraIndexRef.current = cameraIndex; }, [cameraIndex]);
 
-  // Reinicia la entrada manual y la cámara cada vez que se abre el modal
+  // Reinicia la entrada manual, la cámara y el contador cada vez que se abre
   useEffect(() => {
     if (open) {
       setManualOpen(false);
       setManualCode('');
       setCameraIndex(-1);
       setCameraFailed(false);
+      setScanCount(0);
+      scanCountRef.current = 0;
+      lastTextRef.current = '';
+      lastTimeRef.current = 0;
     }
   }, [open]);
 
@@ -6795,19 +6878,36 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
       }
       scanner = session;
 
-      const onDecode = (decodedText: string) => {
-        // Diagnóstico temporal (ronda 4): verifica que onSuccess dispara con
-        // un string decodificado; si la cámara abre pero "no pasa nada", este
-        // log confirma si el problema está en el decode o en el parseo
-        console.info('[ScannerModal] QR detectado:', decodedText);
-        const result = parseScan(decodedText);
-        if (!result) {
-          toast.error(t('inv.scanner.unrecognized'));
+      // RONDA 5 (punto 2): entrega común para cámara y entrada manual.
+      // - Con expectedCount + multiScan la cámara PERMANECE ABIERTA: cada
+      //   lectura aceptada suma al contador en vivo y, al completar la
+      //   cantidad esperada, se detiene sola y cierra el modal (el resultado
+      //   final ya fue entregado antes del apagado, igual que en ronda 4).
+      // - onScan que retorna false = lectura rechazada por el padre (serial
+      //   ajeno, duplicado, etc.): no cuenta y la cámara sigue abierta.
+      // - Sin expectedCount en multiScan se conserva el comportamiento de
+      //   ronda 4: detener → entregar → instancia nueva para la siguiente.
+      const deliverScan = (result: { kind: 'product' | 'location' | 'serial'; id: string }) => {
+        const expected = expectedCountRef.current;
+        if (multiScanRef.current && expected != null) {
+          const accepted = onScanRef.current(result.kind, result.id);
+          // rechazada → no cuenta; la cámara sigue abierta para reintentar
+          if (accepted === false || disposed) return;
+          const next = scanCountRef.current + 1;
+          scanCountRef.current = next;
+          setScanCount(next);
+          onProgressRef.current?.(next);
+          if (next >= expected) {
+            // Objetivo completo: apagado asincrónico y cierre automático
+            void stopScanner().finally(() => {
+              if (!disposed) onOpenChangeRef.current(false);
+            });
+          }
           return;
         }
         if (multiScanRef.current) {
-          // Conteo/recepción: detener → entregar → NUEVA instancia para la
-          // siguiente unidad, sin cerrar el modal
+          // Conteo/recepción sin objetivo definido: detener → entregar →
+          // NUEVA instancia para la siguiente unidad, sin cerrar el modal
           void session.stop()
             .then(() => {
               session.clear();
@@ -6827,6 +6927,27 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
             onScanRef.current(result.kind, result.id);
           });
         }
+      };
+
+      const onDecode = (decodedText: string) => {
+        // Diagnóstico temporal (ronda 4): verifica que onSuccess dispara con
+        // un string decodificado; si la cámara abre pero "no pasa nada", este
+        // log confirma si el problema está en el decode o en el parseo
+        console.info('[ScannerModal] QR detectado:', decodedText);
+        if (multiScanRef.current && expectedCountRef.current != null) {
+          // Anti-duplicado con la cámara abierta: el mismo QR sigue visible
+          // y html5-qrcode vuelve a disparar; se ignora por 2 s
+          const now = Date.now();
+          if (decodedText === lastTextRef.current && now - lastTimeRef.current < 2000) return;
+          lastTextRef.current = decodedText;
+          lastTimeRef.current = now;
+        }
+        const result = parseScan(decodedText);
+        if (!result) {
+          toast.error(t('inv.scanner.unrecognized'));
+          return;
+        }
+        deliverScan(result);
       };
 
       // Cámara directa: trasera (environment) salvo que el botón de respaldo
@@ -6886,6 +7007,19 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
       toast.error(t('inv.scanner.unrecognized'));
       return;
     }
+    // Ronda 5 (punto 2): en modo objetivo la entrada manual cuenta igual que
+    // una lectura de cámara y también dispara el auto-cierre al completar
+    if (multiScan && expectedCount != null) {
+      const accepted = onScanRef.current(result.kind, result.id);
+      setManualCode('');
+      if (accepted === false) return;
+      const next = scanCountRef.current + 1;
+      scanCountRef.current = next;
+      setScanCount(next);
+      onProgressRef.current?.(next);
+      if (next >= expectedCount) onOpenChangeRef.current(false);
+      return;
+    }
     onScanRef.current(result.kind, result.id);
   };
 
@@ -6901,6 +7035,34 @@ function ScannerModal({ open, onOpenChange, onScan, serialIds, multiScan = false
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('inv.scanner.hint')}</p>
           <div id={instanceId} className="rounded-xl overflow-hidden" />
+          {/* RONDA 5 (punto 2): contador en vivo con objetivo de cantidad y
+              botón Detener como cierre manual de respaldo */}
+          {multiScan && expectedCount != null && (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-[#1D1D1F]">
+                  {t('inv.scanner.progress')
+                    .replace('{count}', String(scanCount))
+                    .replace('{expected}', String(expectedCount))}
+                </span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenChange(false)}
+                  className="h-7 text-xs rounded-lg border-[#E5E5E7]"
+                >
+                  {t('inv.scanner.stop')}
+                </Button>
+              </div>
+              <div className="h-1.5 rounded-full bg-[#F5F5F7] overflow-hidden">
+                <div
+                  className="h-full bg-corporate transition-all duration-300"
+                  style={{ width: `${Math.min(100, (scanCount / expectedCount) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
           {(cameraFailed || cameraList.length > 1) && (
             <Button
               type="button"

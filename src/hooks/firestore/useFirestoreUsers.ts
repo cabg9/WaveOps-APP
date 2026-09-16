@@ -55,6 +55,9 @@ export interface FirestoreUser {
   invitedAt?: string;
   visibleDepartments?: string[];
   maxDiscountPercent?: number | null;
+  // Vendedor (Fase 1 Ronda 5): ve precios y registra cobros en Warehouse aunque
+  // su rol no esté en MONEY_ROLES. Lo activan DG/RRHH desde Develops → Usuarios.
+  isVendor?: boolean;
   updatedAt?: string;
   joinDate?: string;
   displayName?: string;

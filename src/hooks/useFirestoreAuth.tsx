@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             photoURL: userData.photoURL || '',
             profileComplete: userData.profileComplete || false,
             visibleDepartments: userData.visibleDepartments || [],
+            isVendor: userData.isVendor === true,
           });
 
           // Listener en tiempo real para expulsar si desactivan al usuario
@@ -119,6 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         photoURL: userData.photoURL || '',
         profileComplete: userData.profileComplete || false,
         visibleDepartments: userData.visibleDepartments || [],
+        isVendor: userData.isVendor === true,
       });
       return true;
     } catch (error: any) {

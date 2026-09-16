@@ -18,7 +18,8 @@ import {
 import {
   collection, doc, updateDoc, addDoc, deleteDoc, getDocs, query, where, onSnapshot, orderBy,
 } from 'firebase/firestore';
-import { db } from '@/firebase-config';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '@/firebase-config';
 import { Layout } from '@/components/Layout';
 import { useAuth } from '@/hooks/useFirestoreAuth';
 import { useAppConfig } from '@/hooks/useAppConfig';
@@ -250,7 +251,9 @@ const FEATURE_FLAG_META: Record<string, { name: string; on: string; off: string 
 function GeneralTab() {
   const { settings } = useAppConfig();
   const { logAction } = useAudit();
+  const { user } = useAuth();
   const [saving, setSaving] = useState<string | null>(null);
+  const [resettingBusinessData, setResettingBusinessData] = useState(false);
   const [branding, setBranding] = useState(settings.branding);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState(settings.branding.logoUrl);
@@ -326,6 +329,48 @@ function GeneralTab() {
     } finally {
       setSaving(null);
     }
+  };
+
+  // TEMPORAL — retirar tras las pruebas de Fase 1: vaciado de datos de
+  // negocio de la gemela (wve-pruebas-b3db5) vía Cloud Function callable.
+  const handleResetBusinessData = async () => {
+    await executeWithConfirm({
+      level: 'critical',
+      title: 'Vaciar datos de negocio (gemela de pruebas)',
+      message:
+        'Se borrarán de la gemela de pruebas: productos, proveedores, stock, movimientos, transferencias, conteos, unidades rentables, órdenes de renta, requisiciones y asignaciones de controles; y de clientes solo los externos (persona/empresa).\n\n' +
+        'Se CONSERVAN: usuarios, departamentos, roles, ubicaciones, módulos, feature flags, notificaciones, auditoría y los catálogos base (categorías, unidades, centros de costo, canales, estados, tipos y destinos de controles).\n\n' +
+        'Esta acción no se puede deshacer.',
+      actionLabel: 'Vaciar datos',
+      action: async () => {
+        setResettingBusinessData(true);
+        try {
+          const fn = httpsCallable(functions, 'resetBusinessData');
+          const res = await fn();
+          const data = res.data as { deleted?: Record<string, number>; total?: number };
+          const lines = Object.entries(data.deleted || {})
+            .map(([name, n]) => `• ${name}: ${n}`)
+            .join('\n');
+          toast.success(
+            `Datos de negocio vaciados (${data.total ?? 0} docs)\n${lines}`,
+            { duration: 10000 }
+          );
+          await logAction({
+            action: 'SETTINGS_UPDATED',
+            targetType: 'settings',
+            targetId: 'resetBusinessData',
+            targetName: 'Vaciar datos de negocio (gemela)',
+            impactLevel: 'critical',
+            description: `Reset de datos de negocio ejecutado vía Develops: ${data.total ?? 0} documentos borrados`,
+          });
+        } catch (err: any) {
+          console.error('Error en resetBusinessData:', err);
+          toast.error('Error al vaciar datos: ' + (err.message || 'Error desconocido'));
+        } finally {
+          setResettingBusinessData(false);
+        }
+      },
+    });
   };
 
   const saveMaxDiscount = async () => {
@@ -494,6 +539,31 @@ function GeneralTab() {
           })()}
         </div>
       </div>
+
+      {/* TEMPORAL — retirar tras las pruebas de Fase 1: zona de pruebas */}
+      {user?.role === Role.DIRECTOR_GENERAL && (
+        <div className="bg-white rounded-2xl p-6 shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#FF3B30]/30">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-[#FF3B30]" />
+            <h3 className="font-semibold text-[#1D1D1F]">Zona de pruebas (temporal)</h3>
+          </div>
+          <p className="text-sm text-[#86868B] leading-relaxed mb-2">
+            Vacía los datos de negocio de la <strong>gemela de pruebas</strong> (wve-pruebas-b3db5) para reiniciar las pruebas de Fase 1.
+          </p>
+          <p className="text-xs text-[#86868B] leading-relaxed mb-4">
+            <strong className="text-[#1D1D1F]">Se borra:</strong> productos, proveedores, stock, movimientos, transferencias, conteos, unidades rentables, órdenes de renta, requisiciones, asignaciones de controles y clientes externos (persona/empresa).
+            <br />
+            <strong className="text-[#1D1D1F]">Se conserva:</strong> usuarios, departamentos, roles, ubicaciones, módulos, feature flags, notificaciones, auditoría y catálogos base.
+          </p>
+          <button
+            onClick={handleResetBusinessData}
+            disabled={resettingBusinessData}
+            className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-[#FF3B30] hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
+          >
+            {resettingBusinessData ? 'Vaciando...' : 'Vaciar datos de negocio (gemela)'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -540,7 +610,7 @@ function UsuariosTab() {
     medications: '', emergencyContactName: '', emergencyContactPhone: '', emergencyContactRelation: '',
     certificationNumber: '', certificationExpiry: '', apneaCert: '', bankCountry: '', bankName: '',
     accountType: '', accountNumber: '', routingNumber: '', photoURL: '', role: '', department: '',
-    position: '', level: 7, joinDate: '', isActive: true, maxDiscountPercent: '',
+    position: '', level: 7, joinDate: '', isActive: true, maxDiscountPercent: '', isVendor: false,
   });
 
   const roleLabels: Record<string, string> = {};
@@ -654,6 +724,7 @@ function UsuariosTab() {
       joinDate: u.joinDate || '',
       isActive: u.isActive !== false,
       maxDiscountPercent: u.maxDiscountPercent != null ? String(u.maxDiscountPercent) : '',
+      isVendor: u.isVendor === true,
     });
   };
 
@@ -719,6 +790,10 @@ function UsuariosTab() {
           }
           updates.maxDiscountPercent = maxPct;
         }
+      }
+      // Vendedor (Warehouse): solo DG/RRHH lo definen (Fase 1 Ronda 5)
+      if (user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.RRHH) {
+        updates.isVendor = profileFormData.isVendor === true;
       }
       await updateUser(u.id, updates);
       await logAction({
@@ -1318,25 +1393,50 @@ function UsuariosTab() {
                                 </div>
                               )}
 
-                              {/* Ventas: descuento máximo sin aprobación (solo DG/RRHH,
-                                  visible cuando el usuario tiene permiso de venta) */}
-                              {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.RRHH) &&
-                                SALES_PERMISSION_ROLES.includes(profileFormData.role) && (
+                              {/* Ventas (solo DG/RRHH): el toggle "es vendedor"
+                                  aplica a cualquier rol; el descuento máximo sin
+                                  aprobación sigue limitado a roles de venta */}
+                              {(user?.role === Role.DIRECTOR_GENERAL || user?.role === Role.RRHH) && (
                                 <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] p-5">
                                   <h4 className="font-semibold text-[#1D1D1F] mb-4">Ventas</h4>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <EditableField
-                                      label="Descuento máximo sin aprobación (%)"
-                                      field="maxDiscountPercent"
-                                      type="number"
-                                      placeholder="10"
-                                    />
+                                  <div className="flex items-start justify-between py-1">
+                                    <div className="pr-4">
+                                      <p className="text-sm font-medium text-[#1D1D1F]">Es vendedor</p>
+                                      <p className="text-xs text-[#86868B] mt-0.5 leading-relaxed">
+                                        El vendedor ve precios y registra cobros en Warehouse, aunque su rol no tenga permiso de montos.
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => setProfileFormData(prev => ({ ...prev, isVendor: !prev.isVendor }))}
+                                      className={cn(
+                                        "w-12 h-7 rounded-full flex items-center px-1 transition-all duration-200 shrink-0 mt-0.5",
+                                        profileFormData.isVendor ? 'bg-corporate' : 'bg-[#E5E5E7]'
+                                      )}
+                                    >
+                                      <div className={cn(
+                                        "w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                                        profileFormData.isVendor ? 'translate-x-5' : 'translate-x-0'
+                                      )} />
+                                    </button>
                                   </div>
-                                  <p className="text-[11px] text-[#86868B] mt-2 leading-relaxed">
-                                    Porcentaje máximo de descuento que este vendedor puede aplicar a una orden de renta sin aprobación de un supervisor.
-                                    Si el descuento lo excede (o un producto no admite descuento), la orden queda "por aprobar" y un supervisor decide desde la campana.
-                                    Dejar vacío usa el valor por defecto (10 %).
-                                  </p>
+                                  {SALES_PERMISSION_ROLES.includes(profileFormData.role) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                                      <EditableField
+                                        label="Descuento máximo sin aprobación (%)"
+                                        field="maxDiscountPercent"
+                                        type="number"
+                                        placeholder="10"
+                                      />
+                                    </div>
+                                  )}
+                                  {SALES_PERMISSION_ROLES.includes(profileFormData.role) && (
+                                    <p className="text-[11px] text-[#86868B] mt-2 leading-relaxed">
+                                      Porcentaje máximo de descuento que este vendedor puede aplicar a una orden de renta sin aprobación de un supervisor.
+                                      Si el descuento lo excede (o un producto no admite descuento), la orden queda "por aprobar" y un supervisor decide desde la campana.
+                                      Dejar vacío usa el valor por defecto (10 %).
+                                    </p>
+                                  )}
                                 </div>
                               )}
 

@@ -53,7 +53,7 @@ import { CATALOG_COLLECTIONS } from '@/types/catalogs';
 import {
   ClipboardList, Plus, Search, ChevronDown, ChevronUp,
   Construction, Package, UserPlus, MapPin, CalendarClock, Banknote, ArrowRight,
-  RotateCcw, Users, LayoutGrid, Upload, QrCode, CheckCircle2, XCircle, Link2,
+  RotateCcw, Users, Upload, QrCode, CheckCircle2, XCircle, Link2,
   Printer, AlertTriangle, ArrowLeft, SwitchCamera, Receipt, Percent,
 } from 'lucide-react';
 
@@ -389,6 +389,32 @@ registerI18nKeys({
     'wh.discount.preAuthorized': 'Pre-autorizado',
     'wh.discount.preAuthorizedHint': 'Descuento pre-autorizado: se aplica sin aprobación, aunque supere el tope general.',
     'wh.discount.maxHint': 'Tope general sin aprobación: {percent}%',
+    'wh.orderForm.discountSpecialOption': 'Solicitar descuento especial',
+    'wh.orderForm.discountSpecial': 'Descuento especial',
+    'wh.orderForm.discountSpecialPercent': 'Porcentaje del descuento (%)',
+    'wh.orderForm.discountReason': 'Motivo de la solicitud (obligatorio)',
+    'wh.orderForm.discountReasonPlaceholder': 'Explica por qué se pide este descuento...',
+    'wh.orderForm.discountReasonRequired': 'Debes escribir el motivo del descuento especial',
+    'wh.orderForm.discountSpecialInvalid': 'El porcentaje del descuento especial debe estar entre 1 y 100',
+    'wh.orderForm.discountSpecialHint': 'El descuento especial siempre requiere aprobación: la orden quedará "por aprobar" hasta que un supervisor la resuelva.',
+    'wh.discount.requestReason': 'Motivo de la solicitud',
+    'wh.discount.requestedBy': 'Solicitado por',
+    'wh.discount.approvedBy': 'Aprobado por',
+    'wh.discount.rejectedBy': 'Rechazado por',
+    'wh.discount.approvalNote': 'Nota',
+    'wh.discount.approvalNoteLabel': 'Nota de aprobación (opcional)',
+    'wh.discount.approvalNotePlaceholder': 'Nota de aprobación (opcional)',
+    'wh.discount.rejectionNoteLabel': 'Nota del rechazo (obligatoria)',
+    'wh.discount.rejectionNotePlaceholder': 'Explica por qué rechazas el descuento...',
+
+    'wh.scanner.multiCount': 'Escaneados {count}/{expected}',
+    'wh.scanner.multiCountOpen': 'Escaneados {count}',
+    'wh.scanner.multiHint': 'La cámara sigue abierta: escanea los seriales uno por uno. Se cierra sola al completar.',
+    'wh.scanner.stop': 'Detener',
+
+    'wh.dispatch.scanSerials': 'Escanear seriales',
+    'wh.return.scanOrderOrSerial': 'Escanear QR de la orden o serial',
+    'wh.return.serialNoOrder': 'Este serial no pertenece a ninguna orden en retorno; sigue escaneando',
   },
   en: {
     'wh.devTitle': 'Module under development',
@@ -717,6 +743,32 @@ registerI18nKeys({
     'wh.discount.preAuthorized': 'Pre-authorized',
     'wh.discount.preAuthorizedHint': 'Pre-authorized discount: applies without approval, even above the general cap.',
     'wh.discount.maxHint': 'General no-approval cap: {percent}%',
+    'wh.orderForm.discountSpecialOption': 'Request special discount',
+    'wh.orderForm.discountSpecial': 'Special discount',
+    'wh.orderForm.discountSpecialPercent': 'Discount percentage (%)',
+    'wh.orderForm.discountReason': 'Request reason (required)',
+    'wh.orderForm.discountReasonPlaceholder': 'Explain why this discount is being requested...',
+    'wh.orderForm.discountReasonRequired': 'You must write the reason for the special discount',
+    'wh.orderForm.discountSpecialInvalid': 'The special discount percentage must be between 1 and 100',
+    'wh.orderForm.discountSpecialHint': 'The special discount always requires approval: the order will stay "pending approval" until a supervisor settles it.',
+    'wh.discount.requestReason': 'Request reason',
+    'wh.discount.requestedBy': 'Requested by',
+    'wh.discount.approvedBy': 'Approved by',
+    'wh.discount.rejectedBy': 'Rejected by',
+    'wh.discount.approvalNote': 'Note',
+    'wh.discount.approvalNoteLabel': 'Approval note (optional)',
+    'wh.discount.approvalNotePlaceholder': 'Approval note (optional)',
+    'wh.discount.rejectionNoteLabel': 'Rejection note (required)',
+    'wh.discount.rejectionNotePlaceholder': 'Explain why you reject the discount...',
+
+    'wh.scanner.multiCount': 'Scanned {count}/{expected}',
+    'wh.scanner.multiCountOpen': 'Scanned {count}',
+    'wh.scanner.multiHint': 'The camera stays open: scan the serials one by one. It closes by itself when complete.',
+    'wh.scanner.stop': 'Stop',
+
+    'wh.dispatch.scanSerials': 'Scan serials',
+    'wh.return.scanOrderOrSerial': 'Scan order or serial QR',
+    'wh.return.serialNoOrder': 'This serial does not belong to any order in return; keep scanning',
   },
 });
 
@@ -904,6 +956,12 @@ function docToRentalOrder(id: string, data: Record<string, unknown>): RentalOrde
     discountName: data.discountName ? toStr(data.discountName) : null,
     discountPercent: toNumOrNull(data.discountPercent) ?? null,
     discountStatus: (data.discountStatus as RentalDiscountStatus) ?? null,
+    discountRequestReason: data.discountRequestReason ? toStr(data.discountRequestReason) : null,
+    discountRequestBy: data.discountRequestBy ? toStr(data.discountRequestBy) : null,
+    discountRequestAt: data.discountRequestAt ? toStr(data.discountRequestAt) : null,
+    discountApprovalNote: data.discountApprovalNote ? toStr(data.discountApprovalNote) : null,
+    discountApprovedBy: data.discountApprovedBy ? toStr(data.discountApprovedBy) : null,
+    discountApprovedAt: data.discountApprovedAt ? toStr(data.discountApprovedAt) : null,
     fees,
     feesTotal: toNumOrNull(data.feesTotal) ?? null,
     total: toNumOrNull(data.total) ?? null,
@@ -1048,7 +1106,7 @@ function unitPriceForQty(product: Product | undefined, qty: number): number | nu
 // y las secciones (Pizarra / Órdenes / Retornos) navegan entre pantallas con
 // botón Volver; las tarjetas-módulo de la pantalla principal son LA navegación
 // (ya no hay pills/pestañas)
-type WhView = 'create' | 'dispatch' | 'return' | 'board' | 'orders' | 'returns' | null;
+type WhView = 'create' | 'dispatch' | 'return' | 'orders' | 'returns' | null;
 
 interface OrderItemDraft {
   productId: string;
@@ -1066,7 +1124,9 @@ interface OrderFormState {
   proofMode: 'foto' | 'ref';
   proofRef: string;
   depositAmount: string;
-  discountId: string; // '' = sin descuento (ref rentalDiscounts)
+  discountId: string; // '' = sin descuento (ref rentalDiscounts); 'special' = solicitud
+  discountPercentSpecial: string; // % del descuento especial (solo si discountId = 'special')
+  discountReason: string; // motivo obligatorio de la solicitud especial
   feeIds: string[]; // refs rentalFees seleccionados
   amountPaid: string; // monto recibido (registro simple)
   observations: string;
@@ -1084,6 +1144,8 @@ const EMPTY_ORDER_FORM: OrderFormState = {
   proofRef: '',
   depositAmount: '',
   discountId: '',
+  discountPercentSpecial: '',
+  discountReason: '',
   feeIds: [],
   amountPaid: '',
   observations: '',
@@ -1235,14 +1297,22 @@ export function WarehouseModule() {
   const [discountFile, setDiscountFile] = useState<File | null>(null);
   const [savingDiscount, setSavingDiscount] = useState(false);
 
+  // Resolución de un descuento pendiente (Ronda 5): diálogo que pide la nota
+  // del aprobador — obligatoria al rechazar, opcional al aprobar. Se guarda
+  // quién resolvió y cuándo.
+  const [discountSettle, setDiscountSettle] = useState<{ orderId: string; approve: boolean } | null>(null);
+  const [discountApprovalNote, setDiscountApprovalNote] = useState('');
+  const [savingDiscountSettle, setSavingDiscountSettle] = useState(false);
+
   // Despacho con escaneo QR (WH-D2): paso 1 orden, paso 2 seriales, paso 3 confirmar
   // (pantalla interna: whView === 'dispatch')
   const [dispatchOrderId, setDispatchOrderId] = useState<string | null>(null);
   const [dispatchStep, setDispatchStep] = useState(1);
   // Asignación de seriales por índice de ítem (anti-sobre-renta: máx. quantity)
   const [dispatchAssignments, setDispatchAssignments] = useState<Record<number, string[]>>({});
-  // Destino del escáner: 'order' (paso 1) o índice de ítem (paso 2)
-  const [scanTarget, setScanTarget] = useState<'order' | number | null>(null);
+  // Destino del escáner: 'order' (paso 1) o 'serials' (paso 2, cámara
+  // inteligente: queda abierta contando hasta completar la orden)
+  const [scanTarget, setScanTarget] = useState<'order' | 'serials' | null>(null);
   const [savingDispatch, setSavingDispatch] = useState(false);
 
   // Verificación de retorno (WH-D2): marca por serial 'ok' | 'damaged'
@@ -1270,7 +1340,8 @@ export function WarehouseModule() {
   const tenantId = getCurrentTenantId();
   const enabled = isFeatureEnabled('enableWarehouse');
   const role = currentUser?.role;
-  const canSeeMoney = !!role && MONEY_ROLES.includes(role);
+  const canSeeMoney =
+    (!!role && MONEY_ROLES.includes(role)) || currentUser?.isVendor === true;
   const canApprove = !!role && APPROVE_ROLES.includes(role);
   const canSupervise = !!role && SUPERVISOR_PLUS_ROLES.includes(role);
   // Aprobación de descuentos: Supervisor+ o cualquiera con el permiso de
@@ -1369,7 +1440,11 @@ export function WarehouseModule() {
     });
     const subtotal = round2(lines.reduce((acc, l) => acc + (l.lineTotal ?? 0), 0));
     const discount = activeDiscounts.find(d => d.id === orderForm.discountId) ?? null;
-    const percent = discount?.percent ?? 0;
+    // Descuento especial: porcentaje libre escrito en el formulario; entra al
+    // total de inmediato pero la orden queda 'pending' hasta la aprobación
+    const specialPercent =
+      orderForm.discountId === 'special' ? Number(orderForm.discountPercentSpecial) || 0 : 0;
+    const percent = discount?.percent ?? specialPercent;
     const discountAmount = round2(subtotal * (percent / 100));
     const afterDiscount = round2(subtotal - discountAmount);
     const feeLines: Array<{ fee: RentalFee; amount: number }> = activeFees
@@ -1381,7 +1456,7 @@ export function WarehouseModule() {
     const feesTotal = round2(feeLines.reduce((acc, l) => acc + l.amount, 0));
     const total = round2(afterDiscount + feesTotal);
     return { lines, subtotal, discount, percent, discountAmount, feeLines, feesTotal, total };
-  }, [canSeeMoney, orderItems, products, activeDiscounts, activeFees, orderForm.discountId, orderForm.feeIds]);
+  }, [canSeeMoney, orderItems, products, activeDiscounts, activeFees, orderForm.discountId, orderForm.discountPercentSpecial, orderForm.feeIds]);
 
   // Sugerencia de fianza de una orden existente (referencia en el detalle):
   // días entre su creación y la fecha de entrega
@@ -1812,6 +1887,18 @@ export function WarehouseModule() {
       toast.error(t('wh.orderForm.validation.deliveryRequired'));
       return;
     }
+    // Descuento especial: porcentaje válido y motivo obligatorio de quien pide
+    if (canSeeMoney && orderForm.discountId === 'special') {
+      const sp = Number(orderForm.discountPercentSpecial);
+      if (!Number.isFinite(sp) || sp <= 0 || sp > 100) {
+        toast.error(t('wh.orderForm.discountSpecialInvalid'));
+        return;
+      }
+      if (!orderForm.discountReason.trim()) {
+        toast.error(t('wh.orderForm.discountReasonRequired'));
+        return;
+      }
+    }
     const firstStatus = activeStatuses[0];
     if (!firstStatus) {
       toast.error(t('wh.orders.noStatuses'));
@@ -1839,7 +1926,14 @@ export function WarehouseModule() {
         : [];
       const subtotal = canSeeMoney && formPricing ? formPricing.subtotal : null;
       const discount = canSeeMoney ? formPricing?.discount ?? null : null;
-      const percent = discount?.percent ?? 0;
+      // Descuento especial (Ronda 5): porcentaje libre + motivo obligatorio;
+      // siempre queda 'pending' hasta que un aprobador lo resuelva con nota
+      const isSpecialDiscount = canSeeMoney && orderForm.discountId === 'special';
+      const specialPercent = isSpecialDiscount ? Number(orderForm.discountPercentSpecial) : 0;
+      const percent = discount?.percent ?? specialPercent;
+      const discountDisplayName = isSpecialDiscount
+        ? t('wh.orderForm.discountSpecial')
+        : discount?.name ?? null;
       // DESCUENTOS MODELO V2 (Ronda 4):
       // - Tope ÚNICO general sin aprobación: appSettings/global
       //   maxDiscountWithoutApproval (default 10). Debajo del tope se aplica
@@ -1862,8 +1956,11 @@ export function WarehouseModule() {
           discount.productIds.length === 0 ||
           orderItems.every(it => !it.productId || discount.productIds!.includes(it.productId)));
       const isPreAuthorized = !!discount?.preAuthorized && discountCoversOrder;
+      // El descuento especial SIEMPRE requiere aprobación, aunque esté bajo el
+      // tope general (es una excepción pedida caso por caso con su motivo)
       const needsDiscountApproval =
-        percent > 0 && !isPreAuthorized && (percent > maxDiscountPercent || hasRestrictedItem);
+        percent > 0 &&
+        (isSpecialDiscount || (!isPreAuthorized && (percent > maxDiscountPercent || hasRestrictedItem)));
       const discountStatus: RentalDiscountStatus | null =
         percent === 0 ? null : needsDiscountApproval ? 'pending' : 'approved';
       const fees: RentalOrderFee[] = canSeeMoney && formPricing
@@ -1915,10 +2012,17 @@ export function WarehouseModule() {
         ...(canSeeMoney
           ? {
               subtotal,
-              discountId: discount?.id ?? null,
-              discountName: discount?.name ?? null,
-              discountPercent: discount?.percent ?? null,
+              discountId: isSpecialDiscount ? 'special' : discount?.id ?? null,
+              discountName: discountDisplayName,
+              discountPercent: percent || null,
               discountStatus,
+              ...(isSpecialDiscount
+                ? {
+                    discountRequestReason: orderForm.discountReason.trim() || null,
+                    discountRequestBy: currentUser!.name,
+                    discountRequestAt: now,
+                  }
+                : {}),
               fees,
               feesTotal,
               total,
@@ -1942,7 +2046,7 @@ export function WarehouseModule() {
         await notifyDiscountApproval(
           {
             clientName: client.name,
-            discountName: discount?.name ?? '',
+            discountName: discountDisplayName ?? '',
             discountPercent: percent,
           },
           orderRef.id
@@ -2028,58 +2132,65 @@ export function WarehouseModule() {
     }
   };
 
-  const settleDiscount = async (order: RentalOrder, approve: boolean) => {
+  // Resolución del descuento pendiente: quien aprueba/rechaza deja una nota
+  // (obligatoria al rechazar, opcional al aprobar) y se guarda quién y cuándo.
+  // La lista de aprobadores y la regla del tope quedan como en Ronda 4.
+  const settleDiscount = async (order: RentalOrder, approve: boolean, note: string) => {
     if (!canApproveDiscount || !currentUser || order.discountStatus !== 'pending') return;
-    await executeWithConfirm(
-      {
-        level: 'major',
-        title: approve ? t('wh.confirm.discountApproveTitle') : t('wh.confirm.discountRejectTitle'),
-        description: approve ? t('wh.confirm.discountApproveDesc') : t('wh.confirm.discountRejectDesc'),
-      },
-      async () => {
-        try {
-          const now = new Date().toISOString();
-          if (approve) {
-            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
-              discountStatus: 'approved',
-              updatedAt: now,
-            });
-          } else {
-            // Rechazar: el descuento se quita del total (los fees se
-            // conservan tal como se cobraron)
-            const subtotal = order.subtotal ?? 0;
-            const feesTotal = order.feesTotal ?? 0;
-            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
-              discountStatus: 'rejected',
-              discountId: null,
-              discountName: null,
-              discountPercent: null,
-              total: round2(subtotal + feesTotal),
-              updatedAt: now,
-            });
-          }
-          await logAction({
-            action: (approve ? 'RENTAL_DISCOUNT_APPROVED' : 'RENTAL_DISCOUNT_REJECTED') as AuditAction,
-            targetType: 'rental_order',
-            targetId: order.id!,
-            targetName: order.orderNumber != null ? `Orden #${order.orderNumber}` : order.clientName,
-            previousValue: { discountStatus: order.discountStatus, discountPercent: order.discountPercent },
-            newValue: {
-              discountStatus: approve ? 'approved' : 'rejected',
-              discountPercent: approve ? order.discountPercent : null,
-            },
-            impactLevel: 'sensitive',
-            description: approve
-              ? `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) aprobado en la orden de ${order.clientName}`
-              : `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) rechazado y quitado del total en la orden de ${order.clientName}`,
-          });
-          toast.success(approve ? t('wh.toast.discountApproved') : t('wh.toast.discountRejected'));
-        } catch (err) {
-          console.error('[WarehouseModule] settleDiscount:', err);
-          toast.error(t('wh.toast.error'));
-        }
+    const noteTrim = note.trim();
+    setSavingDiscountSettle(true);
+    try {
+      const now = new Date().toISOString();
+      if (approve) {
+        await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+          discountStatus: 'approved',
+          discountApprovalNote: noteTrim || null,
+          discountApprovedBy: currentUser.name,
+          discountApprovedAt: now,
+          updatedAt: now,
+        });
+      } else {
+        // Rechazar: el descuento se quita del total (los fees se
+        // conservan tal como se cobraron)
+        const subtotal = order.subtotal ?? 0;
+        const feesTotal = order.feesTotal ?? 0;
+        await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), {
+          discountStatus: 'rejected',
+          discountId: null,
+          discountName: null,
+          discountPercent: null,
+          total: round2(subtotal + feesTotal),
+          discountApprovalNote: noteTrim,
+          discountApprovedBy: currentUser.name,
+          discountApprovedAt: now,
+          updatedAt: now,
+        });
       }
-    );
+      await logAction({
+        action: (approve ? 'RENTAL_DISCOUNT_APPROVED' : 'RENTAL_DISCOUNT_REJECTED') as AuditAction,
+        targetType: 'rental_order',
+        targetId: order.id!,
+        targetName: order.orderNumber != null ? `Orden #${order.orderNumber}` : order.clientName,
+        previousValue: { discountStatus: order.discountStatus, discountPercent: order.discountPercent },
+        newValue: {
+          discountStatus: approve ? 'approved' : 'rejected',
+          discountPercent: approve ? order.discountPercent : null,
+          discountApprovalNote: noteTrim || null,
+          discountApprovedBy: currentUser.name,
+        },
+        impactLevel: 'sensitive',
+        description: approve
+          ? `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) aprobado en la orden de ${order.clientName}${noteTrim ? `. Nota: ${noteTrim}` : ''}`
+          : `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) rechazado y quitado del total en la orden de ${order.clientName}. Nota: ${noteTrim}`,
+      });
+      setDiscountSettle(null);
+      toast.success(approve ? t('wh.toast.discountApproved') : t('wh.toast.discountRejected'));
+    } catch (err) {
+      console.error('[WarehouseModule] settleDiscount:', err);
+      toast.error(t('wh.toast.error'));
+    } finally {
+      setSavingDiscountSettle(false);
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -2362,9 +2473,12 @@ export function WarehouseModule() {
   };
 
   // Resultado del escáner: QR de orden (${origin}/warehouse?order=<id>) o de
-  // serial (${origin}/requisiciones?serial=<id>); texto plano = serial
+  // serial (${origin}/requisiciones?serial=<id>); texto plano = serial.
+  // En modo 'serials' (cámara inteligente) la cámara queda abierta: cada
+  // serial válido suma al contador; al completar los esperados se cierra sola.
   const handleDispatchScan = (kind: 'order' | 'serial', id: string) => {
-    setScanTarget(null);
+    const multi = scanTarget === 'serials';
+    if (!multi) setScanTarget(null);
     if (kind === 'order') {
       const order = orders.find(o => o.id === id);
       if (!order) {
@@ -2396,7 +2510,24 @@ export function WarehouseModule() {
       toast.error(t('wh.dispatch.serialAlreadyAssigned'));
       return;
     }
+    const cur = dispatchAssignments[itemIdx] ?? [];
+    if (cur.includes(unit.id!)) {
+      toast.error(t('wh.dispatch.serialAlreadyAssigned'));
+      return;
+    }
     toggleSerialForItem(itemIdx, unit.id!);
+    // Auto-cierre de la cámara inteligente: con este serial ya está todo
+    // lo esperado de la orden
+    if (multi) {
+      const nextAssignments = { ...dispatchAssignments, [itemIdx]: [...cur, unit.id!] };
+      const complete = dispatchOrder.items.every((it, idx) => {
+        const p = products.find(pr => pr.id === it.productId);
+        if (p && p.hasQr === false) return true;
+        if (!rentalUnits.some(u => u.productId === it.productId)) return true;
+        return (nextAssignments[idx] ?? []).length === it.quantity;
+      });
+      if (complete) setScanTarget(null);
+    }
   };
 
   // Resolución de códigos manuales: texto plano = id de orden o de serial
@@ -2552,9 +2683,12 @@ export function WarehouseModule() {
     setReturnStep(2);
   };
 
-  // Escaneo en el flujo de retorno: QR de orden (paso 1) o serial devuelto
+  // Escaneo inteligente en el flujo de retorno (Ronda 5): la cámara queda
+  // abierta contando. Acepta QR de orden o serial en cualquier paso: un
+  // serial escaneado sin orden seleccionada ABRE el retorno de SU orden; un
+  // serial que no pertenece a la orden avisa y sigue. Al completar los
+  // esperados, la cámara se cierra sola (auto-cierre).
   const handleReturnScan = (kind: 'order' | 'serial', id: string) => {
-    setReturnScanTarget(null);
     if (kind === 'order') {
       const order = orders.find(o => o.id === id);
       if (!order) {
@@ -2562,14 +2696,30 @@ export function WarehouseModule() {
         return;
       }
       selectReturnOrder(order);
+      // Orden sin seriales que esperar: nada más que escanear, se cierra
+      if (assignedUnitEntries(order).length === 0) setReturnScanTarget(null);
       return;
     }
-    const order = returnOrder;
-    if (!order) return;
     const unit = rentalUnits.find(u => u.id === id || u.serialNumber === id);
     if (!unit) {
       toast.error(t('wh.return.serialUnknown'));
       return;
+    }
+    let order = returnOrder;
+    if (!order) {
+      // Serial sin orden abierta: localiza la orden en retorno (despachada o
+      // entregada) que tiene ese serial asignado y abre SU verificación
+      const owner = orders.find(
+        o =>
+          (o.statusId === 'despachado' || o.statusId === 'entregado') &&
+          assignedUnitEntries(o).some(e => e.unitId === unit.id)
+      );
+      if (!owner) {
+        toast.error(t('wh.return.serialNoOrder'));
+        return;
+      }
+      selectReturnOrder(owner);
+      order = owner;
     }
     const assigned = assignedUnitEntries(order).some(e => e.unitId === unit.id);
     if (!assigned) {
@@ -2581,6 +2731,10 @@ export function WarehouseModule() {
       return;
     }
     setReturnedSerialIds(prev => new Set(prev).add(unit.id!));
+    // Auto-cierre: ya regresaron todos los seriales esperados de la orden
+    if (returnedSerialIds.size + 1 >= assignedUnitEntries(order).length) {
+      setReturnScanTarget(null);
+    }
   };
 
   const finalizeReturn = async () => {
@@ -3066,10 +3220,22 @@ export function WarehouseModule() {
                 percent: order.discountPercent ?? 0,
               })}
             </p>
+            {/* Motivo dejado por quien pidió el descuento (obligatorio en la
+                solicitud especial) */}
+            {order.discountRequestReason && (
+              <p className="text-xs text-amber-800 bg-amber-100/60 border border-amber-200 rounded-lg px-2 py-1.5">
+                <span className="font-medium">{t('wh.discount.requestReason')}:</span>{' '}
+                {order.discountRequestReason}
+                {order.discountRequestBy ? ` · ${order.discountRequestBy}` : ''}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
-                onClick={() => settleDiscount(order, true)}
+                onClick={() => {
+                  setDiscountApprovalNote('');
+                  setDiscountSettle({ orderId: order.id!, approve: true });
+                }}
                 className="h-7 rounded-lg bg-green-600 hover:bg-green-600/90 text-xs"
               >
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
@@ -3078,7 +3244,10 @@ export function WarehouseModule() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => settleDiscount(order, false)}
+                onClick={() => {
+                  setDiscountApprovalNote('');
+                  setDiscountSettle({ orderId: order.id!, approve: false });
+                }}
                 className="h-7 rounded-lg border-red-300 text-red-700 hover:bg-red-50 text-xs"
               >
                 <XCircle className="h-3.5 w-3.5 mr-1" />
@@ -3092,6 +3261,20 @@ export function WarehouseModule() {
             {t('wh.discount.rejectedBadge')}
           </div>
         )}
+        {/* Resolución del descuento: nota + quién y cuándo (aprobado o rechazado) */}
+        {(order.discountStatus === 'approved' || order.discountStatus === 'rejected') &&
+          (order.discountApprovedBy || order.discountApprovalNote) && (
+            <div className="text-xs text-[#86868B] bg-[#F5F5F7] border border-[#E5E5E7] rounded-xl px-3 py-2 space-y-0.5">
+              <p>
+                {order.discountStatus === 'approved' ? t('wh.discount.approvedBy') : t('wh.discount.rejectedBy')}
+                {': '}{order.discountApprovedBy || '—'}
+                {order.discountApprovedAt ? ` · ${fmtDateTime(order.discountApprovedAt)}` : ''}
+              </p>
+              {order.discountApprovalNote && (
+                <p>{t('wh.discount.approvalNote')}: {order.discountApprovalNote}</p>
+              )}
+            </div>
+          )}
 
         {/* Transiciones + puntos de extensión (WH-D2) */}
         {canOperate && (
@@ -3258,29 +3441,11 @@ export function WarehouseModule() {
       {whView === null && (
         <>
           {/* Tarjetas-módulo PEQUEÑAS (LA navegación del módulo; reemplaza a
-              las pills/pestañas). 1 columna en móvil, 2-3 en desktop. Tocar
-              una tarjeta navega a la pantalla de esa sección con botón Volver
-              (patrón whView). La Pizarra queda además como resumen abierto
-              debajo de las tarjetas. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => setWhView('board')}
-              className="text-left bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-3 hover:bg-[#F5F5F7] transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-corporate/10 flex items-center justify-center shrink-0">
-                  <LayoutGrid className="w-4 h-4 text-corporate" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-[#1D1D1F]">{t('wh.tab.board')}</p>
-                  <p className="text-[11px] text-[#86868B] truncate">{t('wh.home.boardDesc')}</p>
-                </div>
-                <span className="text-[11px] text-[#86868B] shrink-0">
-                  {tf('wh.home.activeCount', { count: activeOrders.length })}
-                </span>
-              </div>
-            </button>
+              las pills/pestañas). Más angostas: 2 columnas en móvil pequeño,
+              hasta 5 en desktop. Tocar una tarjeta navega a la pantalla de esa
+              sección con botón Volver (patrón whView). La Pizarra NO es una
+              tarjeta: es la vista fija/resumen que siempre se ve debajo. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <button
               type="button"
               onClick={() => setWhView('orders')}
@@ -3362,13 +3527,11 @@ export function WarehouseModule() {
         </>
       )}
 
-      {/* PIZARRA: pantalla de tarjeta-módulo (Volver) y resumen abierto en la
-          pantalla principal. Sin bloque de texto explicatorio. */}
-      {(whView === null || whView === 'board') && (
-        <div className={cn('space-y-4', whView === 'board' && 'bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6')}>
-          {whView === 'board' && (
-            <WhViewHeader title={t('wh.tab.board')} onBack={() => setWhView(null)} />
-          )}
+      {/* PIZARRA: vista fija/resumen — SIEMPRE visible en el home de
+          Warehouse, debajo de las tarjetas-módulo; ya no es una sección
+          navegable (Ronda 5). Sin bloque de texto explicatorio. */}
+      {whView === null && (
+        <div className="space-y-4">
           {activeOrders.length === 0 ? (
             <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
               {t('wh.board.empty')}
@@ -3379,7 +3542,7 @@ export function WarehouseModule() {
                 const columnOrders = activeOrders.filter(o => o.statusId === status.id);
                 if (columnOrders.length === 0) return null;
                 return (
-                  <div key={status.id} className="min-w-[220px] w-[220px] shrink-0 space-y-2">
+                  <div key={status.id} className="min-w-[180px] w-[180px] shrink-0 space-y-2">
                     <div className="flex items-center gap-2 px-1">
                       <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium border', statusBadgeClass(status))}>
                         {statusName(status)}
@@ -3525,6 +3688,9 @@ export function WarehouseModule() {
             </div>
           )}
 
+          {/* Tarjetas de órdenes más angostas: más por fila (2 en tablet,
+              3 en desktop) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
           {filteredOrders.map(order => {
             const status = statusById(order.statusId);
             const isOpen = expandedIds.has(order.id!);
@@ -3579,6 +3745,7 @@ export function WarehouseModule() {
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
@@ -3659,7 +3826,8 @@ export function WarehouseModule() {
                 {t('wh.returns.withClientEmpty')}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* Tarjetas "en poder del cliente" más angostas: 2 por fila */}
                 {withClientOrders.map(order => (
                   <button
                     key={order.id}
@@ -3752,6 +3920,84 @@ export function WarehouseModule() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG: RESOLVER DESCUENTO PENDIENTE (Ronda 5) — nota del
+          aprobador: obligatoria al rechazar, opcional al aprobar ─── */}
+      <Dialog open={!!discountSettle} onOpenChange={open => !open && setDiscountSettle(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#1D1D1F]">
+              {discountSettle?.approve ? t('wh.confirm.discountApproveTitle') : t('wh.confirm.discountRejectTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          {(() => {
+            const settleOrder = discountSettle ? orders.find(o => o.id === discountSettle.orderId) : null;
+            if (!discountSettle || !settleOrder) return null;
+            return (
+              <div className="space-y-3">
+                <p className="text-xs text-[#86868B]">
+                  {tf('wh.discount.bannerDesc', {
+                    name: settleOrder.discountName ?? '',
+                    percent: settleOrder.discountPercent ?? 0,
+                  })}
+                </p>
+                {/* Motivo de la solicitud, para decidir con contexto */}
+                {settleOrder.discountRequestReason && (
+                  <div className="text-xs bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-0.5">
+                    <p className="font-medium text-[#1D1D1F]">
+                      {t('wh.discount.requestedBy')}: {settleOrder.discountRequestBy || '—'}
+                    </p>
+                    <p className="text-[#86868B]">{settleOrder.discountRequestReason}</p>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-xs text-[#86868B]">
+                    {discountSettle.approve ? t('wh.discount.approvalNoteLabel') : t('wh.discount.rejectionNoteLabel')}
+                  </Label>
+                  <textarea
+                    value={discountApprovalNote}
+                    onChange={e => setDiscountApprovalNote(e.target.value)}
+                    rows={2}
+                    placeholder={
+                      discountSettle.approve
+                        ? t('wh.discount.approvalNotePlaceholder')
+                        : t('wh.discount.rejectionNotePlaceholder')
+                    }
+                    className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setDiscountSettle(null)}
+                    className="rounded-xl border-[#E5E5E7]"
+                  >
+                    {t('wh.common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => settleDiscount(settleOrder, discountSettle.approve, discountApprovalNote)}
+                    disabled={savingDiscountSettle || (!discountSettle.approve && !discountApprovalNote.trim())}
+                    className={cn(
+                      'rounded-xl',
+                      discountSettle.approve
+                        ? 'bg-green-600 hover:bg-green-600/90'
+                        : 'bg-red-600 hover:bg-red-600/90'
+                    )}
+                  >
+                    {savingDiscountSettle
+                      ? t('wh.common.save') + '…'
+                      : discountSettle.approve
+                        ? t('wh.discount.approve')
+                        : t('wh.discount.reject')}
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -3914,72 +4160,8 @@ export function WarehouseModule() {
                 )}
               </div>
 
-              {/* Líneas de factura */}
-              <div className="space-y-2">
-                {orderItems.length === 0 && (
-                  <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-3 py-2">
-                    {t('wh.orderForm.emptyLines')}
-                  </p>
-                )}
-                {orderItems.map((item, idx) => {
-                  const product = item.productId ? products.find(p => p.id === item.productId) : undefined;
-                  const qty = Number(item.quantity) || 0;
-                  const lineAvailability = item.productId && orderForm.locationId
-                    ? stockAtLocation(item.productId, orderForm.locationId)
-                    : 0;
-                  const exceeds = qty > lineAvailability;
-                  return (
-                    <div key={idx} className="rounded-xl border border-[#E5E5E7] p-2.5 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Package className="h-4 w-4 text-[#86868B] shrink-0" />
-                        <span className="text-sm font-medium text-[#1D1D1F] truncate">
-                          {product?.name ?? item.productId}
-                        </span>
-                        {exceeds && orderForm.locationId && (
-                          <span className="text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5 shrink-0">
-                            {tf('wh.orderForm.availableShort', { count: lineAvailability })}
-                          </span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="ml-auto h-7 w-7 p-0 rounded-lg justify-self-end text-[#86868B] hover:text-red-600 shrink-0"
-                          onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
-                        >
-                          <span className="text-lg leading-none">×</span>
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-12 gap-2 items-center">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={lineAvailability > 0 ? lineAvailability : undefined}
-                          value={item.quantity}
-                          onChange={e => updateItem(idx, { quantity: e.target.value })}
-                          placeholder={t('wh.orderForm.quantity')}
-                          className={cn(
-                            'col-span-3 sm:col-span-2 rounded-xl border-[#E5E5E7] text-sm',
-                            exceeds && 'border-red-300'
-                          )}
-                        />
-                        <Input
-                          value={item.tallaRef}
-                          onChange={e => updateItem(idx, { tallaRef: e.target.value })}
-                          placeholder={t('wh.orderForm.tallaRefPlaceholder')}
-                          className="col-span-9 sm:col-span-6 rounded-xl border-[#E5E5E7] text-sm"
-                        />
-                        {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
-                          <p className="col-span-12 sm:col-span-4 text-[11px] text-[#86868B] sm:text-right whitespace-nowrap">
-                            ({formatMoney(formPricing.lines[idx].unitPrice)} × {formPricing.lines[idx].qty} = {formatMoney(formPricing.lines[idx].lineTotal)})
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Selector categoría → productos (solo con ubicación elegida) */}
+              {/* Selector categoría → productos (PRIMERO: categorías y
+                  buscador; Ronda 5). Las líneas agregadas quedan debajo. */}
               {orderForm.locationId && (
                 <div className="mt-3 space-y-2">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -4073,6 +4255,73 @@ export function WarehouseModule() {
                   })()}
                 </div>
               )}
+
+              {/* Líneas de factura (DEBAJO del buscador): lo agregado va
+                  sumando como líneas de la orden */}
+              <p className="text-xs font-medium text-[#1D1D1F] mt-3">{t('wh.orderForm.lines')}</p>
+              <div className="space-y-2 mt-1.5">
+                {orderItems.length === 0 && (
+                  <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-3 py-2">
+                    {t('wh.orderForm.emptyLines')}
+                  </p>
+                )}
+                {orderItems.map((item, idx) => {
+                  const product = item.productId ? products.find(p => p.id === item.productId) : undefined;
+                  const qty = Number(item.quantity) || 0;
+                  const lineAvailability = item.productId && orderForm.locationId
+                    ? stockAtLocation(item.productId, orderForm.locationId)
+                    : 0;
+                  const exceeds = qty > lineAvailability;
+                  return (
+                    <div key={idx} className="rounded-xl border border-[#E5E5E7] p-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Package className="h-4 w-4 text-[#86868B] shrink-0" />
+                        <span className="text-sm font-medium text-[#1D1D1F] truncate">
+                          {product?.name ?? item.productId}
+                        </span>
+                        {exceeds && orderForm.locationId && (
+                          <span className="text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 rounded-full px-1.5 py-0.5 shrink-0">
+                            {tf('wh.orderForm.availableShort', { count: lineAvailability })}
+                          </span>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto h-7 w-7 p-0 rounded-lg justify-self-end text-[#86868B] hover:text-red-600 shrink-0"
+                          onClick={() => setOrderItems(prev => prev.filter((_, i) => i !== idx))}
+                        >
+                          <span className="text-lg leading-none">×</span>
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-12 gap-2 items-center">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={lineAvailability > 0 ? lineAvailability : undefined}
+                          value={item.quantity}
+                          onChange={e => updateItem(idx, { quantity: e.target.value })}
+                          placeholder={t('wh.orderForm.quantity')}
+                          className={cn(
+                            'col-span-3 sm:col-span-2 rounded-xl border-[#E5E5E7] text-sm',
+                            exceeds && 'border-red-300'
+                          )}
+                        />
+                        <Input
+                          value={item.tallaRef}
+                          onChange={e => updateItem(idx, { tallaRef: e.target.value })}
+                          placeholder={t('wh.orderForm.tallaRefPlaceholder')}
+                          className="col-span-9 sm:col-span-6 rounded-xl border-[#E5E5E7] text-sm"
+                        />
+                        {canSeeMoney && formPricing && formPricing.lines[idx]?.unitPrice != null && (
+                          <p className="col-span-12 sm:col-span-4 text-[11px] text-[#86868B] sm:text-right whitespace-nowrap">
+                            ({formatMoney(formPricing.lines[idx].unitPrice)} × {formPricing.lines[idx].qty} = {formatMoney(formPricing.lines[idx].lineTotal)})
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Entrega: fecha y hora */}
@@ -4178,11 +4427,43 @@ export function WarehouseModule() {
                         {d.name} (-{d.percent}%){d.preAuthorized ? ` · ${t('wh.discount.preAuthorized')}` : ''}
                       </option>
                     ))}
+                    <option value="special">{t('wh.orderForm.discountSpecialOption')}</option>
                   </select>
                   {activeDiscounts.find(d => d.id === orderForm.discountId)?.preAuthorized && (
                     <p className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-1.5">
                       {t('wh.discount.preAuthorizedHint')}
                     </p>
+                  )}
+                  {/* Descuento especial: % libre + motivo obligatorio. La orden
+                      queda "por aprobar" hasta que un aprobador la resuelva. */}
+                  {orderForm.discountId === 'special' && (
+                    <div className="mt-2 space-y-2">
+                      <div>
+                        <Label className="text-xs text-[#86868B]">{t('wh.orderForm.discountSpecialPercent')}</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={orderForm.discountPercentSpecial}
+                          onChange={e => setOrderForm(prev => ({ ...prev, discountPercentSpecial: e.target.value }))}
+                          placeholder="15"
+                          className="mt-1 rounded-xl border-[#E5E5E7] text-sm"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs text-[#86868B]">{t('wh.orderForm.discountReason')}</Label>
+                        <textarea
+                          value={orderForm.discountReason}
+                          onChange={e => setOrderForm(prev => ({ ...prev, discountReason: e.target.value }))}
+                          placeholder={t('wh.orderForm.discountReasonPlaceholder')}
+                          rows={2}
+                          className="mt-1 w-full px-3 py-2 rounded-xl border border-[#E5E5E7] text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20"
+                        />
+                      </div>
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-1.5">
+                        {t('wh.orderForm.discountSpecialHint')}
+                      </p>
+                    </div>
                   )}
                 </div>
                 {/* Impuestos y cargos: multi-select de los activos */}
@@ -4232,7 +4513,7 @@ export function WarehouseModule() {
                     {formPricing.percent > 0 && (
                       <div className="flex justify-between text-[#86868B]">
                         <span>
-                          {t('wh.orderForm.discount')}: {formPricing.discount?.name} (-{formPricing.percent}%)
+                          {t('wh.orderForm.discount')}: {formPricing.discount?.name ?? t('wh.orderForm.discountSpecial')} (-{formPricing.percent}%)
                         </span>
                         <span>-{formatMoney(formPricing.discountAmount)}</span>
                       </div>
@@ -4414,7 +4695,9 @@ export function WarehouseModule() {
               const progress = dispatchProgress(dispatchOrder);
               return (
               <div className="space-y-3">
-                {/* Contador de progreso: N de M escaneados / faltan N */}
+                {/* Contador de progreso: N de M escaneados / faltan N. La
+                    cámara inteligente queda abierta escaneando en serie hasta
+                    completar (se cierra sola); "Detener" es el respaldo. */}
                 {progress.total > 0 && (
                   <div className="bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
@@ -4441,6 +4724,15 @@ export function WarehouseModule() {
                         style={{ width: `${progress.total > 0 ? (progress.scanned / progress.total) * 100 : 0}%` }}
                       />
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setScanTarget('serials')}
+                      className="h-7 rounded-lg border-[#E5E5E7] text-xs gap-1 w-fit"
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      {t('wh.dispatch.scanSerials')}
+                    </Button>
                   </div>
                 )}
                 {dispatchOrder.items.map((it, idx) => {
@@ -4462,25 +4754,14 @@ export function WarehouseModule() {
                             ×{it.quantity} · {t('wh.dispatch.simpleConfirm')}
                           </span>
                         ) : (
-                          <>
-                            <span
-                              className={cn(
-                                'text-xs font-medium',
-                                selected.length === it.quantity ? 'text-green-700' : 'text-[#86868B]'
-                              )}
-                            >
-                              {tf('wh.dispatch.assigned', { assigned: selected.length, quantity: it.quantity })}
-                            </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setScanTarget(idx)}
-                              className="ml-auto h-7 rounded-lg border-[#E5E5E7] text-xs gap-1"
-                            >
-                              <QrCode className="h-3.5 w-3.5" />
-                              {t('wh.dispatch.scanSerial')}
-                            </Button>
-                          </>
+                          <span
+                            className={cn(
+                              'text-xs font-medium',
+                              selected.length === it.quantity ? 'text-green-700' : 'text-[#86868B]'
+                            )}
+                          >
+                            {tf('wh.dispatch.assigned', { assigned: selected.length, quantity: it.quantity })}
+                          </span>
                         )}
                       </div>
                       {insufficient && (
@@ -4612,17 +4893,19 @@ export function WarehouseModule() {
       {whView === 'return' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6 space-y-4">
           <WhViewHeader title={t('wh.return.title')} onBack={closeReturn} />
-          {/* Paso 1: escanear o seleccionar la orden que regresa */}
+          {/* Paso 1: escanear o seleccionar la orden que regresa. El escaneo es
+              inteligente: acepta el QR de la orden o directamente un serial
+              (abre el retorno de su orden) y sigue abierto contando. */}
           {returnStep === 1 && (
             <div className="space-y-3">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setReturnScanTarget('order')}
+                onClick={() => setReturnScanTarget('serial')}
                 className="rounded-xl border-[#E5E5E7] gap-2"
               >
                 <QrCode className="h-4 w-4" />
-                {t('wh.return.scanOrder')}
+                {t('wh.return.scanOrderOrSerial')}
               </Button>
               <div>
                 <Label className="text-xs text-[#86868B]">{t('wh.return.orSelect')}</Label>
@@ -4893,7 +5176,9 @@ export function WarehouseModule() {
       />
 
       {/* ─── MODAL: ESCANER QR (WH-D2: orden / serial / texto plano; también
-          el escaneo OPCIONAL del formulario de orden) ─── */}
+          el escaneo OPCIONAL del formulario de orden). En despacho y retorno
+          funciona como CÁMARA INTELIGENTE: queda abierto contando en vivo y
+          se cierra solo al completar los seriales esperados. ─── */}
       <WhScannerModal
         open={scanTarget !== null || returnScanTarget !== null || formScanOpen}
         onOpenChange={open => {
@@ -4909,6 +5194,19 @@ export function WarehouseModule() {
           else handleDispatchScan(kind, id);
         }}
         resolveManual={resolveManualScanCode}
+        multiScan={
+          scanTarget === 'serials' && dispatchOrder
+            ? (() => {
+                const p = dispatchProgress(dispatchOrder);
+                return p.total > 0 ? { expected: p.total, count: p.scanned } : null;
+              })()
+            : returnScanTarget !== null
+              ? {
+                  expected: returnOrder ? assignedUnitEntries(returnOrder).length : null,
+                  count: returnedSerialIds.size,
+                }
+              : null
+        }
       />
     </div>
   );
@@ -5026,14 +5324,24 @@ interface WhScannerModalProps {
   onScan: (kind: 'order' | 'serial', id: string) => void;
   /** Resuelve texto plano contra colecciones conocidas (id de orden / serial) */
   resolveManual?: (raw: string) => { kind: 'order' | 'serial'; id: string } | null;
+  /** Modo cámara inteligente (Ronda 5): la cámara PERMANECE ABIERTA escaneando
+      en serie y contando en vivo; el padre la cierra solo al completar
+      (count >= expected) o con el botón "Detener". expected = null cuando aún
+      no hay orden seleccionada (retorno: el serial abre su orden). */
+  multiScan?: { expected: number | null; count: number } | null;
 }
 
-function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScannerModalProps) {
+function WhScannerModal({ open, onOpenChange, onScan, resolveManual, multiScan }: WhScannerModalProps) {
   // Ref para que el callback del escáner siempre vea el handler actual
   const onScanRef = useRef(onScan);
   useEffect(() => { onScanRef.current = onScan; }, [onScan]);
   const resolveManualRef = useRef(resolveManual);
   useEffect(() => { resolveManualRef.current = resolveManual; }, [resolveManual]);
+  const multiScanRef = useRef(multiScan);
+  useEffect(() => { multiScanRef.current = multiScan; }, [multiScan]);
+  // Anti doble-entrega en modo multiScan: el mismo código leído de nuevo en
+  // menos de 3 s se ignora (el QR sigue enfocado frente a la cámara)
+  const lastMultiScanRef = useRef<{ text: string; at: number } | null>(null);
 
   // Id único por instancia: nunca colisiona entre dos modales montados
   const instanceId = `wh-qr-scanner-${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
@@ -5057,6 +5365,7 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
       setCameraIndex(-1);
       setScanError(false);
       setCameras([]);
+      lastMultiScanRef.current = null;
     }
   }, [open]);
 
@@ -5159,6 +5468,22 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
           { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText) => {
             if (disposed || sessionId !== currentSession) return;
+            // MODO CÁMARA INTELIGENTE (multiScan): la sesión se mantiene viva
+            // y la cámara sigue abierta contando; el cierre lo decide el padre
+            // (completado → cierra sola; respaldo manual → "Detener").
+            if (multiScanRef.current) {
+              const now = Date.now();
+              const last = lastMultiScanRef.current;
+              if (last && last.text === decodedText && now - last.at < 3000) return;
+              lastMultiScanRef.current = { text: decodedText, at: now };
+              const result = parseScan(decodedText);
+              if (!result) {
+                toast.error(t('wh.scanner.unrecognized'));
+                return; // lectura inválida: aviso y la cámara sigue abierta
+              }
+              onScanRef.current(result.kind, result.id);
+              return;
+            }
             // Una sola entrega por sesión: se invalida la sesión ANTES de
             // entregar, para que un doble disparo del decoder no duplique.
             sessionId += 1;
@@ -5235,6 +5560,45 @@ function WhScannerModal({ open, onOpenChange, onScan, resolveManual }: WhScanner
         </DialogHeader>
         <div className="space-y-3">
           <p className="text-xs text-[#86868B]">{t('wh.scanner.hint')}</p>
+          {/* Contador vivo del modo cámara inteligente + botón Detener (respaldo) */}
+          {multiScan && (
+            <div className="bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-1.5">
+              <div className="flex items-center justify-between gap-2 text-xs">
+                <span
+                  className={cn(
+                    'font-medium',
+                    multiScan.expected != null && multiScan.count >= multiScan.expected
+                      ? 'text-green-700'
+                      : 'text-[#1D1D1F]'
+                  )}
+                >
+                  {multiScan.expected != null
+                    ? tf('wh.scanner.multiCount', { count: multiScan.count, expected: multiScan.expected })
+                    : tf('wh.scanner.multiCountOpen', { count: multiScan.count })}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onOpenChange(false)}
+                  className="h-7 rounded-lg border-[#E5E5E7] text-xs"
+                >
+                  {t('wh.scanner.stop')}
+                </Button>
+              </div>
+              {multiScan.expected != null && multiScan.expected > 0 && (
+                <div className="h-1.5 rounded-full bg-[#E5E5E7] overflow-hidden">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all',
+                      multiScan.count >= multiScan.expected ? 'bg-green-500' : 'bg-corporate'
+                    )}
+                    style={{ width: `${Math.min(100, (multiScan.count / multiScan.expected) * 100)}%` }}
+                  />
+                </div>
+              )}
+              <p className="text-[11px] text-[#86868B]">{t('wh.scanner.multiHint')}</p>
+            </div>
+          )}
           {scanError && (
             <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               {t('wh.scanner.cameraError')}

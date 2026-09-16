@@ -88,3 +88,6 @@ exports.listCollections = listCollections;
 
 const { resetDemoDataV2 } = require('./src/admin/resetDemoDataV2');
 exports.resetDemoDataV2 = resetDemoDataV2;
+
+const { resetBusinessData } = require('./src/admin/resetBusinessData');
+exports.resetBusinessData = resetBusinessData;

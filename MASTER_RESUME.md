@@ -1,9 +1,37 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-16 (FASE 1 — RONDA 4 de correcciones desplegada en GEMELA — pendiente re-prueba)
+> Última actualización: 2026-09-16 (FASE 1 — RONDA 5 + RESET de datos de prueba ejecutado en GEMELA — gemela limpia, pendiente re-prueba)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — RONDA 5 + RESET DE DATOS (16 de septiembre) — DESPLEGADA EN GEMELA, DATOS LIMPIOS
+
+**Estado:** EN GEMELA (https://wve-pruebas-b3db5.web.app), datos de negocio en cero y estructura intacta. Deploy: hosting + functions (rules sin cambios). Spec: prompt del usuario (§4.24 del doc aún no existe). NOTA: el tab de usuarios vive DENTRO de DevelopsModule.tsx (no hay UsuariosTab.tsx aparte).
+
+**A) RESET DE DATOS DE PRUEBA (ejecutado y verificado):**
+- `scripts/reset-business-data.cjs` (CLI; core compartido `functions/src/admin/resetBusinessDataCore.js`). Barrera de seguridad: aborta si el proyecto no es `wve-pruebas-b3db5`; `--execute` requerido (sin él = dry-run). Lotes de 500.
+- Callable `resetBusinessData` (desplegada en gemela): verifica DIRECTOR_GENERAL (authUid → doc users, fallback por email). Botón TEMPORAL en Develops → General (solo DG, confirm crítica con contraseña, muestra conteos) — RETIRAR tras las pruebas de Fase 1.
+- Borra: products, suppliers, inventoryStocks, inventoryMovements, inventoryTransfers, countSessions, rentalUnits, rentalOrders, purchaseRequisitions, controlAssignments; clients SOLO externos (type persona/empresa). Conserva: users, departments, roleTemplates, positions, locations (+types/groups), appModules, appSettings (flags), notifications, auditLogs, timeOffRequests y catálogos base (productCategories, unitsOfMeasure, costCenters, salesChannels, movementTypes, serialStatuses, rentalOrderStatuses, rentalFees, rentalDiscounts, controlTypes, controlTargetTypes).
+- **Ejecutado en gemela: 38 docs borrados. Verificado por el coordinador**: las 10 colecciones de negocio en 0; estructura intacta (8 users, 9 departments, 5 locations, 10 modules, catálogos, 7 timeOffRequests, 9 clientes internos conservados).
+
+**B) RONDA 5 (correcciones):**
+1. **Recepción "Recibido por" automático**: caja de solo lectura con currentUser.name (ya nadie puede editarlo/suplantar); payload y auditoría usan el nombre del logueado.
+2. **Cámara inteligente** (ambos módulos): en modo con objetivo la cámara PERMANECE ABIERTA contando "Escaneados N de M" + barra; auto-cierre al completar (entrega antes del apagado async); botón "Detener" de respaldo; anti-duplicado 2-3 s (html5-qrcode repite el QR visible); entrada manual también cuenta. Inventario: props `expectedCount`/`onProgress` en ScannerModal; recepción serial dejó de ser toggle (idempotente). Warehouse: `multiScan {expected, count}` en WhScannerModal; un solo botón "Escanear seriales" en despacho paso 2 (asigna por producto).
+3. **Escáner por tipo (bug real)**: la ficha de producto tenía TODO el bloque de acciones bajo `canWrite` (solo DG/RRHH) — por eso "no aparecían". Rehecho por tipo: no serializado → Comprar/Transferir/Consumir/Ajuste/Historial; serializado → Dar de alta seriales/Transferir/Rentar/Reparación/Historial (nunca Consumir/Ajuste en rentables). QR de ubicación → inventario de esa ubicación (ya estaba, verificado).
+4. **Orden**: ítems agregados DEBAJO del buscador ("Ítems de la orden"); **toggle "Es vendedor"** en Develops → Usuarios (tarjeta Ventas del perfil expandido, solo DG/RRHH; ayuda literal). `canSeeMoney = MONEY_ROLES || currentUser.isVendor`. `isVendor` propagado: FirestoreUser + User (types) + useFirestoreAuth (sin esto no llegaba al runtime).
+5. **Escaneo inteligente en retornos**: escanear un serial sin orden abierta LOCALIZA su orden (despachada/entregada) y abre su verificación; serial ajeno → toast y la cámara sigue; al completar → auto-cierre; contador pasa a "N/M" al abrirse la orden.
+6. **Descuento UI completa**: select muestra pre-autorizados + opción "Solicitar descuento especial" (% libre 1-100 + MOTIVO OBLIGATORIO del solicitante; guarda `discountId:'special'`, `discountRequestReason/By/At`, siempre `pending`). Aprobar/Rechazar abren diálogo con NOTA (obligatoria al rechazar, opcional al aprobar, placeholder exacto "Nota de aprobación (opcional)"), mostrando el motivo del solicitante; guarda `discountApprovalNote/ApprovedBy/ApprovedAt`; detalle muestra quién, cuándo y nota.
+7. **Pizarra + navegación + tarjetas**: Pizarra ELIMINADA como módulo — el resumen kanban + retornos pendientes + turno quedan SIEMPRE VISIBLES debajo de las tarjetas en el home; 5 pantallas internas con "Volver" arriba (WhViewHeader); tarjetas más angostas: módulos `grid-cols-2 sm:grid-cols-3 lg:grid-cols-5`, órdenes `sm:grid-cols-2 xl:grid-cols-3`, kanban 220→180 px.
+8. **Re-verificado**: contador "N de M · faltan X" en despacho (dispatchProgress, se actualiza por serial; la cámara inteligente lo complementa); recepción visible para departamento destino en Inventario (intacta, Ronda 4).
+
+**Shapes nuevos (aditivos):** `RentalOrder`: `discountRequestReason/By/At`, `discountApprovalNote/ApprovedBy/ApprovedAt` (+ `discountId:'special'`); `User/FirestoreUser.isVendor?: boolean`; ScannerModal `expectedCount?`/`onProgress?`; WhScannerModal `multiScan?`.
+
+**Archivos:** InventarioModule.tsx, WarehouseModule.tsx, DevelopsModule.tsx (GeneralTab: botón reset TEMPORAL + UsuariosTab: toggle vendedor), useFirestoreUsers.ts, useFirestoreAuth.tsx, types (catalogs/index), functions (admin/resetBusinessData* + index), scripts/reset-business-data.cjs. **Build:** exit 0 (tsbuildinfo fresco). **Deploy gemela:** hosting (index-BtGu0yo3.js) + functions (resetBusinessData).
+
+**Pendientes:** retirar bloque temporal del reset en Develops General y logs de diagnóstico (ScannerModal/canReceiveTransfer) tras las pruebas; cámara/hardware real solo verificable por el usuario; órdenes con descuento especial usan `discountId:'special'` (no es ref — considerarlo en reportes futuros).
 
 ---
 

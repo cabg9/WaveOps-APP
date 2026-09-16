@@ -442,6 +442,14 @@ export interface RentalOrder {
   discountName?: string | null; // denormalizado
   discountPercent?: number | null; // positivo: 10 = -10 %
   discountStatus?: RentalDiscountStatus | null; // aprobación del descuento
+  // Descuento especial solicitado (Ronda 5): motivo obligatorio de quien pide
+  discountRequestReason?: string | null;
+  discountRequestBy?: string | null;
+  discountRequestAt?: string | null;
+  // Resolución del descuento: nota (obligatoria al rechazar) + quién y cuándo
+  discountApprovalNote?: string | null;
+  discountApprovedBy?: string | null;
+  discountApprovedAt?: string | null;
   // Impuestos/cargos aplicados (catálogo rentalFees) y su suma; el total
   // final = subtotal − descuento + feesTotal
   fees?: RentalOrderFee[];

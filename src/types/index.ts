@@ -141,6 +141,9 @@ export interface User {
   // Descuento máximo (%) que el vendedor puede aplicar a una orden de renta
   // sin aprobación de un supervisor. Si no está definido se usa 10.
   maxDiscountPercent?: number | null;
+  // Vendedor (Fase 1 Ronda 5): ve precios y registra cobros en Warehouse
+  // aunque su rol no tenga permiso de montos (lo activan DG/RRHH).
+  isVendor?: boolean;
 }
 
 export interface Subtask {
