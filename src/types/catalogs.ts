@@ -89,6 +89,11 @@ export interface ProductCategory extends CatalogBase {
 
 export interface UnitOfMeasure extends CatalogBase {
   name: string; // ej. unidad, galón, litro, caja
+  // Nombre plural (opcional): se muestra cuando la cantidad es mayor a 1
+  // (ej: "20 litros"). Si está vacío/ausente (docs viejos), el consumidor
+  // hace fallback al singular `name`.
+  namePlural?: string;
+  namePluralEn?: string;
   abbreviation?: string;
 }
 

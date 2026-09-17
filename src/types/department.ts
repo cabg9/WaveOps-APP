@@ -18,6 +18,17 @@ export interface Department {
    * el permiso del rol no se exige para ellos.
    */
   visibleModuleIds?: string[];
+  /**
+   * Configuración de compras del departamento. Ambos campos son booleanos
+   * concretos en Firestore (el parser siempre devuelve true/false).
+   * - canRequestPurchases: ausente o true = el departamento puede solicitar
+   *   compras (default SÍ).
+   * - managesPurchases: ausente o false = no gestiona compras (default NO);
+   *   los gerentes y roles superiores de los departamentos con esta opción
+   *   reciben y aprueban las solicitudes de compra de toda la empresa.
+   */
+  canRequestPurchases?: boolean;
+  managesPurchases?: boolean;
 }
 
 export type DepartmentFormData = Omit<Department, 'id' | 'createdAt' | 'updatedAt'>;

@@ -1,9 +1,32 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-16 (FASE 1 — RONDA 6 estructura+detalles desplegada en GEMELA — pendiente re-prueba)
+> Última actualización: 2026-09-16 (FASE 1 — ENTREGA: Pedido de compra + ajustes — desplegada en GEMELA, pendiente re-prueba de los 9 puntos)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — ENTREGA: PEDIDO DE COMPRA + AJUSTES (16 de septiembre) — DESPLEGADA EN GEMELA
+
+**Estado:** EN GEMELA, pendiente re-prueba. Spec = prompt del usuario (§4.26 aún no existe en el doc). Deploy: **hosting + firestore:rules** (asset index-77Yk8IVZ.js verificado en vivo). Verificaciones 1-9 hechas a nivel código/datos por el coordinador; la prueba end-to-end real (campana, flujo completo) es del usuario por requerir sesión en navegador.
+
+**Los 9 puntos (estado):**
+1. **"Compra" → "Pedido de compra"**: tarjeta renombrada (`inv.home.purchases`), abre vista `invView='purchases'` con dos pestañas: "Mis solicitudes" (las de mi departamento) y "+ Nueva solicitud". Verificado en código.
+2. **Toggles por departamento** (Develops → Departamentos, solo DG): "Puede solicitar compras" (`canRequestPurchases`, default true) y "Gestiona compras" (`managesPurchases`, default false). Parser con defaults, payload con booleanos explícitos (false se persiste), auditoría DEPARTMENT_UPDATED major. Persistencia garantizada por diseño. **AVISO:** ADMINISTRATIVO es departamento protegido — su rama de guardado solo persiste color/ícono, por lo que `managesPurchases: true` se seteó DIRECTO en el doc de la gemela (cuuTDF3cMi01ZeqT63D8). Si algún día se reprovisiona la gemela, repetir ese seteo.
+3. **Nueva solicitud**: producto del catálogo (categoría → producto con buscador) O descripción libre; cantidad + unidad; fecha necesaria; motivo obligatorio; toggle URGENTE; proveedor sugerido opcional. Si `canRequestPurchases=false` → mensaje y solo ve sus pedidos. Al guardar: status `por_aprobar` + notificación de campana a DG y a Supervisor+ de departamentos con `managesPurchases=true` (deep link `/requisiciones?purchase=<id>`). **FIX DE REGLAS:** las reglas solo permitían create en `notifications` a Supervisor+; se añadió un match que permite create a cualquier autenticado cuando `type == 'PURCHASE_REQUEST_APPROVAL'` y el doc lleva `userId` destinatario (desplegado en la gemela). Sin esto, un solicitante STAFF no podía notificar al gerente.
+4. **Aprobación**: el aprobador decide desde la campana (o la tarjeta): APRUEBA (nota opcional) o RECHAZA (motivo obligatorio, con executeWithConfirm). Notificación al solicitante en ambos casos (`PURCHASE_REQUEST_APPROVED/REJECTED`). Aprobada queda como borrador de orden de compra (Fase 5).
+5. **Recepción vinculada**: el formulario de entrada (movimiento tipo compra) tiene selector opcional "Pedido de compra aprobado"; al vincular y guardar, el pedido pasa a `recibida` con `linkedMovementId` y el kardex registra el movimiento.
+6. **Política sin popups de éxito** (global en Inventario/Warehouse): 0 `toast.success` restantes en InventarioModule.tsx y WarehouseModule.tsx. Los confirms de executeWithConfirm se mantienen SOLO en irreversibles: cancelar transferencia, rechazar solicitud, baja de serial, eliminar producto, seeds.
+7. **Seriales en masa**: formulario con producto + cantidad (1-500) + prefijo + número inicial → códigos con `padStart(3)` (T-001…), validación de colisiones case-insensitive. Tras crear QUEDA en pantalla con botones "Crear más" (resetea cantidad/número, mantiene producto/prefijo) y "Volver".
+8. **Seriales visibles en Stock**: la pestaña Stock lista también productos serializados con conteo por estado ("X seriales: Y disponibles · Z rentados · W en reparación"), sin número plano; al expandir se ven los seriales con su estado; en la vista por ubicación hay sección "Seriales sin ubicación asignada".
+9. **Plural/singular en unidades**: `UnitOfMeasure` gana `namePlural?` y `namePluralEn?` (catálogo de unidades, con ayuda). Helper `formatQtyUnit(qty, unitId)` aplicado en TODOS los concatenados de cantidad+unidad: cantidad > 1 → plural ("20 litros"), = 1 → singular ("1 litro").
+
+**Shape final `purchaseRequisitions`**: status `draft | por_aprobar | aprobada | rechazada | recibida`; source `manual | auto`; departmentId/departmentName; neededBy; reason; urgent; suggestedSupplierId/Name; approvedBy/ByName/At/Note; rejectedBy/ByName/At/Reason; receivedAt; linkedMovementId (todo aditivo sobre el shape de la Ronda 3).
+
+**Archivos:** InventarioModule.tsx (~+700), DepartamentosTab.tsx, CatalogosTab.tsx, WarehouseModule.tsx, firestore.rules (match notifications para PURCHASE_REQUEST_APPROVAL). **Build:** exit 0 (tsbuildinfo fresco). **Deploy gemela:** hosting index-77Yk8IVZ.js + firestore rules.
+
+**Pendientes:** ADMINISTRATIVO `managesPurchases` seteado por dato (ver punto 2); bloque temporal de reset de datos en Develops aún activo (retirar tras pruebas); la aprobación de descuento por jerarquía sigue usando el árbol de días libres (sin cambios en esta entrega).
 
 ---
 

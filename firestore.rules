@@ -83,10 +83,18 @@ service cloud.firestore {
     }
     // ═══ FASE 0 — Alertas de controles: RRHH/Directorio pueden crear notificaciones ═══
     // (ampliado Fase 1 Ronda 3: supervisores y gerentes de departamento también
-    // crean notificaciones operativas, ej. aprobación de descuento de renta)
+    // crean notificaciones operativas, ej. aprobación de descuento de renta;
+    // ampliado entrega "Pedido de compra": cualquier autenticado notifica a su
+    // gerente, siempre que el documento lleve destinatario userId válido)
     match /notifications/{notificationId} {
       allow create: if request.auth != null &&
+        request.resource.data.userId is string &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['DIRECTOR_GENERAL', 'DIRECTOR', 'RRHH', 'GERENTE_OPERACIONES', 'GERENTE_DEPARTAMENTO', 'SUPERVISOR'];
+    }
+    match /notifications/{notificationId} {
+      allow create: if request.auth != null &&
+        request.resource.data.userId is string &&
+        request.resource.data.type in ['PURCHASE_REQUEST_APPROVAL'];
     }
     // ═══ FASE 1 — Inventario / Warehouse (aditivo) ═══
     // Config (catálogos de tipos) solo admin de catálogos. Stock, transferencias,

@@ -153,6 +153,9 @@ registerI18nKeys({
     'catalogs.categories.editUnit': 'Editar unidad',
     'catalogs.categories.name': 'Nombre',
     'catalogs.categories.nameEn': 'Nombre (inglés)',
+    'catalogs.categories.namePlural': 'Nombre plural (ES)',
+    'catalogs.categories.namePluralEn': 'Nombre plural (EN)',
+    'catalogs.categories.namePluralHelp': 'Se muestra cuando la cantidad es mayor a 1 (ej: 20 litros). Si queda vacío, se usa el nombre singular.',
     'catalogs.categories.abbreviation': 'Abreviatura',
     'catalogs.categories.categoryCount': '{count} categoría(s)',
     'catalogs.categories.unitCount': '{count} unidad(es)',
@@ -468,6 +471,9 @@ registerI18nKeys({
     'catalogs.categories.editUnit': 'Edit unit',
     'catalogs.categories.name': 'Name',
     'catalogs.categories.nameEn': 'Name (English)',
+    'catalogs.categories.namePlural': 'Plural name (ES)',
+    'catalogs.categories.namePluralEn': 'Plural name (EN)',
+    'catalogs.categories.namePluralHelp': 'Shown when the quantity is greater than 1 (e.g. 20 liters). If left empty, the singular name is used.',
     'catalogs.categories.abbreviation': 'Abbreviation',
     'catalogs.categories.categoryCount': '{count} category(ies)',
     'catalogs.categories.unitCount': '{count} unit(s)',
@@ -2281,7 +2287,7 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
 
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [editingUnit, setEditingUnit] = useState<UnitOfMeasure | null>(null);
-  const [unitForm, setUnitForm] = useState({ name: '', abbreviation: '' });
+  const [unitForm, setUnitForm] = useState({ name: '', namePlural: '', namePluralEn: '', abbreviation: '' });
   const [seeding, setSeeding] = useState(false);
   const [expandedCategoryIds, setExpandedCategoryIds] = useState<Set<string>>(new Set());
   const [expandedUnitIds, setExpandedUnitIds] = useState<Set<string>>(new Set());
@@ -2293,10 +2299,12 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
     setShowCategoryModal(true);
   };
 
-  const openCreateUnit = () => { setEditingUnit(null); setUnitForm({ name: '', abbreviation: '' }); setShowUnitModal(true); };
+  const openCreateUnit = () => { setEditingUnit(null); setUnitForm({ name: '', namePlural: '', namePluralEn: '', abbreviation: '' }); setShowUnitModal(true); };
   const openEditUnit = (u: UnitOfMeasure) => {
     setEditingUnit(u);
-    setUnitForm({ name: u.name || '', abbreviation: u.abbreviation || '' });
+    // Docs viejos sin plurales: campos vacíos (el consumidor hace fallback
+    // al singular cuando el plural está ausente).
+    setUnitForm({ name: u.name || '', namePlural: u.namePlural || '', namePluralEn: u.namePluralEn || '', abbreviation: u.abbreviation || '' });
     setShowUnitModal(true);
   };
 
@@ -2335,7 +2343,12 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
   const handleSaveUnit = async () => {
     if (!user?.id) return;
     if (!unitForm.name.trim()) { toast.error(t('catalogs.common.required')); return; }
-    const payload = { name: unitForm.name.trim(), abbreviation: unitForm.abbreviation.trim() || null };
+    const payload = {
+      name: unitForm.name.trim(),
+      namePlural: unitForm.namePlural.trim() || null,
+      namePluralEn: unitForm.namePluralEn.trim() || null,
+      abbreviation: unitForm.abbreviation.trim() || null,
+    };
     try {
       if (editingUnit) {
         await updateDoc(doc(db, 'unitsOfMeasure', editingUnit.id), { ...payload, ...touchPayload(user.id) });
@@ -2514,6 +2527,8 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
                   details={
                     <DetailsGrid>
                       <DetailItem label={t('catalogs.categories.abbreviation')}>{u.abbreviation}</DetailItem>
+                      <DetailItem label={t('catalogs.categories.namePlural')}>{u.namePlural || '—'}</DetailItem>
+                      <DetailItem label={t('catalogs.categories.namePluralEn')}>{u.namePluralEn || '—'}</DetailItem>
                       <DetailItem label={t('catalogs.common.status')}>
                         {u.isActive ? t('catalogs.common.active') : t('catalogs.common.inactive')}
                       </DetailItem>
@@ -2565,6 +2580,23 @@ function CategoriesSection({ canWrite }: { canWrite: boolean }) {
             <div className="space-y-2">
               <Label>{t('catalogs.categories.name')} *</Label>
               <Input value={unitForm.name} onChange={(e) => setUnitForm({ ...unitForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.categories.namePlural')}</Label>
+              <Input
+                value={unitForm.namePlural}
+                onChange={(e) => setUnitForm({ ...unitForm, namePlural: e.target.value })}
+                placeholder="ej: litros"
+              />
+              <p className="text-xs text-[#86868B]">{t('catalogs.categories.namePluralHelp')}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{t('catalogs.categories.namePluralEn')}</Label>
+              <Input
+                value={unitForm.namePluralEn}
+                onChange={(e) => setUnitForm({ ...unitForm, namePluralEn: e.target.value })}
+                placeholder="e.g. liters"
+              />
             </div>
             <div className="space-y-2">
               <Label>{t('catalogs.categories.abbreviation')}</Label>

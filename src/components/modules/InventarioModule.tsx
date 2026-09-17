@@ -19,6 +19,7 @@ import { useAppConfig } from '@/hooks/useAppConfig';
 import { useAudit } from '@/hooks/useAudit';
 import { useFirestoreUsers } from '@/hooks/firestore/useFirestoreUsers';
 import { normalizeDeptCode } from '@/hooks/firestore/useDynamicDepartments';
+import { useFirestoreDepartments } from '@/hooks/firestore/useFirestoreDepartments';
 import { useStorageUpload } from '@/hooks/firestore/useStorageUpload';
 import { executeWithConfirm } from '@/lib/confirm-action';
 import { getCurrentTenantId } from '@/lib/tenant';
@@ -55,6 +56,7 @@ import {
   Truck, ClipboardList, Play, Send, Inbox, Ban, Printer, Upload,
   ShoppingCart, ArrowUpRight, SlidersHorizontal, ArrowLeft, Camera,
   History, Wrench, ScanLine, Eraser, Check, RotateCcw, AlertTriangle, KeyRound,
+  Flame, Boxes, X,
 } from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -80,6 +82,8 @@ const AUDIT_ACTIONS = {
   serialStatusChanged: 'SERIAL_STATUS_CHANGED' as AuditAction,
   serialUpdated: 'SERIAL_UPDATED' as AuditAction,
   purchaseRequisitionCreated: 'PURCHASE_REQUISITION_CREATED' as AuditAction,
+  purchaseRequisitionApproved: 'PURCHASE_REQUISITION_APPROVED' as AuditAction,
+  purchaseRequisitionRejected: 'PURCHASE_REQUISITION_REJECTED' as AuditAction,
 };
 
 // ═══════════════════════════════════════════════════════════════════
@@ -446,6 +450,86 @@ registerI18nKeys({
     'inv.repair.noAvailable': 'No hay unidades disponibles de este producto.',
     'inv.repair.noSerialsHelp': 'Este producto no tiene seriales: registra una salida por ajuste con motivo de reparación.',
     'inv.repair.done': 'Unidades enviadas a reparación',
+
+    // Pedido de compra (vista de solicitudes): la tarjeta "Compra" del home
+    // abre esta vista de dos pestañas; la entrada de stock por compra sigue
+    // en Stock (categoría/producto → acción Compra) y en la ficha de producto
+    'inv.home.purchases': 'Pedido de compra',
+    'inv.home.purchasesDesc': 'Solicitudes de compra de tu departamento y aprobaciones',
+    'inv.purchases.title': 'Pedido de compra',
+    'inv.purchases.myRequests': 'Mis solicitudes',
+    'inv.purchases.newRequest': 'Nueva solicitud',
+    'inv.purchases.cannotRequest': 'Tu departamento no tiene habilitada la solicitud de compras.',
+    'inv.purchases.empty': 'No hay solicitudes de compra',
+    'inv.purchases.status.draft': 'Sugerencia automática',
+    'inv.purchases.status.por_aprobar': 'Por aprobar',
+    'inv.purchases.status.aprobada': 'Aprobada',
+    'inv.purchases.status.rechazada': 'Rechazada',
+    'inv.purchases.status.recibida': 'Recibida',
+    'inv.purchases.urgent': 'Urgente',
+    'inv.purchases.mode.catalog': 'Producto del catálogo',
+    'inv.purchases.mode.free': 'Descripción libre',
+    'inv.purchases.category': 'Categoría',
+    'inv.purchases.freeDescription': 'Descripción del producto',
+    'inv.purchases.freeDescriptionPlaceholder': 'Ej: repuesto de compresor de alta presión',
+    'inv.purchases.unit': 'Unidad',
+    'inv.purchases.selectUnit': 'Selecciona una unidad',
+    'inv.purchases.neededBy': 'Fecha en que se necesita',
+    'inv.purchases.reason': 'Motivo (obligatorio)',
+    'inv.purchases.reasonPlaceholder': 'Ej: se acabó el stock y se necesita para el fin de semana',
+    'inv.purchases.supplier': 'Proveedor sugerido (opcional)',
+    'inv.purchases.noSupplier': 'Sin proveedor sugerido',
+    'inv.purchases.urgentToggle': 'Marcar como urgente',
+    'inv.purchases.send': 'Enviar solicitud',
+    'inv.purchases.validation.descriptionRequired': 'Escribe la descripción del producto',
+    'inv.purchases.validation.unitRequired': 'Selecciona una unidad',
+    'inv.purchases.validation.reasonRequired': 'El motivo es obligatorio',
+    'inv.purchases.requester': 'Solicitante',
+    'inv.purchases.department': 'Departamento',
+    'inv.purchases.approvedBy': 'Aprobada por',
+    'inv.purchases.approvedAt': 'Aprobada el',
+    'inv.purchases.approvedNote': 'Nota de aprobación',
+    'inv.purchases.rejectedBy': 'Rechazada por',
+    'inv.purchases.rejectedAt': 'Rechazada el',
+    'inv.purchases.rejectedReason': 'Motivo del rechazo',
+    'inv.purchases.receivedAt': 'Recibida el',
+    'inv.purchases.linkedMovement': 'Movimiento vinculado',
+    'inv.purchases.notes': 'Notas',
+    'inv.purchases.approve': 'Aprobar',
+    'inv.purchases.reject': 'Rechazar',
+    'inv.purchases.approveTitle': 'Aprobar solicitud',
+    'inv.purchases.rejectTitle': 'Rechazar solicitud',
+    'inv.purchases.noteOptional': 'Nota (opcional)',
+    'inv.purchases.noteOptionalPlaceholder': 'Ej: aprobado, comprar esta semana',
+    'inv.purchases.rejectReasonLabel': 'Motivo del rechazo (obligatorio)',
+    'inv.purchases.rejectReasonPlaceholder': 'Ej: fuera de presupuesto, stock suficiente...',
+    'inv.purchases.linkLabel': 'Pedido de compra aprobado (opcional)',
+    'inv.purchases.noLink': 'Sin vincular',
+    'inv.purchases.detail.description': 'Descripción',
+    'inv.purchases.detail.neededBy': 'Se necesita para',
+    'inv.purchases.detail.urgent': 'Urgente',
+    'inv.purchases.yes': 'Sí',
+    'inv.purchases.no': 'No',
+
+    // Seriales visibles en Stock (conteo por estado, sin número plano)
+    'inv.stock.serialsCount': '{count} seriales',
+    'inv.stock.serialListTitle': 'Seriales',
+    'inv.stock.serialsNoLocation': 'Seriales (sin ubicación asignada)',
+
+    // Seriales en masa: cantidad + prefijo + número inicial → T-001, T-002...
+    'inv.serials.mode.bulk': 'En masa',
+    'inv.serials.mode.single': 'Individual',
+    'inv.serials.bulkHelp': 'Crea varias unidades numeradas de una vez: define prefijo y número inicial (el número se rellena con ceros hasta 3 dígitos mínimo). Cada unidad queda con su código y QR.',
+    'inv.serials.bulkQty': 'Cantidad a crear',
+    'inv.serials.prefix': 'Prefijo',
+    'inv.serials.prefixPlaceholder': 'Ej: T-',
+    'inv.serials.startNumber': 'Número inicial',
+    'inv.serials.bulkPreview': 'Se crearán: {codes}',
+    'inv.serials.bulkCreated': '{count} seriales creados:',
+    'inv.serials.bulkCollide': 'Ya existen estos códigos; no se creó nada: {codes}',
+    'inv.serials.bulkQtyInvalid': 'La cantidad y el número inicial deben ser enteros válidos',
+    'inv.serials.createMore': 'Crear más',
+    'inv.serials.viewAll': 'Ver seriales',
   },
   en: {
     'inv.devTitle': 'Module under development',
@@ -806,6 +890,84 @@ registerI18nKeys({
     'inv.repair.noAvailable': 'There are no available units of this product.',
     'inv.repair.noSerialsHelp': 'This product has no serials: register an adjustment-type stock out with a repair reason.',
     'inv.repair.done': 'Units sent to repair',
+
+    // Purchase request view: the home "Purchase" card opens this two-tab view
+    'inv.home.purchases': 'Purchase request',
+    'inv.home.purchasesDesc': 'Purchase requests from your department and approvals',
+    'inv.purchases.title': 'Purchase request',
+    'inv.purchases.myRequests': 'My requests',
+    'inv.purchases.newRequest': 'New request',
+    'inv.purchases.cannotRequest': 'Your department does not have purchase requests enabled.',
+    'inv.purchases.empty': 'No purchase requests yet',
+    'inv.purchases.status.draft': 'Automatic suggestion',
+    'inv.purchases.status.por_aprobar': 'Pending approval',
+    'inv.purchases.status.aprobada': 'Approved',
+    'inv.purchases.status.rechazada': 'Rejected',
+    'inv.purchases.status.recibida': 'Received',
+    'inv.purchases.urgent': 'Urgent',
+    'inv.purchases.mode.catalog': 'Catalog product',
+    'inv.purchases.mode.free': 'Free description',
+    'inv.purchases.category': 'Category',
+    'inv.purchases.freeDescription': 'Product description',
+    'inv.purchases.freeDescriptionPlaceholder': 'E.g.: high-pressure compressor spare part',
+    'inv.purchases.unit': 'Unit',
+    'inv.purchases.selectUnit': 'Select a unit',
+    'inv.purchases.neededBy': 'Date needed by',
+    'inv.purchases.reason': 'Reason (required)',
+    'inv.purchases.reasonPlaceholder': 'E.g.: stock ran out and it is needed for the weekend',
+    'inv.purchases.supplier': 'Suggested supplier (optional)',
+    'inv.purchases.noSupplier': 'No suggested supplier',
+    'inv.purchases.urgentToggle': 'Mark as urgent',
+    'inv.purchases.send': 'Send request',
+    'inv.purchases.validation.descriptionRequired': 'Write the product description',
+    'inv.purchases.validation.unitRequired': 'Select a unit',
+    'inv.purchases.validation.reasonRequired': 'Reason is required',
+    'inv.purchases.requester': 'Requested by',
+    'inv.purchases.department': 'Department',
+    'inv.purchases.approvedBy': 'Approved by',
+    'inv.purchases.approvedAt': 'Approved on',
+    'inv.purchases.approvedNote': 'Approval note',
+    'inv.purchases.rejectedBy': 'Rejected by',
+    'inv.purchases.rejectedAt': 'Rejected on',
+    'inv.purchases.rejectedReason': 'Rejection reason',
+    'inv.purchases.receivedAt': 'Received on',
+    'inv.purchases.linkedMovement': 'Linked movement',
+    'inv.purchases.notes': 'Notes',
+    'inv.purchases.approve': 'Approve',
+    'inv.purchases.reject': 'Reject',
+    'inv.purchases.approveTitle': 'Approve request',
+    'inv.purchases.rejectTitle': 'Reject request',
+    'inv.purchases.noteOptional': 'Note (optional)',
+    'inv.purchases.noteOptionalPlaceholder': 'E.g.: approved, buy this week',
+    'inv.purchases.rejectReasonLabel': 'Rejection reason (required)',
+    'inv.purchases.rejectReasonPlaceholder': 'E.g.: out of budget, enough stock...',
+    'inv.purchases.linkLabel': 'Approved purchase request (optional)',
+    'inv.purchases.noLink': 'Not linked',
+    'inv.purchases.detail.description': 'Description',
+    'inv.purchases.detail.neededBy': 'Needed by',
+    'inv.purchases.detail.urgent': 'Urgent',
+    'inv.purchases.yes': 'Yes',
+    'inv.purchases.no': 'No',
+
+    // Serials visible in Stock (per-status counts, never a plain unit number)
+    'inv.stock.serialsCount': '{count} serials',
+    'inv.stock.serialListTitle': 'Serials',
+    'inv.stock.serialsNoLocation': 'Serials (no location assigned)',
+
+    // Bulk serials: quantity + prefix + starting number → T-001, T-002...
+    'inv.serials.mode.bulk': 'Bulk',
+    'inv.serials.mode.single': 'Individual',
+    'inv.serials.bulkHelp': 'Create several numbered units at once: set the prefix and the starting number (padded with zeros to 3 digits minimum). Each unit gets its code and QR.',
+    'inv.serials.bulkQty': 'Quantity to create',
+    'inv.serials.prefix': 'Prefix',
+    'inv.serials.prefixPlaceholder': 'E.g.: T-',
+    'inv.serials.startNumber': 'Starting number',
+    'inv.serials.bulkPreview': 'Will be created: {codes}',
+    'inv.serials.bulkCreated': '{count} serials created:',
+    'inv.serials.bulkCollide': 'These codes already exist; nothing was created: {codes}',
+    'inv.serials.bulkQtyInvalid': 'Quantity and starting number must be valid integers',
+    'inv.serials.createMore': 'Create more',
+    'inv.serials.viewAll': 'View serials',
   },
 });
 
@@ -1011,7 +1173,7 @@ function docToLocation(id: string, data: Record<string, unknown>): Location {
 }
 
 function docToUnit(id: string, data: Record<string, unknown>): UnitOfMeasure {
-  return {
+  const unit: UnitOfMeasure = {
     id,
     tenantId: toStr(data.tenantId),
     name: toStr(data.name),
@@ -1020,6 +1182,19 @@ function docToUnit(id: string, data: Record<string, unknown>): UnitOfMeasure {
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
   };
+  // Nombres plural por idioma (los agrega Catálogos, contrato entre agentes):
+  // se preservan de forma defensiva. Si no existen, el display de cantidad
+  // cae al nombre base (fallback), igual que con nameEn en otras entidades.
+  const extra = unit as unknown as Record<string, unknown>;
+  for (const key of [
+    'namePlural', 'nameEsPlural', 'pluralName', 'plural',
+    'nameEn', 'nameEnPlural', 'namePluralEn', 'pluralEn',
+  ]) {
+    if (typeof data[key] === 'string' && (data[key] as string).trim() !== '') {
+      extra[key] = data[key];
+    }
+  }
+  return unit;
 }
 
 function docToProductCategory(id: string, data: Record<string, unknown>): Omit<ProductCategory, 'id'> {
@@ -1060,21 +1235,54 @@ function docToTransfer(id: string, data: Record<string, unknown>): InventoryTran
   };
 }
 
-// Borrador de pedido automático (punto 16): sugerencia al bajar del mínimo.
-// NO toca stock ni genera movimiento; la orden de compra formal llega en Fase 5.
+// Pedido de compra / solicitud de compra. REUTILIZA la colección
+// purchaseRequisitions de la Ronda 3 (borradores automáticos de stock bajo):
+// la extensión es ADITIVA. status: 'draft' = pedido automático legacy (R3);
+// 'por_aprobar' → 'aprobada' | 'rechazada' (aprobación manual) → 'recibida'
+// (vinculada a un movimiento de entrada de compra). source distingue el
+// origen: 'auto' (sugerencia por stock bajo) o 'manual' (solicitud de un
+// departamento).
 export interface PurchaseRequisition {
   id?: string;
   tenantId: string;
-  productId: string;
+  source: 'manual' | 'auto';
+  status: 'draft' | 'por_aprobar' | 'aprobada' | 'rechazada' | 'recibida';
+  // Producto del catálogo; null cuando la solicitud usa descripción libre
+  productId: string | null;
   productName: string;
+  freeDescription?: string;
   quantity: number;
-  unit: string;
-  suggestedQty: number;
+  unit: string; // nombre de la unidad persistido (display con fallback)
+  unitId?: string;
+  // Borrador automático (R3): cantidad sugerida hasta máximo/mínimo
+  suggestedQty?: number;
+  // Proveedor preferido del borrador automático (legacy R3)
   supplierId: string | null;
   supplierName: string | null;
-  locationId: string;
-  locationName: string;
-  status: 'draft' | 'ordered' | 'cancelled';
+  // Proveedor sugerido en solicitudes manuales
+  suggestedSupplierId?: string | null;
+  suggestedSupplierName?: string | null;
+  // Borrador automático (R3): ubicación que quedó bajo mínimo
+  locationId?: string;
+  locationName?: string;
+  // Solicitud manual: departamento solicitante
+  departmentId?: string;
+  departmentName?: string;
+  neededBy?: string; // fecha en que se necesita (ISO)
+  reason?: string; // motivo (obligatorio en solicitudes manuales)
+  urgent?: boolean;
+  // Aprobación / rechazo
+  approvedBy?: string | null;
+  approvedByName?: string | null;
+  approvedAt?: string | null;
+  approvedNote?: string | null;
+  rejectedBy?: string | null;
+  rejectedByName?: string | null;
+  rejectedAt?: string | null;
+  rejectedReason?: string | null;
+  // Recepción vinculada a un movimiento de entrada
+  receivedAt?: string | null;
+  linkedMovementId?: string | null;
   createdBy: string;
   createdByName?: string;
   createdAt: string;
@@ -1085,16 +1293,36 @@ function docToPurchaseRequisition(id: string, data: Record<string, unknown>): Pu
   return {
     id,
     tenantId: toStr(data.tenantId),
-    productId: toStr(data.productId),
-    productName: toStr(data.productName),
+    source: data.source === 'manual' ? 'manual' : 'auto',
+    status: (data.status as PurchaseRequisition['status']) ?? 'draft',
+    productId: data.productId ? toStr(data.productId) : null,
+    productName: toStr(data.productName) || (data.freeDescription ? toStr(data.freeDescription) : ''),
+    freeDescription: data.freeDescription ? toStr(data.freeDescription) : undefined,
     quantity: toNum(data.quantity),
     unit: toStr(data.unit),
-    suggestedQty: toNum(data.suggestedQty),
+    unitId: data.unitId ? toStr(data.unitId) : undefined,
+    suggestedQty: typeof data.suggestedQty === 'number' ? toNum(data.suggestedQty) : undefined,
     supplierId: data.supplierId ? toStr(data.supplierId) : null,
     supplierName: data.supplierName ? toStr(data.supplierName) : null,
-    locationId: toStr(data.locationId),
-    locationName: toStr(data.locationName),
-    status: (data.status as PurchaseRequisition['status']) ?? 'draft',
+    suggestedSupplierId: data.suggestedSupplierId ? toStr(data.suggestedSupplierId) : undefined,
+    suggestedSupplierName: data.suggestedSupplierName ? toStr(data.suggestedSupplierName) : undefined,
+    locationId: data.locationId ? toStr(data.locationId) : undefined,
+    locationName: data.locationName ? toStr(data.locationName) : undefined,
+    departmentId: data.departmentId ? toStr(data.departmentId) : undefined,
+    departmentName: data.departmentName ? toStr(data.departmentName) : undefined,
+    neededBy: data.neededBy ? toStr(data.neededBy) : undefined,
+    reason: data.reason ? toStr(data.reason) : undefined,
+    urgent: toBool(data.urgent),
+    approvedBy: data.approvedBy ? toStr(data.approvedBy) : null,
+    approvedByName: data.approvedByName ? toStr(data.approvedByName) : null,
+    approvedAt: data.approvedAt ? toStr(data.approvedAt) : null,
+    approvedNote: data.approvedNote ? toStr(data.approvedNote) : null,
+    rejectedBy: data.rejectedBy ? toStr(data.rejectedBy) : null,
+    rejectedByName: data.rejectedByName ? toStr(data.rejectedByName) : null,
+    rejectedAt: data.rejectedAt ? toStr(data.rejectedAt) : null,
+    rejectedReason: data.rejectedReason ? toStr(data.rejectedReason) : null,
+    receivedAt: data.receivedAt ? toStr(data.receivedAt) : null,
+    linkedMovementId: data.linkedMovementId ? toStr(data.linkedMovementId) : null,
     createdBy: toStr(data.createdBy),
     createdByName: data.createdByName ? toStr(data.createdByName) : undefined,
     createdAt: toStr(data.createdAt),
@@ -1191,7 +1419,8 @@ type InvView =
   | 'transfer-new'
   | 'count-new'
   | 'serial-new'
-  | 'receive';
+  | 'receive'
+  | 'purchases';
 
 type TransferStatusFilter = 'all' | InventoryTransfer['status'];
 
@@ -1203,6 +1432,9 @@ interface MovementFormState {
   toLocationId: string;
   reason: string;
   supplierId: string;
+  // Punto 5 (recepción vinculada): pedido de compra aprobado que recibe
+  // esta entrada; al guardar, el pedido pasa a 'recibida'
+  purchaseReqId: string;
 }
 
 const EMPTY_MOVEMENT_FORM: MovementFormState = {
@@ -1212,6 +1444,35 @@ const EMPTY_MOVEMENT_FORM: MovementFormState = {
   fromLocationId: '',
   toLocationId: '',
   reason: '',
+  supplierId: '',
+  purchaseReqId: '',
+};
+
+// Formulario de solicitud de compra (pestaña "Nueva solicitud"): producto del
+// catálogo (categoría primero → producto con buscador) o descripción libre
+interface PurchaseRequestFormState {
+  mode: 'catalog' | 'free';
+  categoryId: string;
+  productId: string;
+  freeDescription: string;
+  quantity: string;
+  unitId: string;
+  neededBy: string;
+  reason: string;
+  urgent: boolean;
+  supplierId: string;
+}
+
+const EMPTY_PR_FORM: PurchaseRequestFormState = {
+  mode: 'catalog',
+  categoryId: '',
+  productId: '',
+  freeDescription: '',
+  quantity: '',
+  unitId: '',
+  neededBy: '',
+  reason: '',
+  urgent: false,
   supplierId: '',
 };
 
@@ -1265,6 +1526,15 @@ const TRANSFER_STATUS_BADGE: Record<InventoryTransfer['status'], string> = {
   en_transito: 'bg-blue-50 text-blue-700 border border-blue-200',
   recibido: 'bg-green-50 text-green-700 border border-green-200',
   cancelado: 'bg-red-50 text-red-700 border border-red-200',
+};
+
+// Distintivos de estado de las solicitudes de compra (tarjetas expandibles)
+const PR_STATUS_BADGE: Record<PurchaseRequisition['status'], string> = {
+  draft: 'bg-[#F5F5F7] text-[#86868B] border border-[#E5E5E7]',
+  por_aprobar: 'bg-blue-50 text-blue-700 border border-blue-200',
+  aprobada: 'bg-green-50 text-green-700 border border-green-200',
+  rechazada: 'bg-red-50 text-red-700 border border-red-200',
+  recibida: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
 };
 
 // Nivel de rol: definición de mínimos/máximos, ajustes por conteo y
@@ -1468,6 +1738,28 @@ export function InventarioModule() {
   const [purchaseReqs, setPurchaseReqs] = useState<PurchaseRequisition[]>([]);
   const [savingPurchaseReq, setSavingPurchaseReq] = useState(false);
 
+  // Pedido de compra (tarjeta del home): vista de dos pestañas — "Mis
+  // solicitudes" y "Nueva solicitud" — con aprobación/rechazo (puntos 1,3,4)
+  const [purchaseViewTab, setPurchaseViewTab] = useState<'list' | 'new'>('list');
+  const [prForm, setPrForm] = useState<PurchaseRequestFormState>(EMPTY_PR_FORM);
+  const [savingPr, setSavingPr] = useState(false);
+  // Decisión del aprobador (nota opcional al aprobar / motivo al rechazar)
+  const [prDecision, setPrDecision] = useState<{
+    req: PurchaseRequisition;
+    action: 'approve' | 'reject';
+  } | null>(null);
+  const [prDecisionNote, setPrDecisionNote] = useState('');
+
+  // Seriales en masa (punto 7): cantidad + prefijo + número inicial; tras
+  // crear se queda en pantalla con "Crear más" / "Volver"
+  const [serialBulkMode, setSerialBulkMode] = useState<'bulk' | 'single'>('bulk');
+  const [serialBulk, setSerialBulk] = useState<{ quantity: string; prefix: string; startNumber: string }>({
+    quantity: '1',
+    prefix: '',
+    startNumber: '1',
+  });
+  const [serialBulkResult, setSerialBulkResult] = useState<string[] | null>(null);
+
   // Baja permanente de un serial (foto + motivo obligatorios, aprobadores ampliados)
   const [retiringUnit, setRetiringUnit] = useState<RentalUnit | null>(null);
   const [retirePhotoFile, setRetirePhotoFile] = useState<File | null>(null);
@@ -1492,6 +1784,7 @@ export function InventarioModule() {
   const scanPickRef = useRef<((productId: string) => void) | null>(null);
 
   const { users } = useFirestoreUsers();
+  const { departments } = useFirestoreDepartments();
   const { uploadImage, uploading: uploadingSerialPhoto } = useStorageUpload();
 
   const tenantId = getCurrentTenantId();
@@ -1571,6 +1864,23 @@ export function InventarioModule() {
     </div>
   );
 
+  // Stock serializado completo (punto 8): total de seriales + chips por
+  // estado. Los seriales no llevan locationId, así que el conteo es global
+  // por producto (la vista por ubicación lo muestra donde el producto tiene
+  // doc de stock, y aparte una sección para los que no tienen ubicación).
+  const renderSerializedStock = (productId: string) => {
+    const count = rentalUnits.filter(u => u.productId === productId).length;
+    if (!count) return null;
+    return (
+      <div className="mt-1 space-y-1">
+        <div className="text-[11px] text-[#86868B]">
+          {t('inv.stock.serialsCount').replace('{count}', String(count))}
+        </div>
+        {renderUnitStatusChips(productId)}
+      </div>
+    );
+  };
+
   // Tipo de movimiento seleccionado en la pantalla de movimiento (campos
   // adaptados al tipo). Se calcula arriba de los early returns porque la
   // regla de ubicación automática (punto 15) lo usa en un efecto.
@@ -1641,6 +1951,49 @@ export function InventarioModule() {
   const productName = (id: string) => products.find(p => p.id === id)?.name || id;
   const locationName = (id: string) => locations.find(l => l.id === id)?.name || id;
   const unitName = (id: string) => units.find(u => u.id === id)?.name || id;
+
+  // ═══ Cantidad + unidad con plural/singular (punto 9) ═══
+  // Contrato con el agente de Catálogos: las unidades llevan campos de nombre
+  // plural por idioma. Se consumen defensivamente: si no existen, fallback al
+  // nombre base. Cantidad > 1 → plural ("20 litros"); = 1 → singular.
+  const unitSingularName = (unit: UnitOfMeasure | undefined): string => {
+    if (!unit) return '';
+    if (getLanguage() === 'en') {
+      const en = (unit as unknown as Record<string, unknown>).nameEn;
+      return typeof en === 'string' && en ? en : unit.name;
+    }
+    return unit.name;
+  };
+  const unitPluralName = (unit: UnitOfMeasure | undefined): string => {
+    if (!unit) return '';
+    const raw = unit as unknown as Record<string, unknown>;
+    const pick = (...keys: string[]): string => {
+      for (const k of keys) {
+        const v = raw[k];
+        if (typeof v === 'string' && v.trim() !== '') return v;
+      }
+      return '';
+    };
+    if (getLanguage() === 'en') {
+      return (
+        pick('nameEnPlural', 'namePluralEn', 'pluralEn') ||
+        pick('namePlural', 'nameEsPlural', 'pluralName', 'plural') ||
+        unitSingularName(unit)
+      );
+    }
+    return (
+      pick('namePlural', 'nameEsPlural', 'pluralName', 'plural') ||
+      unitSingularName(unit)
+    );
+  };
+  // Palabra de la unidad según la cantidad (para reemplazos '{unit}')
+  const qtyUnitName = (qty: number, unitId: string): string =>
+    qty === 1 ? unitSingularName(units.find(u => u.id === unitId)) : unitPluralName(units.find(u => u.id === unitId));
+  // "20 litros" / "1 litro" completo
+  const formatQtyUnit = (qty: number, unitId: string): string => {
+    const word = qtyUnitName(qty, unitId);
+    return word ? `${qty} ${word}` : String(qty);
+  };
   const movementTypeName = (mt: MovementType) =>
     getLanguage() === 'en' && mt.nameEn ? mt.nameEn : mt.name;
   const stockFor = (productId: string, locationId: string) =>
@@ -1648,8 +2001,9 @@ export function InventarioModule() {
 
   // Líneas "En tránsito a {destino}: {cantidad} {unidad}" (punto 3):
   // transferencias activas (pendiente/en_tránsito) desde una ubicación
-  // origen hacia cada destino, para una fila de stock concreta
-  const renderTransitLines = (productId: string, fromLocationId: string, unit: string) => {
+  // origen hacia cada destino, para una fila de stock concreta. La unidad
+  // se resuelve según la cantidad (punto 9): singular si es 1, plural si no.
+  const renderTransitLines = (productId: string, fromLocationId: string, unitId: string) => {
     const groups = transitByOrigin.get(`${productId}__${fromLocationId}`);
     if (!groups) return null;
     return [...groups.entries()].map(([toLocationId, qty]) => (
@@ -1658,7 +2012,7 @@ export function InventarioModule() {
         {t('inv.transfers.inTransitTo')
           .replace('{location}', locationName(toLocationId))
           .replace('{quantity}', String(qty))
-          .replace('{unit}', unit)}
+          .replace('{unit}', qtyUnitName(qty, unitId))}
       </div>
     ));
   };
@@ -2041,69 +2395,78 @@ export function InventarioModule() {
       if (supplier) reason = `Proveedor: ${supplier.name}. ${reason}`.trim();
     }
 
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.movementForm.title'),
-      description: `${productName(movementForm.productId)} · ${movementTypeName(mt)} · ${qty}`,
-      action: async () => {
-        setSavingMovement(true);
+    // Punto 6 (sin popups de confirmación): registrar un movimiento no es
+    // irreversible — crear y listo; el movimiento en el kardex ES la
+    // confirmación. Solo se confirman acciones irreversibles (baja, rechazo).
+    setSavingMovement(true);
+    try {
+      const now = new Date().toISOString();
+      const signedQty = mt.isOutput ? -qty : qty;
+      // La ubicación que cambia: origen si resta, destino si suma
+      const targetLocationId = mt.isOutput ? effFromLocationId : effToLocationId;
+      const current = stockFor(movementForm.productId, targetLocationId)?.quantity ?? 0;
+
+      // Actualizar (o crear) el stock del producto en la ubicación
+      await setDoc(
+        doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(movementForm.productId, targetLocationId)),
+        {
+          tenantId,
+          productId: movementForm.productId,
+          locationId: targetLocationId,
+          quantity: current + signedQty,
+          updatedAt: now,
+          updatedBy: currentUser.name,
+        },
+        { merge: true }
+      );
+
+      // Bitácora inmutable del movimiento
+      const movRef = await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+        tenantId,
+        productId: movementForm.productId,
+        quantity: signedQty,
+        fromLocationId: effFromLocationId || null,
+        toLocationId: effToLocationId || null,
+        movementTypeId: mt.id!,
+        reason: reason || null,
+        referenceType: null,
+        referenceId: null,
+        createdAt: now,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+      });
+
+      // Punto 5 (recepción vinculada): si se eligió un pedido de compra
+      // aprobado, pasa a 'recibida' y queda referenciado al movimiento
+      if (movementForm.purchaseReqId) {
         try {
-          const now = new Date().toISOString();
-          const signedQty = mt.isOutput ? -qty : qty;
-          // La ubicación que cambia: origen si resta, destino si suma
-          const targetLocationId = mt.isOutput ? effFromLocationId : effToLocationId;
-          const current = stockFor(movementForm.productId, targetLocationId)?.quantity ?? 0;
-
-          // Actualizar (o crear) el stock del producto en la ubicación
-          await setDoc(
-            doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(movementForm.productId, targetLocationId)),
-            {
-              tenantId,
-              productId: movementForm.productId,
-              locationId: targetLocationId,
-              quantity: current + signedQty,
-              updatedAt: now,
-              updatedBy: currentUser.name,
-            },
-            { merge: true }
-          );
-
-          // Bitácora inmutable del movimiento
-          const movRef = await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
-            tenantId,
-            productId: movementForm.productId,
-            quantity: signedQty,
-            fromLocationId: effFromLocationId || null,
-            toLocationId: effToLocationId || null,
-            movementTypeId: mt.id!,
-            reason: reason || null,
-            referenceType: null,
-            referenceId: null,
-            createdAt: now,
-            createdBy: currentUser.id,
-            createdByName: currentUser.name,
+          await updateDoc(doc(db, 'purchaseRequisitions', movementForm.purchaseReqId), {
+            status: 'recibida',
+            receivedAt: now,
+            linkedMovementId: movRef.id,
           });
-
-          await logAction({
-            action: AUDIT_ACTIONS.stockMovementCreated,
-            targetType: 'inventory_movement',
-            targetId: movRef.id,
-            targetName: `${productName(movementForm.productId)} · ${movementTypeName(mt)}`,
-            impactLevel: 'major',
-            description: `Movimiento de inventario: ${productName(movementForm.productId)} · ${movementTypeName(mt)} · ${signedQty > 0 ? '+' : ''}${signedQty}`,
-          });
-
-          toast.success(t('inv.movementForm.save'));
-          setInvView('main');
-          setMovementForm(EMPTY_MOVEMENT_FORM);
-          setMovementCategoryId('');
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        } finally {
-          setSavingMovement(false);
+        } catch (linkErr) {
+          console.error('[InventarioModule] vincular pedido de compra:', linkErr);
         }
-      },
-    });
+      }
+
+      await logAction({
+        action: AUDIT_ACTIONS.stockMovementCreated,
+        targetType: 'inventory_movement',
+        targetId: movRef.id,
+        targetName: `${productName(movementForm.productId)} · ${movementTypeName(mt)}`,
+        impactLevel: 'major',
+        description: `Movimiento de inventario: ${productName(movementForm.productId)} · ${movementTypeName(mt)} · ${signedQty > 0 ? '+' : ''}${signedQty}`,
+      });
+
+      setInvView('main');
+      setMovementForm(EMPTY_MOVEMENT_FORM);
+      setMovementCategoryId('');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingMovement(false);
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -2132,85 +2495,79 @@ export function InventarioModule() {
         t('inv.transfers.validation.insufficientStock').replace('{available}', String(available))
       );
 
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.transfers.new'),
-      description: `${productName(transferForm.productId)} · ${qty} · ${locationName(transferForm.fromLocationId)} → ${locationName(transferForm.toLocationId)}. ${t('inv.transfers.createConfirmDesc').replace('{quantity}', String(qty))}`,
-      action: async () => {
-        setSavingTransfer(true);
-        try {
-          const now = new Date().toISOString();
-          const responsible = activeUsers.find(u => u.id === transferForm.responsibleUserId);
+    // Punto 6 (sin popups de confirmación): crear no es irreversible — el
+    // elemento en la lista ES la confirmación
+    setSavingTransfer(true);
+    try {
+      const now = new Date().toISOString();
+      const responsible = activeUsers.find(u => u.id === transferForm.responsibleUserId);
 
-          const transferRef = await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryTransfers), {
-            tenantId,
-            productId: transferForm.productId,
-            quantity: qty,
-            fromLocationId: transferForm.fromLocationId,
-            toLocationId: transferForm.toLocationId,
-            responsibleUserId: responsible?.id || null,
-            responsibleName: responsible?.name || null,
-            status: 'pendiente',
-            receivedBy: null,
-            receivedAt: null,
-            createdAt: now,
-            createdBy: currentUser.id,
-            createdByName: currentUser.name,
-          });
+      const transferRef = await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryTransfers), {
+        tenantId,
+        productId: transferForm.productId,
+        quantity: qty,
+        fromLocationId: transferForm.fromLocationId,
+        toLocationId: transferForm.toLocationId,
+        responsibleUserId: responsible?.id || null,
+        responsibleName: responsible?.name || null,
+        status: 'pendiente',
+        receivedBy: null,
+        receivedAt: null,
+        createdAt: now,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+      });
 
-          // Se descuenta del origen de inmediato (crea el doc si no existe)
-          await setDoc(
-            doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(transferForm.productId, transferForm.fromLocationId)),
-            {
-              tenantId,
-              productId: transferForm.productId,
-              locationId: transferForm.fromLocationId,
-              quantity: available - qty,
-              updatedAt: now,
-              updatedBy: currentUser.name,
-            },
-            { merge: true }
-          );
+      // Se descuenta del origen de inmediato (crea el doc si no existe)
+      await setDoc(
+        doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(transferForm.productId, transferForm.fromLocationId)),
+        {
+          tenantId,
+          productId: transferForm.productId,
+          locationId: transferForm.fromLocationId,
+          quantity: available - qty,
+          updatedAt: now,
+          updatedBy: currentUser.name,
+        },
+        { merge: true }
+      );
 
-          // Bitácora inmutable del movimiento
-          await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
-            tenantId,
-            productId: transferForm.productId,
-            quantity: -qty,
-            fromLocationId: transferForm.fromLocationId,
-            toLocationId: transferForm.toLocationId,
-            movementTypeId: 'transferencia',
-            reason: t('inv.transfers.reasonCreated'),
-            referenceType: 'transfer',
-            referenceId: transferRef.id,
-            createdAt: now,
-            createdBy: currentUser.id,
-            createdByName: currentUser.name,
-          });
+      // Bitácora inmutable del movimiento
+      await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+        tenantId,
+        productId: transferForm.productId,
+        quantity: -qty,
+        fromLocationId: transferForm.fromLocationId,
+        toLocationId: transferForm.toLocationId,
+        movementTypeId: 'transferencia',
+        reason: t('inv.transfers.reasonCreated'),
+        referenceType: 'transfer',
+        referenceId: transferRef.id,
+        createdAt: now,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+      });
 
-          // La notificación al destino la envía la Cloud Function
-          // notifyTransferCreated (onDocumentCreated de inventoryTransfers)
+      // La notificación al destino la envía la Cloud Function
+      // notifyTransferCreated (onDocumentCreated de inventoryTransfers)
 
-          await logAction({
-            action: AUDIT_ACTIONS.transferCreated,
-            targetType: 'inventory_transfer',
-            targetId: transferRef.id,
-            targetName: `${productName(transferForm.productId)} · ${qty}`,
-            impactLevel: 'major',
-            description: `Transferencia creada: ${productName(transferForm.productId)} · ${qty} · ${locationName(transferForm.fromLocationId)} → ${locationName(transferForm.toLocationId)}`,
-          });
+      await logAction({
+        action: AUDIT_ACTIONS.transferCreated,
+        targetType: 'inventory_transfer',
+        targetId: transferRef.id,
+        targetName: `${productName(transferForm.productId)} · ${qty}`,
+        impactLevel: 'major',
+        description: `Transferencia creada: ${productName(transferForm.productId)} · ${qty} · ${locationName(transferForm.fromLocationId)} → ${locationName(transferForm.toLocationId)}`,
+      });
 
-          toast.success(t('inv.transfers.new'));
-          setInvView('main');
-          setTransferForm(EMPTY_TRANSFER_FORM);
-          setTransferCategoryId('');
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        } finally {
-          setSavingTransfer(false);
-        }
-      },
-    });
+      setInvView('main');
+      setTransferForm(EMPTY_TRANSFER_FORM);
+      setTransferCategoryId('');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingTransfer(false);
+    }
   };
 
   const handleShipTransfer = async (transfer: InventoryTransfer) => {
@@ -2322,104 +2679,97 @@ export function InventarioModule() {
       if (!receivePhoto) return toast.error(t('inv.receive.photo'));
       if (!receiveSignature) return toast.error(t('inv.receive.signature'));
     }
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.transfers.receiveTitle'),
-      description: `${productName(transfer.productId)} · ${transfer.quantity} → ${locationName(transfer.toLocationId)}`,
-      action: async () => {
-        try {
-          const now = new Date().toISOString();
-          const current = stockFor(transfer.productId, transfer.toLocationId)?.quantity ?? 0;
+    // Punto 6: recibir no es irreversible — sin popup de confirmación
+    try {
+      const now = new Date().toISOString();
+      const current = stockFor(transfer.productId, transfer.toLocationId)?.quantity ?? 0;
 
-          // Suma en el destino
-          await setDoc(
-            doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(transfer.productId, transfer.toLocationId)),
-            {
-              tenantId,
-              productId: transfer.productId,
-              locationId: transfer.toLocationId,
-              quantity: current + transfer.quantity,
-              updatedAt: now,
-              updatedBy: currentUser.name,
-            },
-            { merge: true }
-          );
+      // Suma en el destino
+      await setDoc(
+        doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(transfer.productId, transfer.toLocationId)),
+        {
+          tenantId,
+          productId: transfer.productId,
+          locationId: transfer.toLocationId,
+          quantity: current + transfer.quantity,
+          updatedAt: now,
+          updatedBy: currentUser.name,
+        },
+        { merge: true }
+      );
 
-          await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
-            tenantId,
-            productId: transfer.productId,
-            quantity: transfer.quantity,
-            fromLocationId: null,
-            toLocationId: transfer.toLocationId,
-            movementTypeId: 'transferencia',
-            reason: t('inv.transfers.reasonReceived'),
-            referenceType: 'transfer',
-            referenceId: transfer.id,
-            createdAt: now,
-            createdBy: currentUser.id,
-            createdByName: currentUser.name,
-          });
+      await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+        tenantId,
+        productId: transfer.productId,
+        quantity: transfer.quantity,
+        fromLocationId: null,
+        toLocationId: transfer.toLocationId,
+        movementTypeId: 'transferencia',
+        reason: t('inv.transfers.reasonReceived'),
+        referenceType: 'transfer',
+        referenceId: transfer.id,
+        createdAt: now,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+      });
 
-          // Evidencia de recepción: foto + firma (dataURL) solo para productos
-          // sin QR; el cast local evita tocar el tipo compartido (el campo es
-          // aditivo y firestore lo acepta)
-          const receivedPayload: Record<string, unknown> = {
-            status: 'recibido',
-            receivedBy: currentUser.name,
-            receivedAt: now,
-            receivedUnitIds: needsUnits ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
-          };
-          if (!needsUnits && !hasQr) {
-            receivedPayload.receivedPhoto = receivePhoto;
-            receivedPayload.receivedSignature = receiveSignature;
-            receivedPayload.receivedQrConfirmed = false;
-          } else if (!needsUnits && hasQr) {
-            receivedPayload.receivedQrConfirmed = true;
-          }
-          await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), receivedPayload);
+      // Evidencia de recepción: foto + firma (dataURL) solo para productos
+      // sin QR; el cast local evita tocar el tipo compartido (el campo es
+      // aditivo y firestore lo acepta)
+      const receivedPayload: Record<string, unknown> = {
+        status: 'recibido',
+        receivedBy: currentUser.name,
+        receivedAt: now,
+        receivedUnitIds: needsUnits ? receiveSerialIds : (transfer.receivedUnitIds ?? null),
+      };
+      if (!needsUnits && !hasQr) {
+        receivedPayload.receivedPhoto = receivePhoto;
+        receivedPayload.receivedSignature = receiveSignature;
+        receivedPayload.receivedQrConfirmed = false;
+      } else if (!needsUnits && hasQr) {
+        receivedPayload.receivedQrConfirmed = true;
+      }
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), receivedPayload);
 
-          // Las notificaciones de esta transferencia quedan leídas al recibirla
-          try {
-            const notifSnap = await getDocs(
-              query(
-                collection(db, 'notifications'),
-                where('userId', '==', currentUser.id),
-                where('read', '==', false)
-              )
-            );
-            await Promise.all(
-              notifSnap.docs
-                .filter(d => {
-                  const data = d.data() as { data?: { transferId?: string } };
-                  return data.data?.transferId === transfer.id;
-                })
-                .map(d => updateDoc(d.ref, { read: true }))
-            );
-          } catch {
-            // Marcar leída es lo mejor esfuerzo: no bloquea la recepción
-          }
+      // Las notificaciones de esta transferencia quedan leídas al recibirla
+      try {
+        const notifSnap = await getDocs(
+          query(
+            collection(db, 'notifications'),
+            where('userId', '==', currentUser.id),
+            where('read', '==', false)
+          )
+        );
+        await Promise.all(
+          notifSnap.docs
+            .filter(d => {
+              const data = d.data() as { data?: { transferId?: string } };
+              return data.data?.transferId === transfer.id;
+            })
+            .map(d => updateDoc(d.ref, { read: true }))
+        );
+      } catch {
+        // Marcar leída es lo mejor esfuerzo: no bloquea la recepción
+      }
 
-          await logAction({
-            action: AUDIT_ACTIONS.transferReceived,
-            targetType: 'inventory_transfer',
-            targetId: transfer.id,
-            targetName: `${productName(transfer.productId)} · ${transfer.quantity}`,
-            impactLevel: 'major',
-            description: `Transferencia recibida: ${productName(transfer.productId)} · ${transfer.quantity} · recibido por ${currentUser.name}`,
-          });
+      await logAction({
+        action: AUDIT_ACTIONS.transferReceived,
+        targetType: 'inventory_transfer',
+        targetId: transfer.id,
+        targetName: `${productName(transfer.productId)} · ${transfer.quantity}`,
+        impactLevel: 'major',
+        description: `Transferencia recibida: ${productName(transfer.productId)} · ${transfer.quantity} · recibido por ${currentUser.name}`,
+      });
 
-          toast.success(t('inv.transfers.receive'));
-          setReceiveTransferId(null);
-          setReceiveSerialIds([]);
-          setReceiveScanConfirmed(false);
-          setReceivePhoto(null);
-          setReceiveSignature(null);
-          setInvView('main');
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        }
-      },
-    });
+      setReceiveTransferId(null);
+      setReceiveSerialIds([]);
+      setReceiveScanConfirmed(false);
+      setReceivePhoto(null);
+      setReceiveSignature(null);
+      setInvView('main');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    }
   };
 
   const openCancelTransfer = (transfer: InventoryTransfer) => {
@@ -2483,7 +2833,6 @@ export function InventarioModule() {
             description: `Transferencia cancelada: ${productName(transfer.productId)} · ${transfer.quantity}${cancelReason.trim() ? ` · motivo: ${cancelReason.trim()}` : ''}`,
           });
 
-          toast.success(t('inv.transfers.cancel'));
           setCancelTransferId(null);
           setCancelReason('');
         } catch (err: any) {
@@ -2518,76 +2867,354 @@ export function InventarioModule() {
     const unit = unitName(product.unitId);
     const locName = locationName(stock.locationId);
 
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.stock.orderSuggestion'),
-      description: `${product.name} · ${locName} · ${suggestedQty} ${unit}${supplier ? ` · ${supplier.name}` : ''}`,
-      action: async () => {
-        setSavingPurchaseReq(true);
-        try {
-          const now = new Date().toISOString();
-          const ref = await addDoc(collection(db, 'purchaseRequisitions'), {
-            tenantId,
-            productId: product.id,
-            productName: product.name,
-            quantity: suggestedQty,
-            unit,
-            suggestedQty,
-            supplierId: supplier?.id || null,
-            supplierName: supplier?.name || null,
-            locationId: stock.locationId,
-            locationName: locName,
-            status: 'draft',
+    // Punto 6: crear un borrador no es irreversible — sin popup ni toast;
+    // el distintivo "Borrador pendiente" en la fila ES la confirmación
+    setSavingPurchaseReq(true);
+    try {
+      const now = new Date().toISOString();
+      const ref = await addDoc(collection(db, 'purchaseRequisitions'), {
+        tenantId,
+        source: 'auto',
+        productId: product.id,
+        productName: product.name,
+        quantity: suggestedQty,
+        unit,
+        unitId: product.unitId,
+        suggestedQty,
+        supplierId: supplier?.id || null,
+        supplierName: supplier?.name || null,
+        locationId: stock.locationId,
+        locationName: locName,
+        status: 'draft',
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        createdAt: now,
+        notes: `Bajo mínimo: quedan ${formatQtyUnit(stock.quantity, product.unitId)} (mínimo ${stock.minStock}). La orden de compra formal se gestiona en Compras & Pagos (Fase 5).`,
+      });
+
+      // Notificación desde cliente (patrón de HorariosModule): avisa a
+      // DG/RRHH y al responsable de la ubicación. Es lo mejor esfuerzo:
+      // nunca bloquea la creación del borrador.
+      try {
+        const targets = new Set<string>();
+        activeUsers
+          .filter(u => u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
+          .forEach(u => u.id && targets.add(u.id));
+        const locResponsible = locations.find(l => l.id === stock.locationId)?.responsibleUserId;
+        if (locResponsible) targets.add(locResponsible);
+        for (const uid of targets) {
+          await addDoc(collection(db, 'notifications'), {
+            userId: uid,
+            type: 'PURCHASE_REQUISITION_CREATED',
+            title: `Pedido sugerido: ${product.name}`,
+            body: `${currentUser.name} creó un borrador de pedido de ${formatQtyUnit(suggestedQty, product.unitId)} de ${product.name} para ${locName}${supplier ? ` (proveedor: ${supplier.name})` : ''}.`,
+            data: { link: '/requisiciones' },
+            read: false,
+            createdAt: serverTimestamp(),
             createdBy: currentUser.id,
-            createdByName: currentUser.name,
-            createdAt: now,
-            notes: `Bajo mínimo: quedan ${stock.quantity} ${unit} (mínimo ${stock.minStock}). La orden de compra formal se gestiona en Compras & Pagos (Fase 5).`,
+            priority: 'normal',
           });
-
-          // Notificación desde cliente (patrón de HorariosModule): avisa a
-          // DG/RRHH y al responsable de la ubicación. Es lo mejor esfuerzo:
-          // nunca bloquea la creación del borrador.
-          try {
-            const targets = new Set<string>();
-            activeUsers
-              .filter(u => u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
-              .forEach(u => u.id && targets.add(u.id));
-            const locResponsible = locations.find(l => l.id === stock.locationId)?.responsibleUserId;
-            if (locResponsible) targets.add(locResponsible);
-            for (const uid of targets) {
-              await addDoc(collection(db, 'notifications'), {
-                userId: uid,
-                type: 'PURCHASE_REQUISITION_CREATED',
-                title: `Pedido sugerido: ${product.name}`,
-                body: `${currentUser.name} creó un borrador de pedido de ${suggestedQty} ${unit} de ${product.name} para ${locName}${supplier ? ` (proveedor: ${supplier.name})` : ''}.`,
-                data: { link: '/requisiciones' },
-                read: false,
-                createdAt: serverTimestamp(),
-                createdBy: currentUser.id,
-                priority: 'normal',
-              });
-            }
-          } catch (notifErr) {
-            console.error('[InventarioModule] notificación de pedido:', notifErr);
-          }
-
-          await logAction({
-            action: AUDIT_ACTIONS.purchaseRequisitionCreated,
-            targetType: 'purchase_requisition',
-            targetId: ref.id,
-            targetName: `${product.name} · ${suggestedQty} ${unit}`,
-            impactLevel: 'major',
-            description: `Borrador de pedido creado: ${product.name} · ${suggestedQty} ${unit} · ${locName}${supplier ? ` · proveedor: ${supplier.name}` : ''}`,
-          });
-
-          toast.success(t('inv.stock.orderCreated'));
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        } finally {
-          setSavingPurchaseReq(false);
         }
-      },
+      } catch (notifErr) {
+        console.error('[InventarioModule] notificación de pedido:', notifErr);
+      }
+
+      await logAction({
+        action: AUDIT_ACTIONS.purchaseRequisitionCreated,
+        targetType: 'purchase_requisition',
+        targetId: ref.id,
+        targetName: `${product.name} · ${formatQtyUnit(suggestedQty, product.unitId)}`,
+        impactLevel: 'major',
+        description: `Borrador de pedido creado: ${product.name} · ${formatQtyUnit(suggestedQty, product.unitId)} · ${locName}${supplier ? ` · proveedor: ${supplier.name}` : ''}`,
+      });
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingPurchaseReq(false);
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════
+  // PEDIDO DE COMPRA — SOLICITUDES Y APROBACIÓN (puntos 1, 3, 4, 5)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Departamento del usuario actual (contrato departments/{id}):
+  // canRequestPurchases ausente = true; managesPurchases ausente = false
+  const myDepartment = useMemo(() => {
+    const code = myDeptCode;
+    if (!code || !currentUser?.department) return undefined;
+    return departments.find(
+      d =>
+        normalizeDeptCode(d.code || '') === code ||
+        normalizeDeptCode(d.name || '') === code ||
+        d.id === currentUser.department
+    );
+  }, [departments, myDeptCode, currentUser?.department]);
+
+  // ¿Puede MI departamento solicitar compras? (ausente / sin departamento = sí)
+  const canRequestPurchases = !myDepartment || myDepartment.canRequestPurchases !== false;
+
+  // Códigos normalizados de los departamentos que gestionan compras
+  const managesPurchasesCodes = useMemo(
+    () =>
+      new Set(
+        departments
+          .filter(d => d.managesPurchases)
+          .map(d => normalizeDeptCode(d.code || d.name || ''))
+          .filter(c => !!c)
+      ),
+    [departments]
+  );
+
+  // ¿Puede el usuario actual aprobar/rechazar? Supervisor+ de un departamento
+  // con managesPurchases === true, o Director General (contrato punto 4)
+  const isPurchaseApprover =
+    !!currentUser &&
+    (currentUser.role === Role.DIRECTOR_GENERAL ||
+      (canSupervise && managesPurchasesCodes.has(normalizeDeptCode(currentUser.department || ''))));
+
+  // "Mis solicitudes": el aprobador ve TODAS (es su cola de aprobación, con
+  // distintivo de departamento); el resto solo las de SU departamento. Los
+  // borradores legacy (auto, sin departamento) se listan para todos con el
+  // distintivo "Sugerencia automática".
+  const visiblePurchaseReqs = useMemo(() => {
+    if (isPurchaseApprover) return purchaseReqs;
+    const code = myDeptCode;
+    return purchaseReqs.filter(r => {
+      if (!r.departmentId && !r.departmentName) return true;
+      return !!code && normalizeDeptCode(r.departmentName || r.departmentId || '') === code;
     });
+  }, [purchaseReqs, isPurchaseApprover, myDeptCode]);
+
+  // Selector de producto de la solicitud: primero CATEGORÍA, luego productos
+  // de esa categoría con buscador (mismo patrón que los formularios de
+  // movimiento)
+  const prFormProducts = useMemo(() => {
+    if (prForm.mode !== 'catalog') return [];
+    if (!prForm.categoryId) return [];
+    if (prForm.categoryId === '__none__') return activeProducts.filter(p => !p.categoryId);
+    return activeProducts.filter(p => p.categoryId === prForm.categoryId);
+  }, [activeProducts, prForm.categoryId, prForm.mode]);
+
+  // Pedidos aprobados disponibles para vincular a una entrada de compra
+  // (punto 5): filtrados por producto si ya hay uno seleccionado
+  const approvedPrOptions = useMemo(
+    () =>
+      purchaseReqs.filter(
+        r =>
+          r.status === 'aprobada' &&
+          (!movementForm.productId || !r.productId || r.productId === movementForm.productId)
+      ),
+    [purchaseReqs, movementForm.productId]
+  );
+
+  // Etiqueta "cantidad + unidad" de una solicitud (usa unitId si existe;
+  // fallback al nombre de unidad persistido)
+  const prQtyLabel = (r: PurchaseRequisition) =>
+    r.unitId ? formatQtyUnit(r.quantity, r.unitId) : `${r.quantity} ${r.unit}`.trim();
+  const prItemName = (r: PurchaseRequisition) => r.productName || r.freeDescription || '—';
+  const prSupplierName = (r: PurchaseRequisition) =>
+    r.suggestedSupplierName || r.supplierName || null;
+
+  const openPurchasesView = () => {
+    setPurchaseViewTab('list');
+    setInvView('purchases');
+  };
+
+  const openPrDecision = (req: PurchaseRequisition, action: 'approve' | 'reject') => {
+    if (!isPurchaseApprover || req.status !== 'por_aprobar') return;
+    setPrDecision({ req, action });
+    setPrDecisionNote('');
+  };
+
+  // Crear solicitud de compra (punto 3): estado 'por_aprobar' + notificación
+  // por campana a los Supervisor+ de los departamentos con managesPurchases.
+  // Sin popup de confirmación: la solicitud aparece en Mis solicitudes.
+  const handleCreatePurchaseRequest = async () => {
+    if (!currentUser || !canRequestPurchases || savingPr) return;
+    const qty = Number(prForm.quantity);
+    const product =
+      prForm.mode === 'catalog' ? products.find(p => p.id === prForm.productId) : undefined;
+    if (prForm.mode === 'catalog' && !product) return toast.error(t('inv.validation.productRequired'));
+    if (prForm.mode === 'free' && !prForm.freeDescription.trim())
+      return toast.error(t('inv.purchases.validation.descriptionRequired'));
+    const unitId = prForm.mode === 'catalog' ? product?.unitId || prForm.unitId : prForm.unitId;
+    if (!unitId) return toast.error(t('inv.purchases.validation.unitRequired'));
+    if (!Number.isFinite(qty) || qty <= 0) return toast.error(t('inv.validation.quantityPositive'));
+    if (!prForm.reason.trim()) return toast.error(t('inv.purchases.validation.reasonRequired'));
+    const supplier = prForm.supplierId ? suppliers.find(s => s.id === prForm.supplierId) : undefined;
+
+    setSavingPr(true);
+    try {
+      const now = new Date().toISOString();
+      const itemName = product?.name || prForm.freeDescription.trim();
+      const ref = await addDoc(collection(db, 'purchaseRequisitions'), {
+        tenantId,
+        source: 'manual',
+        status: 'por_aprobar',
+        productId: product?.id || null,
+        productName: itemName,
+        freeDescription: prForm.mode === 'free' ? prForm.freeDescription.trim() : null,
+        quantity: qty,
+        unit: unitName(unitId),
+        unitId,
+        suggestedSupplierId: supplier?.id || null,
+        suggestedSupplierName: supplier?.name || null,
+        departmentId: myDepartment?.id || null,
+        departmentName: myDepartment?.name || currentUser.department || null,
+        neededBy: prForm.neededBy || null,
+        reason: prForm.reason.trim(),
+        urgent: prForm.urgent,
+        createdBy: currentUser.id,
+        createdByName: currentUser.name,
+        createdAt: now,
+      });
+
+      // Notificación por campana (patrón cliente de la Ronda 3) a los
+      // Supervisor+ de TODOS los departamentos con managesPurchases === true
+      // (+ DG, que también aprueba). Deep link a la solicitud. Lo mejor
+      // esfuerzo: nunca bloquea la creación.
+      try {
+        const targets = new Set<string>();
+        for (const u of activeUsers) {
+          if (!u.id || u.id === currentUser.id) continue;
+          if (u.role === Role.DIRECTOR_GENERAL) {
+            targets.add(u.id);
+            continue;
+          }
+          if (
+            SUPERVISOR_PLUS_ROLES.includes(u.role) &&
+            managesPurchasesCodes.has(normalizeDeptCode(u.department || ''))
+          ) {
+            targets.add(u.id);
+          }
+        }
+        for (const uid of targets) {
+          await addDoc(collection(db, 'notifications'), {
+            userId: uid,
+            type: 'PURCHASE_REQUEST_APPROVAL',
+            title: `${prForm.urgent ? 'Solicitud de compra urgente: ' : 'Solicitud de compra: '}${itemName}`,
+            body: `${currentUser.name} (${myDepartment?.name || currentUser.department || '—'}) solicita ${formatQtyUnit(qty, unitId)} de ${itemName}.${prForm.neededBy ? ` Se necesita para el ${prForm.neededBy}.` : ''}`,
+            data: { link: `/requisiciones?purchase=${ref.id}` },
+            read: false,
+            createdAt: serverTimestamp(),
+            createdBy: currentUser.id,
+            priority: prForm.urgent ? 'high' : 'normal',
+          });
+        }
+      } catch (notifErr) {
+        console.error('[InventarioModule] notificación de solicitud de compra:', notifErr);
+      }
+
+      await logAction({
+        action: AUDIT_ACTIONS.purchaseRequisitionCreated,
+        targetType: 'purchase_requisition',
+        targetId: ref.id,
+        targetName: `${itemName} · ${formatQtyUnit(qty, unitId)}`,
+        impactLevel: 'major',
+        description: `Solicitud de compra creada: ${itemName} · ${formatQtyUnit(qty, unitId)} · ${myDepartment?.name || currentUser.department || '—'}${prForm.urgent ? ' · URGENTE' : ''}`,
+      });
+
+      // Sin toast de éxito (política punto 6): la solicitud en Mis
+      // solicitudes ES la confirmación
+      setPrForm(EMPTY_PR_FORM);
+      setPurchaseViewTab('list');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingPr(false);
+    }
+  };
+
+  // Aprobar / rechazar una solicitud (punto 4). Aprobar: nota opcional, sin
+  // popup (no es irreversible). Rechazar: motivo OBLIGATORIO + confirmación
+  // (irreversible). Ambos notifican al solicitante por campana.
+  const handlePrDecision = async () => {
+    if (!currentUser || !prDecision?.req?.id || !isPurchaseApprover) return;
+    const { req, action } = prDecision;
+    const note = prDecisionNote.trim();
+    if (action === 'reject' && !note) {
+      return toast.error(t('inv.purchases.validation.reasonRequired'));
+    }
+    const itemName = prItemName(req);
+    const qtyLabel = prQtyLabel(req);
+
+    const doSave = async () => {
+      try {
+        const now = new Date().toISOString();
+        if (action === 'approve') {
+          await updateDoc(doc(db, 'purchaseRequisitions', req.id!), {
+            status: 'aprobada',
+            approvedBy: currentUser.id,
+            approvedByName: currentUser.name,
+            approvedAt: now,
+            approvedNote: note || null,
+          });
+        } else {
+          await updateDoc(doc(db, 'purchaseRequisitions', req.id!), {
+            status: 'rechazada',
+            rejectedBy: currentUser.id,
+            rejectedByName: currentUser.name,
+            rejectedAt: now,
+            rejectedReason: note,
+          });
+        }
+
+        // Notificación al solicitante (best effort, deep link a la solicitud)
+        try {
+          if (req.createdBy && req.createdBy !== currentUser.id) {
+            await addDoc(collection(db, 'notifications'), {
+              userId: req.createdBy,
+              type: action === 'approve' ? 'PURCHASE_REQUEST_APPROVED' : 'PURCHASE_REQUEST_REJECTED',
+              title:
+                action === 'approve'
+                  ? `Solicitud de compra aprobada: ${itemName}`
+                  : `Solicitud de compra rechazada: ${itemName}`,
+              body:
+                action === 'approve'
+                  ? `${currentUser.name} aprobó tu solicitud de ${qtyLabel} de ${itemName}.${note ? ` Nota: ${note}` : ''}`
+                  : `${currentUser.name} rechazó tu solicitud de ${qtyLabel} de ${itemName}. Motivo: ${note}`,
+              data: { link: `/requisiciones?purchase=${req.id}` },
+              read: false,
+              createdAt: serverTimestamp(),
+              createdBy: currentUser.id,
+              priority: action === 'approve' ? 'normal' : 'high',
+            });
+          }
+        } catch (notifErr) {
+          console.error('[InventarioModule] notificación de decisión de compra:', notifErr);
+        }
+
+        await logAction({
+          action: action === 'approve' ? AUDIT_ACTIONS.purchaseRequisitionApproved : AUDIT_ACTIONS.purchaseRequisitionRejected,
+          targetType: 'purchase_requisition',
+          targetId: req.id,
+          targetName: `${itemName} · ${qtyLabel}`,
+          impactLevel: 'major',
+          description:
+            action === 'approve'
+              ? `Solicitud de compra aprobada: ${itemName} · ${qtyLabel}${note ? ` · nota: ${note}` : ''}`
+              : `Solicitud de compra rechazada: ${itemName} · ${qtyLabel} · motivo: ${note}`,
+        });
+
+        // Sin toast de éxito (punto 6): el distintivo en la lista confirma
+        setPrDecision(null);
+        setPrDecisionNote('');
+      } catch (err: any) {
+        toast.error(`${t('inv.error.save')}: ${err.message}`);
+      }
+    };
+
+    if (action === 'reject') {
+      await executeWithConfirm({
+        level: 'major',
+        title: t('inv.purchases.rejectTitle'),
+        description: `${itemName} · ${qtyLabel}`,
+        action: doSave,
+      });
+    } else {
+      await doSave();
+    }
   };
 
   // ═══════════════════════════════════════════════════════════════════
@@ -2618,7 +3245,6 @@ export function InventarioModule() {
         impactLevel: 'minor',
         description: `Conteo programado: ${locationName(countForm.locationId)} · ${t(`inv.counts.frequency.${countForm.frequency}`)}${countForm.blind ? ` · ${t('inv.counts.blindYes').toLowerCase()}` : ''}`,
       });
-      toast.success(t('inv.counts.schedule'));
       setInvView('main');
       setCountForm(EMPTY_COUNT_FORM);
     } catch (err: any) {
@@ -2671,7 +3297,6 @@ export function InventarioModule() {
         counts: parsed,
         scannedSerials,
       });
-      toast.success(t('inv.common.save'));
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
     }
@@ -2680,55 +3305,49 @@ export function InventarioModule() {
   const handleFinishCount = async () => {
     const session = countSessions.find(x => x.id === countingId);
     if (!currentUser || !canWrite || !session?.id) return;
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.counts.finish'),
-      description: locationName(session.locationId),
-      action: async () => {
-        try {
-          const now = new Date().toISOString();
-          const rows = stocks.filter(s => s.locationId === session.locationId && s.quantity !== 0);
-          const parsedCounts: Record<string, number> = {};
-          const differences: Array<{ productId: string; expected: number; counted: number; delta: number }> = [];
-          rows.forEach(s => {
-            const raw = countsDraft[s.productId] ?? '';
-            const counted = raw.trim() === '' || !Number.isFinite(Number(raw)) ? 0 : Number(raw);
-            parsedCounts[s.productId] = counted;
-            if (counted !== s.quantity) {
-              differences.push({
-                productId: s.productId,
-                expected: s.quantity,
-                counted,
-                delta: counted - s.quantity,
-              });
-            }
+    // Punto 6: finalizar (registrar) no es irreversible — sin popup; las
+    // diferencias quedan en la tarjeta del conteo
+    try {
+      const now = new Date().toISOString();
+      const rows = stocks.filter(s => s.locationId === session.locationId && s.quantity !== 0);
+      const parsedCounts: Record<string, number> = {};
+      const differences: Array<{ productId: string; expected: number; counted: number; delta: number }> = [];
+      rows.forEach(s => {
+        const raw = countsDraft[s.productId] ?? '';
+        const counted = raw.trim() === '' || !Number.isFinite(Number(raw)) ? 0 : Number(raw);
+        parsedCounts[s.productId] = counted;
+        if (counted !== s.quantity) {
+          differences.push({
+            productId: s.productId,
+            expected: s.quantity,
+            counted,
+            delta: counted - s.quantity,
           });
-
-          await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
-            status: 'finalizado',
-            finishedAt: now,
-            counts: parsedCounts,
-            differences,
-          });
-
-          await logAction({
-            action: AUDIT_ACTIONS.countCompleted,
-            targetType: 'count_session',
-            targetId: session.id,
-            targetName: locationName(session.locationId),
-            impactLevel: 'major',
-            description: differences.length
-              ? `Conteo finalizado con ${differences.length} diferencias: ${locationName(session.locationId)}`
-              : `Conteo finalizado sin diferencias: ${locationName(session.locationId)}`,
-          });
-
-          toast.success(differences.length ? t('inv.counts.differencesTitle') : t('inv.counts.noDifferences'));
-          setCountingId(null);
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
         }
-      },
-    });
+      });
+
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
+        status: 'finalizado',
+        finishedAt: now,
+        counts: parsedCounts,
+        differences,
+      });
+
+      await logAction({
+        action: AUDIT_ACTIONS.countCompleted,
+        targetType: 'count_session',
+        targetId: session.id,
+        targetName: locationName(session.locationId),
+        impactLevel: 'major',
+        description: differences.length
+          ? `Conteo finalizado con ${differences.length} diferencias: ${locationName(session.locationId)}`
+          : `Conteo finalizado sin diferencias: ${locationName(session.locationId)}`,
+      });
+
+      setCountingId(null);
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    }
   };
 
   const openAdjustment = (session: CountSession) => {
@@ -2742,64 +3361,58 @@ export function InventarioModule() {
     if (!adjustmentReason.trim()) return toast.error(t('inv.counts.validation.reasonRequired'));
     const diffs = session.differences ?? [];
     if (diffs.length === 0) return;
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.counts.applyAdjustment'),
-      description: `${locationName(session.locationId)} · ${diffs.length}`,
-      action: async () => {
-        try {
-          const now = new Date().toISOString();
-          for (const d of diffs) {
-            // Ajusta el stock al contado
-            await setDoc(
-              doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(d.productId, session.locationId)),
-              {
-                tenantId,
-                productId: d.productId,
-                locationId: session.locationId,
-                quantity: d.counted,
-                updatedAt: now,
-                updatedBy: currentUser.name,
-              },
-              { merge: true }
-            );
-            await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
-              tenantId,
-              productId: d.productId,
-              quantity: d.delta,
-              fromLocationId: d.delta < 0 ? session.locationId : null,
-              toLocationId: d.delta > 0 ? session.locationId : null,
-              movementTypeId: 'ajuste',
-              reason: `${adjustmentReason.trim()} · Ajuste por conteo`,
-              referenceType: 'count',
-              referenceId: session.id,
-              createdAt: now,
-              createdBy: currentUser.id,
-              createdByName: currentUser.name,
-            });
-          }
-          await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
-            status: 'ajustado',
-            approvedBy: currentUser.name,
-            approvedAt: now,
-            adjustmentReason: adjustmentReason.trim(),
-          });
-          await logAction({
-            action: AUDIT_ACTIONS.countAdjustmentApproved,
-            targetType: 'count_session',
-            targetId: session.id,
-            targetName: locationName(session.locationId),
-            impactLevel: 'sensitive',
-            description: `Ajuste por conteo aprobado: ${locationName(session.locationId)} · ${diffs.length} productos · motivo: ${adjustmentReason.trim()}`,
-          });
-          toast.success(t('inv.counts.applyAdjustment'));
-          setAdjustmentSessionId(null);
-          setAdjustmentReason('');
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        }
-      },
-    });
+    // Punto 6: un ajuste es registrable sin popup; el motivo (obligatorio) y
+    // la auditoría sensitive quedan como trazabilidad
+    try {
+      const now = new Date().toISOString();
+      for (const d of diffs) {
+        // Ajusta el stock al contado
+        await setDoc(
+          doc(db, CATALOG_COLLECTIONS.inventoryStocks, stockDocId(d.productId, session.locationId)),
+          {
+            tenantId,
+            productId: d.productId,
+            locationId: session.locationId,
+            quantity: d.counted,
+            updatedAt: now,
+            updatedBy: currentUser.name,
+          },
+          { merge: true }
+        );
+        await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+          tenantId,
+          productId: d.productId,
+          quantity: d.delta,
+          fromLocationId: d.delta < 0 ? session.locationId : null,
+          toLocationId: d.delta > 0 ? session.locationId : null,
+          movementTypeId: 'ajuste',
+          reason: `${adjustmentReason.trim()} · Ajuste por conteo`,
+          referenceType: 'count',
+          referenceId: session.id,
+          createdAt: now,
+          createdBy: currentUser.id,
+          createdByName: currentUser.name,
+        });
+      }
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
+        status: 'ajustado',
+        approvedBy: currentUser.name,
+        approvedAt: now,
+        adjustmentReason: adjustmentReason.trim(),
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.countAdjustmentApproved,
+        targetType: 'count_session',
+        targetId: session.id,
+        targetName: locationName(session.locationId),
+        impactLevel: 'sensitive',
+        description: `Ajuste por conteo aprobado: ${locationName(session.locationId)} · ${diffs.length} productos · motivo: ${adjustmentReason.trim()}`,
+      });
+      setAdjustmentSessionId(null);
+      setAdjustmentReason('');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    }
   };
 
   // Sesión de conteo activa (panel de captura) y sus filas de productos
@@ -2855,7 +3468,6 @@ export function InventarioModule() {
         },
         { merge: true }
       );
-      toast.success(t('inv.common.save'));
       setEditingMinMaxId(null);
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -2871,9 +3483,15 @@ export function InventarioModule() {
     const defaultStatus = activeSerialStatuses.find(s => !s.blocksRental) ?? activeSerialStatuses[0];
     setSerialForm({ ...EMPTY_SERIAL_FORM, productId: productId || '', statusId: defaultStatus?.id || '' });
     setSerialPhotoFile(null);
+    // Modo masa por defecto (punto 7), con el formulario de masa reiniciado
+    setSerialBulkMode('bulk');
+    setSerialBulk({ quantity: '1', prefix: '', startNumber: '1' });
+    setSerialBulkResult(null);
     setInvView('serial-new');
   };
 
+  // Crear un serial individual (punto 6: sin popup de confirmación — crear
+  // no es irreversible; el serial en la lista ES la confirmación)
   const handleCreateSerial = async () => {
     if (!currentUser || !canWrite) return;
     if (!serialForm.productId) return toast.error(t('inv.validation.productRequired'));
@@ -2882,48 +3500,109 @@ export function InventarioModule() {
     if (rentalUnits.some(u => u.serialNumber.trim().toLowerCase() === serialNumber.toLowerCase()))
       return toast.error(t('inv.serials.validation.serialDuplicate'));
 
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.serials.new'),
-      description: `${productName(serialForm.productId)} · ${serialNumber}`,
-      action: async () => {
-        setSavingSerial(true);
-        try {
-          let photoUrl: string | null = null;
-          if (serialPhotoFile) photoUrl = await uploadImage(serialPhotoFile, 'serials');
-          const now = new Date().toISOString();
-          const ref = await addDoc(collection(db, CATALOG_COLLECTIONS.rentalUnits), {
-            tenantId,
-            productId: serialForm.productId,
-            serialNumber,
-            photoUrl,
-            size: serialForm.size.trim() || null,
-            statusId: serialForm.statusId,
-            notes: serialForm.notes.trim() || null,
-            createdAt: now,
-            createdBy: currentUser.name,
-            updatedAt: now,
-            updatedBy: currentUser.name,
-          });
-          await logAction({
-            action: AUDIT_ACTIONS.serialCreated,
-            targetType: 'rental_unit',
-            targetId: ref.id,
-            targetName: `${productName(serialForm.productId)} · ${serialNumber}`,
-            impactLevel: 'major',
-            description: `Serial creado: ${productName(serialForm.productId)} · ${serialNumber}`,
-          });
-          toast.success(t('inv.serials.new'));
-          setInvView('main');
-          setSerialForm(EMPTY_SERIAL_FORM);
-          setSerialPhotoFile(null);
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        } finally {
-          setSavingSerial(false);
-        }
-      },
-    });
+    setSavingSerial(true);
+    try {
+      let photoUrl: string | null = null;
+      if (serialPhotoFile) photoUrl = await uploadImage(serialPhotoFile, 'serials');
+      const now = new Date().toISOString();
+      const ref = await addDoc(collection(db, CATALOG_COLLECTIONS.rentalUnits), {
+        tenantId,
+        productId: serialForm.productId,
+        serialNumber,
+        photoUrl,
+        size: serialForm.size.trim() || null,
+        statusId: serialForm.statusId,
+        notes: serialForm.notes.trim() || null,
+        createdAt: now,
+        createdBy: currentUser.name,
+        updatedAt: now,
+        updatedBy: currentUser.name,
+      });
+      await logAction({
+        action: AUDIT_ACTIONS.serialCreated,
+        targetType: 'rental_unit',
+        targetId: ref.id,
+        targetName: `${productName(serialForm.productId)} · ${serialNumber}`,
+        impactLevel: 'major',
+        description: `Serial creado: ${productName(serialForm.productId)} · ${serialNumber}`,
+      });
+      setInvView('main');
+      setSerialForm(EMPTY_SERIAL_FORM);
+      setSerialPhotoFile(null);
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingSerial(false);
+    }
+  };
+
+  // Genera los códigos del lote: prefijo + número relleno con ceros hasta
+  // 3 dígitos mínimo (T- + 1 → T-001). El número puede pasar de 3 dígitos.
+  const buildBulkSerialCodes = (): string[] => {
+    const count = Number(serialBulk.quantity);
+    const start = Number(serialBulk.startNumber);
+    if (!Number.isInteger(count) || count < 1 || count > 500) return [];
+    if (!Number.isInteger(start) || start < 0) return [];
+    const prefix = serialBulk.prefix.trim();
+    return Array.from({ length: count }, (_, i) => `${prefix}${String(start + i).padStart(3, '0')}`);
+  };
+
+  // Crear seriales EN MASA (punto 7): valida colisiones contra los
+  // existentes (si hay choque, avisa cuáles y no crea nada). Tras crear se
+  // QUEDA en la pantalla con "Crear más" (resetea cantidad/número, mantiene
+  // producto y prefijo) y "Volver". Sin popup de confirmación (punto 6).
+  const handleCreateSerialsBulk = async () => {
+    if (!currentUser || !canWrite || savingSerial) return;
+    if (!serialForm.productId) return toast.error(t('inv.validation.productRequired'));
+    const codes = buildBulkSerialCodes();
+    if (codes.length === 0) return toast.error(t('inv.serials.bulkQtyInvalid'));
+    const existing = new Set(rentalUnits.map(u => u.serialNumber.trim().toLowerCase()));
+    const collisions = codes.filter(c => existing.has(c.trim().toLowerCase()));
+    if (collisions.length > 0) {
+      return toast.error(
+        t('inv.serials.bulkCollide').replace(
+          '{codes}',
+          collisions.slice(0, 10).join(', ') + (collisions.length > 10 ? '…' : '')
+        )
+      );
+    }
+    const statusId = serialForm.statusId || activeSerialStatuses.find(s => !s.blocksRental)?.id || activeSerialStatuses[0]?.id;
+    if (!statusId) return toast.error(t('inv.error.save'));
+
+    setSavingSerial(true);
+    try {
+      const now = new Date().toISOString();
+      for (const code of codes) {
+        await addDoc(collection(db, CATALOG_COLLECTIONS.rentalUnits), {
+          tenantId,
+          productId: serialForm.productId,
+          serialNumber: code,
+          photoUrl: null,
+          size: null,
+          statusId,
+          notes: null,
+          createdAt: now,
+          createdBy: currentUser.name,
+          updatedAt: now,
+          updatedBy: currentUser.name,
+        });
+      }
+      await logAction({
+        action: AUDIT_ACTIONS.serialCreated,
+        targetType: 'rental_unit',
+        targetId: `bulk-${now}`,
+        targetName: `${productName(serialForm.productId)} · ${codes.length}`,
+        impactLevel: 'major',
+        description: `Seriales creados en masa: ${productName(serialForm.productId)} · ${codes.length} · ${codes.slice(0, 5).join(', ')}${codes.length > 5 ? '…' : ''}`,
+      });
+      // Se queda en la pantalla: los códigos creados se muestran en ella
+      // (sin toast, punto 6) con "Crear más" / "Volver"
+      setSerialBulkResult(codes);
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    } finally {
+      setSavingSerial(false);
+    }
   };
 
   const handleChangeSerialStatus = async (unit: RentalUnit, statusId: string) => {
@@ -2945,7 +3624,6 @@ export function InventarioModule() {
         impactLevel: 'minor',
         description: `Estado de serial cambiado: ${unit.serialNumber} → ${status?.name || statusId}`,
       });
-      toast.success(t('inv.common.save'));
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
     }
@@ -2974,7 +3652,6 @@ export function InventarioModule() {
         impactLevel: 'minor',
         description: `Serial actualizado: ${unit.serialNumber} (talla/notas)`,
       });
-      toast.success(t('inv.common.save'));
       setEditingSerialId(null);
     } catch (err: any) {
       toast.error(`${t('inv.error.save')}: ${err.message}`);
@@ -3017,7 +3694,6 @@ export function InventarioModule() {
             impactLevel: 'sensitive',
             description: `Baja permanente del serial ${unit.serialNumber}: ${reason}`,
           });
-          toast.success(t('inv.serials.retireDone'));
           setRetiringUnit(null);
           setRetirePhotoFile(null);
           setRetireReason('');
@@ -3044,41 +3720,35 @@ export function InventarioModule() {
     const reason = repairReason.trim() || 'Reparación';
     const units = rentalUnits.filter(u => repairUnitIds.includes(u.id || ''));
     if (units.length === 0) return toast.error(t('inv.repair.noAvailable'));
-    await executeWithConfirm({
-      level: 'major',
-      title: t('inv.repair.title'),
-      description: `${productName(repairProductId)} · ${units.length}`,
-      action: async () => {
-        try {
-          const now = new Date().toISOString();
-          const repairStatus = serialStatuses.find(s => s.id === 'en_reparacion')?.id
-            ?? serialStatuses.find(s => s.blocksRental)?.id;
-          if (!repairStatus) return toast.error(t('inv.error.save'));
-          for (const unit of units) {
-            await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unit.id!), {
-              statusId: repairStatus,
-              notes: `${reason} · Enviado a reparación`,
-              updatedAt: now,
-              updatedBy: currentUser.name,
-            });
-          }
-          await logAction({
-            action: AUDIT_ACTIONS.serialStatusChanged,
-            targetType: 'rental_unit',
-            targetId: repairProductId,
-            targetName: `${productName(repairProductId)} · ${units.map(u => u.serialNumber).join(', ')}`,
-            impactLevel: 'major',
-            description: `Unidades enviadas a reparación: ${productName(repairProductId)} · ${units.length} · motivo: ${reason}`,
-          });
-          toast.success(t('inv.repair.done'));
-          setRepairProductId(null);
-          setRepairUnitIds([]);
-          setRepairReason('');
-        } catch (err: any) {
-          toast.error(`${t('inv.error.save')}: ${err.message}`);
-        }
-      },
-    });
+    // Punto 6: enviar a reparación no es irreversible — sin popup de
+    // confirmación (la unidad puede volver a estado disponible)
+    try {
+      const now = new Date().toISOString();
+      const repairStatus = serialStatuses.find(s => s.id === 'en_reparacion')?.id
+        ?? serialStatuses.find(s => s.blocksRental)?.id;
+      if (!repairStatus) return toast.error(t('inv.error.save'));
+      for (const unit of units) {
+        await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unit.id!), {
+          statusId: repairStatus,
+          notes: `${reason} · Enviado a reparación`,
+          updatedAt: now,
+          updatedBy: currentUser.name,
+        });
+      }
+      await logAction({
+        action: AUDIT_ACTIONS.serialStatusChanged,
+        targetType: 'rental_unit',
+        targetId: repairProductId,
+        targetName: `${productName(repairProductId)} · ${units.map(u => u.serialNumber).join(', ')}`,
+        impactLevel: 'major',
+        description: `Unidades enviadas a reparación: ${productName(repairProductId)} · ${units.length} · motivo: ${reason}`,
+      });
+      setRepairProductId(null);
+      setRepairUnitIds([]);
+      setRepairReason('');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    }
   };
 
   // Seriales agrupados por producto rentable (para el render)
@@ -3206,7 +3876,8 @@ export function InventarioModule() {
       setScannedSerials(prev => ({ ...prev, [productId]: [...already, id] }));
       const current = Number(countsDraft[productId] ?? 0);
       setCountsDraft(d => ({ ...d, [productId]: String((Number.isFinite(current) ? current : 0) + 1) }));
-      toast.success(productName(productId));
+      // Punto 6: sin toast por cada escaneo — el contador en vivo del
+      // escáner y el badge de la fila ya confirman la lectura
       return true;
     }
     if (kind === 'product') {
@@ -3244,7 +3915,7 @@ export function InventarioModule() {
       }
       if (receiveScanConfirmed) return false;
       setReceiveScanConfirmed(true);
-      toast.success(t('inv.receive.scanConfirmed'));
+      // Punto 6: la propia pantalla muestra el check de confirmación
       return true;
     }
     if (kind !== 'serial') {
@@ -3262,7 +3933,8 @@ export function InventarioModule() {
       return false;
     }
     setReceiveSerialIds(prev => [...prev, id]);
-    toast.success(unit.serialNumber);
+    // Punto 6: sin toast por escaneo — el contador "N / M" de la pantalla
+    // confirma la lectura
     return true;
   };
 
@@ -3276,14 +3948,21 @@ export function InventarioModule() {
   };
 
   // Deep links: ?product= / ?location= / ?serial= → sección correspondiente
-  // (ficha de producto / stock por ubicación / seriales) con tarjeta expandida
+  // (ficha de producto / stock por ubicación / seriales) con tarjeta expandida;
+  // ?purchase=<id> abre la vista de pedidos de compra con esa solicitud
+  // expandida (campana de PURCHASE_REQUEST_*)
   useEffect(() => {
     if (!enabled || deepLinkHandled.current) return;
     const product = searchParams.get('product');
     const location = searchParams.get('location');
     const serial = searchParams.get('serial');
-    if (!product && !location && !serial) return;
-    if (product) revealTarget('product', product);
+    const purchase = searchParams.get('purchase');
+    if (!product && !location && !serial && !purchase) return;
+    if (purchase) {
+      setPurchaseViewTab('list');
+      setInvView('purchases');
+      setExpandedIds(prev => new Set(prev).add(purchase));
+    } else if (product) revealTarget('product', product);
     else if (location) revealTarget('location', location);
     else if (serial) revealTarget('serial', serial);
     setSearchParams({}, { replace: true });
@@ -3340,7 +4019,6 @@ export function InventarioModule() {
         impactLevel: 'minor',
         description: `Tipo de movimiento renombrado: ${editingMtName.trim()}`,
       });
-      toast.success(t('inv.catalogs.mt.renamed'));
       setEditingMtId(null);
       setEditingMtName('');
       setEditingMtNameEn('');
@@ -3413,13 +4091,9 @@ export function InventarioModule() {
           });
           if (created === 0) {
             toast.info(t('inv.catalogs.seedsAlreadyLoaded'));
-          } else {
-            toast.success(
-              t('inv.catalogs.mt.seedsSummary')
-                .replace('{created}', String(created))
-                .replace('{existing}', String(existing))
-            );
           }
+          // Punto 6: sin toast de éxito por cargar semillas (las tarjetas del
+          // catálogo reflejan el resultado)
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -3479,7 +4153,6 @@ export function InventarioModule() {
         impactLevel: 'minor',
         description: `Estado de ciclo de vida renombrado: ${editingSsName.trim()}`,
       });
-      toast.success(t('inv.catalogs.ss.renamed'));
       setEditingSsId(null);
       setEditingSsName('');
       setEditingSsNameEn('');
@@ -3552,13 +4225,9 @@ export function InventarioModule() {
           });
           if (created === 0) {
             toast.info(t('inv.catalogs.seedsAlreadyLoaded'));
-          } else {
-            toast.success(
-              t('inv.catalogs.ss.seedsSummary')
-                .replace('{created}', String(created))
-                .replace('{existing}', String(existing))
-            );
           }
+          // Punto 6: sin toast de éxito por cargar semillas (las tarjetas del
+          // catálogo reflejan el resultado)
         } catch (err: any) {
           toast.error(`${t('inv.error.save')}: ${err.message}`);
         } finally {
@@ -3603,7 +4272,7 @@ export function InventarioModule() {
   const stockCategoryGroups = useMemo(() => {
     const byCat = new Map<string, Product[]>();
     for (const p of activeProducts) {
-      if (!stocks.some(s => s.productId === p.id)) continue;
+      if (!stocks.some(s => s.productId === p.id) && !rentalUnits.some(u => u.productId === p.id)) continue;
       const key = p.categoryId || '__none__';
       const list = byCat.get(key) || [];
       list.push(p);
@@ -3621,7 +4290,7 @@ export function InventarioModule() {
       groups.push({ categoryId: '__none__', categoryName: t('inv.movementForm.noCategory'), products: none });
     }
     return groups;
-  }, [activeProducts, activeCategories, stocks]);
+  }, [activeProducts, activeCategories, stocks, rentalUnits]);
 
   // Filtrado de la pestaña Transferencias (punto 4): la lista base ya trae
   // TODAS las transferencias; el filtro solo decide cuáles se muestran
@@ -3664,7 +4333,17 @@ export function InventarioModule() {
     { id: 'transfers', icon: Truck, title: t('inv.home.transfers'), desc: t('inv.home.transfersDesc'), onClick: () => setInvView('transfers') },
     { id: 'devolucion', icon: RotateCcw, title: t('inv.home.devolucion'), desc: t('inv.home.devolucionDesc'), onClick: () => openMovementFormFor('devolucion') },
     { id: 'consumo', icon: ArrowUpRight, title: t('inv.home.consumo'), desc: t('inv.home.consumoDesc'), onClick: () => openMovementFormFor('consumo') },
-    { id: 'compra', icon: ShoppingCart, title: t('inv.home.compra'), desc: t('inv.home.compraDesc'), onClick: () => openMovementFormFor('compra') },
+    {
+      // Punto 1: la tarjeta "Compra" ahora es "Pedido de compra" y abre la
+      // vista de solicitudes (dos pestañas). La entrada de stock por compra
+      // SIGUE existiendo desde Stock (categoría/producto → acción Compra)
+      // y desde la ficha del producto.
+      id: 'compra',
+      icon: ShoppingCart,
+      title: t('inv.home.purchases'),
+      desc: t('inv.home.purchasesDesc'),
+      onClick: openPurchasesView,
+    },
     {
       id: 'dano',
       icon: AlertTriangle,
@@ -3767,6 +4446,7 @@ export function InventarioModule() {
             {invView === 'receive' && t('inv.transfers.receiveTitle')}
             {invView === 'count-new' && t('inv.counts.schedule')}
             {invView === 'serial-new' && t('inv.serials.new')}
+            {invView === 'purchases' && t('inv.purchases.title')}
           </h2>
         </div>
       )}
@@ -3995,7 +4675,7 @@ export function InventarioModule() {
                                 producto serializado se muestra por estado
                                 ("12 disponibles · 3 rentados"), nunca plano */}
                             {serialized && (
-                              <div className="mt-1">{renderUnitStatusChips(product.id!)}</div>
+                              <div className="mt-1">{renderSerializedStock(product.id!)}</div>
                             )}
                           </div>
                           <Button
@@ -4029,6 +4709,52 @@ export function InventarioModule() {
                         </div>
                         {isOpen && (
                           <div className="border-t border-[#E5E5E7] divide-y divide-[#F5F5F7]">
+                            {/* Lista de seriales del producto (punto 8): visible
+                                aunque el producto no tenga doc de stock */}
+                            {serialized && (
+                              <div className="p-3 bg-[#FAFAFC]">
+                                <p className="text-xs font-medium text-[#86868B] mb-2">
+                                  {t('inv.stock.serialListTitle')}
+                                </p>
+                                <div className="space-y-1.5">
+                                  {rentalUnits
+                                    .filter(u => u.productId === product.id)
+                                    .map(u => {
+                                      const uStatus = serialStatuses.find(s => s.id === u.statusId);
+                                      return (
+                                        <div key={u.id} className="flex items-center gap-2">
+                                          <span className="text-sm text-[#1D1D1F] truncate">{u.serialNumber}</span>
+                                          <span
+                                            className={cn(
+                                              'px-2 py-0.5 rounded-full text-[10px] font-medium border shrink-0',
+                                              u.statusId === 'dado_de_baja'
+                                                ? 'bg-[#F5F5F7] text-[#86868B] border-[#E5E5E7]'
+                                                : uStatus?.blocksRental
+                                                  ? 'bg-red-50 text-red-700 border-red-200'
+                                                  : 'bg-green-50 text-green-700 border-green-200'
+                                            )}
+                                          >
+                                            {u.statusId === 'dado_de_baja'
+                                              ? t('inv.serials.retired')
+                                              : uStatus
+                                                ? (getLanguage() === 'en' && uStatus.nameEn ? uStatus.nameEn : uStatus.name)
+                                                : u.statusId}
+                                          </span>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => openSerialQr(u)}
+                                            className="h-7 w-7 p-0 text-[#86868B] ml-auto shrink-0"
+                                            title={t('inv.serials.viewQr')}
+                                          >
+                                            <QrCode className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </div>
+                            )}
                             {productStocks.map(s => {
                               const isLow = s.quantity <= (s.minStock ?? Infinity);
                               const isEditingMm = editingMinMaxId === s.id;
@@ -4047,7 +4773,7 @@ export function InventarioModule() {
                                       </span>
                                     ) : (
                                       <span className="text-sm font-semibold text-[#1D1D1F]">
-                                        {s.quantity} {unitName(product.unitId)}
+                                        {formatQtyUnit(s.quantity, product.unitId)}
                                       </span>
                                     )}
                                     {s.minStock != null && (
@@ -4091,21 +4817,20 @@ export function InventarioModule() {
                                       )}
                                     </div>
                                   </div>
-                                  {renderTransitLines(s.productId, s.locationId, unitName(product.unitId))}
+                                  {renderTransitLines(s.productId, s.locationId, product.unitId)}
                                   {isLow && s.minStock != null && product && (() => {
                                     const draft = purchaseDraftFor(s.productId, s.locationId);
                                     const supplier = product.preferredSupplierId
                                       ? suppliers.find(x => x.id === product.preferredSupplierId)
                                       : undefined;
                                     const suggested = purchaseSuggestedQty(s);
-                                    const unit = unitName(product.unitId);
                                     return (
                                       <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 space-y-1">
                                         <div className="text-[11px] font-semibold text-amber-800">
                                           {t('inv.stock.orderSuggestion')}
                                         </div>
                                         <div className="text-[11px] text-amber-800">
-                                          {t('inv.stock.suggestedQty')}: {suggested} {unit}
+                                          {t('inv.stock.suggestedQty')}: {formatQtyUnit(suggested, product.unitId)}
                                         </div>
                                         <div className="text-[11px] text-amber-800">
                                           {t('inv.stock.preferredSupplier')}:{' '}
@@ -4249,11 +4974,11 @@ export function InventarioModule() {
                                     <span className="text-xs text-[#86868B]">
                                       {t('inv.serialized.stockHint')}
                                     </span>
-                                    {renderUnitStatusChips(s.productId)}
+                                    {renderSerializedStock(s.productId)}
                                   </>
                                 ) : (
                                   <span className="text-sm font-semibold text-[#1D1D1F]">
-                                    {s.quantity} {unitName(product?.unitId || '')}
+                                    {formatQtyUnit(s.quantity, product?.unitId || '')}
                                   </span>
                                 )}
                                 {s.minStock != null && (
@@ -4295,7 +5020,7 @@ export function InventarioModule() {
                                   </Button>
                                 )}
                               </div>
-                              {renderTransitLines(s.productId, location.id, unitName(product?.unitId || ''))}
+                              {renderTransitLines(s.productId, location.id, product?.unitId || '')}
                             </div>
                           );
                         })}
@@ -4304,6 +5029,26 @@ export function InventarioModule() {
                   </div>
                 );
               })}
+              {/* Seriales sin doc de stock en ninguna ubicación (punto 8):
+                  los seriales no llevan locationId; si el producto no tiene
+                  stock doc se lista aparte para que sea visible en Stock */}
+              {activeProducts.filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id)).length > 0 && (
+                <div className="mt-4 rounded-xl border border-[#E5E5E7] bg-white overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-[#F5F5F7] bg-[#F5F5F7]">
+                    <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('inv.stock.serialsNoLocation')}</h3>
+                  </div>
+                  <div className="divide-y divide-[#F5F5F7]">
+                    {activeProducts
+                      .filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id))
+                      .map(p => (
+                        <div key={p.id} className="p-3">
+                          <div className="text-sm font-medium text-[#1D1D1F]">{p.name}</div>
+                          {renderSerializedStock(p.id!)}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4720,7 +5465,7 @@ export function InventarioModule() {
                         </div>
                         {!countingSession.blind && (
                           <div className="text-[11px] text-[#86868B]">
-                            {t('inv.counts.expected')}: {s.quantity} {unitName(product?.unitId || '')}
+                            {t('inv.counts.expected')}: {formatQtyUnit(s.quantity, product?.unitId || '')}
                           </div>
                         )}
                         {needsScan && (
@@ -5439,6 +6184,26 @@ export function InventarioModule() {
                 <p className="text-[11px] text-[#86868B]">{t('inv.movementForm.originExternalHint')}</p>
               </div>
             )}
+            {/* Punto 5 (recepción vinculada): en entradas (compra) se puede
+                vincular un pedido de compra aprobado; al guardar, el pedido
+                pasa a 'recibida'. Filtrado por producto si ya hay uno. */}
+            {isInputMt && (
+              <div className="space-y-1">
+                <Label className="text-xs text-[#86868B]">{t('inv.purchases.linkLabel')}</Label>
+                <select
+                  value={movementForm.purchaseReqId}
+                  onChange={e => setMovementForm(f => ({ ...f, purchaseReqId: e.target.value }))}
+                  className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                >
+                  <option value="">{t('inv.purchases.noLink')}</option>
+                  {approvedPrOptions.map(r => (
+                    <option key={r.id} value={r.id}>
+                      {prItemName(r)} · {prQtyLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">
                 {t('inv.movementForm.reason')}
@@ -5579,7 +6344,7 @@ export function InventarioModule() {
                   {t('inv.transfers.stockLine')
                     .replace('{location}', locationName(transferForm.fromLocationId) || '—')
                     .replace('{quantity}', String(stockFor(transferForm.productId, transferForm.fromLocationId)?.quantity ?? 0))
-                    .replace('{unit}', unitName(products.find(p => p.id === transferForm.productId)?.unitId || ''))}
+                    .replace('{unit}', qtyUnitName(stockFor(transferForm.productId, transferForm.fromLocationId)?.quantity ?? 0, products.find(p => p.id === transferForm.productId)?.unitId || ''))}
                 </div>
                 <div className="text-[11px] text-[#86868B] pt-1">
                   {t('inv.transfers.stockDestination')}
@@ -5588,7 +6353,7 @@ export function InventarioModule() {
                   {t('inv.transfers.stockLine')
                     .replace('{location}', locationName(transferForm.toLocationId) || '—')
                     .replace('{quantity}', String(stockFor(transferForm.productId, transferForm.toLocationId)?.quantity ?? 0))
-                    .replace('{unit}', unitName(products.find(p => p.id === transferForm.productId)?.unitId || ''))}
+                    .replace('{unit}', qtyUnitName(stockFor(transferForm.productId, transferForm.toLocationId)?.quantity ?? 0, products.find(p => p.id === transferForm.productId)?.unitId || ''))}
                 </div>
               </div>
             )}
@@ -5938,10 +6703,29 @@ export function InventarioModule() {
         </DialogContent>
       </Dialog>
 
-      {/* ─── PANTALLA INTERNA: NUEVO SERIAL (punto 8) ─── */}
+      {/* ─── PANTALLA INTERNA: NUEVO SERIAL (punto 7: modo MASA por defecto,
+            con modo individual accesible por toggle) ─── */}
       {invView === 'serial-new' && (
         <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
           <div className="space-y-3">
+            {/* Toggle En masa / Individual */}
+            <div className="flex items-center gap-1 bg-[#F5F5F7] rounded-full p-1 w-fit">
+              {(['bulk', 'single'] as const).map(mode => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setSerialBulkMode(mode); setSerialBulkResult(null); }}
+                  className={cn(
+                    'px-3 py-1 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1',
+                    serialBulkMode === mode ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B]'
+                  )}
+                >
+                  {mode === 'bulk' ? <Boxes className="h-3.5 w-3.5" /> : <Box className="h-3.5 w-3.5" />}
+                  {mode === 'bulk' ? t('inv.serials.mode.bulk') : t('inv.serials.mode.single')}
+                </button>
+              ))}
+            </div>
+
             <div className="space-y-1">
               <Label className="text-xs text-[#86868B]">{t('inv.serials.product')}</Label>
               {rentableProducts.length === 0 ? (
@@ -5961,80 +6745,213 @@ export function InventarioModule() {
                 </select>
               )}
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.serials.serialNumber')}</Label>
-              <Input
-                value={serialForm.serialNumber}
-                onChange={e => setSerialForm(f => ({ ...f, serialNumber: e.target.value }))}
-                placeholder={t('inv.serials.serialNumberPlaceholder')}
-                className="h-9 text-sm rounded-lg"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.serials.size')}</Label>
-              <Input
-                value={serialForm.size}
-                onChange={e => setSerialForm(f => ({ ...f, size: e.target.value }))}
-                placeholder={t('inv.serials.sizePlaceholder')}
-                className="h-9 text-sm rounded-lg"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.serials.photo')}</Label>
-              <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-corporate hover:underline">
-                <Upload className="h-3.5 w-3.5" />
-                {uploadingSerialPhoto ? '...' : t('inv.serials.uploadPhoto')}
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  disabled={uploadingSerialPhoto}
-                  onChange={e => setSerialPhotoFile(e.target.files?.[0] || null)}
-                />
-              </label>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.serials.status')}</Label>
-              <select
-                value={serialForm.statusId}
-                onChange={e => setSerialForm(f => ({ ...f, statusId: e.target.value }))}
-                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
-              >
-                {activeSerialStatuses.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name}
-                    {s.blocksRental ? ` · ${t('inv.catalogs.ss.blocksRental')}` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-[#86868B]">{t('inv.serials.notes')}</Label>
-              <Input
-                value={serialForm.notes}
-                onChange={e => setSerialForm(f => ({ ...f, notes: e.target.value }))}
-                placeholder={t('inv.serials.notesPlaceholder')}
-                className="h-9 text-sm rounded-lg"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => { setInvView('main'); setSerialForm(EMPTY_SERIAL_FORM); setSerialPhotoFile(null); }}
-                className="text-xs text-[#86868B]"
-              >
-                {t('inv.common.cancel')}
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleCreateSerial}
-                disabled={savingSerial || uploadingSerialPhoto || rentableProducts.length === 0}
-                className="text-xs bg-corporate"
-              >
-                {t('inv.common.create')}
-              </Button>
-            </div>
+
+            {serialBulkMode === 'bulk' ? (
+              <>
+                <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg px-3 py-2">
+                  {t('inv.serials.bulkHelp')}
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.serials.bulkQty')}</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="500"
+                      step="1"
+                      value={serialBulk.quantity}
+                      onChange={e => setSerialBulk(b => ({ ...b, quantity: e.target.value }))}
+                      className="h-9 text-sm rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.serials.prefix')}</Label>
+                    <Input
+                      value={serialBulk.prefix}
+                      onChange={e => setSerialBulk(b => ({ ...b, prefix: e.target.value }))}
+                      placeholder={t('inv.serials.prefixPlaceholder')}
+                      className="h-9 text-sm rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.serials.startNumber')}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={serialBulk.startNumber}
+                      onChange={e => setSerialBulk(b => ({ ...b, startNumber: e.target.value }))}
+                      className="h-9 text-sm rounded-lg"
+                    />
+                  </div>
+                </div>
+                {buildBulkSerialCodes().length > 0 && (
+                  <p className="text-[11px] text-[#86868B] break-words">
+                    {t('inv.serials.bulkPreview').replace(
+                      '{codes}',
+                      buildBulkSerialCodes()
+                        .slice(0, 5)
+                        .join(', ') + (buildBulkSerialCodes().length > 5 ? '…' : '')
+                    )}
+                  </p>
+                )}
+
+                {/* Tras crear: se QUEDA en la pantalla con los códigos y los
+                    botones "Crear más" (resetea cantidad/número, mantiene
+                    producto/prefijo) y "Volver" */}
+                {serialBulkResult && (
+                  <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 space-y-1.5">
+                    <p className="text-xs font-semibold text-green-800">
+                      {t('inv.serials.bulkCreated').replace('{count}', String(serialBulkResult.length))}
+                    </p>
+                    <p className="text-[11px] text-green-700 break-words">
+                      {serialBulkResult.join(', ')}
+                    </p>
+                  </div>
+                )}
+                {serialBulkResult ? (
+                  <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setInvView('serials')}
+                      className="text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                    >
+                      {t('inv.serials.viewAll')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSerialBulkResult(null);
+                        // Resetea el formulario manteniendo producto y prefijo
+                        setSerialBulk(b => ({ ...b, quantity: '1', startNumber: '1' }));
+                      }}
+                      className="text-xs text-[#86868B]"
+                    >
+                      {t('inv.common.cancel')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSerialBulkResult(null);
+                        setSerialBulk(b => ({ ...b, quantity: '1', startNumber: '1' }));
+                      }}
+                      disabled={savingSerial}
+                      className="text-xs bg-corporate gap-1.5"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      {t('inv.serials.createMore')}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { setInvView('main'); setSerialForm(EMPTY_SERIAL_FORM); }}
+                      className="text-xs rounded-lg border-[#E5E5E7]"
+                    >
+                      {t('inv.view.back')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setInvView('main'); setSerialForm(EMPTY_SERIAL_FORM); setSerialBulkResult(null); }}
+                      className="text-xs text-[#86868B]"
+                    >
+                      {t('inv.common.cancel')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleCreateSerialsBulk}
+                      disabled={savingSerial || rentableProducts.length === 0}
+                      className="text-xs bg-corporate gap-1.5"
+                    >
+                      <Boxes className="h-3.5 w-3.5" />
+                      {t('inv.common.create')}
+                    </Button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.serials.serialNumber')}</Label>
+                  <Input
+                    value={serialForm.serialNumber}
+                    onChange={e => setSerialForm(f => ({ ...f, serialNumber: e.target.value }))}
+                    placeholder={t('inv.serials.serialNumberPlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.serials.size')}</Label>
+                  <Input
+                    value={serialForm.size}
+                    onChange={e => setSerialForm(f => ({ ...f, size: e.target.value }))}
+                    placeholder={t('inv.serials.sizePlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.serials.photo')}</Label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer text-xs text-corporate hover:underline">
+                    <Upload className="h-3.5 w-3.5" />
+                    {uploadingSerialPhoto ? '...' : t('inv.serials.uploadPhoto')}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={uploadingSerialPhoto}
+                      onChange={e => setSerialPhotoFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.serials.status')}</Label>
+                  <select
+                    value={serialForm.statusId}
+                    onChange={e => setSerialForm(f => ({ ...f, statusId: e.target.value }))}
+                    className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                  >
+                    {activeSerialStatuses.map(s => (
+                      <option key={s.id} value={s.id}>
+                        {getLanguage() === 'en' && s.nameEn ? s.nameEn : s.name}
+                        {s.blocksRental ? ` · ${t('inv.catalogs.ss.blocksRental')}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.serials.notes')}</Label>
+                  <Input
+                    value={serialForm.notes}
+                    onChange={e => setSerialForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder={t('inv.serials.notesPlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setInvView('main'); setSerialForm(EMPTY_SERIAL_FORM); setSerialPhotoFile(null); }}
+                    className="text-xs text-[#86868B]"
+                  >
+                    {t('inv.common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCreateSerial}
+                    disabled={savingSerial || uploadingSerialPhoto || rentableProducts.length === 0}
+                    className="text-xs bg-corporate"
+                  >
+                    {t('inv.common.create')}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -6187,6 +7104,438 @@ export function InventarioModule() {
         </div>
       )}
 
+      {/* ─── SECCIÓN: PEDIDO DE COMPRA (puntos 1, 3, 4): dos pestañas ─── */}
+      {invView === 'purchases' && (
+        <div className="space-y-4">
+          {/* Pestañas: "Mis solicitudes" + "Nueva solicitud" (icono Plus, sin
+              emojis). Sin canRequestPurchases solo se ve Mis solicitudes. */}
+          <div className="flex flex-wrap items-center gap-1 bg-[#F5F5F7] rounded-full p-1 w-fit">
+            <button
+              type="button"
+              onClick={() => setPurchaseViewTab('list')}
+              className={cn(
+                'px-3 py-1 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1.5',
+                purchaseViewTab === 'list' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B]'
+              )}
+            >
+              {t('inv.purchases.myRequests')}
+              <span className="text-[10px]">({visiblePurchaseReqs.length})</span>
+            </button>
+            {canRequestPurchases && (
+              <button
+                type="button"
+                onClick={() => setPurchaseViewTab('new')}
+                className={cn(
+                  'px-3 py-1 rounded-full text-xs font-medium transition-colors inline-flex items-center gap-1',
+                  purchaseViewTab === 'new' ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B]'
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                {t('inv.purchases.newRequest')}
+              </button>
+            )}
+          </div>
+          {!canRequestPurchases && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              {t('inv.purchases.cannotRequest')}
+            </p>
+          )}
+
+          {/* Pestaña 1: Mis solicitudes */}
+          {purchaseViewTab === 'list' && (
+            <div className="space-y-2">
+              {visiblePurchaseReqs.length === 0 && (
+                <div className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-8 text-center text-sm text-[#86868B]">
+                  {t('inv.purchases.empty')}
+                </div>
+              )}
+              {visiblePurchaseReqs.map(r => {
+                const isOpen = expandedIds.has(r.id!);
+                const itemName = prItemName(r);
+                const supplierName = prSupplierName(r);
+                return (
+                  <div
+                    key={r.id}
+                    className="bg-white rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] overflow-hidden"
+                  >
+                    <button
+                      onClick={() => toggleExpanded(r.id!)}
+                      className="w-full flex items-center gap-3 p-3 text-left"
+                    >
+                      <span
+                        className={cn(
+                          'px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0',
+                          PR_STATUS_BADGE[r.status] ?? PR_STATUS_BADGE.draft
+                        )}
+                      >
+                        {t(`inv.purchases.status.${r.status}`)}
+                      </span>
+                      {!!r.urgent && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-300 shrink-0 inline-flex items-center gap-1">
+                          <Flame className="h-3 w-3" />
+                          {t('inv.purchases.urgent')}
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium text-[#1D1D1F] truncate">{itemName}</div>
+                        <div className="text-xs text-[#86868B] truncate">
+                          {prQtyLabel(r)}
+                          {r.departmentName ? ` · ${r.departmentName}` : ''}
+                        </div>
+                      </div>
+                      <span className="text-xs text-[#86868B] shrink-0">
+                        {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}
+                      </span>
+                      {isOpen ? (
+                        <ChevronUp className="h-4 w-4 text-[#86868B] shrink-0" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-[#86868B] shrink-0" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div className="border-t border-[#E5E5E7] p-3 space-y-1.5">
+                        {r.productId ? (
+                          <DetailRow label={t('inv.movements.product')} value={itemName} />
+                        ) : (
+                          <DetailRow label={t('inv.purchases.detail.description')} value={itemName} />
+                        )}
+                        <DetailRow
+                          label={t('inv.transfers.quantity')}
+                          value={prQtyLabel(r)}
+                        />
+                        {r.neededBy && (
+                          <DetailRow
+                            label={t('inv.purchases.detail.neededBy')}
+                            value={new Date(r.neededBy).toLocaleDateString()}
+                          />
+                        )}
+                        {r.reason && (
+                          <DetailRow label={t('inv.movements.reason')} value={r.reason} />
+                        )}
+                        <DetailRow
+                          label={t('inv.purchases.detail.urgent')}
+                          value={r.urgent ? t('inv.purchases.yes') : t('inv.purchases.no')}
+                        />
+                        <DetailRow label={t('inv.purchases.requester')} value={r.createdByName || '—'} />
+                        <DetailRow label={t('inv.purchases.department')} value={r.departmentName || '—'} />
+                        <DetailRow
+                          label={t('inv.purchases.supplier')}
+                          value={supplierName || t('inv.purchases.noSupplier')}
+                        />
+                        {r.source === 'auto' && r.notes && (
+                          <DetailRow label={t('inv.purchases.notes')} value={r.notes} />
+                        )}
+
+                        {/* Resultado de la aprobación */}
+                        {r.status === 'aprobada' && (
+                          <>
+                            <DetailRow
+                              label={t('inv.purchases.approvedBy')}
+                              value={r.approvedByName || '—'}
+                            />
+                            <DetailRow
+                              label={t('inv.purchases.approvedAt')}
+                              value={r.approvedAt ? new Date(r.approvedAt).toLocaleString() : '—'}
+                            />
+                            {r.approvedNote && (
+                              <DetailRow label={t('inv.purchases.approvedNote')} value={r.approvedNote} />
+                            )}
+                          </>
+                        )}
+                        {r.status === 'rechazada' && (
+                          <>
+                            <DetailRow
+                              label={t('inv.purchases.rejectedBy')}
+                              value={r.rejectedByName || '—'}
+                            />
+                            <DetailRow
+                              label={t('inv.purchases.rejectedAt')}
+                              value={r.rejectedAt ? new Date(r.rejectedAt).toLocaleString() : '—'}
+                            />
+                            <DetailRow
+                              label={t('inv.purchases.rejectedReason')}
+                              value={r.rejectedReason || '—'}
+                            />
+                          </>
+                        )}
+                        {r.status === 'recibida' && (
+                          <>
+                            <DetailRow
+                              label={t('inv.purchases.receivedAt')}
+                              value={r.receivedAt ? new Date(r.receivedAt).toLocaleString() : '—'}
+                            />
+                            <DetailRow
+                              label={t('inv.purchases.linkedMovement')}
+                              value={r.linkedMovementId || '—'}
+                            />
+                          </>
+                        )}
+
+                        {/* Acciones del aprobador: Supervisor+ de un departamento
+                            con managesPurchases (o DG), solo en 'por_aprobar' */}
+                        {r.status === 'por_aprobar' && isPurchaseApprover && (
+                          <div className="flex flex-wrap items-center gap-2 pt-2">
+                            <Button
+                              size="sm"
+                              onClick={() => openPrDecision(r, 'approve')}
+                              className="h-7 text-xs rounded-lg bg-corporate gap-1.5"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              {t('inv.purchases.approve')}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openPrDecision(r, 'reject')}
+                              className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5 text-red-600"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                              {t('inv.purchases.reject')}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Pestaña 2: Nueva solicitud */}
+          {purchaseViewTab === 'new' && canRequestPurchases && (
+            <div className="bg-white rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-[#E5E5E7] p-4 sm:p-6">
+              <div className="space-y-3">
+                {/* Toggle: producto del catálogo / descripción libre */}
+                <div className="flex items-center gap-1 bg-[#F5F5F7] rounded-full p-1 w-fit">
+                  {(['catalog', 'free'] as const).map(mode => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => setPrForm(f => ({ ...f, mode, productId: '', categoryId: '' }))}
+                      className={cn(
+                        'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                        prForm.mode === mode ? 'bg-white text-[#1D1D1F] shadow-sm' : 'text-[#86868B]'
+                      )}
+                    >
+                      {mode === 'catalog' ? t('inv.purchases.mode.catalog') : t('inv.purchases.mode.free')}
+                    </button>
+                  ))}
+                </div>
+
+                {prForm.mode === 'catalog' ? (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.purchases.category')}</Label>
+                      <select
+                        value={prForm.categoryId}
+                        onChange={e => setPrForm(f => ({ ...f, categoryId: e.target.value, productId: '' }))}
+                        className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                      >
+                        <option value="">{t('inv.movementForm.selectCategory')}</option>
+                        {activeCategories.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                        {activeProducts.some(p => !p.categoryId) && (
+                          <option value="__none__">{t('inv.movementForm.noCategory')}</option>
+                        )}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.movementForm.product')}</Label>
+                      <ProductSearchSelect
+                        products={prFormProducts}
+                        value={prForm.productId}
+                        onChange={id => {
+                          const p = products.find(x => x.id === id);
+                          setPrForm(f => ({ ...f, productId: id, unitId: p?.unitId || f.unitId }));
+                        }}
+                        selectPlaceholder={prForm.categoryId ? t('inv.movementForm.selectProduct') : t('inv.movementForm.selectCategory')}
+                        searchPlaceholder={t('inv.movementForm.noMatches')}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.purchases.freeDescription')}</Label>
+                      <Input
+                        value={prForm.freeDescription}
+                        onChange={e => setPrForm(f => ({ ...f, freeDescription: e.target.value }))}
+                        placeholder={t('inv.purchases.freeDescriptionPlaceholder')}
+                        className="h-9 text-sm rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-[#86868B]">{t('inv.purchases.unit')}</Label>
+                      <select
+                        value={prForm.unitId}
+                        onChange={e => setPrForm(f => ({ ...f, unitId: e.target.value }))}
+                        className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                      >
+                        <option value="">{t('inv.purchases.selectUnit')}</option>
+                        {units.filter(u => u.isActive).map(u => (
+                          <option key={u.id} value={u.id}>
+                            {u.abbreviation ? `${u.name} (${u.abbreviation})` : u.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.movementForm.quantity')}</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={prForm.quantity}
+                      onChange={e => setPrForm(f => ({ ...f, quantity: e.target.value }))}
+                      className="h-9 text-sm rounded-lg"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-[#86868B]">{t('inv.purchases.neededBy')}</Label>
+                    <Input
+                      type="date"
+                      value={prForm.neededBy}
+                      onChange={e => setPrForm(f => ({ ...f, neededBy: e.target.value }))}
+                      className="h-9 text-sm rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">
+                    {t('inv.purchases.reason')}
+                  </Label>
+                  <Input
+                    value={prForm.reason}
+                    onChange={e => setPrForm(f => ({ ...f, reason: e.target.value }))}
+                    placeholder={t('inv.purchases.reasonPlaceholder')}
+                    className="h-9 text-sm rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-[#86868B]">{t('inv.purchases.supplier')}</Label>
+                  <select
+                    value={prForm.supplierId}
+                    onChange={e => setPrForm(f => ({ ...f, supplierId: e.target.value }))}
+                    className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+                  >
+                    <option value="">{t('inv.purchases.noSupplier')}</option>
+                    {activeSuppliers.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <label className="flex items-center gap-2 text-xs text-[#1D1D1F] cursor-pointer w-fit">
+                  <input
+                    type="checkbox"
+                    checked={prForm.urgent}
+                    onChange={e => setPrForm(f => ({ ...f, urgent: e.target.checked }))}
+                    className="h-3.5 w-3.5 accent-red-500"
+                  />
+                  <Flame className="h-3.5 w-3.5 text-red-500" />
+                  {t('inv.purchases.urgentToggle')}
+                </label>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { setPurchaseViewTab('list'); setPrForm(EMPTY_PR_FORM); }}
+                    className="text-xs text-[#86868B]"
+                  >
+                    {t('inv.common.cancel')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleCreatePurchaseRequest}
+                    disabled={savingPr}
+                    className="text-xs bg-corporate gap-1.5"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {t('inv.purchases.send')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── MODAL: APROBAR / RECHAZAR SOLICITUD DE COMPRA (punto 4) ─── */}
+      <Dialog
+        open={prDecision !== null}
+        onOpenChange={open => { if (!open) { setPrDecision(null); setPrDecisionNote(''); } }}
+      >
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
+              {prDecision?.action === 'approve' ? (
+                <>
+                  <Check className="h-4 w-4 text-corporate" />
+                  {t('inv.purchases.approveTitle')}
+                </>
+              ) : (
+                <>
+                  <X className="h-4 w-4 text-red-500" />
+                  {t('inv.purchases.rejectTitle')}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-[#86868B]">
+              {prDecision ? `${prItemName(prDecision.req)} · ${prQtyLabel(prDecision.req)}` : ''}
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">
+                {prDecision?.action === 'approve'
+                  ? t('inv.purchases.noteOptional')
+                  : t('inv.purchases.rejectReasonLabel')}
+              </Label>
+              <Input
+                value={prDecisionNote}
+                onChange={e => setPrDecisionNote(e.target.value)}
+                placeholder={
+                  prDecision?.action === 'approve'
+                    ? t('inv.purchases.noteOptionalPlaceholder')
+                    : t('inv.purchases.rejectReasonPlaceholder')
+                }
+                className="h-9 text-sm rounded-lg"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setPrDecision(null); setPrDecisionNote(''); }}
+                className="text-xs text-[#86868B]"
+              >
+                {t('inv.common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handlePrDecision}
+                disabled={prDecision?.action === 'reject' && !prDecisionNote.trim()}
+                className={cn(
+                  'text-xs',
+                  prDecision?.action === 'reject' ? 'bg-red-600 hover:bg-red-700' : 'bg-corporate'
+                )}
+              >
+                {prDecision?.action === 'approve' ? t('inv.purchases.approve') : t('inv.purchases.reject')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ─── PANTALLA: FICHA DE PRODUCTO (punto 13, centro de operaciones) ─── */}
       {invView === 'product' && (() => {
         const product = products.find(p => p.id === productDetailId);
@@ -6249,8 +7598,8 @@ export function InventarioModule() {
                 )}
                 {productStocks.map(s => (
                   <div key={s.id} className="text-sm text-[#1D1D1F]">
-                    {locationName(s.locationId)}: <span className="font-semibold">{s.quantity}</span>{' '}
-                    {unitName(product.unitId)}
+                    {locationName(s.locationId)}:{' '}
+                    <span className="font-semibold">{formatQtyUnit(s.quantity, product.unitId)}</span>
                   </div>
                 ))}
               </div>

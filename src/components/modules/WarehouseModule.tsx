@@ -1776,7 +1776,8 @@ export function WarehouseModule() {
       setQuickClientName('');
       setQuickClientType('persona');
       setQuickClientOpen(false);
-      toast.success(t('wh.toast.clientCreated'));
+      // Sin toast de éxito: el cliente queda seleccionado en el formulario
+      // (política "sin pop-ups de confirmación").
     } catch (err) {
       console.error('[WarehouseModule] createQuickClient:', err);
       toast.error(t('wh.toast.error'));
@@ -2065,7 +2066,8 @@ export function WarehouseModule() {
         );
       }
       setWhView(null);
-      toast.success(t('wh.toast.orderCreated'));
+      // Sin toast de éxito: la orden nueva aparece en la lista (política
+      // "sin pop-ups de confirmación").
     } catch (err) {
       console.error('[WarehouseModule] saveOrder:', err);
       toast.error(t('wh.toast.error'));
@@ -2196,7 +2198,7 @@ export function WarehouseModule() {
           : `Descuento "${order.discountName ?? ''}" (-${order.discountPercent ?? 0}%) rechazado y quitado del total en la orden de ${order.clientName}. Nota: ${noteTrim}`,
       });
       setDiscountSettle(null);
-      toast.success(approve ? t('wh.toast.discountApproved') : t('wh.toast.discountRejected'));
+      // Sin toast de éxito: el estado del descuento se ve en la orden.
     } catch (err) {
       console.error('[WarehouseModule] settleDiscount:', err);
       toast.error(t('wh.toast.error'));
@@ -2275,7 +2277,7 @@ export function WarehouseModule() {
       async () => {
         try {
           await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalOrders, order.id!), buildTransitionPatch(target));
-          toast.success(t('wh.toast.statusChanged'));
+          // Sin toast de éxito: el estado nuevo se ve en la tarjeta de la orden.
         } catch (err) {
           console.error('[WarehouseModule] advanceOrder:', err);
           toast.error(t('wh.toast.error'));
@@ -2336,7 +2338,8 @@ export function WarehouseModule() {
             description: `Avance forzado en modo emergencia a "${statusName(target)}" sin escáner. Motivo: ${reason}`,
           });
           setEmergencyOrderId(null);
-          toast.success(t('wh.emergency.toast'));
+          // Sin toast de éxito: el avance forzado queda auditado y visible en
+          // la orden (el confirm previo ya avisó del riesgo).
         } catch (err) {
           console.error('[WarehouseModule] saveEmergency:', err);
           toast.error(t('wh.toast.error'));
@@ -2365,7 +2368,7 @@ export function WarehouseModule() {
             depositStatus: 'devuelta',
             updatedAt: new Date().toISOString(),
           });
-          toast.success(t('wh.toast.depositReturned'));
+          // Sin toast de éxito: el estado de la fianza se ve en la orden.
         } catch (err) {
           console.error('[WarehouseModule] markDepositReturned:', err);
           toast.error(t('wh.toast.error'));
@@ -2404,7 +2407,7 @@ export function WarehouseModule() {
         updatedAt: new Date().toISOString(),
       });
       setDiscountOrderId(null);
-      toast.success(t('wh.toast.depositDiscounted'));
+      // Sin toast de éxito: la fianza descontada se ve en la orden.
     } catch (err) {
       console.error('[WarehouseModule] saveDiscount:', err);
       toast.error(t('wh.toast.error'));
@@ -2635,7 +2638,7 @@ export function WarehouseModule() {
           }
           // TODO WH-audit: registrar el despacho cuando exista una acción adecuada
           closeDispatch();
-          toast.success(t('wh.toast.dispatched'));
+          // Sin toast de éxito: la orden pasa a "despachado" en la lista.
         } catch (err) {
           console.error('[WarehouseModule] confirmDispatch:', err);
           toast.error(t('wh.toast.error'));
@@ -2850,7 +2853,7 @@ export function WarehouseModule() {
           });
           // TODO WH-audit: registrar la verificación cuando exista una acción adecuada
           closeReturn();
-          toast.success(t('wh.toast.returnVerified'));
+          // Sin toast de éxito: la orden queda en su estado final en la lista.
         } catch (err) {
           console.error('[WarehouseModule] finalizeReturn:', err);
           toast.error(t('wh.toast.error'));

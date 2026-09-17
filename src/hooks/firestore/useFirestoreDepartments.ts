@@ -21,6 +21,9 @@ function docToDepartment(id: string, data: any): Department {
     visibleModuleIds: Array.isArray(data.visibleModuleIds)
       ? data.visibleModuleIds.filter((x: unknown): x is string => typeof x === 'string')
       : undefined,
+    // Compras: defaults ausente = puede solicitar (true) / no gestiona (false)
+    canRequestPurchases: data.canRequestPurchases !== false,
+    managesPurchases: data.managesPurchases === true,
     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt || new Date().toISOString(),
     updatedAt: data.updatedAt?.toDate?.().toISOString() || data.updatedAt || new Date().toISOString(),
   };

@@ -187,6 +187,7 @@ export function DepartamentosTab() {
   const [originalName, setOriginalName] = useState("");
   const [form, setForm] = useState<DepartmentFormData>({
     code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [],
+    canRequestPurchases: true, managesPurchases: false,
   });
   const [saving, setSaving] = useState(false);
   const isDirectorGeneral = currentUser?.role === Role.DIRECTOR_GENERAL;
@@ -229,7 +230,7 @@ export function DepartamentosTab() {
 
   const PROTECTED_DEPT_CODES = ["OPERACIONES", "ADMINISTRATIVO"];
 
-  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [] }); setShowFormModal(true); };
+  const openCreate = () => { setEditingId(null); setOriginalName(""); setForm({ code: "", name: "", description: "", color: CORPORATE_COLORS[0].value, icon: "building", isActive: true, parentId: null, visibleModuleIds: [], canRequestPurchases: true, managesPurchases: false }); setShowFormModal(true); };
   const openEdit = (dept: any) => {
     // Los nodos del árbol (useDynamicDepartments) no traen description/color/
     // visibleModuleIds: se busca el registro completo en el hook principal
@@ -239,6 +240,7 @@ export function DepartamentosTab() {
       code: full.code || "", name: full.name || "", description: full.description ?? "", color: full.color ?? CORPORATE_COLORS[0].value, icon: full.icon ?? "building",
       isActive: full.isActive !== false, parentId: full.parentId ?? null,
       visibleModuleIds: Array.isArray(full.visibleModuleIds) ? [...full.visibleModuleIds] : [],
+      canRequestPurchases: full.canRequestPurchases !== false, managesPurchases: full.managesPurchases === true,
     }); setShowFormModal(true);
   };
   const openTeam = (dept: any) => { setSelectedDept(dept); setEditingUserId(null); setShowTeamModal(true); };
@@ -258,6 +260,10 @@ export function DepartamentosTab() {
       isActive: form.isActive !== false,
       parentId: form.parentId ?? null,
       visibleModuleIds: Array.isArray(form.visibleModuleIds) ? form.visibleModuleIds : [],
+      // Booleanos explícitos: false debe guardarse como false (sanitize solo
+      // elimina undefined, nunca false).
+      canRequestPurchases: form.canRequestPurchases !== false,
+      managesPurchases: form.managesPurchases === true,
     });
     if (editingId && isEditingProtected) {
       // Departamentos base: solo permitir editar color e icono
@@ -281,6 +287,14 @@ export function DepartamentosTab() {
         const prevVisible: string[] = departments.find((d: any) => d.id === editingId)?.visibleModuleIds || [];
         const nextVisible: string[] = form.visibleModuleIds || [];
         const visibilityChanged = JSON.stringify(prevVisible) !== JSON.stringify(nextVisible);
+        // Diff de configuración de compras para auditoría (defaults: solicitar
+        // = true, gestionar = false)
+        const prevDept = departments.find((d: any) => d.id === editingId);
+        const prevCanRequest = prevDept?.canRequestPurchases !== false;
+        const nextCanRequest = form.canRequestPurchases !== false;
+        const prevManages = prevDept?.managesPurchases === true;
+        const nextManages = form.managesPurchases === true;
+        const purchasesConfigChanged = prevCanRequest !== nextCanRequest || prevManages !== nextManages;
         if (originalName && originalName !== form.name) {
           const updated = await syncDepartmentName(originalName, form.name);
           await logAction({ action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name, impactLevel: "critical", description: "Renombrado: " + originalName + " -> " + form.name + " (" + updated + " registros)" });
@@ -295,6 +309,15 @@ export function DepartamentosTab() {
             description: "Módulos adicionales actualizados: " + form.name + " (" + prevVisible.length + " → " + nextVisible.length + ")",
             previousValue: { visibleModuleIds: prevVisible },
             newValue: { visibleModuleIds: nextVisible },
+          });
+        }
+        if (purchasesConfigChanged) {
+          await logAction({
+            action: "DEPARTMENT_UPDATED", targetType: "department", targetId: editingId, targetName: form.name,
+            impactLevel: "major",
+            description: "Configuración de compras actualizada: " + form.name + " (solicita: " + (prevCanRequest ? "sí" : "no") + " → " + (nextCanRequest ? "sí" : "no") + ", gestiona: " + (prevManages ? "sí" : "no") + " → " + (nextManages ? "sí" : "no") + ")",
+            previousValue: { canRequestPurchases: prevCanRequest, managesPurchases: prevManages },
+            newValue: { canRequestPurchases: nextCanRequest, managesPurchases: nextManages },
           });
         }
       } else {
@@ -568,6 +591,35 @@ export function DepartamentosTab() {
               />
               <p className="text-[11px] text-[#86868B]">
                 Selecciona los módulos adicionales que verá este departamento. Se suman a lo que su rol permite; no quitan visibilidad.
+              </p>
+              {!isDirectorGeneral && (
+                <p className="text-[11px] text-amber-600">Solo el Director General puede cambiar esta configuración.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-[#86868B]">Configuración de compras</Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.canRequestPurchases !== false}
+                  disabled={!isDirectorGeneral || isEditingProtected}
+                  onChange={(e) => setForm(f => ({ ...f, canRequestPurchases: e.target.checked }))}
+                  className="rounded border-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <Label className="text-sm text-[#1D1D1F]">Puede solicitar compras</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={form.managesPurchases === true}
+                  disabled={!isDirectorGeneral || isEditingProtected}
+                  onChange={(e) => setForm(f => ({ ...f, managesPurchases: e.target.checked }))}
+                  className="rounded border-[#E5E5E7] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+                <Label className="text-sm text-[#1D1D1F]">Gestiona compras</Label>
+              </div>
+              <p className="text-[11px] text-[#86868B]">
+                Los gerentes y roles superiores de los departamentos con esta opción reciben y aprueban las solicitudes de compra de toda la empresa.
               </p>
               {!isDirectorGeneral && (
                 <p className="text-[11px] text-amber-600">Solo el Director General puede cambiar esta configuración.</p>
@@ -936,6 +988,17 @@ export function DepartamentosTab() {
               </>
             )}
           </div>
+
+          {isExpanded && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${dept.canRequestPurchases !== false ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                Puede solicitar compras: {dept.canRequestPurchases !== false ? "Sí" : "No"}
+              </span>
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-medium ${dept.managesPurchases === true ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
+                Gestiona compras: {dept.managesPurchases === true ? "Sí" : "No"}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
