@@ -309,7 +309,7 @@ export interface InventoryMovement {
   toLocationId?: string | null;
   movementTypeId: string;
   reason?: string | null;
-  referenceType?: 'transfer' | 'count' | 'rental' | null;
+  referenceType?: 'transfer' | 'count' | 'rental' | 'rental_unit' | null;
   referenceId?: string | null;
   createdAt: string;
   createdBy: string;
@@ -394,6 +394,9 @@ export interface RentalUnit {
   size?: string | null;
   statusId: string; // id del catálogo serialStatuses
   notes?: string | null;
+  // Bodega actual del serial (aditivo): ausente/null = "por ubicar". Lo
+  // actualizan "Ubicar" y la recepción de transferencias serializadas
+  locationId?: string | null;
   createdAt: string;
   createdBy: string;
   updatedAt: string;

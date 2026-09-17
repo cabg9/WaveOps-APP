@@ -1,9 +1,26 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-16 (FASE 1 — ENTREGA: Pedido de compra + ajustes — desplegada en GEMELA, pendiente re-prueba de los 9 puntos)
+> Última actualización: 2026-09-16 (FASE 1 — FIXES ETAPA 2: 5 correcciones — desplegadas en GEMELA, pendiente re-prueba)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — FIXES ETAPA 2 (16 de septiembre) — DESPLEGADAS EN GEMELA
+
+**Estado:** EN GEMELA, pendiente re-prueba. Deploy: hosting (index-dLLlXDuX.js verificado en vivo; rules/functions sin cambios — el fix de reglas `notifications` de la entrega anterior ya cubre el punto 3). Verificaciones hechas a nivel código/datos por el coordinador; la prueba con sesión real queda para el usuario.
+
+**Los 5 fixes:**
+1. **Prefijo telefónico completo** (CatalogosTab.tsx): lista de ~235 países como constante UI (iso/name/prefix, orden alfabético ES). SIN emojis: badge ISO de 2 letras. Buscable por nombre o prefijo ("ita" → Italia, "593" → Ecuador), normalización de acentos. Default = locale del dispositivo (navigator.language), fallback +593. Contrato de guardado intacto (phone compuesto + prefix/number estructurados); prefijo desconocido → opción "Prefijo personalizado". Limitación conocida: países que comparten prefijo (+1, +44…) marcan el check en el primero de la lista (contrato solo pasa prefijo, no ISO).
+2. **Sugeridos en Nueva solicitud**: memo `suggestedPrProducts` — productos con stock ≤ mínimo o 0 (sin doc = 0), máx 8, ordenados por urgencia. Chips con nombre + stock (rojo 0 / ámbar bajo mínimo) arriba del selector; tocar chip precarga producto+categoría+unidad y enfoca la cantidad.
+3. **BUG notificación de solicitud no llegaba** — diagnóstico: (a) campos escritos coinciden exactamente con lo que lee `useNotifications` (sin cambios necesarios); (b) el hook de usuarios NO filtra por departamento, pero `activeUsers = users.filter(u => isActive)` excluía perfiles heredados sin `isActive` → nunca entraban en `targets`. Fix: destinatarios resueltos contra `users` completo (mismo patrón best-effort que WarehouseModule). La regla de Firestore para `PURCHASE_REQUEST_APPROVAL` ya estaba desplegada de la entrega anterior.
+4. **BUG entrada vinculada no aparecía en Stock** — CAUSA RAÍZ REAL: `canWrite` era solo DG/RRHH y `handleSaveMovement` hacía `return` SILENCIOSO; quien no era DG/RRHH (p. ej. staff) registraba la entrada, no pasaba nada, sin error. Fix: nuevo `canOperate = !!currentUser` aplicado a TODAS las operaciones (movimientos, transferencias, conteos, seriales, ubicar); `canWrite` queda solo en administración de catálogos; TODOS los retornos mudos sustituidos por `toast.error` con claves i18n (inv.error.loginRequired / inv.readOnly / inv.error.supervisorOnly). Verificado con Admin SDK: la gemela tenía inventoryStocks VACÍA (la entrada nunca se escribió).
+5. **Seriales con ubicación**: `RentalUnit.locationId?` (types + parser). Formulario de creación (individual y masa) con "Ubicación de ingreso" (default: nombre con 'warehouse' → primera tipo Almacenaje → primera activa; siempre editable) + ayuda. Stock agrupa seriales por ubicación ("The Warehouse: 5 disponibles…"), sin ubicación bajo "Por ubicar". Badge "Por ubicar"; acción "Ubicar" (diálogo → guarda locationId + kardex con tipo 'ingreso' / fallback entrada, referenceType 'rental_unit'). Bloqueos: serial sin ubicar no pasa a 'rentado'; en recepción de transferencias serializadas se rechaza unidad ubicada en otra bodega; `handleReceiveTransfer` ahora actualiza locationId de cada serial recibido. DECISIÓN: no se bloqueó la transferencia de seriales legacy sin ubicación (habría roto el flujo existente); se sanean con "Ubicar".
+
+**Archivos:** InventarioModule.tsx (+~900), CatalogosTab.tsx (PhoneField ~+300), src/types/catalogs.ts (RentalUnit.locationId + 'rental_unit' en referenceType). **Build:** exit 0. **Deploy gemela:** hosting index-dLLlXDuX.js.
+
+**Pendientes:** serial sin ubicar no es bloqueado en despacho de WarehouseModule (vive ahí, fuera de alcance); prefijos compartidos marcan el primer país (ver punto 1); botón temporal de reset en Develops aún activo; ADMINISTRATIVO `managesPurchases` sigue seteado por dato directo.
 
 ---
 

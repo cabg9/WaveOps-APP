@@ -103,7 +103,7 @@ registerI18nKeys({
     'inv.loading': 'Cargando inventario...',
     'inv.error.load': 'Error al cargar datos de inventario',
     'inv.error.save': 'Error al guardar',
-    'inv.readOnly': 'Solo lectura. Solo Dirección General y RRHH pueden gestionar inventario.',
+    'inv.readOnly': 'Solo Dirección General y RRHH pueden gestionar los catálogos.',
 
     'inv.view.back': 'Volver',
     'inv.home.movement': 'Registrar movimiento',
@@ -530,6 +530,28 @@ registerI18nKeys({
     'inv.serials.bulkQtyInvalid': 'La cantidad y el número inicial deben ser enteros válidos',
     'inv.serials.createMore': 'Crear más',
     'inv.serials.viewAll': 'Ver seriales',
+
+    // Operación de inventario: cualquier usuario autenticado opera (las
+    // reglas de Firestore ya lo permiten); los toasts de permiso nunca
+    // quedan mudos en un handler de guardado
+    'inv.error.loginRequired': 'Inicia sesión para guardar cambios',
+    'inv.error.supervisorOnly': 'Solo supervisores pueden hacer esto',
+
+    // Sugeridos en "Nueva solicitud" (stock bajo o en cero)
+    'inv.purchases.suggested': 'Sugeridos',
+    'inv.purchases.suggestedChip': '{name} · {stock}',
+
+    // Seriales con ubicación (modelo final): ubicación de ingreso, "por
+    // ubicar" y acción "Ubicar" con movimiento de kardex
+    'inv.serials.entryLocation': 'Ubicación de ingreso',
+    'inv.serials.entryLocationHelp': '¿Dónde recibes estos equipos?',
+    'inv.serials.unlocated': 'Por ubicar',
+    'inv.serials.locate': 'Ubicar',
+    'inv.serials.locateTitle': 'Ubicar serial',
+    'inv.serials.locateHelp': 'Elige la bodega donde queda esta unidad. Queda registrado en el kardex como entrada.',
+    'inv.serials.locateReason': 'Ubicación inicial',
+    'inv.serials.unlocatedNoDispatch': 'Ubica el serial en una bodega antes de rentarlo o transferirlo',
+    'inv.serials.wrongLocation': 'Ese serial está registrado en otra bodega',
   },
   en: {
     'inv.devTitle': 'Module under development',
@@ -543,7 +565,7 @@ registerI18nKeys({
     'inv.loading': 'Loading inventory...',
     'inv.error.load': 'Error loading inventory data',
     'inv.error.save': 'Error saving',
-    'inv.readOnly': 'Read only. Only General Management and HR can manage inventory.',
+    'inv.readOnly': 'Only General Management and HR can manage the catalogs.',
 
     'inv.view.back': 'Back',
     'inv.home.movement': 'Register movement',
@@ -968,6 +990,27 @@ registerI18nKeys({
     'inv.serials.bulkQtyInvalid': 'Quantity and starting number must be valid integers',
     'inv.serials.createMore': 'Create more',
     'inv.serials.viewAll': 'View serials',
+
+    // Inventory operations: any authenticated user operates (Firestore rules
+    // already allow it); permission toasts are never silent in save handlers
+    'inv.error.loginRequired': 'Sign in to save changes',
+    'inv.error.supervisorOnly': 'Only supervisors can do this',
+
+    // Suggested items in "New request" (low or zero stock)
+    'inv.purchases.suggested': 'Suggested',
+    'inv.purchases.suggestedChip': '{name} · {stock}',
+
+    // Serials with location (final model): receiving location, "unlocated"
+    // state and "Locate" action with a ledger movement
+    'inv.serials.entryLocation': 'Receiving location',
+    'inv.serials.entryLocationHelp': 'Where are you receiving these units?',
+    'inv.serials.unlocated': 'Unlocated',
+    'inv.serials.locate': 'Locate',
+    'inv.serials.locateTitle': 'Locate serial',
+    'inv.serials.locateHelp': 'Choose the warehouse where this unit stays. It is recorded in the ledger as an incoming movement.',
+    'inv.serials.locateReason': 'Initial location',
+    'inv.serials.unlocatedNoDispatch': 'Locate the serial in a warehouse before renting or transferring it',
+    'inv.serials.wrongLocation': 'That serial is registered at another warehouse',
   },
 });
 
@@ -1060,6 +1103,7 @@ function docToRentalUnit(id: string, data: Record<string, unknown>): RentalUnit 
     size: data.size ? toStr(data.size) : null,
     statusId: toStr(data.statusId),
     notes: data.notes ? toStr(data.notes) : null,
+    locationId: data.locationId ? toStr(data.locationId) : null,
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
     updatedAt: toStr(data.updatedAt),
@@ -1510,6 +1554,9 @@ interface SerialFormState {
   size: string;
   statusId: string;
   notes: string;
+  // Ubicación de ingreso (modelo final de seriales): queda en cada serial
+  // creado, individual o en masa
+  locationId: string;
 }
 
 const EMPTY_SERIAL_FORM: SerialFormState = {
@@ -1518,6 +1565,7 @@ const EMPTY_SERIAL_FORM: SerialFormState = {
   size: '',
   statusId: '',
   notes: '',
+  locationId: '',
 };
 
 // Badges de estado (mismo lenguaje visual que el resto del módulo)
@@ -1622,6 +1670,9 @@ export function InventarioModule() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  // Tipos de ubicación (para el default de "Ubicación de ingreso" de seriales:
+  // tipo 'Almacenaje'). Catálogo real de Firestore; parser defensivo mínimo
+  const [locationTypes, setLocationTypes] = useState<Array<{ id: string; name: string; isActive: boolean }>>([]);
 
   // Estado de carga / error
   const [loading, setLoading] = useState(true);
@@ -1766,6 +1817,11 @@ export function InventarioModule() {
   const [retireReason, setRetireReason] = useState('');
   const [savingRetire, setSavingRetire] = useState(false);
 
+  // "Ubicar" un serial (modelo final punto 5): elige bodega, guarda
+  // locationId y registra una entrada en el kardex
+  const [locatingUnit, setLocatingUnit] = useState<RentalUnit | null>(null);
+  const [locateLocationId, setLocateLocationId] = useState('');
+
   // QR y escáner (FASE 1B-serials)
   const [qrDialog, setQrDialog] = useState<{ title: string; subtitle: string; qrText: string } | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -1789,6 +1845,15 @@ export function InventarioModule() {
 
   const tenantId = getCurrentTenantId();
   const enabled = isFeatureEnabled('enableInventario');
+  // Operación de inventario (movimientos, transferencias, conteos, seriales,
+  // solicitudes): CUALQUIER usuario autenticado, coherente con las reglas de
+  // Firestore (write para autenticados en inventoryStocks / inventoryMovements
+  // / purchaseRequisitions) y con el spec de Warehouse ("crear/operar órdenes
+  // de renta, movimientos, conteos, transferencias"). El bug de la "entrada
+  // vinculada que no aparece en stock" era este guard DG/RRHH con retorno
+  // silencioso: quien no era DG/RRHH guardaba y NO pasaba nada.
+  const canOperate = !!currentUser;
+  // Solo administración de catálogos/config (movementTypes, serialStatuses)
   const canWrite = currentUser?.role === Role.DIRECTOR_GENERAL || currentUser?.role === Role.RRHH;
   // Supervisor o superior (jerarquía de niveles 1-6): define mínimos/máximos,
   // aprueba ajustes por conteo y puede recibir transferencias ajenas
@@ -1811,6 +1876,17 @@ export function InventarioModule() {
     return activeProducts.filter(p => p.categoryId === movementCategoryId);
   }, [activeProducts, movementCategoryId]);
   const activeLocations = useMemo(() => locations.filter(l => l.isActive), [locations]);
+  // Default de "Ubicación de ingreso" de seriales (modelo final): la
+  // ubicación cuyo nombre normalizado contiene 'warehouse'; si no, la primera
+  // activa de tipo 'Almacenaje'; si no, la primera activa. Siempre editable
+  const defaultSerialLocationId = useMemo(() => {
+    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const warehouse = activeLocations.find(l => norm(l.name).includes('warehouse'));
+    if (warehouse) return warehouse.id || '';
+    const almacenajeType = locationTypes.find(lt => norm(lt.name) === 'almacenaje');
+    const byType = almacenajeType ? activeLocations.find(l => l.typeId === almacenajeType.id) : undefined;
+    return byType?.id || activeLocations[0]?.id || '';
+  }, [activeLocations, locationTypes]);
   const activeMovementTypes = useMemo(() => movementTypes.filter(m => m.isActive), [movementTypes]);
   const activeSuppliers = useMemo(() => suppliers.filter(s => s.isActive), [suppliers]);
   const activeUsers = useMemo(() => users.filter(u => u.isActive), [users]);
@@ -1831,52 +1907,68 @@ export function InventarioModule() {
     !!products.find(p => p.id === productId)?.isRentable &&
     rentalUnits.some(u => u.productId === productId);
 
-  // Conteo de unidades por estado de un producto serializado
-  // ({ statusId: cantidad }), para mostrar "12 disponibles · 3 rentados..."
-  const unitCountsByStatus = (productId: string): Array<{ status: SerialStatus; count: number }> => {
+  // Conteo por estado y chips "N estado" de un CONJUNTO de unidades
+  // (reutilizado en Stock, ficha y en los grupos por ubicación del modelo
+  // final de seriales)
+  const renderUnitsStatusChips = (units: RentalUnit[]) => {
     const counts = new Map<string, number>();
-    for (const u of rentalUnits) {
-      if (u.productId !== productId) continue;
+    for (const u of units) {
       counts.set(u.statusId, (counts.get(u.statusId) || 0) + 1);
     }
-    return [...counts.entries()]
+    const rows = [...counts.entries()]
       .map(([statusId, count]) => ({ status: serialStatuses.find(s => s.id === statusId), count }))
       .filter((x): x is { status: SerialStatus; count: number } => !!x.status)
       .sort((a, b) => a.status.name.localeCompare(b.status.name));
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        {rows.map(({ status, count }) => (
+          <span
+            key={status.id}
+            className={cn(
+              'px-2 py-0.5 rounded-full text-[10px] font-medium',
+              status.blocksRental
+                ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                : 'bg-green-50 text-green-700 border border-green-200'
+            )}
+          >
+            {count} {getLanguage() === 'en' && status.nameEn ? status.nameEn : status.name}
+          </span>
+        ))}
+      </div>
+    );
   };
 
   // Chips "N estado" del stock serializado (reutilizado en Stock y ficha)
-  const renderUnitStatusChips = (productId: string) => (
-    <div className="flex flex-wrap items-center gap-1">
-      {unitCountsByStatus(productId).map(({ status, count }) => (
-        <span
-          key={status.id}
-          className={cn(
-            'px-2 py-0.5 rounded-full text-[10px] font-medium',
-            status.blocksRental
-              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-              : 'bg-green-50 text-green-700 border border-green-200'
-          )}
-        >
-          {count} {getLanguage() === 'en' && status.nameEn ? status.nameEn : status.name}
-        </span>
-      ))}
-    </div>
-  );
+  const renderUnitStatusChips = (productId: string) =>
+    renderUnitsStatusChips(rentalUnits.filter(u => u.productId === productId));
 
   // Stock serializado completo (punto 8): total de seriales + chips por
-  // estado. Los seriales no llevan locationId, así que el conteo es global
-  // por producto (la vista por ubicación lo muestra donde el producto tiene
-  // doc de stock, y aparte una sección para los que no tienen ubicación).
+  // estado. Modelo final (punto 5): los seriales se agrupan POR UBICACIÓN —
+  // una línea por bodega ("The Warehouse: 5 disponibles · 1 en reparación");
+  // los seriales sin locationId se muestran bajo "Por ubicar"
   const renderSerializedStock = (productId: string) => {
-    const count = rentalUnits.filter(u => u.productId === productId).length;
-    if (!count) return null;
+    const units = rentalUnits.filter(u => u.productId === productId);
+    if (!units.length) return null;
+    const groups = new Map<string, RentalUnit[]>();
+    for (const u of units) {
+      const key = u.locationId || '__unlocated__';
+      const list = groups.get(key) || [];
+      list.push(u);
+      groups.set(key, list);
+    }
     return (
       <div className="mt-1 space-y-1">
         <div className="text-[11px] text-[#86868B]">
-          {t('inv.stock.serialsCount').replace('{count}', String(count))}
+          {t('inv.stock.serialsCount').replace('{count}', String(units.length))}
         </div>
-        {renderUnitStatusChips(productId)}
+        {[...groups.entries()].map(([key, list]) => (
+          <div key={key} className="flex flex-wrap items-center gap-1">
+            <span className="text-[11px] text-[#86868B] shrink-0">
+              {key === '__unlocated__' ? t('inv.serials.unlocated') : `${locationName(key)}:`}
+            </span>
+            {renderUnitsStatusChips(list)}
+          </div>
+        ))}
       </div>
     );
   };
@@ -2051,6 +2143,26 @@ export function InventarioModule() {
     );
     return () => unsub();
   }, [enabled, tenantId]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const unsub = onSnapshot(
+      collection(db, CATALOG_COLLECTIONS.locationTypes),
+      (snap) => {
+        setLocationTypes(
+          snap.docs
+            .map(d => ({
+              id: d.id,
+              name: toStr(d.data().name),
+              isActive: toBool(d.data().isActive, true),
+            }))
+            .filter(lt => lt.isActive)
+        );
+      },
+      (err) => console.error('[InventarioModule] locationTypes:', err)
+    );
+    return () => unsub();
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -2368,7 +2480,7 @@ export function InventarioModule() {
   };
 
   const handleSaveMovement = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canOperate) return toast.error(t('inv.error.loginRequired'));
     const qty = Number(movementForm.quantity);
     const mt = movementTypes.find(m => m.id === movementForm.movementTypeId);
     if (!movementForm.productId) return toast.error(t('inv.validation.productRequired'));
@@ -2481,7 +2593,7 @@ export function InventarioModule() {
   };
 
   const handleCreateTransfer = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canOperate) return toast.error(t('inv.error.loginRequired'));
     const qty = Number(transferForm.quantity);
     if (!transferForm.productId) return toast.error(t('inv.validation.productRequired'));
     if (!Number.isFinite(qty) || qty <= 0) return toast.error(t('inv.validation.quantityPositive'));
@@ -2571,7 +2683,7 @@ export function InventarioModule() {
   };
 
   const handleShipTransfer = async (transfer: InventoryTransfer) => {
-    if (!currentUser || !canWrite || !transfer.id) return;
+    if (!currentUser || !canOperate || !transfer.id) return toast.error(t('inv.error.loginRequired'));
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), {
         status: 'en_transito',
@@ -2731,6 +2843,18 @@ export function InventarioModule() {
       }
       await updateDoc(doc(db, CATALOG_COLLECTIONS.inventoryTransfers, transfer.id), receivedPayload);
 
+      // Modelo final de seriales (punto 5): cada serial recibido queda
+      // ubicado en la bodega destino de la transferencia
+      if (needsUnits) {
+        for (const uid of receiveSerialIds) {
+          await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, uid), {
+            locationId: transfer.toLocationId,
+            updatedAt: now,
+            updatedBy: currentUser.name,
+          });
+        }
+      }
+
       // Las notificaciones de esta transferencia quedan leídas al recibirla
       try {
         const notifSnap = await getDocs(
@@ -2779,7 +2903,7 @@ export function InventarioModule() {
 
   const handleCancelTransfer = async () => {
     const transfer = transfers.find(x => x.id === cancelTransferId);
-    if (!currentUser || !canWrite || !transfer?.id) return;
+    if (!currentUser || !canOperate || !transfer?.id) return toast.error(t('inv.error.loginRequired'));
     await executeWithConfirm({
       level: 'major',
       title: t('inv.transfers.cancelTitle'),
@@ -2896,8 +3020,12 @@ export function InventarioModule() {
       // DG/RRHH y al responsable de la ubicación. Es lo mejor esfuerzo:
       // nunca bloquea la creación del borrador.
       try {
+        // Destinatarios: TODOS los usuarios no eliminados (useFirestoreUsers
+        // no filtra por departamento). NO se usa activeUsers (exige
+        // isActive === true; perfiles heredados pueden no tenerlo y quedarse
+        // fuera de la campana — diagnóstico del gerente que no recibía aviso)
         const targets = new Set<string>();
-        activeUsers
+        users
           .filter(u => u.role === Role.DIRECTOR_GENERAL || u.role === Role.RRHH)
           .forEach(u => u.id && targets.add(u.id));
         const locResponsible = locations.find(l => l.id === stock.locationId)?.responsibleUserId;
@@ -2996,6 +3124,49 @@ export function InventarioModule() {
     return activeProducts.filter(p => p.categoryId === prForm.categoryId);
   }, [activeProducts, prForm.categoryId, prForm.mode]);
 
+  // Sugeridos para "Nueva solicitud" (punto 2): productos con stock total
+  // <= mínimo (o sin doc de stock = 0). Máximo 8, ordenados por urgencia:
+  // stock 0 primero, luego menor ratio cantidad/mínimo
+  const suggestedPrProducts = useMemo(() => {
+    const rows = activeProducts
+      .map(product => {
+        const pStocks = stocks.filter(s => s.productId === product.id);
+        const total = pStocks.reduce((acc, s) => acc + s.quantity, 0);
+        const min = pStocks.reduce<number | null>((acc, s) => {
+          if (s.minStock == null) return acc;
+          return acc == null ? s.minStock : Math.min(acc, s.minStock);
+        }, null);
+        return { product, total, min };
+      })
+      .filter(({ total, min }) => total <= 0 || (min != null && total <= min));
+    const ratio = (r: { total: number; min: number | null }): number =>
+      r.min != null && r.min > 0 ? r.total / r.min : r.total <= 0 ? 0 : 1;
+    rows.sort(
+      (a, b) =>
+        Number(b.total <= 0) - Number(a.total <= 0) ||
+        ratio(a) - ratio(b) ||
+        a.product.name.localeCompare(b.product.name)
+    );
+    return rows.slice(0, 8);
+  }, [activeProducts, stocks]);
+
+  // Tocar un sugerido pone el producto en el formulario (modo catálogo,
+  // categoría y unidad resueltas) y hace foco sutil al campo de cantidad
+  const applyPurchaseSuggestion = (productId: string) => {
+    const p = products.find(x => x.id === productId);
+    if (!p) return;
+    setPrForm(f => ({
+      ...f,
+      mode: 'catalog',
+      categoryId: p.categoryId || (activeProducts.some(x => !x.categoryId) ? '__none__' : ''),
+      productId: p.id,
+      unitId: p.unitId || f.unitId,
+    }));
+    setTimeout(() => {
+      document.getElementById('pr-quantity-input')?.focus();
+    }, 60);
+  };
+
   // Pedidos aprobados disponibles para vincular a una entrada de compra
   // (punto 5): filtrados por producto si ya hay uno seleccionado
   const approvedPrOptions = useMemo(
@@ -3075,8 +3246,11 @@ export function InventarioModule() {
       // (+ DG, que también aprueba). Deep link a la solicitud. Lo mejor
       // esfuerzo: nunca bloquea la creación.
       try {
+        // Mismo criterio que el borrador automático: destinatarios contra
+        // TODOS los usuarios no eliminados (sin filtro de isActive ni de
+        // departamento): el aprobador puede estar en OTRO departamento
         const targets = new Set<string>();
-        for (const u of activeUsers) {
+        for (const u of users) {
           if (!u.id || u.id === currentUser.id) continue;
           if (u.role === Role.DIRECTOR_GENERAL) {
             targets.add(u.id);
@@ -3222,7 +3396,7 @@ export function InventarioModule() {
   // ═══════════════════════════════════════════════════════════════════
 
   const handleScheduleCount = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canOperate) return toast.error(t('inv.error.loginRequired'));
     if (!countForm.locationId) return toast.error(t('inv.counts.validation.locationRequired'));
     setSavingCount(true);
     try {
@@ -3271,7 +3445,7 @@ export function InventarioModule() {
   };
 
   const handleStartCount = async (session: CountSession) => {
-    if (!currentUser || !canWrite || !session.id) return;
+    if (!currentUser || !canOperate || !session.id) return toast.error(t('inv.error.loginRequired'));
     try {
       const now = new Date().toISOString();
       await updateDoc(doc(db, CATALOG_COLLECTIONS.countSessions, session.id), {
@@ -3286,7 +3460,7 @@ export function InventarioModule() {
 
   const handleSaveCountsDraft = async () => {
     const session = countSessions.find(x => x.id === countingId);
-    if (!currentUser || !canWrite || !session?.id) return;
+    if (!currentUser || !canOperate || !session?.id) return toast.error(t('inv.error.loginRequired'));
     try {
       const parsed: Record<string, number> = {};
       Object.entries(countsDraft).forEach(([pid, v]) => {
@@ -3304,7 +3478,7 @@ export function InventarioModule() {
 
   const handleFinishCount = async () => {
     const session = countSessions.find(x => x.id === countingId);
-    if (!currentUser || !canWrite || !session?.id) return;
+    if (!currentUser || !canOperate || !session?.id) return toast.error(t('inv.error.loginRequired'));
     // Punto 6: finalizar (registrar) no es irreversible — sin popup; las
     // diferencias quedan en la tarjeta del conteo
     try {
@@ -3357,7 +3531,7 @@ export function InventarioModule() {
 
   const handleApplyAdjustment = async () => {
     const session = countSessions.find(x => x.id === adjustmentSessionId);
-    if (!currentUser || !canWrite || !session?.id) return;
+    if (!currentUser || !canOperate || !session?.id) return toast.error(t('inv.error.loginRequired'));
     if (!adjustmentReason.trim()) return toast.error(t('inv.counts.validation.reasonRequired'));
     const diffs = session.differences ?? [];
     if (diffs.length === 0) return;
@@ -3439,7 +3613,7 @@ export function InventarioModule() {
   // ═══════════════════════════════════════════════════════════════════
 
   const startEditMinMax = (stock: InventoryStock) => {
-    if (!canSupervise) return;
+    if (!canSupervise) return toast.error(t('inv.error.supervisorOnly'));
     setEditingMinMaxId(stock.id || null);
     setMinMaxDraft({
       min: stock.minStock != null ? String(stock.minStock) : '',
@@ -3448,7 +3622,7 @@ export function InventarioModule() {
   };
 
   const handleSaveMinMax = async (stock: InventoryStock) => {
-    if (!currentUser || !canSupervise || !stock.id) return;
+    if (!currentUser || !canSupervise || !stock.id) return toast.error(t('inv.error.supervisorOnly'));
     try {
       const now = new Date().toISOString();
       const parseVal = (v: string): number | null => {
@@ -3481,7 +3655,14 @@ export function InventarioModule() {
   const openSerialForm = (productId?: string) => {
     // Estado inicial por defecto: el primero activo que NO bloquea renta
     const defaultStatus = activeSerialStatuses.find(s => !s.blocksRental) ?? activeSerialStatuses[0];
-    setSerialForm({ ...EMPTY_SERIAL_FORM, productId: productId || '', statusId: defaultStatus?.id || '' });
+    setSerialForm({
+      ...EMPTY_SERIAL_FORM,
+      productId: productId || '',
+      statusId: defaultStatus?.id || '',
+      // Ubicación de ingreso: default preseleccionado (la del nombre con
+      // 'warehouse', tipo 'Almacenaje' o la primera activa); siempre editable
+      locationId: defaultSerialLocationId,
+    });
     setSerialPhotoFile(null);
     // Modo masa por defecto (punto 7), con el formulario de masa reiniciado
     setSerialBulkMode('bulk');
@@ -3493,7 +3674,7 @@ export function InventarioModule() {
   // Crear un serial individual (punto 6: sin popup de confirmación — crear
   // no es irreversible; el serial en la lista ES la confirmación)
   const handleCreateSerial = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canOperate) return toast.error(t('inv.error.loginRequired'));
     if (!serialForm.productId) return toast.error(t('inv.validation.productRequired'));
     const serialNumber = serialForm.serialNumber.trim();
     if (!serialNumber) return toast.error(t('inv.serials.validation.serialRequired'));
@@ -3513,6 +3694,7 @@ export function InventarioModule() {
         size: serialForm.size.trim() || null,
         statusId: serialForm.statusId,
         notes: serialForm.notes.trim() || null,
+        locationId: serialForm.locationId || defaultSerialLocationId || null,
         createdAt: now,
         createdBy: currentUser.name,
         updatedAt: now,
@@ -3552,7 +3734,7 @@ export function InventarioModule() {
   // QUEDA en la pantalla con "Crear más" (resetea cantidad/número, mantiene
   // producto y prefijo) y "Volver". Sin popup de confirmación (punto 6).
   const handleCreateSerialsBulk = async () => {
-    if (!currentUser || !canWrite || savingSerial) return;
+    if (!currentUser || !canOperate || savingSerial) return toast.error(t('inv.error.loginRequired'));
     if (!serialForm.productId) return toast.error(t('inv.validation.productRequired'));
     const codes = buildBulkSerialCodes();
     if (codes.length === 0) return toast.error(t('inv.serials.bulkQtyInvalid'));
@@ -3572,6 +3754,7 @@ export function InventarioModule() {
     setSavingSerial(true);
     try {
       const now = new Date().toISOString();
+      const bulkLocationId = serialForm.locationId || defaultSerialLocationId || null;
       for (const code of codes) {
         await addDoc(collection(db, CATALOG_COLLECTIONS.rentalUnits), {
           tenantId,
@@ -3581,6 +3764,7 @@ export function InventarioModule() {
           size: null,
           statusId,
           notes: null,
+          locationId: bulkLocationId,
           createdAt: now,
           createdBy: currentUser.name,
           updatedAt: now,
@@ -3606,8 +3790,14 @@ export function InventarioModule() {
   };
 
   const handleChangeSerialStatus = async (unit: RentalUnit, statusId: string) => {
-    if (!currentUser || !canWrite || !unit.id || !statusId || statusId === unit.statusId) return;
+    if (!currentUser || !canOperate || !unit.id || !statusId || statusId === unit.statusId) {
+      return currentUser ? undefined : toast.error(t('inv.error.loginRequired'));
+    }
     if (unit.statusId === 'dado_de_baja') return; // baja permanente: no se reactiva
+    // Serial "por ubicar": no se despacha (renta) hasta tener bodega
+    if (!unit.locationId && statusId === 'rentado') {
+      return toast.error(t('inv.serials.unlocatedNoDispatch'));
+    }
     try {
       const now = new Date().toISOString();
       const status = serialStatuses.find(s => s.id === statusId);
@@ -3635,7 +3825,7 @@ export function InventarioModule() {
   };
 
   const handleSaveSerialEdit = async (unit: RentalUnit) => {
-    if (!currentUser || !canWrite || !unit.id) return;
+    if (!currentUser || !canOperate || !unit.id) return toast.error(t('inv.error.loginRequired'));
     try {
       const now = new Date().toISOString();
       await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unit.id), {
@@ -3706,6 +3896,64 @@ export function InventarioModule() {
     });
   };
 
+  // "Ubicar" (modelo final punto 5): asigna la bodega actual de un serial y
+  // registra la entrada en el kardex. Sin popup (no es irreversible) ni
+  // toast de éxito: el badge "Por ubicar" desaparece y el movimiento queda
+  // en el kardex
+  const openLocateSerial = (unit: RentalUnit) => {
+    setLocatingUnit(unit);
+    setLocateLocationId(unit.locationId || defaultSerialLocationId);
+  };
+
+  const handleLocateSerial = async () => {
+    if (!currentUser || !canOperate || !locatingUnit?.id) {
+      return toast.error(t('inv.error.loginRequired'));
+    }
+    if (!locateLocationId) return toast.error(t('inv.movementForm.selectLocation'));
+    try {
+      const now = new Date().toISOString();
+      await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, locatingUnit.id), {
+        locationId: locateLocationId,
+        updatedAt: now,
+        updatedBy: currentUser.name,
+      });
+      // Kardex: tipo 'ingreso' normalizado (tolerante a acentos/idioma); si
+      // no existe en el catálogo, el primer tipo activo que suma stock
+      const inputMt =
+        activeMovementTypes.find(
+          m => normalizeTypeKey(m.name) === 'ingreso' || (!!m.nameEn && normalizeTypeKey(m.nameEn) === 'ingreso')
+        ) || activeMovementTypes.find(m => !m.isOutput);
+      if (inputMt) {
+        await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+          tenantId,
+          productId: locatingUnit.productId,
+          quantity: 1,
+          fromLocationId: null,
+          toLocationId: locateLocationId,
+          movementTypeId: inputMt.id!,
+          reason: t('inv.serials.locateReason'),
+          referenceType: 'rental_unit',
+          referenceId: locatingUnit.id,
+          createdAt: now,
+          createdBy: currentUser.id,
+          createdByName: currentUser.name,
+        });
+      }
+      await logAction({
+        action: AUDIT_ACTIONS.serialUpdated,
+        targetType: 'rental_unit',
+        targetId: locatingUnit.id,
+        targetName: `${productName(locatingUnit.productId)} · ${locatingUnit.serialNumber}`,
+        impactLevel: 'minor',
+        description: `Serial ubicado: ${locatingUnit.serialNumber} → ${locationName(locateLocationId)}`,
+      });
+      setLocatingUnit(null);
+      setLocateLocationId('');
+    } catch (err: any) {
+      toast.error(`${t('inv.error.save')}: ${err.message}`);
+    }
+  };
+
   // Envío a reparación desde la ficha del producto (punto 13): con seriales,
   // selección de unidades disponibles + motivo; sin seriales, el botón de la
   // ficha deriva a un movimiento de salida tipo ajuste con motivo "Reparación"
@@ -3716,7 +3964,7 @@ export function InventarioModule() {
   };
 
   const handleSendRepair = async () => {
-    if (!currentUser || !canWrite || !repairProductId) return;
+    if (!currentUser || !canOperate || !repairProductId) return toast.error(t('inv.error.loginRequired'));
     const reason = repairReason.trim() || 'Reparación';
     const units = rentalUnits.filter(u => repairUnitIds.includes(u.id || ''));
     if (units.length === 0) return toast.error(t('inv.repair.noAvailable'));
@@ -3927,6 +4175,11 @@ export function InventarioModule() {
       toast.error(t('inv.transfers.validation.serialNotForProduct'));
       return false;
     }
+    // Unidad ubicada en OTRA bodega: no se puede mover con esta transferencia
+    if (unit.locationId && unit.locationId !== transfer.fromLocationId) {
+      toast.error(t('inv.serials.wrongLocation'));
+      return false;
+    }
     if (receiveSerialIds.includes(id)) {
       // ya confirmada: idempotente (no desconfirma ni cuenta de nuevo)
       toast.error(t('inv.counts.serialAlreadyCounted'));
@@ -3974,7 +4227,7 @@ export function InventarioModule() {
   // ═══════════════════════════════════════════════════════════════════
 
   const handleCreateMovementType = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canWrite) return toast.error(t('inv.readOnly'));
     if (!mtNewName.trim()) return toast.error(t('inv.validation.nameRequired'));
     setSavingCatalogs(true);
     try {
@@ -4004,7 +4257,7 @@ export function InventarioModule() {
   };
 
   const handleRenameMovementType = async () => {
-    if (!currentUser || !canWrite || !editingMtId || !editingMtName.trim()) return;
+    if (!currentUser || !canWrite || !editingMtId || !editingMtName.trim()) return toast.error(t('inv.readOnly'));
     setSavingCatalogs(true);
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.movementTypes, editingMtId), {
@@ -4030,7 +4283,7 @@ export function InventarioModule() {
   };
 
   const handleToggleMovementTypeActive = async (mt: MovementType) => {
-    if (!currentUser || !canWrite || !mt.id) return;
+    if (!currentUser || !canWrite || !mt.id) return toast.error(t('inv.readOnly'));
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.movementTypes, mt.id), {
         isActive: !mt.isActive,
@@ -4051,7 +4304,7 @@ export function InventarioModule() {
   };
 
   const handleSeedMovementTypes = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canWrite) return toast.error(t('inv.readOnly'));
     await executeWithConfirm({
       level: 'minor',
       title: t('inv.catalogs.mt.seedsConfirmTitle'),
@@ -4108,7 +4361,7 @@ export function InventarioModule() {
   // ═══════════════════════════════════════════════════════════════════
 
   const handleCreateSerialStatus = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canWrite) return toast.error(t('inv.readOnly'));
     if (!ssNewName.trim()) return toast.error(t('inv.validation.nameRequired'));
     setSavingCatalogs(true);
     try {
@@ -4138,7 +4391,7 @@ export function InventarioModule() {
   };
 
   const handleRenameSerialStatus = async () => {
-    if (!currentUser || !canWrite || !editingSsId || !editingSsName.trim()) return;
+    if (!currentUser || !canWrite || !editingSsId || !editingSsName.trim()) return toast.error(t('inv.readOnly'));
     setSavingCatalogs(true);
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.serialStatuses, editingSsId), {
@@ -4164,7 +4417,7 @@ export function InventarioModule() {
   };
 
   const handleToggleSerialStatusActive = async (ss: SerialStatus) => {
-    if (!currentUser || !canWrite || !ss.id) return;
+    if (!currentUser || !canWrite || !ss.id) return toast.error(t('inv.readOnly'));
     try {
       await updateDoc(doc(db, CATALOG_COLLECTIONS.serialStatuses, ss.id), {
         isActive: !ss.isActive,
@@ -4185,7 +4438,7 @@ export function InventarioModule() {
   };
 
   const handleSeedSerialStatuses = async () => {
-    if (!currentUser || !canWrite) return;
+    if (!currentUser || !canWrite) return toast.error(t('inv.readOnly'));
     await executeWithConfirm({
       level: 'minor',
       title: t('inv.catalogs.ss.seedsConfirmTitle'),
@@ -4476,9 +4729,6 @@ export function InventarioModule() {
           </button>
         ))}
       </div>
-      {!canWrite && (
-        <p className="text-xs text-[#86868B]">{t('inv.readOnly')}</p>
-      )}
       </>
       )}
 
@@ -4560,7 +4810,7 @@ export function InventarioModule() {
                     </button>
                     {categoryMenuId === group.categoryId && (
                       <div className="border-t border-[#E5E5E7] px-3 py-2 flex flex-wrap items-center gap-2">
-                        {canWrite && (
+                        {canOperate && (
                           <>
                             <Button
                               size="sm"
@@ -4613,9 +4863,6 @@ export function InventarioModule() {
                             </Button>
                           </>
                         )}
-                        {!canWrite && (
-                          <span className="text-[11px] text-[#86868B]">{t('inv.readOnly')}</span>
-                        )}
                       </div>
                     )}
                   </div>
@@ -4643,12 +4890,12 @@ export function InventarioModule() {
                             // Ronda 6 (punto 3): presionar el producto abre el
                             // formulario de acción con el producto preseleccionado;
                             // la expansión queda en la flecha
-                            if (canWrite) openMovementForm(product.id);
+                            if (canOperate) openMovementForm(product.id);
                             else toggleExpanded(product.id!);
                           }}
                           onKeyDown={e => {
                             if (e.key === 'Enter' || e.key === ' ') {
-                              if (canWrite) openMovementForm(product.id);
+                              if (canOperate) openMovementForm(product.id);
                               else toggleExpanded(product.id!);
                             }
                           }}
@@ -4740,6 +4987,11 @@ export function InventarioModule() {
                                                 ? (getLanguage() === 'en' && uStatus.nameEn ? uStatus.nameEn : uStatus.name)
                                                 : u.statusId}
                                           </span>
+                                          {!u.locationId && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                                              {t('inv.serials.unlocated')}
+                                            </span>
+                                          )}
                                           <Button
                                             variant="ghost"
                                             size="sm"
@@ -4793,7 +5045,7 @@ export function InventarioModule() {
                                       </span>
                                     )}
                                     <div className="ml-auto flex items-center gap-1">
-                                      {canWrite && (
+                                      {canOperate && (
                                         <Button
                                           variant="outline"
                                           size="sm"
@@ -5008,7 +5260,7 @@ export function InventarioModule() {
                                     <QrCode className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
-                                {canWrite && product && (
+                                {canOperate && product && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -5096,7 +5348,7 @@ export function InventarioModule() {
                 ))}
               </select>
             </div>
-            {canWrite && (
+            {canOperate && (
               <Button
                 size="sm"
                 onClick={() => openMovementForm()}
@@ -5197,7 +5449,7 @@ export function InventarioModule() {
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7] flex-1 min-w-[220px]">
               {t('inv.transfers.help')}
             </p>
-            {canWrite && (
+            {canOperate && (
               <Button
                 size="sm"
                 onClick={() => openTransferForm()}
@@ -5329,7 +5581,7 @@ export function InventarioModule() {
                           {t('inv.transfers.noDeptWarning')}
                         </p>
                       )}
-                      {canWrite && tr.status === 'pendiente' && (
+                      {canOperate && tr.status === 'pendiente' && (
                         <div className="flex flex-wrap items-center gap-2 pt-2">
                           <Button
                             size="sm"
@@ -5350,7 +5602,7 @@ export function InventarioModule() {
                           </Button>
                         </div>
                       )}
-                      {tr.status === 'en_transito' && (canWrite || canReceiveTransfer(tr)) && (
+                      {tr.status === 'en_transito' && (canOperate || canReceiveTransfer(tr)) && (
                         <div className="flex flex-wrap items-center gap-2 pt-2">
                           {canReceiveTransfer(tr) && (
                             <Button
@@ -5362,7 +5614,7 @@ export function InventarioModule() {
                               {t('inv.transfers.receive')}
                             </Button>
                           )}
-                          {canWrite && (
+                          {canOperate && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -5395,7 +5647,7 @@ export function InventarioModule() {
               <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7] flex-1 min-w-[220px]">
                 {t('inv.counts.help')}
               </p>
-              {canWrite && (
+              {canOperate && (
                 <Button
                   size="sm"
                   onClick={() => { setCountForm(EMPTY_COUNT_FORM); setInvView('count-new'); }}
@@ -5649,7 +5901,7 @@ export function InventarioModule() {
                         )}
 
                         {/* Acciones según estado */}
-                        {canWrite && cs.status === 'programado' && (
+                        {canOperate && cs.status === 'programado' && (
                           <div className="pt-2">
                             <Button
                               size="sm"
@@ -5673,7 +5925,7 @@ export function InventarioModule() {
                             </Button>
                           </div>
                         )}
-                        {canWrite && cs.status === 'finalizado' && diffs.length > 0 && (
+                        {canOperate && cs.status === 'finalizado' && diffs.length > 0 && (
                           <div className="pt-2">
                             <Button
                               size="sm"
@@ -5702,7 +5954,7 @@ export function InventarioModule() {
             <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-xl px-4 py-3 border border-[#E5E5E7] flex-1 min-w-[220px]">
               {t('inv.serials.help')}
             </p>
-            {canWrite && (
+            {canOperate && (
               <Button
                 size="sm"
                 onClick={() => openSerialForm()}
@@ -5769,6 +6021,11 @@ export function InventarioModule() {
                         {status?.blocksRental && (
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 shrink-0">
                             {t('inv.serials.blocksRental')}
+                          </span>
+                        )}
+                        {!unit.locationId && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                            {t('inv.serials.unlocated')}
                           </span>
                         )}
                         {unit.statusId === 'dado_de_baja' && (
@@ -5848,6 +6105,10 @@ export function InventarioModule() {
                             label={t('inv.serials.updatedAt')}
                             value={unit.updatedAt ? new Date(unit.updatedAt).toLocaleString() : '—'}
                           />
+                          <DetailRow
+                            label={t('inv.serials.entryLocation')}
+                            value={unit.locationId ? locationName(unit.locationId) : t('inv.serials.unlocated')}
+                          />
 
                           {/* Historial de rentas del serial (WH-D2) */}
                           <div className="pt-2 border-t border-[#F5F5F7]">
@@ -5888,10 +6149,19 @@ export function InventarioModule() {
                             )}
                           </div>
 
-                          {(canWrite || canRetire) && unit.statusId !== 'dado_de_baja' && (
+                          {(canOperate || canRetire) && unit.statusId !== 'dado_de_baja' && (
                             <div className="flex flex-wrap items-center gap-2 pt-2">
-                              {canWrite && (
+                              {canOperate && (
                                 <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openLocateSerial(unit)}
+                                    className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                                  >
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    {t('inv.serials.locate')}
+                                  </Button>
                                   <div className="flex items-center gap-1.5">
                                     <Label className="text-xs text-[#86868B]">{t('inv.serials.changeStatus')}</Label>
                                     <select
@@ -5932,7 +6202,7 @@ export function InventarioModule() {
                             </div>
                           )}
 
-                          {canWrite && isEditing && (
+                          {canOperate && isEditing && (
                             <div className="pt-2 space-y-2 border-t border-[#F5F5F7]">
                               <Input
                                 value={serialEditDraft.size}
@@ -6463,11 +6733,22 @@ export function InventarioModule() {
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() =>
+                              onChange={() => {
+                                // Unidad ubicada en OTRA bodega: no se puede
+                                // mover con esta transferencia (misma regla
+                                // que el escaneo)
+                                if (
+                                  !checked &&
+                                  u.locationId &&
+                                  u.locationId !== receivingTransfer.fromLocationId
+                                ) {
+                                  toast.error(t('inv.serials.wrongLocation'));
+                                  return;
+                                }
                                 setReceiveSerialIds(prev =>
                                   checked ? prev.filter(x => x !== u.id) : [...prev, u.id || '']
-                                )
-                              }
+                                );
+                              }}
                               className="h-3.5 w-3.5 accent-corporate"
                             />
                             <span className="font-medium">{u.serialNumber}</span>
@@ -6746,6 +7027,24 @@ export function InventarioModule() {
               )}
             </div>
 
+            {/* Ubicación de ingreso (modelo final punto 5): queda guardada en
+                cada serial creado (individual o en masa). Default:
+                nombre con 'warehouse' → tipo 'Almacenaje' → primera activa */}
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.serials.entryLocation')}</Label>
+              <select
+                value={serialForm.locationId}
+                onChange={e => setSerialForm(f => ({ ...f, locationId: e.target.value }))}
+                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+              >
+                <option value="">{t('inv.movementForm.selectLocation')}</option>
+                {activeLocations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[#86868B]">{t('inv.serials.entryLocationHelp')}</p>
+            </div>
+
             {serialBulkMode === 'bulk' ? (
               <>
                 <p className="text-xs text-[#86868B] bg-[#F5F5F7] rounded-lg px-3 py-2">
@@ -7022,6 +7321,59 @@ export function InventarioModule() {
                 className="text-xs bg-corporate"
               >
                 {t('inv.serials.retire')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── MODAL: UBICAR SERIAL (modelo final punto 5): elige bodega y
+          registra la entrada en el kardex ─── */}
+      <Dialog
+        open={locatingUnit !== null}
+        onOpenChange={open => { if (!open) { setLocatingUnit(null); setLocateLocationId(''); } }}
+      >
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-[#1D1D1F] flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-corporate" />
+              {t('inv.serials.locateTitle')}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-[#86868B]">
+              {locatingUnit ? `${productName(locatingUnit.productId)} · ${locatingUnit.serialNumber}` : ''}
+              {' — '}{t('inv.serials.locateHelp')}
+            </p>
+            <div className="space-y-1">
+              <Label className="text-xs text-[#86868B]">{t('inv.movementForm.toLocation')}</Label>
+              <select
+                value={locateLocationId}
+                onChange={e => setLocateLocationId(e.target.value)}
+                className="w-full h-9 text-sm rounded-lg border border-[#E5E5E7] bg-white px-2 text-[#1D1D1F]"
+              >
+                <option value="">{t('inv.movementForm.selectLocation')}</option>
+                {activeLocations.map(l => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setLocatingUnit(null); setLocateLocationId(''); }}
+                className="text-xs text-[#86868B]"
+              >
+                {t('inv.common.cancel')}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleLocateSerial}
+                disabled={!locateLocationId}
+                className="text-xs bg-corporate"
+              >
+                {t('inv.serials.locate')}
               </Button>
             </div>
           </div>
@@ -7325,6 +7677,32 @@ export function InventarioModule() {
 
                 {prForm.mode === 'catalog' ? (
                   <>
+                    {/* Sugeridos (punto 2): productos con stock bajo o en
+                        cero; tocar un chip llena el formulario */}
+                    {suggestedPrProducts.length > 0 && (
+                      <div className="space-y-1">
+                        <Label className="text-xs text-[#86868B]">{t('inv.purchases.suggested')}</Label>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {suggestedPrProducts.map(({ product, total }) => (
+                            <button
+                              key={product.id}
+                              type="button"
+                              onClick={() => applyPurchaseSuggestion(product.id!)}
+                              className={cn(
+                                'px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors',
+                                total <= 0
+                                  ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                                  : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'
+                              )}
+                            >
+                              {t('inv.purchases.suggestedChip')
+                                .replace('{name}', product.name)
+                                .replace('{stock}', String(total))}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <Label className="text-xs text-[#86868B]">{t('inv.purchases.category')}</Label>
                       <select
@@ -7388,6 +7766,7 @@ export function InventarioModule() {
                   <div className="space-y-1">
                     <Label className="text-xs text-[#86868B]">{t('inv.movementForm.quantity')}</Label>
                     <Input
+                      id="pr-quantity-input"
                       type="number"
                       min="0"
                       step="any"
@@ -7612,7 +7991,7 @@ export function InventarioModule() {
                 Reparación / Ver historial — NUNCA Consumir/Ajuste por
                 cantidad (los bloquea el modelo de ronda 4). */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {canWrite && !product.isRentable && (
+              {canOperate && !product.isRentable && (
                 <>
                   <Button
                     size="sm"
@@ -7651,7 +8030,7 @@ export function InventarioModule() {
                   </Button>
                 </>
               )}
-              {canWrite && product.isRentable && (
+              {canOperate && product.isRentable && (
                 <>
                   <Button
                     size="sm"

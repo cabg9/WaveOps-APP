@@ -1,7 +1,7 @@
 // CATALOGOS TAB - Catálogos maestros (Fase 0 del plano maestro)
 // Piso de los futuros módulos Inventario y Compras & Pagos.
 // Cero datos hardcodeados: todo se crea desde la app.
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, doc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '@/firebase-config';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   Plus, Pencil, Package, Truck, Layers, Calculator, Megaphone, Users,
   Eye, EyeOff, Upload, Sparkles, Building2, Info, Lock, Tags, Scale,
   Search, Trash2, ArrowUpDown, Star, ChevronDown, ChevronUp, Percent,
-  ClipboardList, Receipt,
+  ClipboardList, Receipt, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useFirestoreAuth';
@@ -251,6 +251,9 @@ registerI18nKeys({
     'catalogs.products.hasQr': '¿Lleva código QR?',
     'catalogs.products.hasQrHelp': 'Sí = se escanea en despachos, conteos y recepciones. No = se confirma con firma/foto (se pedirá al recibir o despachar).',
     'catalogs.common.phonePrefix': 'Prefijo',
+    'catalogs.common.phoneSearchPlaceholder': 'Buscar país o prefijo',
+    'catalogs.common.phoneNoResults': 'Sin resultados',
+    'catalogs.common.phoneCustomPrefix': 'Prefijo personalizado',
     'catalogs.suppliers.paymentTermsOtherKind': 'Tipo',
     'catalogs.suppliers.paymentTermsOtherKindCredit': 'Crédito a X días',
     'catalogs.suppliers.paymentTermsOtherKindAdvance': 'Anticipo %',
@@ -437,6 +440,9 @@ registerI18nKeys({
     'catalogs.products.hasQr': 'Has QR code?',
     'catalogs.products.hasQrHelp': 'Yes = scanned on dispatches, counts and receptions. No = confirmed with signature/photo (asked when receiving or dispatching).',
     'catalogs.common.phonePrefix': 'Prefix',
+    'catalogs.common.phoneSearchPlaceholder': 'Search country or prefix',
+    'catalogs.common.phoneNoResults': 'No results',
+    'catalogs.common.phoneCustomPrefix': 'Custom prefix',
     'catalogs.suppliers.paymentTermsOtherKind': 'Type',
     'catalogs.suppliers.paymentTermsOtherKindCredit': 'Credit at X days',
     'catalogs.suppliers.paymentTermsOtherKindAdvance': 'Advance %',
@@ -571,9 +577,268 @@ function toggleId(set: Set<string>, id: string): Set<string> {
 // `phoneNumber` por separado para edición estructurada. Compatibilidad:
 // teléfonos legacy sin "+" se precargan con prefijo por defecto y el número
 // tal cual; si empieza con "+", se separa el prefijo (aunque no esté en la
-// lista, se ofrece como opción extra en el selector).
-const PHONE_PREFIXES = ['+593', '+1', '+34', '+52', '+57', '+51', '+56', '+598', '+502', '+506', '+507'];
-const DEFAULT_PHONE_PREFIX = '+593';
+// lista, se ofrece como opción extra "Prefijo personalizado" en el selector).
+// Catálogo estándar UI (~235 países/territorios con prefijo oficial, orden
+// alfabético por nombre en español). No es dato de negocio: va como constante.
+interface PhoneCountry { iso: string; name: string; prefix: string }
+
+const PHONE_COUNTRIES: PhoneCountry[] = [
+  { iso: 'AF', name: 'Afganistán', prefix: '+93' },
+  { iso: 'AL', name: 'Albania', prefix: '+355' },
+  { iso: 'DE', name: 'Alemania', prefix: '+49' },
+  { iso: 'AD', name: 'Andorra', prefix: '+376' },
+  { iso: 'AO', name: 'Angola', prefix: '+244' },
+  { iso: 'AI', name: 'Anguila', prefix: '+1' },
+  { iso: 'AG', name: 'Antigua y Barbuda', prefix: '+1' },
+  { iso: 'SA', name: 'Arabia Saudita', prefix: '+966' },
+  { iso: 'DZ', name: 'Argelia', prefix: '+213' },
+  { iso: 'AR', name: 'Argentina', prefix: '+54' },
+  { iso: 'AM', name: 'Armenia', prefix: '+374' },
+  { iso: 'AW', name: 'Aruba', prefix: '+297' },
+  { iso: 'AU', name: 'Australia', prefix: '+61' },
+  { iso: 'AT', name: 'Austria', prefix: '+43' },
+  { iso: 'AZ', name: 'Azerbaiyán', prefix: '+994' },
+  { iso: 'BS', name: 'Bahamas', prefix: '+1' },
+  { iso: 'BD', name: 'Bangladés', prefix: '+880' },
+  { iso: 'BB', name: 'Barbados', prefix: '+1' },
+  { iso: 'BH', name: 'Baréin', prefix: '+973' },
+  { iso: 'BE', name: 'Bélgica', prefix: '+32' },
+  { iso: 'BZ', name: 'Belice', prefix: '+501' },
+  { iso: 'BJ', name: 'Benín', prefix: '+229' },
+  { iso: 'BM', name: 'Bermudas', prefix: '+1' },
+  { iso: 'BY', name: 'Bielorrusia', prefix: '+375' },
+  { iso: 'MM', name: 'Birmania (Myanmar)', prefix: '+95' },
+  { iso: 'BO', name: 'Bolivia', prefix: '+591' },
+  { iso: 'BA', name: 'Bosnia y Herzegovina', prefix: '+387' },
+  { iso: 'BW', name: 'Botsuana', prefix: '+267' },
+  { iso: 'BR', name: 'Brasil', prefix: '+55' },
+  { iso: 'BN', name: 'Brunéi', prefix: '+673' },
+  { iso: 'BG', name: 'Bulgaria', prefix: '+359' },
+  { iso: 'BF', name: 'Burkina Faso', prefix: '+226' },
+  { iso: 'BI', name: 'Burundi', prefix: '+257' },
+  { iso: 'BT', name: 'Bután', prefix: '+975' },
+  { iso: 'CV', name: 'Cabo Verde', prefix: '+238' },
+  { iso: 'KH', name: 'Camboya', prefix: '+855' },
+  { iso: 'CM', name: 'Camerún', prefix: '+237' },
+  { iso: 'CA', name: 'Canadá', prefix: '+1' },
+  { iso: 'QA', name: 'Catar', prefix: '+974' },
+  { iso: 'TD', name: 'Chad', prefix: '+235' },
+  { iso: 'CZ', name: 'Chequia', prefix: '+420' },
+  { iso: 'CL', name: 'Chile', prefix: '+56' },
+  { iso: 'CN', name: 'China', prefix: '+86' },
+  { iso: 'CY', name: 'Chipre', prefix: '+357' },
+  { iso: 'VA', name: 'Ciudad del Vaticano', prefix: '+39' },
+  { iso: 'CO', name: 'Colombia', prefix: '+57' },
+  { iso: 'KM', name: 'Comoras', prefix: '+269' },
+  { iso: 'CG', name: 'Congo', prefix: '+242' },
+  { iso: 'KP', name: 'Corea del Norte', prefix: '+850' },
+  { iso: 'KR', name: 'Corea del Sur', prefix: '+82' },
+  { iso: 'CI', name: 'Costa de Marfil', prefix: '+225' },
+  { iso: 'CR', name: 'Costa Rica', prefix: '+506' },
+  { iso: 'HR', name: 'Croacia', prefix: '+385' },
+  { iso: 'CU', name: 'Cuba', prefix: '+53' },
+  { iso: 'CW', name: 'Curazao', prefix: '+599' },
+  { iso: 'DK', name: 'Dinamarca', prefix: '+45' },
+  { iso: 'DM', name: 'Dominica', prefix: '+1' },
+  { iso: 'EC', name: 'Ecuador', prefix: '+593' },
+  { iso: 'EG', name: 'Egipto', prefix: '+20' },
+  { iso: 'SV', name: 'El Salvador', prefix: '+503' },
+  { iso: 'AE', name: 'Emiratos Árabes Unidos', prefix: '+971' },
+  { iso: 'ER', name: 'Eritrea', prefix: '+291' },
+  { iso: 'SK', name: 'Eslovaquia', prefix: '+421' },
+  { iso: 'SI', name: 'Eslovenia', prefix: '+386' },
+  { iso: 'ES', name: 'España', prefix: '+34' },
+  { iso: 'US', name: 'Estados Unidos', prefix: '+1' },
+  { iso: 'EE', name: 'Estonia', prefix: '+372' },
+  { iso: 'SZ', name: 'Esuatini', prefix: '+268' },
+  { iso: 'ET', name: 'Etiopía', prefix: '+251' },
+  { iso: 'PH', name: 'Filipinas', prefix: '+63' },
+  { iso: 'FI', name: 'Finlandia', prefix: '+358' },
+  { iso: 'FJ', name: 'Fiyi', prefix: '+679' },
+  { iso: 'FR', name: 'Francia', prefix: '+33' },
+  { iso: 'GA', name: 'Gabón', prefix: '+241' },
+  { iso: 'GM', name: 'Gambia', prefix: '+220' },
+  { iso: 'GE', name: 'Georgia', prefix: '+995' },
+  { iso: 'GH', name: 'Ghana', prefix: '+233' },
+  { iso: 'GI', name: 'Gibraltar', prefix: '+350' },
+  { iso: 'GD', name: 'Granada', prefix: '+1' },
+  { iso: 'GR', name: 'Grecia', prefix: '+30' },
+  { iso: 'GL', name: 'Groenlandia', prefix: '+299' },
+  { iso: 'GP', name: 'Guadalupe', prefix: '+590' },
+  { iso: 'GU', name: 'Guam', prefix: '+1' },
+  { iso: 'GT', name: 'Guatemala', prefix: '+502' },
+  { iso: 'GY', name: 'Guayana', prefix: '+592' },
+  { iso: 'GF', name: 'Guayana Francesa', prefix: '+594' },
+  { iso: 'GN', name: 'Guinea', prefix: '+224' },
+  { iso: 'GW', name: 'Guinea-Bisáu', prefix: '+245' },
+  { iso: 'GQ', name: 'Guinea Ecuatorial', prefix: '+240' },
+  { iso: 'HT', name: 'Haití', prefix: '+509' },
+  { iso: 'HN', name: 'Honduras', prefix: '+504' },
+  { iso: 'HK', name: 'Hong Kong', prefix: '+852' },
+  { iso: 'HU', name: 'Hungría', prefix: '+36' },
+  { iso: 'IN', name: 'India', prefix: '+91' },
+  { iso: 'ID', name: 'Indonesia', prefix: '+62' },
+  { iso: 'IQ', name: 'Irak', prefix: '+964' },
+  { iso: 'IR', name: 'Irán', prefix: '+98' },
+  { iso: 'IE', name: 'Irlanda', prefix: '+353' },
+  { iso: 'IM', name: 'Isla de Man', prefix: '+44' },
+  { iso: 'CX', name: 'Isla de Navidad', prefix: '+61' },
+  { iso: 'IS', name: 'Islandia', prefix: '+354' },
+  { iso: 'KY', name: 'Islas Caimán', prefix: '+1' },
+  { iso: 'CK', name: 'Islas Cook', prefix: '+682' },
+  { iso: 'FO', name: 'Islas Feroe', prefix: '+298' },
+  { iso: 'FK', name: 'Islas Malvinas', prefix: '+500' },
+  { iso: 'MP', name: 'Islas Marianas del Norte', prefix: '+1' },
+  { iso: 'MH', name: 'Islas Marshall', prefix: '+692' },
+  { iso: 'PN', name: 'Islas Pitcairn', prefix: '+64' },
+  { iso: 'SB', name: 'Islas Salomón', prefix: '+677' },
+  { iso: 'TC', name: 'Islas Turcas y Caicos', prefix: '+1' },
+  { iso: 'VG', name: 'Islas Vírgenes Británicas', prefix: '+1' },
+  { iso: 'VI', name: 'Islas Vírgenes de EE. UU.', prefix: '+1' },
+  { iso: 'IL', name: 'Israel', prefix: '+972' },
+  { iso: 'IT', name: 'Italia', prefix: '+39' },
+  { iso: 'JM', name: 'Jamaica', prefix: '+1' },
+  { iso: 'JP', name: 'Japón', prefix: '+81' },
+  { iso: 'JE', name: 'Jersey', prefix: '+44' },
+  { iso: 'JO', name: 'Jordania', prefix: '+962' },
+  { iso: 'KZ', name: 'Kazajistán', prefix: '+7' },
+  { iso: 'KE', name: 'Kenia', prefix: '+254' },
+  { iso: 'KG', name: 'Kirguistán', prefix: '+996' },
+  { iso: 'KI', name: 'Kiribati', prefix: '+686' },
+  { iso: 'KW', name: 'Kuwait', prefix: '+965' },
+  { iso: 'LA', name: 'Laos', prefix: '+856' },
+  { iso: 'LS', name: 'Lesoto', prefix: '+266' },
+  { iso: 'LV', name: 'Letonia', prefix: '+371' },
+  { iso: 'LB', name: 'Líbano', prefix: '+961' },
+  { iso: 'LR', name: 'Liberia', prefix: '+231' },
+  { iso: 'LY', name: 'Libia', prefix: '+218' },
+  { iso: 'LI', name: 'Liechtenstein', prefix: '+423' },
+  { iso: 'LT', name: 'Lituania', prefix: '+370' },
+  { iso: 'LU', name: 'Luxemburgo', prefix: '+352' },
+  { iso: 'MO', name: 'Macao', prefix: '+853' },
+  { iso: 'MK', name: 'Macedonia del Norte', prefix: '+389' },
+  { iso: 'MG', name: 'Madagascar', prefix: '+261' },
+  { iso: 'MY', name: 'Malasia', prefix: '+60' },
+  { iso: 'MW', name: 'Malaui', prefix: '+265' },
+  { iso: 'MV', name: 'Maldivas', prefix: '+960' },
+  { iso: 'ML', name: 'Malí', prefix: '+223' },
+  { iso: 'MT', name: 'Malta', prefix: '+356' },
+  { iso: 'MA', name: 'Marruecos', prefix: '+212' },
+  { iso: 'MQ', name: 'Martinica', prefix: '+596' },
+  { iso: 'MU', name: 'Mauricio', prefix: '+230' },
+  { iso: 'MR', name: 'Mauritania', prefix: '+222' },
+  { iso: 'YT', name: 'Mayotte', prefix: '+262' },
+  { iso: 'MX', name: 'México', prefix: '+52' },
+  { iso: 'FM', name: 'Micronesia', prefix: '+691' },
+  { iso: 'MD', name: 'Moldavia', prefix: '+373' },
+  { iso: 'MC', name: 'Mónaco', prefix: '+377' },
+  { iso: 'MN', name: 'Mongolia', prefix: '+976' },
+  { iso: 'ME', name: 'Montenegro', prefix: '+382' },
+  { iso: 'MS', name: 'Montserrat', prefix: '+1' },
+  { iso: 'MZ', name: 'Mozambique', prefix: '+258' },
+  { iso: 'NA', name: 'Namibia', prefix: '+264' },
+  { iso: 'NR', name: 'Nauru', prefix: '+674' },
+  { iso: 'NP', name: 'Nepal', prefix: '+977' },
+  { iso: 'NI', name: 'Nicaragua', prefix: '+505' },
+  { iso: 'NE', name: 'Níger', prefix: '+227' },
+  { iso: 'NG', name: 'Nigeria', prefix: '+234' },
+  { iso: 'NU', name: 'Niue', prefix: '+683' },
+  { iso: 'NO', name: 'Noruega', prefix: '+47' },
+  { iso: 'NC', name: 'Nueva Caledonia', prefix: '+687' },
+  { iso: 'NZ', name: 'Nueva Zelanda', prefix: '+64' },
+  { iso: 'OM', name: 'Omán', prefix: '+968' },
+  { iso: 'NL', name: 'Países Bajos', prefix: '+31' },
+  { iso: 'PK', name: 'Pakistán', prefix: '+92' },
+  { iso: 'PW', name: 'Palaos', prefix: '+680' },
+  { iso: 'PS', name: 'Palestina', prefix: '+970' },
+  { iso: 'PA', name: 'Panamá', prefix: '+507' },
+  { iso: 'PG', name: 'Papúa Nueva Guinea', prefix: '+675' },
+  { iso: 'PY', name: 'Paraguay', prefix: '+595' },
+  { iso: 'PE', name: 'Perú', prefix: '+51' },
+  { iso: 'PF', name: 'Polinesia Francesa', prefix: '+689' },
+  { iso: 'PL', name: 'Polonia', prefix: '+48' },
+  { iso: 'PT', name: 'Portugal', prefix: '+351' },
+  { iso: 'PR', name: 'Puerto Rico', prefix: '+1' },
+  { iso: 'GB', name: 'Reino Unido', prefix: '+44' },
+  { iso: 'CF', name: 'República Centroafricana', prefix: '+236' },
+  { iso: 'CD', name: 'República Democrática del Congo', prefix: '+243' },
+  { iso: 'DO', name: 'República Dominicana', prefix: '+1' },
+  { iso: 'RE', name: 'Reunión', prefix: '+262' },
+  { iso: 'RW', name: 'Ruanda', prefix: '+250' },
+  { iso: 'RO', name: 'Rumania', prefix: '+40' },
+  { iso: 'RU', name: 'Rusia', prefix: '+7' },
+  { iso: 'EH', name: 'Sahara Occidental', prefix: '+212' },
+  { iso: 'WS', name: 'Samoa', prefix: '+685' },
+  { iso: 'AS', name: 'Samoa Americana', prefix: '+1' },
+  { iso: 'KN', name: 'San Cristóbal y Nieves', prefix: '+1' },
+  { iso: 'SM', name: 'San Marino', prefix: '+378' },
+  { iso: 'SX', name: 'San Martín', prefix: '+1' },
+  { iso: 'PM', name: 'San Pedro y Miquelón', prefix: '+508' },
+  { iso: 'VC', name: 'San Vicente y las Granadinas', prefix: '+1' },
+  { iso: 'SH', name: 'Santa Elena', prefix: '+290' },
+  { iso: 'LC', name: 'Santa Lucía', prefix: '+1' },
+  { iso: 'ST', name: 'Santo Tomé y Príncipe', prefix: '+239' },
+  { iso: 'SN', name: 'Senegal', prefix: '+221' },
+  { iso: 'RS', name: 'Serbia', prefix: '+381' },
+  { iso: 'SC', name: 'Seychelles', prefix: '+248' },
+  { iso: 'SL', name: 'Sierra Leona', prefix: '+232' },
+  { iso: 'SG', name: 'Singapur', prefix: '+65' },
+  { iso: 'SY', name: 'Siria', prefix: '+963' },
+  { iso: 'SO', name: 'Somalia', prefix: '+252' },
+  { iso: 'LK', name: 'Sri Lanka', prefix: '+94' },
+  { iso: 'ZA', name: 'Sudáfrica', prefix: '+27' },
+  { iso: 'SD', name: 'Sudán', prefix: '+249' },
+  { iso: 'SS', name: 'Sudán del Sur', prefix: '+211' },
+  { iso: 'SE', name: 'Suecia', prefix: '+46' },
+  { iso: 'CH', name: 'Suiza', prefix: '+41' },
+  { iso: 'SR', name: 'Surinam', prefix: '+597' },
+  { iso: 'TH', name: 'Tailandia', prefix: '+66' },
+  { iso: 'TW', name: 'Taiwán', prefix: '+886' },
+  { iso: 'TZ', name: 'Tanzania', prefix: '+255' },
+  { iso: 'TJ', name: 'Tayikistán', prefix: '+992' },
+  { iso: 'IO', name: 'Territorio Británico del Océano Índico', prefix: '+246' },
+  { iso: 'TL', name: 'Timor Oriental', prefix: '+670' },
+  { iso: 'TG', name: 'Togo', prefix: '+228' },
+  { iso: 'TK', name: 'Tokelau', prefix: '+690' },
+  { iso: 'TO', name: 'Tonga', prefix: '+676' },
+  { iso: 'TT', name: 'Trinidad y Tobago', prefix: '+1' },
+  { iso: 'TN', name: 'Túnez', prefix: '+216' },
+  { iso: 'TM', name: 'Turkmenistán', prefix: '+993' },
+  { iso: 'TR', name: 'Turquía', prefix: '+90' },
+  { iso: 'TV', name: 'Tuvalu', prefix: '+688' },
+  { iso: 'UG', name: 'Uganda', prefix: '+256' },
+  { iso: 'UA', name: 'Ucrania', prefix: '+380' },
+  { iso: 'UY', name: 'Uruguay', prefix: '+598' },
+  { iso: 'UZ', name: 'Uzbekistán', prefix: '+998' },
+  { iso: 'VU', name: 'Vanuatu', prefix: '+678' },
+  { iso: 'VE', name: 'Venezuela', prefix: '+58' },
+  { iso: 'VN', name: 'Vietnam', prefix: '+84' },
+  { iso: 'WF', name: 'Wallis y Futuna', prefix: '+681' },
+  { iso: 'YE', name: 'Yemen', prefix: '+967' },
+  { iso: 'DJ', name: 'Yibuti', prefix: '+253' },
+  { iso: 'ZM', name: 'Zambia', prefix: '+260' },
+  { iso: 'ZW', name: 'Zimbabue', prefix: '+263' },
+];
+
+// Comparación de búsqueda: sin acentos y en minúsculas (acepta "ecuador",
+// "Ecuador", "España"/"espana").
+const normalizePhoneText = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+// Prefijo por defecto = locale del dispositivo: 'es-EC' → región 'EC' → +593.
+// Si la región no está en la lista, cae a +593 (Ecuador, default histórico) o,
+// si no existiera, al primer país. Se calcula una sola vez (equivalente al
+// estado inicial / useMemo con deps vacías).
+function resolveDefaultPhonePrefix(): string {
+  try {
+    const lang = typeof navigator !== 'undefined' ? navigator.language || '' : '';
+    const region = (lang.split('-')[1] || '').toUpperCase();
+    const match = region ? PHONE_COUNTRIES.find((c) => c.iso === region) : undefined;
+    if (match) return match.prefix;
+  } catch { /* entornos sin navigator: usar fallback */ }
+  const ecuador = PHONE_COUNTRIES.find((c) => c.iso === 'EC');
+  return ecuador ? ecuador.prefix : PHONE_COUNTRIES[0].prefix;
+}
+const DEFAULT_PHONE_PREFIX = resolveDefaultPhonePrefix();
 
 function parsePhoneParts(phone?: string | null): { prefix: string; number: string } {
   const raw = (phone || '').trim();
@@ -688,25 +953,113 @@ function useCatalog<T extends CatalogBase & { name?: string }>(collectionName: s
 
 const SELECT_CLASS = 'w-full h-10 rounded-lg border border-[#E5E5E7] bg-white px-3 text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-corporate/20';
 
-// Campo de teléfono compartido (punto 6): select de prefijo internacional +
-// input numérico. El padre guarda prefijo y número por separado.
+// Badge pequeño con el código ISO de 2 letras (sin emojis de bandera:
+// inconsistentes en Windows). Se usa en el selector de prefijo telefónico.
+function PhoneIsoBadge({ iso }: { iso: string }) {
+  return (
+    <span className="shrink-0 inline-flex items-center justify-center h-5 min-w-[1.5rem] px-1 rounded bg-[#F5F5F7] text-[10px] font-semibold uppercase tracking-wide text-[#86868B]">
+      {iso}
+    </span>
+  );
+}
+
+// Campo de teléfono compartido (punto 6): selector de prefijo internacional
+// (dropdown buscable, ~235 países) + input numérico. El padre guarda prefijo
+// y número por separado. Si el prefijo guardado no está en la lista (teléfono
+// viejo), se ofrece como opción extra "Prefijo personalizado" para no perderlo.
 function PhoneField({ prefix, number, onPrefixChange, onNumberChange }: {
   prefix: string;
   number: string;
   onPrefixChange: (v: string) => void;
   onNumberChange: (v: string) => void;
 }) {
-  const options = PHONE_PREFIXES.includes(prefix) ? PHONE_PREFIXES : [...PHONE_PREFIXES, prefix];
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const selected = useMemo(() => PHONE_COUNTRIES.find((c) => c.prefix === prefix), [prefix]);
+  const custom = !selected && prefix
+    ? { name: t('catalogs.common.phoneCustomPrefix'), prefix }
+    : null;
+
+  const q = normalizePhoneText(query);
+  const filtered = useMemo(() => {
+    if (!q) return PHONE_COUNTRIES;
+    return PHONE_COUNTRIES.filter(
+      (c) => normalizePhoneText(c.name).includes(q) || c.prefix.replace(/\D/g, '').includes(q)
+    );
+  }, [q]);
+  const showCustom = !!custom && (!q || normalizePhoneText(custom.name).includes(q) || custom.prefix.replace(/\D/g, '').includes(q));
+
+  // Escape cierra; clic fuera también
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('mousedown', onDown);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onDown);
+    };
+  }, [open]);
+
+  const renderOption = (key: string, name: string, iso: string, value: string) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => { onPrefixChange(value); setOpen(false); }}
+      className={cn(
+        'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-sm hover:bg-[#F5F5F7]',
+        value === prefix && 'bg-[#F5F5F7]'
+      )}
+    >
+      {iso && <PhoneIsoBadge iso={iso} />}
+      <span className="flex-1 min-w-0 truncate">{name}</span>
+      <span className="text-xs text-[#86868B] shrink-0">{value}</span>
+      {value === prefix && <Check className="w-3.5 h-3.5 text-corporate shrink-0" />}
+    </button>
+  );
+
   return (
     <div className="flex gap-2">
-      <select
-        value={prefix}
-        onChange={(e) => onPrefixChange(e.target.value)}
-        aria-label={t('catalogs.common.phonePrefix')}
-        className={cn(SELECT_CLASS, 'w-auto shrink-0 pr-8')}
-      >
-        {options.map((p) => <option key={p} value={p}>{p}</option>)}
-      </select>
+      <div ref={rootRef} className="relative shrink-0">
+        <button
+          type="button"
+          onClick={() => { setOpen(!open); setQuery(''); }}
+          aria-label={t('catalogs.common.phonePrefix')}
+          className={cn(SELECT_CLASS, 'w-auto pr-8 flex items-center gap-2')}
+        >
+          {selected && <PhoneIsoBadge iso={selected.iso} />}
+          <span className="whitespace-nowrap">{prefix}</span>
+          {selected && (
+            <span className="hidden md:inline text-xs text-[#86868B] max-w-[7rem] truncate">{selected.name}</span>
+          )}
+          <ChevronDown className={cn('w-4 h-4 text-[#86868B] shrink-0', open && 'rotate-180')} />
+        </button>
+        {open && (
+          <div className="absolute z-50 mt-1 w-72 rounded-lg border border-[#E5E5E7] bg-white shadow-lg">
+            <div className="p-2 border-b border-[#F5F5F7]">
+              <Input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('catalogs.common.phoneSearchPlaceholder')}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div className="max-h-60 overflow-y-auto p-1">
+              {showCustom && renderOption('custom', custom.name, '', custom.prefix)}
+              {filtered.map((c) => renderOption(c.iso, c.name, c.iso, c.prefix))}
+              {!showCustom && filtered.length === 0 && (
+                <p className="px-3 py-2 text-xs text-[#86868B]">{t('catalogs.common.phoneNoResults')}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
       <Input
         value={number}
         onChange={(e) => onNumberChange(e.target.value.replace(/\D/g, ''))}
