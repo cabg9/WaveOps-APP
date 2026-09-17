@@ -1,9 +1,32 @@
 # WaveOps - Resumen Maestro de Progreso
 
-> Última actualización: 2026-09-16 (FASE 1 — FIXES ETAPA 2: 5 correcciones — desplegadas en GEMELA, pendiente re-prueba)
+> Última actualización: 2026-09-17 (FASE 1 — FIX CRÍTICO: Stock vacío + candado ubicación seriales — desplegado en GEMELA, pendiente re-prueba)
 > Branch activo: `fix-horarios-provider`
 > Proyecto Firebase: `wve-b3db5` (producción) · `wve-pruebas-b3db5` (gemela de pruebas)
 > Repo: `github.com:cabg9/WaveOps-APP.git`
+
+---
+
+## FASE 1 — FIX CRÍTICO: STOCK VACÍO + CANDADO DE UBICACIÓN (17 de septiembre) — DESPLEGADO EN GEMELA
+
+**Estado:** EN GEMELA, pendiente re-prueba. Deploy: hosting (index-CKOKqYuN.js verificado en vivo; rules/functions sin cambios).
+
+**DIAGNÓSTICO CON DATOS REALES (Admin SDK sobre la gemela):**
+- `inventoryStocks` e `inventoryMovements` estaban VACÍAS: la entrada de cloro del usuario NUNCA se escribió. Causa: el bug de permisos silenciosos del fix anterior (canWrite solo DG/RRHH + return mudo) — el usuario la registró antes de ese deploy. El guardado del movimiento se re-verificó correcto; el fix de canOperate ya está en producción de la gemela.
+- Había 2 seriales (`rentalUnits`) CON `locationId` (loc_guayaquil) que Stock no mostraba: la vista por ubicación (default) solo renderizaba docs de stock + seriales SIN ubicar. **Bug real de vista, corregido.**
+- Se dejaron datos de prueba reales replicando el flujo exacto del cliente (setDoc stock `productId__locationId` → addDoc kardex → updateDoc pedido): "Cloro — 20 — The Warehouse" en stock y kardex; pedido a4RAbVyS0xEVwyIGXw83 → 'recibida' vinculado al movimiento XAk6R0z9Vje7Fzh2lJ3l. Sirven para la re-prueba visual.
+
+**CAMBIOS:**
+1. **Stock vista por ubicación muestra seriales**: por cada ubicación activa, productos serializados con seriales ubicados ahí se listan como fila "Tanques 12Lts — [chips por estado]" (memo `serializedHere`, ~l.5188). Sección "Por ubicar" sin duplicar los ubicados. En la gemela ya debe verse "Guayaquil — Tanques 12Lts — 2 disponibles".
+2. **Candado de ubicación del serial**: verificado que la edición nunca tuvo campo de ubicación; "Ubicar" ahora solo renderiza si el serial no tiene locationId (~l.6200); bloqueo de rentado sin ubicación ya existía (~l.3815). Nuevo "Historial de ubicaciones" en la tarjeta expandida del serial (`serialKardex`, movimientos con referenceType 'rental_unit' + referenceId = id del serial, ~l.1983/6198).
+3. **Warehouse despacho/retorno mueven la ubicación del serial**: despacho → `locationId: null` (salió de bodega, ~l.2670); retorno verificado OK → `locationId: order.locationId` si la orden tiene ubicación de entrega (~l.2899). Kardex por serial en ambos (quantity ±1, referenceType 'rental_unit', referenceId = serialId, tipo de movimiento resuelto dinámicamente, best-effort). Soporte: `docToRentalUnit` ahora mapea locationId (antes se perdía al leer), listener de movementTypes y helper `kardexMovementType` en WarehouseModule.
+4. **Prefijo telefónico sin nombre de país** en la vista colapsada (solo badge ISO + prefijo; CatalogosTab ~l.1035).
+5. **Sugeridos de compra por departamento**: `suggestedPrProducts` calcula stock solo sobre `myDeptLocations` (ubicaciones asignadas al departamento del usuario); si no tiene, cae al global (~l.3145).
+6. **Notificación de solicitud**: targets ahora SIEMPRE incluyen usuarios activos (`isActive !== false`) con rol DG/DIRECTOR/RRHH, además de Supervisor+ de departamentos con managesPurchases (union, sin duplicados, sin creador, ~l.3267).
+
+**Archivos:** InventarioModule.tsx, WarehouseModule.tsx, CatalogosTab.tsx. **Build:** exit 0. **Deploy gemela:** index-CKOKqYuN.js.
+
+**Pendientes:** conteo del encabezado de tarjeta de ubicación sigue siendo "{n} stock" (seriales no suman al contador — cosmético); motivo del kardex de ubicación se guarda en el idioma de quien ejecuta (igual que "Ubicar"); botón temporal de reset aún activo.
 
 ---
 

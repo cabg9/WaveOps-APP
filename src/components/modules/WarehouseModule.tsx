@@ -42,6 +42,7 @@ import type {
   Location,
   Client,
   InventoryStock,
+  MovementType,
   RentalDiscount,
   RentalFee,
   RentalDiscountStatus,
@@ -217,6 +218,9 @@ registerI18nKeys({
     'wh.dispatch.confirmTitle': 'Confirmar despacho',
     'wh.dispatch.confirmDesc': 'La orden pasará a "Despachado", los seriales quedarán como rentados y se registrará la salida de inventario.',
     'wh.dispatch.unrecognizedQr': 'QR no reconocido: escanea el QR de una orden o de un serial',
+
+    'wh.kardex.dispatchReason': 'Despacho de renta {order}',
+    'wh.kardex.returnReason': 'Retorno de renta {order}',
 
     'wh.return.button': 'Verificar retorno',
     'wh.return.title': 'Verificar retorno',
@@ -575,6 +579,9 @@ registerI18nKeys({
     'wh.dispatch.confirmDesc': 'The order will move to "Dispatched", the serials will be marked as rented and the inventory output will be recorded.',
     'wh.dispatch.unrecognizedQr': 'Unrecognized QR: scan an order or serial QR',
 
+    'wh.kardex.dispatchReason': 'Rental dispatch {order}',
+    'wh.kardex.returnReason': 'Rental return {order}',
+
     'wh.return.button': 'Verify return',
     'wh.return.title': 'Verify return',
     'wh.return.instructions': 'Review each returned serial and mark it as OK or Damaged.',
@@ -880,6 +887,7 @@ function docToRentalUnit(id: string, data: Record<string, unknown>): RentalUnit 
     size: data.size ? toStr(data.size) : null,
     statusId: toStr(data.statusId),
     notes: data.notes ? toStr(data.notes) : null,
+    locationId: data.locationId ? toStr(data.locationId) : null,
     createdAt: toStr(data.createdAt),
     createdBy: toStr(data.createdBy),
     updatedAt: toStr(data.updatedAt),
@@ -894,6 +902,17 @@ function docToSerialStatus(id: string, data: Record<string, unknown>): SerialSta
     name: toStr(data.name),
     nameEn: data.nameEn ? toStr(data.nameEn) : undefined,
     blocksRental: toBool(data.blocksRental),
+    isActive: toBool(data.isActive, true),
+  };
+}
+
+function docToMovementType(id: string, data: Record<string, unknown>): MovementType {
+  return {
+    id,
+    tenantId: toStr(data.tenantId),
+    name: toStr(data.name),
+    nameEn: data.nameEn ? toStr(data.nameEn) : undefined,
+    isOutput: toBool(data.isOutput),
     isActive: toBool(data.isActive, true),
   };
 }
@@ -1251,6 +1270,7 @@ export function WarehouseModule() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [rentalUnits, setRentalUnits] = useState<RentalUnit[]>([]);
   const [serialStatuses, setSerialStatuses] = useState<SerialStatus[]>([]);
+  const [movementTypes, setMovementTypes] = useState<MovementType[]>([]);
   const [stocks, setStocks] = useState<InventoryStock[]>([]);
   const [rentalDiscounts, setRentalDiscounts] = useState<RentalDiscount[]>([]);
   const [rentalFees, setRentalFees] = useState<RentalFee[]>([]);
@@ -1694,6 +1714,23 @@ export function WarehouseModule() {
         );
       },
       (err) => console.error('[WarehouseModule] serialStatuses:', err)
+    );
+    return () => unsub();
+  }, [enabled, tenantId]);
+
+  useEffect(() => {
+    if (!enabled) return;
+    const q = query(collection(db, CATALOG_COLLECTIONS.movementTypes), orderBy('name', 'asc'));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setMovementTypes(
+          snap.docs
+            .map(d => docToMovementType(d.id, d.data()))
+            .filter(m => !m.tenantId || m.tenantId === tenantId)
+        );
+      },
+      (err) => console.error('[WarehouseModule] movementTypes:', err)
     );
     return () => unsub();
   }, [enabled, tenantId]);
@@ -2449,6 +2486,24 @@ export function WarehouseModule() {
     );
   };
 
+  // Resolución dinámica del tipo de movimiento para el kardex del serial
+  // (mismo criterio que InventarioModule): primero por clave normalizada
+  // ('salida'/'ingreso') sobre el catálogo activo; si no hay correspondencia
+  // clara, por sentido (isOutput). Nunca se hardcodea: sin tipo no hay kardex.
+  const normalizeTypeKey = (s: string) =>
+    s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const kardexMovementType = (key: 'salida' | 'ingreso'): MovementType | undefined => {
+    const active = movementTypes.filter(m => m.isActive);
+    const byKey = active.find(
+      m => normalizeTypeKey(m.name) === key || (!!m.nameEn && normalizeTypeKey(m.nameEn) === key)
+    );
+    if (byKey) return byKey;
+    return key === 'ingreso'
+      ? active.find(m => !m.isOutput)
+      : active.find(m => m.isOutput && m.id !== 'transferencia' && normalizeTypeKey(m.name) !== 'ajuste');
+  };
+
   const openDispatch = (orderId?: string) => {
     setDispatchAssignments({});
     setScanTarget(null);
@@ -2608,11 +2663,40 @@ export function WarehouseModule() {
           });
           const allUnitIds = newItems.flatMap(it => it.assignedUnitIds ?? []);
           for (const unitId of allUnitIds) {
+            const unit = rentalUnits.find(u => u.id === unitId);
             await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unitId), {
               statusId: 'rentado',
+              // El equipo sale de la bodega: queda rentado y sin ubicación
+              locationId: null,
               updatedAt: now,
               updatedBy: currentUser.name,
             });
+            // Kardex del serial (best-effort: una falla no rompe el despacho).
+            // Un serial "por ubicar" registra la salida con fromLocationId null.
+            if (!unit) continue;
+            try {
+              const mt = kardexMovementType('salida');
+              if (mt) {
+                await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+                  tenantId,
+                  productId: unit.productId,
+                  quantity: -1,
+                  fromLocationId: unit.locationId ?? null,
+                  toLocationId: null,
+                  movementTypeId: mt.id!,
+                  reason: tf('wh.kardex.dispatchReason', {
+                    order: order.orderNumber != null ? `#${order.orderNumber}` : order.clientName,
+                  }),
+                  referenceType: 'rental_unit',
+                  referenceId: unitId,
+                  createdAt: now,
+                  createdBy: currentUser.id,
+                  createdByName: currentUser.name,
+                });
+              }
+            } catch (kardexErr) {
+              console.error('[WarehouseModule] kardex despacho:', kardexErr);
+            }
           }
           for (const it of newItems) {
             const qty = (it.assignedUnitIds ?? []).length;
@@ -2807,11 +2891,41 @@ export function WarehouseModule() {
         try {
           const now = new Date().toISOString();
           for (const unitId of okIds) {
+            const unit = rentalUnits.find(u => u.id === unitId);
             await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unitId), {
               statusId: 'disponible',
+              // El serial vuelve a la ubicación de entrega de la orden; sin
+              // ubicación en la orden se deja el locationId como estaba
+              ...(order.locationId ? { locationId: order.locationId } : {}),
               updatedAt: now,
               updatedBy: currentUser.name,
             });
+            // Kardex del serial (best-effort). Sin ubicación de entrega no hay
+            // cambio de ubicación que registrar.
+            if (!unit || !order.locationId) continue;
+            try {
+              const mt = kardexMovementType('ingreso');
+              if (mt) {
+                await addDoc(collection(db, CATALOG_COLLECTIONS.inventoryMovements), {
+                  tenantId,
+                  productId: unit.productId,
+                  quantity: 1,
+                  fromLocationId: null,
+                  toLocationId: order.locationId,
+                  movementTypeId: mt.id!,
+                  reason: tf('wh.kardex.returnReason', {
+                    order: order.orderNumber != null ? `#${order.orderNumber}` : order.clientName,
+                  }),
+                  referenceType: 'rental_unit',
+                  referenceId: unitId,
+                  createdAt: now,
+                  createdBy: currentUser.id,
+                  createdByName: currentUser.name,
+                });
+              }
+            } catch (kardexErr) {
+              console.error('[WarehouseModule] kardex retorno:', kardexErr);
+            }
           }
           for (const unitId of damagedIds) {
             await updateDoc(doc(db, CATALOG_COLLECTIONS.rentalUnits, unitId), {

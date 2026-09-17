@@ -359,6 +359,8 @@ registerI18nKeys({
     'inv.serials.viewQr': 'Ver QR del serial',
     'inv.serials.history': 'Historial',
     'inv.serials.historyEmpty': 'Este serial aún no ha sido rentado.',
+    'inv.serials.movementHistory': 'Historial de ubicaciones',
+    'inv.serials.movementHistoryEmpty': 'Este serial no tiene movimientos de ubicación registrados.',
     'inv.serials.outAt': 'Salió',
     'inv.serials.backAt': 'Volvió',
     'inv.serials.inRepair': 'En reparación',
@@ -821,6 +823,8 @@ registerI18nKeys({
     'inv.serials.viewQr': 'View serial QR',
     'inv.serials.history': 'History',
     'inv.serials.historyEmpty': 'This serial has not been rented yet.',
+    'inv.serials.movementHistory': 'Location history',
+    'inv.serials.movementHistoryEmpty': 'This serial has no location movements recorded.',
     'inv.serials.outAt': 'Out',
     'inv.serials.backAt': 'Back',
     'inv.serials.inRepair': 'In repair',
@@ -1972,6 +1976,12 @@ export function InventarioModule() {
       </div>
     );
   };
+
+  // Kardex de un serial: los cambios de ubicación se escriben como
+  // movimientos con referenceType 'rental_unit' y referenceId = id del
+  // serial (lo mismo escribe "Ubicar" y los despachos/retornos de renta)
+  const serialKardex = (unitId: string) =>
+    movements.filter(m => m.referenceType === 'rental_unit' && m.referenceId === unitId);
 
   // Tipo de movimiento seleccionado en la pantalla de movimiento (campos
   // adaptados al tipo). Se calcula arriba de los early returns porque la
@@ -3126,11 +3136,18 @@ export function InventarioModule() {
 
   // Sugeridos para "Nueva solicitud" (punto 2): productos con stock total
   // <= mínimo (o sin doc de stock = 0). Máximo 8, ordenados por urgencia:
-  // stock 0 primero, luego menor ratio cantidad/mínimo
+  // stock 0 primero, luego menor ratio cantidad/mínimo.
+  // El stock se calcula SOLO sobre las ubicaciones del departamento del
+  // usuario (myDeptLocations); si su departamento no tiene ubicaciones
+  // asignadas, cae al cálculo global (no romper a usuarios sin departamento)
   const suggestedPrProducts = useMemo(() => {
+    const scopeIds =
+      myDeptLocations.length > 0 ? new Set(myDeptLocations.map(l => l.id)) : null;
     const rows = activeProducts
       .map(product => {
-        const pStocks = stocks.filter(s => s.productId === product.id);
+        const pStocks = stocks.filter(
+          s => s.productId === product.id && (!scopeIds || scopeIds.has(s.locationId))
+        );
         const total = pStocks.reduce((acc, s) => acc + s.quantity, 0);
         const min = pStocks.reduce<number | null>((acc, s) => {
           if (s.minStock == null) return acc;
@@ -3148,7 +3165,7 @@ export function InventarioModule() {
         a.product.name.localeCompare(b.product.name)
     );
     return rows.slice(0, 8);
-  }, [activeProducts, stocks]);
+  }, [activeProducts, stocks, myDeptLocations]);
 
   // Tocar un sugerido pone el producto en el formulario (modo catálogo,
   // categoría y unidad resueltas) y hace foco sutil al campo de cantidad
@@ -3241,18 +3258,18 @@ export function InventarioModule() {
         createdAt: now,
       });
 
-      // Notificación por campana (patrón cliente de la Ronda 3) a los
-      // Supervisor+ de TODOS los departamentos con managesPurchases === true
-      // (+ DG, que también aprueba). Deep link a la solicitud. Lo mejor
-      // esfuerzo: nunca bloquea la creación.
+      // Notificación por campana (patrón cliente de la Ronda 3): SIEMPRE a
+      // los usuarios activos con rol DIRECTOR_GENERAL / DIRECTOR / RRHH,
+      // ADEMÁS de los Supervisor+ de departamentos con managesPurchases.
+      // Union sin duplicados (Set) y sin el creador. Deep link a la
+      // solicitud. Lo mejor esfuerzo: nunca bloquea la creación.
       try {
-        // Mismo criterio que el borrador automático: destinatarios contra
-        // TODOS los usuarios no eliminados (sin filtro de isActive ni de
-        // departamento): el aprobador puede estar en OTRO departamento
+        const ALWAYS_NOTIFY_ROLES: Role[] = [Role.DIRECTOR_GENERAL, Role.DIRECTOR, Role.RRHH];
         const targets = new Set<string>();
         for (const u of users) {
           if (!u.id || u.id === currentUser.id) continue;
-          if (u.role === Role.DIRECTOR_GENERAL) {
+          // Activos: isActive ausente (perfil heredado) cuenta como activo
+          if (u.isActive !== false && ALWAYS_NOTIFY_ROLES.includes(u.role)) {
             targets.add(u.id);
             continue;
           }
@@ -5164,6 +5181,18 @@ export function InventarioModule() {
                 // Punto 3 (ronda 4): misma regla que la vista por producto —
                 // el stock registrado en 0 sigue listándose
                 const locationStocks = stocks.filter(s => s.locationId === location.id);
+                // Seriales CON ubicación en esta bodega cuyo producto NO tiene
+                // doc de stock aquí (si lo tiene, la fila de stock ya los
+                // muestra agrupados por ubicación). Una fila por producto
+                // serializado: nombre + chips por estado
+                const serializedHere = activeProducts.filter(
+                  p =>
+                    isSerializedProduct(p.id!) &&
+                    !locationStocks.some(s => s.productId === p.id) &&
+                    rentalUnits.some(u => u.productId === p.id && u.locationId === location.id)
+                );
+                // Sin stock ni seriales: la ubicación no se muestra
+                if (locationStocks.length === 0 && serializedHere.length === 0) return null;
                 const isOpen = expandedIds.has(location.id);
                 return (
                   <div
@@ -5208,7 +5237,7 @@ export function InventarioModule() {
                     </div>
                     {isOpen && (
                       <div className="border-t border-[#E5E5E7] divide-y divide-[#F5F5F7]">
-                        {locationStocks.length === 0 && (
+                        {locationStocks.length === 0 && serializedHere.length === 0 && (
                           <div className="p-3 text-xs text-[#86868B]">{t('inv.stock.emptyLocation')}</div>
                         )}
                         {locationStocks.map(s => {
@@ -5276,26 +5305,43 @@ export function InventarioModule() {
                             </div>
                           );
                         })}
+                        {serializedHere.map(p => (
+                          <div key={`serial-${p.id}`} className="p-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm text-[#1D1D1F]">{p.name}</span>
+                              {renderUnitsStatusChips(
+                                rentalUnits.filter(
+                                  u => u.productId === p.id && u.locationId === location.id
+                                )
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
                 );
               })}
-              {/* Seriales sin doc de stock en ninguna ubicación (punto 8):
-                  los seriales no llevan locationId; si el producto no tiene
-                  stock doc se lista aparte para que sea visible en Stock */}
-              {activeProducts.filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id)).length > 0 && (
+              {/* Seriales "por ubicar" (sin locationId) cuyo producto no tiene
+                  doc de stock (punto 8): los ubicados ya se ven en la tarjeta
+                  de SU ubicación; aquí solo los que siguen sin ubicar */}
+              {activeProducts.filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id) && rentalUnits.some(u => u.productId === p.id && !u.locationId)).length > 0 && (
                 <div className="mt-4 rounded-xl border border-[#E5E5E7] bg-white overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-[#F5F5F7] bg-[#F5F5F7]">
                     <h3 className="text-sm font-semibold text-[#1D1D1F]">{t('inv.stock.serialsNoLocation')}</h3>
                   </div>
                   <div className="divide-y divide-[#F5F5F7]">
                     {activeProducts
-                      .filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id))
+                      .filter(p => isSerializedProduct(p.id!) && !stocks.some(s => s.productId === p.id) && rentalUnits.some(u => u.productId === p.id && !u.locationId))
                       .map(p => (
                         <div key={p.id} className="p-3">
                           <div className="text-sm font-medium text-[#1D1D1F]">{p.name}</div>
-                          {renderSerializedStock(p.id!)}
+                          <div className="mt-1 flex flex-wrap items-center gap-1">
+                            <span className="text-[11px] text-[#86868B] shrink-0">
+                              {t('inv.serials.unlocated')}:
+                            </span>
+                            {renderUnitsStatusChips(rentalUnits.filter(u => u.productId === p.id && !u.locationId))}
+                          </div>
                         </div>
                       ))}
                   </div>
@@ -6149,19 +6195,66 @@ export function InventarioModule() {
                             )}
                           </div>
 
+                          {/* Kardex del serial: cada cambio de ubicación
+                              queda como movimiento 'rental_unit' (Ubicar,
+                              despacho/retorno de renta). Fecha, tipo, quién
+                              y nota */}
+                          <div className="pt-2 border-t border-[#F5F5F7]">
+                            <p className="text-xs font-medium text-[#86868B]">
+                              {t('inv.serials.movementHistory')}
+                            </p>
+                            {serialKardex(unit.id!).length === 0 ? (
+                              <p className="text-xs text-[#86868B] mt-1">
+                                {t('inv.serials.movementHistoryEmpty')}
+                              </p>
+                            ) : (
+                              <div className="mt-1.5 space-y-1.5">
+                                {serialKardex(unit.id!).map(m => {
+                                  const mt = movementTypes.find(x => x.id === m.movementTypeId);
+                                  return (
+                                    <div
+                                      key={m.id}
+                                      className="bg-[#F5F5F7] rounded-xl px-3 py-2 space-y-0.5"
+                                    >
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-xs font-medium text-[#1D1D1F]">
+                                          {mt ? movementTypeName(mt) : m.movementTypeId}
+                                        </span>
+                                        {(m.fromLocationId || m.toLocationId) && (
+                                          <span className="text-[11px] text-[#86868B]">
+                                            {m.fromLocationId
+                                              ? `${t('inv.movements.from')}: ${locationName(m.fromLocationId)}`
+                                              : `${t('inv.movements.to')}: ${locationName(m.toLocationId!)}`}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="text-[11px] text-[#86868B]">
+                                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : '—'}
+                                        {m.createdByName ? ` · ${m.createdByName}` : ''}
+                                        {m.reason ? ` · ${m.reason}` : ''}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+
                           {(canOperate || canRetire) && unit.statusId !== 'dado_de_baja' && (
                             <div className="flex flex-wrap items-center gap-2 pt-2">
+                              {canOperate && !unit.locationId && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openLocateSerial(unit)}
+                                  className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
+                                >
+                                  <MapPin className="h-3.5 w-3.5" />
+                                  {t('inv.serials.locate')}
+                                </Button>
+                              )}
                               {canOperate && (
                                 <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openLocateSerial(unit)}
-                                    className="h-7 text-xs rounded-lg border-[#E5E5E7] gap-1.5"
-                                  >
-                                    <MapPin className="h-3.5 w-3.5" />
-                                    {t('inv.serials.locate')}
-                                  </Button>
                                   <div className="flex items-center gap-1.5">
                                     <Label className="text-xs text-[#86868B]">{t('inv.serials.changeStatus')}</Label>
                                     <select

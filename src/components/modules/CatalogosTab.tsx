@@ -1034,9 +1034,8 @@ function PhoneField({ prefix, number, onPrefixChange, onNumberChange }: {
         >
           {selected && <PhoneIsoBadge iso={selected.iso} />}
           <span className="whitespace-nowrap">{prefix}</span>
-          {selected && (
-            <span className="hidden md:inline text-xs text-[#86868B] max-w-[7rem] truncate">{selected.name}</span>
-          )}
+          {/* Sin nombre de país en la vista colapsada (petición del usuario):
+              solo badge ISO + prefijo; el nombre se ve al abrir el selector */}
           <ChevronDown className={cn('w-4 h-4 text-[#86868B] shrink-0', open && 'rotate-180')} />
         </button>
         {open && (
